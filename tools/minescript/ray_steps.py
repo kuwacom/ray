@@ -310,6 +310,29 @@ def run_step(step: dict):
         time.sleep(float(step.get("sec", 0.1)))
         m.press_key_bind(step["key_bind"], False)
         return None
+    if "freecam" in step:
+        # 例: {"freecam": true} Freecam mod (net.xolt.freecam) を有効/無効にする。今の状態と違う時だけ toggle する
+        # key_bind "key.freecam.toggle" は押下状態しか変えず、consumeClick で読む Freecam には効かない
+        with JavaScope() as j:
+            freecam_cls = j.cls("net.xolt.freecam.Freecam")
+            if (m.java_to_string(j.call(0, freecam_cls, "isEnabled")) == "true") != bool(step["freecam"]):
+                j.call(0, freecam_cls, "toggle")
+            return m.java_to_string(j.call(0, freecam_cls, "isEnabled")) == "true"
+    if "freecam_state" in step:
+        # Freecam mod (net.xolt.freecam) の有効状態
+        with JavaScope() as j:
+            return m.java_to_string(j.call(0, j.cls("net.xolt.freecam.Freecam"), "isEnabled")) == "true"
+    if "freecam_pose" in step:
+        # 例: {"freecam_pose": [x, y, z, yaw, pitch]} フリーカメラの位置 (足元、目は +0.4) と向きを決める (視線の操作はマウス入力しか効かないため)
+        x, y, z, yaw, pitch = step["freecam_pose"]
+        with JavaScope() as j:
+            camera = j.call(0, j.cls("net.xolt.freecam.Freecam"), "getFreeCamera")
+            if not camera:
+                raise RuntimeError("freecam is not enabled")
+            j.call(camera, j.cls("net.minecraft.world.entity.Entity"), "absSnapTo",
+                   j.keep(m.java_double(x)), j.keep(m.java_double(y)), j.keep(m.java_double(z)),
+                   j.keep(m.java_float(yaw)), j.keep(m.java_float(pitch)))
+        return camera_info()
     if "slot" in step:
         return m.player_inventory_select_slot(int(step["slot"]))
     if "echo" in step:

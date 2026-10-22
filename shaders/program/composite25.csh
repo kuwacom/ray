@@ -125,19 +125,25 @@ float applyEnvironmentExposure(float appliedEv, float ev) {
 /*
  * 水面越しは水面に合わせる。depthtex2 は半透明を含まないので、海を見ると水底 (数十ブロック先) に合い、
  * 手前の水面と映り込みが前ボケになってつやの無いぼやけた面に見えた。ガラス越しは従来どおり奥に合わせる
+ * 半透明の経路で描くエンティティ (プレイヤーのスキン・マネキン・旗等) も depthtex2 に無いので、そちらにも合わせる
+ * (三人称やフリーカメラで自分の体を見ると、奥の地面に合って体がぼけていた)。光の柱・雷は透けて見えるので除く
+ * 水中から見上げた水面は奥に合わせたいので、水面だけは水の外にいる時に限る
  */
+bool isFocusTranslucent(int mat) {
+    if (mat == MAT_WATER) return isEyeInWater == 0;
+    return isEntityMaterial(mat) && mat != MAT_BEACON_BEAM && mat != MAT_LIGHTNING;
+}
+
 float focusTapDistance(vec2 uv) {
     ivec2 p = ivec2(uv * viewSize());
     float d = texelFetch(depthtex2, p, 0).r;
-    if (isEyeInWater == 0) {
-        float d0 = texelFetch(depthtex0, p, 0).r;
-        if (d0 < d && !isHandDepth(d0)) {
-            vec3 n;
-            vec2 lm;
-            int mat;
-            decodeTranslucentData(texelFetch(colortex5, p, 0), n, lm, mat);
-            if (mat == MAT_WATER) d = d0;
-        }
+    float d0 = texelFetch(depthtex0, p, 0).r;
+    if (d0 < d && !isHandDepth(d0)) {
+        vec3 n;
+        vec2 lm;
+        int mat;
+        decodeTranslucentData(texelFetch(colortex5, p, 0), n, lm, mat);
+        if (isFocusTranslucent(mat)) d = d0;
     }
     return d >= 1.0 ? far : linearizeDepth(d);
 }

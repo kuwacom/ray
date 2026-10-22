@@ -23,6 +23,8 @@ BASE_DIR = os.path.join(SCRIPT_DIR, "ray")
 CMD_PATH = os.path.join(BASE_DIR, "cmd.json")
 STATUS_PATH = os.path.join(BASE_DIR, "status.json")
 POLL_SEC = 0.5
+REPLACE_RETRIES = 20
+REPLACE_RETRY_SEC = 0.05
 
 if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
@@ -33,6 +35,13 @@ def write_status(data: dict) -> None:
     tmp = STATUS_PATH + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=1)
+    # Windows では外部 (mc.py) が読んでいる間の置き換えが PermissionError になり常駐が落ちたので、少し待って再試行する
+    for _ in range(REPLACE_RETRIES - 1):
+        try:
+            os.replace(tmp, STATUS_PATH)
+            return
+        except PermissionError:
+            time.sleep(REPLACE_RETRY_SEC)
     os.replace(tmp, STATUS_PATH)
 
 
