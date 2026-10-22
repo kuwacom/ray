@@ -73,7 +73,144 @@ float expectedPreviousDistance(vec2 uv, float depth, out float tolerance) {
     return getPreviousViewDistance(uv, depth);
 }
 
+/*
+ * ---- 歪曲・魚眼を TAA の中で組み立てる (LENS_WARP_TAA, lib/post/lens.glsl) ----
+ * 出力 (再投影後) の画素ごとに、写っている元画像の点を今フレーム (ジッター込み) から読み、出力の座標の履歴に積む
+ * 魚眼の中央は元画像を 2 倍以上に引き伸ばすので、1 フレームの補間ではぼける。ジッターで毎フレーム違う所に来る
+ * 元の画素のうち、出力の画素の中心に近いものほど強く混ぜると、静止時は元画像より細かい像が履歴に溜まる (時間方向の超解像)
+ * 再投影: 出力 uv -> 元 uv -> 深度 -> 前フレームの元 uv -> lensForwardUv で前フレームの出力 uv
+ */
+void taaWarped() {
+    ivec2 texel = ivec2(gl_FragCoord.xy);
+    ivec2 maxTexel = ivec2(viewSize()) - 1;
+    vec2 uv = (vec2(texel) + 0.5) * texelSize();
+    float rho;
+    vec2 src = lensProjectUv(uv, rho);
+    // 出力の 1 画素が元画像の何画素に当たるか (微分は早期 return の前に取る)
+    vec2 srcPx = src * viewSize();
+    float footprint = max(length(dFdx(srcPx)), length(dFdy(srcPx)));
+    if (any(lessThan(src, vec2(0.0))) || any(greaterThan(src, vec2(1.0)))) {
+        // 魚眼の「横幅に合わせる」の隅 (描画の範囲外)。final が黒にする
+        outColor = vec4(0.0);
+        outHistory = vec4(0.0, 0.0, 0.0, TAA_SKY_DISTANCE);
+        return;
+    }
+    float exposure = getExposure();
+    vec2 jitter = taaJitterUv();
+
+    // 今フレームのバッファの上で、この点が写っている位置 (ラスタライズはジッター分ずれている)
+    vec2 pos = (src + jitter) * viewSize();
+    ivec2 nearest = clamp(ivec2(floor(pos)), ivec2(0), maxTexel);
+    vec2 nearestUv = (vec2(nearest) + 0.5) * texelSize();
+    // 拡大している所だけ超解像を効かせる (縮小している周辺は今までどおりの補間)
+    float magnify = 1.0 / max(footprint, 1e-3);
+    float superRes = saturate((magnify - 1.0) * LENS_WARP_TAA_SR_RAMP);
+    // 一番近い元の画素の中心と出力の画素の中心の距離 (出力の画素)
+    float distOut = length(pos - (vec2(nearest) + 0.5)) * magnify;
+    float nearWeight = exp(-LENS_WARP_TAA_KERNEL * distOut * distOut);
+
+    vec4 nearRaw = texelFetch(colortex0, nearest, 0);
+    vec3 nearColor = sanitizeColor(nearRaw.rgb) * (1.0 - glintShare(nearRaw.a));
+    float centerDepth = texelFetch(depthtex0, nearest, 0).r;
+
+    // 1 フレームの補間 (今までの final と同じ Catmull-Rom)。輝点は双線形で別に取り出す
+    vec2 posUv = pos * texelSize();
+    vec2 b = pos - 0.5;
+    ivec2 b0 = ivec2(floor(b));
+    vec2 bf = b - vec2(b0);
+    vec3 glint = vec3(0.0);
+    for (int i = 0; i < 4; i++) {
+        ivec2 o = ivec2(i & 1, i >> 1);
+        vec4 s = texelFetch(colortex0, clamp(b0 + o, ivec2(0), maxTexel), 0);
+        float w = (o.x == 1 ? bf.x : 1.0 - bf.x) * (o.y == 1 ? bf.y : 1.0 - bf.y);
+        glint += sanitizeColor(s.rgb) * glintShare(s.a) * w;
+    }
+    vec3 smoothColor = max(sanitizeColor(sampleCatmullRom(colortex0, posUv, viewSize())) - glint, 0.0);
+
+    // 一番近い元の画素の周り 3x3 の統計と、最も手前の深度 (元画像の座標。今までの TAA と同じ)
+    vec3 m1 = vec3(0.0);
+    vec3 m2 = vec3(0.0);
+    vec3 boxMin = vec3(1e9);
+    vec3 boxMax = vec3(-1e9);
+    float closestDepth = centerDepth;
+    ivec2 closestOffset = ivec2(0);
+    for (int y = -1; y <= 1; y++) {
+        for (int x = -1; x <= 1; x++) {
+            ivec2 p = clamp(nearest + ivec2(x, y), ivec2(0), maxTexel);
+            vec4 s = texelFetch(colortex0, p, 0);
+            vec3 c = rgbToYCoCg(taaCompress(sanitizeColor(s.rgb) * (1.0 - glintShare(s.a)), exposure));
+            m1 += c;
+            m2 += c * c;
+            boxMin = min(boxMin, c);
+            boxMax = max(boxMax, c);
+            float d = texelFetch(depthtex0, p, 0).r;
+            if (d < closestDepth) {
+                closestDepth = d;
+                closestOffset = ivec2(x, y);
+            }
+        }
+    }
+    vec3 mean = m1 / 9.0;
+    vec3 sigma = sqrt(max(m2 / 9.0 - mean * mean, 0.0));
+
+    // 前フレームの出力の位置
+    vec2 closestUv = nearestUv + vec2(closestOffset) * texelSize();
+    vec2 prevSrc = src + (getPreviousUv(closestUv, closestDepth) - closestUv);
+    vec2 prevUv = lensForwardUv(prevSrc);
+    float motionPx = length((prevUv - uv) * viewSize());
+    // 速く動く時は 1 フレームの補間に寄せる (ずれた元の画素を強く混ぜると残像になる)
+    float superResEff = superRes * (1.0 - saturate(motionPx / LENS_WARP_TAA_SR_MOTION));
+    vec3 currentColor = mix(smoothColor, nearColor, superResEff);
+    vec3 currentYcc = rgbToYCoCg(taaCompress(currentColor, exposure));
+
+    bool valid = all(greaterThanEqual(prevUv, vec2(0.0))) && all(lessThanEqual(prevUv, vec2(1.0)));
+    vec3 history = vec3(0.0);
+    if (valid) {
+        float tolCenter, tolClosest;
+        float expCenter = expectedPreviousDistance(nearestUv - jitter, centerDepth, tolCenter);
+        float expClosest = expectedPreviousDistance(closestUv - jitter, closestDepth, tolClosest);
+        ivec2 base = ivec2(floor(prevUv * viewSize() - 0.5));
+        bool matched = false;
+        for (int i = 0; i < 4; i++) {
+            ivec2 p = clamp(base + ivec2(i & 1, i >> 1), ivec2(0), maxTexel);
+            float stored = texelFetch(colortex13, p, 0).a;
+            matched = matched || historyMatches(stored, expCenter, tolCenter) || historyMatches(stored, expClosest, tolClosest);
+        }
+        valid = matched;
+        history = sanitizeColor(sampleCatmullRom(colortex13, prevUv, viewSize()));
+    }
+
+    vec3 resultYcc;
+    if (valid) {
+        float motion = saturate(motionPx / 4.0);
+        float gamma = mix(TAA_GAMMA_STATIC, TAA_GAMMA_MOVING, motion);
+        vec3 clipMin = mean - gamma * sigma;
+        vec3 clipMax = mean + gamma * sigma;
+        if (motion > 0.0) {
+            clipMin = mix(clipMin, max(boxMin, clipMin), motion);
+            clipMax = mix(clipMax, min(boxMax, clipMax), motion);
+        }
+        vec3 historyYcc = clipToBox(rgbToYCoCg(taaCompress(history, exposure)), clipMin, clipMax);
+        float alpha = mix(TAA_BLEND_STATIC, TAA_BLEND_MOVING, saturate(motionPx / 6.0));
+        if (isHandDepth(centerDepth)) alpha = max(alpha, TAA_BLEND_HAND);
+        // 出力の画素の中心から遠い元の画素は弱く混ぜる
+        alpha = max(alpha * mix(1.0, nearWeight, superResEff), LENS_WARP_TAA_MIN_BLEND);
+        resultYcc = mix(historyYcc, currentYcc, alpha);
+    } else {
+        // 履歴が無い所は 1 フレームの補間 (今までの final の再投影と同じぼけ方)
+        resultYcc = mix(rgbToYCoCg(taaCompress(smoothColor, exposure)), mean, 0.3 * (1.0 - superRes));
+    }
+
+    vec3 result = sanitizeColor(taaExpand(yCoCgToRgb(resultYcc), exposure));
+    outColor = vec4(result + glint, min(nearRaw.a, 0.0));
+    outHistory = vec4(result, historyDistance(src, centerDepth));
+}
+
 void main() {
+    if (LENS_WARP_TAA) {
+        taaWarped();
+        return;
+    }
     ivec2 texel = ivec2(gl_FragCoord.xy);
     ivec2 maxTexel = ivec2(viewSize()) - 1;
     vec2 uv = (vec2(texel) + 0.5) * texelSize();

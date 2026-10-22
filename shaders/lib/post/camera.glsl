@@ -14,9 +14,12 @@ float cameraFocalLength() {
  * 絞り (入射瞳) の直径 (mm)
  * 0: ボケの量 (DOF_STRENGTH)。センサーに比例させて F 値を保つ (フルサイズでは従来どおり、FOV に依らず一定の径)
  * 1: レンズプリセットの開放 F 値, 2: 指定の F 値 (どちらも焦点距離 / F 値なので FOV で変わる)
+ * 絞りの無いレンズ (Hologon の固定 F8) は設定に依らず開放 F 値
  */
 float cameraApertureDiameter() {
-#if DOF_APERTURE_MODE == 1
+#if defined LENS_FIXED_APERTURE
+    return cameraFocalLength() / LP_F_OPEN;
+#elif DOF_APERTURE_MODE == 1
     return cameraFocalLength() / LP_F_OPEN;
 #elif DOF_APERTURE_MODE == 2
     return cameraFocalLength() / DOF_F_NUMBER;

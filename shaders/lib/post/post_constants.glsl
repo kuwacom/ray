@@ -275,6 +275,8 @@ const float LENS_CA_SCALE = 0.004;
 const float LENS_AXIAL_CA_PX = 1.5;
 // 球面収差: 狭いブルームへの混合率 (LP_SOFT_FOCUS = 1 の時)
 const float LENS_SOFT_FOCUS_AMOUNT = 0.35;
+// 処方の球面収差のハロー (LENS_SOFT_HALO_TABLE) の割合に掛ける倍率 (1 = 処方の点像のエネルギーどおり)
+const float LENS_SOFT_HALO_GAIN = 1.0;
 // ハレーション: 露出後の閾値と色 (フィルムベースで反射して赤い層だけが感光する)
 const float LENS_HALATION_THRESHOLD = 0.8;
 const vec3 LENS_HALATION_TINT = vec3(1.0, 0.28, 0.08);
@@ -283,6 +285,34 @@ const float LENS_HALATION_GAIN = 0.6;
 const float LENS_SWIRL_STRETCH = 0.6;
 // 像面湾曲: 画面の隅でピント距離が縮む割合 (LP_FIELD_CURVATURE = 1 の時)
 const float LENS_FIELD_CURVATURE_SCALE = 0.35;
+// 負の像面湾曲 (周辺ほどピントが奥) で、ピント距離の割り算が 0 や負にならないための下限 (隅でピント距離 5 倍まで)
+const float LENS_FIELD_CURVATURE_MIN = 0.2;
+/*
+ * 処方の像面の焦点ずれ (LP_FIELD_ZT / ZS, mm) をボケに足す時の基準: 135 判の対角の半分 (mm)。画面の隅をこれに合わせる
+ * 1 軸あたりの上限 (画面の高さ比)。処方の設計画角の外 (Flektogon の隅) で像面が崩れた分を伸ばしすぎない
+ * (0.025 では Flektogon の画面の外側 1/3 が流れて見えた。開放の Canon 50/1.2 の隅の非点収差もこの上限で止まる)
+ */
+const float LENS_FRAME_HALF_DIAGONAL_MM = 21.63;
+const float LENS_FIELD_DEFOCUS_MAX = 0.01;
+// 陣笠型の歪曲で、枠の外を読まない拡大率を決めるために端に沿って調べる点の数 (片側の端あたり)
+const int LENS_DISTORTION_EDGE_STEPS = 8;
+const float LENS_DISTORTION_NORM_MARGIN = 1e-4;
+/*
+ * 歪曲・魚眼を TAA の中で組み立てる (LENS_WARP_IN_TAA)
+ * AUTO_AMOUNT: 自動で有効にする歪曲の大きさ (画面の倍率の変化の最大)。アナモルフィック (0.05) と処方どおりの
+ *   Flektogon (0.023) は final のまま、Flektogon の強さ 3 (0.07) から TAA で組み立てる
+ * SR_RAMP: 拡大率 1 から何倍分で超解像を効かせきるか (1 / RAMP 倍の拡大で全開)
+ * KERNEL: 一番近い元の画素の中心が出力の画素の中心から d 画素 (出力) 離れた時の重み exp(-KERNEL d^2) (0.5 画素で 0.5)
+ * SR_MOTION: 超解像を止める動きの速さ (出力の画素 / フレーム)。速い時は 1 フレームの補間に寄せて残像を出さない
+ * MIN_BLEND: 今フレームの混合率の下限 (遠い元の画素しか来ないフレームが続いても履歴が固まらない)
+ */
+const float LENS_WARP_AUTO_AMOUNT = 0.06;
+const float LENS_WARP_TAA_SR_RAMP = 2.0;
+const float LENS_WARP_TAA_KERNEL = 2.77;
+const float LENS_WARP_TAA_SR_MOTION = 2.0;
+const float LENS_WARP_TAA_MIN_BLEND = 0.015;
+// 魚眼の周辺光量・像面の表の rho = 1 に当たる半画角 (処方を解析した最大の画角)
+const float LENS_FISHEYE_TABLE_ANGLE = 1.562070; // 89.5 度
 // 口径食: 画面の隅での前玉の縁と絞りのずれ (開口半径比, LP_CATS_EYE = 1 の時)
 const float LENS_CATS_EYE_SCALE = 1.0;
 // トリウムガラスの黄変 (LP_YELLOWING = 1 の時の透過色)

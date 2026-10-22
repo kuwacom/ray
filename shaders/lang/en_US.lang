@@ -424,14 +424,26 @@ option.LENS_FLARE.comment=Master switch for the sun / moon flare (ghosts, starbu
 option.LENS_FLARE_STRENGTH=Flare Strength
 option.LENS_FLARE_STRENGTH.comment=Works with every lens. 1 = as designed (ghosts use physically computed reflectance)
 option.LENS_PRESET=Lens
-option.LENS_PRESET.comment=Picks the lens character (flare colors and shapes, starburst rays, aberrations). Individual strengths only apply with Custom (see Custom Lens). Toggles always apply
-value.LENS_PRESET.0=Modern Prime (subtle)
-value.LENS_PRESET.1=Helios 44-2
-value.LENS_PRESET.2=Super Takumar 50/1.4
-value.LENS_PRESET.3=Petzval
-value.LENS_PRESET.4=Canon FD 50/1.4 S.S.C.
-value.LENS_PRESET.5=Anamorphic
-value.LENS_PRESET.6=Custom
+option.LENS_PRESET.comment=Picks the lens character (flare colors and shapes, starburst rays, aberrations). Individual strengths only apply with Custom (see Custom Lens). Toggles always apply. Sonnar to Fish-eye are computed from the patent prescriptions of real lenses: Sonnar = high contrast, few ghosts, slight pincushion. Summilux 35 = glow wide open, cat's eye bokeh, dark corners. Canon 50/1.2 = soft and low contrast wide open, background smears toward the edges, strong corner falloff. Hologon = straight lines across 110 degrees, strong corner falloff, fixed f/8 (FOV 68). Flektogon = wavy mustache distortion (FOV 54). Fish-eye = fisheye projection, straight lines bend (FOV 110, Fisheye Framing = Fit Width matches the real lens). Suggested FOV = the real lens's angle with the 36 mm width of the 35 mm frame fitted to the screen width (16:9 cuts the top and bottom of 3:2): vertical FOV = 2 atan(18 / f x 9 / 16). Gyogyotto = near-orthographic fisheye, edges squeezed harder than the Rokkor, fixed f/8. Ultra Wide-Heliar 12 = 121 degrees, plain barrel distortion, very dark corners even stopped down. New FD 14 = 114 degrees, barrel distortion that eases off at the corners, dark corners wide open that recover when stopped down. STF 135 = apodization filter, out-of-focus highlights melt away without a rim. FA 28 Soft = soft focus halo wide open that disappears by f/5.6 (set the aperture with Depth of Field). Canon 50/0.95 = the darkest corners, glow only wide open. 35 mm = 32, 20 mm = 54, 15 mm = 68. 50 mm and longer need less than the game's minimum of 30, so use 30 (still wider than the real lens)
+value.LENS_PRESET.0=Custom
+value.LENS_PRESET.1=Modern Prime (subtle)
+value.LENS_PRESET.2=Helios 44-2
+value.LENS_PRESET.3=Super Takumar 50/1.4
+value.LENS_PRESET.4=Petzval
+value.LENS_PRESET.5=Canon FD 50/1.4 S.S.C.
+value.LENS_PRESET.6=Anamorphic
+value.LENS_PRESET.7=Zeiss Sonnar 50/1.5 (1932)
+value.LENS_PRESET.8=Leica Summilux 35/1.4 (1961, FOV 32)
+value.LENS_PRESET.9=Canon 50/1.2 (1956)
+value.LENS_PRESET.10=Zeiss Hologon 15/8 (ultra wide, FOV 68)
+value.LENS_PRESET.11=CZJ Flektogon 20/4 (wide, FOV 54)
+value.LENS_PRESET.12=Minolta Fish-eye Rokkor 16/2.8 (FOV 110)
+value.LENS_PRESET.13=Nikon Gyogyotto 20/8 (fisheye, FOV 107)
+value.LENS_PRESET.14=Voigtlander Ultra Wide-Heliar 12/5.6 (FOV 80)
+value.LENS_PRESET.15=Canon New FD 14/2.8L (FOV 72)
+value.LENS_PRESET.16=Minolta STF 135/2.8 [T4.5]
+value.LENS_PRESET.17=Pentax FA 28/2.8 Soft (FOV 40)
+value.LENS_PRESET.18=Canon 50/0.95 (1961)
 option.LENS_QUALITY=Lens Quality
 option.LENS_QUALITY.comment=Ghost count (8 / 12 / 16 / 24) and wavelength samples for dispersion (3 / 4 / 5 / 7)
 value.LENS_QUALITY.0=Low
@@ -451,7 +463,18 @@ option.LENS_DIRT.comment=Dust and fingerprints on the front element light up nea
 option.LENS_VEILING_GLARE=Veiling Glare
 option.LENS_VEILING_GLARE.comment=Scattering inside the lens adds a haze and lowers contrast against the light
 option.LENS_DISTORTION=Distortion
-option.LENS_DISTORTION.comment=Barrel / pincushion distortion (Brown-Conrady)
+option.LENS_DISTORTION.comment=Barrel / pincushion / mustache distortion (Brown-Conrady) and the fisheye projection. Off keeps the game's straight-line image
+option.LENS_DISTORTION_SCALE=Distortion Strength
+option.LENS_DISTORTION_SCALE.comment=1 = as computed from the lens prescription (the Flektogon's mustache is about 2%, subtle). Raise it to exaggerate. Does not change the fisheye projection
+option.LENS_FISHEYE_FIT=Fisheye Framing
+option.LENS_FISHEYE_FIT.comment=How the fisheye fits the screen. Fill Corners = no black areas (slightly tighter view). Fit Width = closest to the real lens, corners outside the rendered view turn black
+value.LENS_FISHEYE_FIT.0=Fill Corners
+value.LENS_FISHEYE_FIT.1=Fit Width
+option.LENS_WARP_IN_TAA=Build Distortion In TAA
+option.LENS_WARP_IN_TAA.comment=Where the fisheye / distortion image is built. Final stretches the finished image, so the fisheye center (magnified about 2.5x at FOV 110) looks soft. TAA builds it from the jittered frames, so the center regains fine detail while standing still or turning slowly (fast motion looks like Final). Costs about the same as Final (about 1 ms more in a test at 1038x938). Auto = TAA for the fisheye and strong distortion. Needs TAA
+value.LENS_WARP_IN_TAA.0=Auto
+value.LENS_WARP_IN_TAA.1=Final (stretch)
+value.LENS_WARP_IN_TAA.2=TAA
 option.LENS_CHROMATIC=Lateral Chromatic Aberration
 option.LENS_CHROMATIC.comment=Rainbow fringes toward the image edges (wavelength sampled)
 option.LENS_AXIAL_CA=Axial Chromatic Aberration
@@ -472,6 +495,18 @@ option.LENS_C_DESIGN.comment=Optical design that places the ghosts
 value.LENS_C_DESIGN.0=Double Gauss 6/4
 value.LENS_C_DESIGN.1=Double Gauss 7/6
 value.LENS_C_DESIGN.2=Petzval 4/2
+value.LENS_C_DESIGN.3=Sonnar 7/3
+value.LENS_C_DESIGN.4=Summilux 35 7/5
+value.LENS_C_DESIGN.5=Canon 50/1.2 7/5
+value.LENS_C_DESIGN.6=Hologon 3/3
+value.LENS_C_DESIGN.7=Flektogon 10/6
+value.LENS_C_DESIGN.8=Fish-eye Rokkor 10/7
+value.LENS_C_DESIGN.9=Gyogyotto 3/2
+value.LENS_C_DESIGN.10=Ultra Wide-Heliar 12 10/8
+value.LENS_C_DESIGN.11=New FD 14 14/10
+value.LENS_C_DESIGN.12=STF 135 8/6
+value.LENS_C_DESIGN.13=FA 28 Soft 5/5
+value.LENS_C_DESIGN.14=Canon 50/0.95 7/5
 option.LENS_C_COATING=Coating
 option.LENS_C_COATING.comment=Multi: faint green / purple ghosts. Single: amber / magenta, stronger. None: very strong
 value.LENS_C_COATING.0=Multi-coated
@@ -493,16 +528,28 @@ option.LENS_C_DIRT_CONTRAST=Dirt Contrast
 option.LENS_C_VEILING_GLARE=Veiling Glare Strength
 option.LENS_C_DISTORTION=Distortion
 option.LENS_C_DISTORTION.comment=Positive = barrel, negative = pincushion
+option.LENS_C_DISTORTION2=Distortion (4th Order)
+option.LENS_C_DISTORTION2.comment=Acts toward the edges. Opposite sign to Distortion gives wavy mustache distortion
+option.LENS_C_PROJECTION=Projection
+option.LENS_C_PROJECTION.comment=Fisheye remaps the image so straight lines bend. Works best with FOV 90 to 110
+value.LENS_C_PROJECTION.0=Rectilinear
+value.LENS_C_PROJECTION.1=Fisheye
+option.LENS_C_FISHEYE_K=Fisheye Mapping
+option.LENS_C_FISHEYE_K.comment=r = f sin(k theta) / k. -0.5 = stereographic, 0 = equidistant, 0.5 = equisolid, 1 = orthographic. 0.564 is the Minolta Rokkor 16mm
 option.LENS_C_CA=Lateral CA Strength
+option.LENS_C_CA.comment=Positive = red image larger, negative = blue image larger
 option.LENS_C_AXIAL_CA=Axial CA Strength
 option.LENS_C_SOFT_FOCUS=Spherical Aberration Glow
 option.LENS_C_SWIRL=Swirl (Astigmatism)
 option.LENS_C_FIELD_CURVATURE=Field Curvature
+option.LENS_C_FIELD_CURVATURE.comment=Positive = focus comes closer toward the edges, negative = farther
 option.LENS_C_CATS_EYE=Optical Vignetting (Cat's Eye)
 option.LENS_C_SQUEEZE=Anamorphic Squeeze
 option.LENS_C_SQUEEZE.comment=1.0 = spherical. Higher values make bokeh and ghosts tall ovals
 option.LENS_C_BOKEH_RIM=Bokeh Rim
 option.LENS_C_BOKEH_RIM.comment=Positive = bright-rim bubble bokeh, negative = soft center-weighted bokeh
+option.LENS_C_APODIZATION=Apodization
+option.LENS_C_APODIZATION.comment=Darkens the edge of the aperture so out-of-focus highlights fade out without a rim. 1.96 = Minolta STF 135. Weaker when stopped down
 option.LENS_C_HALATION=Halation Strength
 option.LENS_C_YELLOWING=Yellowing
 option.LENS_C_YELLOWING.comment=Thorium glass yellowing (less blue, warmer)

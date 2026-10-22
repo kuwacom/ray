@@ -1,5 +1,5 @@
 /*
- * final: 歪曲・色収差・シャープ (CAS)・ブルーム合成・球面収差・ベーリンググレア・レンズフレア・口径食・ハレーション・Purkinje・ビネット・露出・
+ * final: 歪曲と魚眼の再投影・色収差・シャープ (CAS)・ブルーム合成・球面収差・ベーリンググレア・レンズフレア・口径食・ハレーション・Purkinje・ビネット・露出・
  *        ホワイトバランス・コントラスト・彩度・トーンマップ・グレイン・ディザ・デバッグ表示
  * 色に掛ける処理は物理的な順 (レンズ -> センサー -> 現像) に並べる
  * post モジュール
@@ -111,25 +111,61 @@ void main() {
     vec2 uv = texcoord;
     float exposure = getExposure();
 
-    // ---- レンズ: 歪曲 (以降のシーンの読み出しは全て歪曲後の位置 uvL で行う) ----
+    /*
+     * ---- レンズ: 歪曲・魚眼の再投影 (以降のシーンの読み出しは全て再投影後の位置 uvL で行う) ----
+     * 直線写像で歪曲の無いプリセットでは定数畳み込みで丸ごと消える
+     */
 #ifdef LENS_DISTORTION
-    const bool distort = LP_K1 != 0.0 || LP_K2 != 0.0;
+    const bool distort = LP_K1 != 0.0 || LP_K2 != 0.0 || LP_K3 != 0.0 || LENS_PROJECTION == 1;
 #else
     const bool distort = false;
 #endif
-    vec2 uvL = distort ? lensDistortUv(uv) : uv;
+    // 周辺光量・像面の表を引く正規化半径 (lensProjectUv の説明を参照)
+    float rhoLens = sqrt(lensRadius2(uv));
+    vec2 uvL = distort ? lensProjectUv(uv, rhoLens) : uv;
+    // 描画の範囲の外 (魚眼の「横幅に合わせる」の隅) は黒。縁は出力の 1 画素ぶんで滑らかに落とす
+    float inside = 1.0;
+#if defined LENS_DISTORTION && LENS_PROJECTION == 1
+    #if LENS_FISHEYE_FIT == 1
+        vec2 edgePx = min(uvL, 1.0 - uvL) * viewSize();
+        vec2 footprint = fwidth(uvL * viewSize());
+        inside = saturate(min(edgePx.x, edgePx.y) / max(max(footprint.x, footprint.y), 1e-3) + 0.5);
+    #endif
+    uvL = clamp(uvL, 0.5 / viewSize(), 1.0 - 0.5 / viewSize());
+#endif
     ivec2 texelL = distort ? ivec2(uvL * viewSize()) : texel;
+    // 深度と G バッファ (溶岩・フォグ) を読む位置。いつも元画像の座標
+    ivec2 texelG = texelL;
+    /*
+     * 歪曲・魚眼を TAA で組み立てた時 (LENS_WARP_TAA) は、colortex0 とブルームがもう出力の座標なので再投影しない
+     * (rhoLens と inside は上で求めたものをそのまま使う)
+     */
+    if (LENS_WARP_TAA) {
+        uvL = uv;
+        texelL = texel;
+    }
+    // 太陽・月のフレアと汚れはレンズ (像面) に固定なので、出力の座標で描く (既存のプリセットは元画像の座標のまま)
+#ifdef LENS_FLARE_OUTPUT_SPACE
+    const bool flareOutput = true;
+#else
+    const bool flareOutput = LENS_WARP_TAA;
+#endif
+    vec2 uvFlare = flareOutput ? uv : uvL;
 
-    vec3 center = distort ? sanitizeColor(sampleCatmullRom(colortex0, uvL, viewSize())) : fetchScene(texel);
+    vec3 center = distort && !LENS_WARP_TAA ? sanitizeColor(sampleCatmullRom(colortex0, uvL, viewSize())) : fetchScene(texel);
     vec3 hdr = center;
 
     // ---- レンズ: 倍率色収差 (波長ごとに倍率が違い、画面の隅ほど縁が虹色にずれる) ----
 #ifdef LENS_CHROMATIC
-    if (LP_CA > 0.0) hdr = lensChromaticSample(colortex0, uvL, LP_CA);
+    #if defined LENS_DISTORTION && LENS_PROJECTION == 1
+    if (LP_CA != 0.0) hdr = LENS_WARP_TAA ? lensChromaticSample(colortex0, uv, LP_CA) : lensChromaticProjected(colortex0, uv, LP_CA);
+    #else
+    if (LP_CA != 0.0) hdr = lensChromaticSample(colortex0, uvL, LP_CA);
+    #endif
 #endif
     hdr = max(hdr + casDelta(texelL, center, exposure), 0.0);
 
-    float lava = lavaToneMask(texelL);
+    float lava = lavaToneMask(texelG);
     // 溶岩のブルームの滲みが占める割合。溶岩と同じ色を保つトーンマップに寄せる (AgX では周りの煙・壁の滲みが淡いサーモン色に抜けた)
     float lavaGlowShare = 0.0;
 
@@ -140,6 +176,11 @@ void main() {
     #ifdef LENS_SOFT_FOCUS
         // 球面収差: ピントが合っていても低い周波数の滲みが乗る (開放ほど強い)
         hdr = mix(hdr, bands.narrow, saturate(LP_SOFT_FOCUS * LENS_SOFT_FOCUS_AMOUNT * lensApertureFactor()));
+        #ifdef LENS_SOFT_HALO_TABLE
+            // 処方の球面収差のハロー (FA 28 Soft など)。半径と割合は F 値で変わり、絞ると消える
+            vec4 softHalo = lensSoftHalo(uvL);
+            hdr = mix(hdr, softHalo.rgb, saturate(softHalo.a * LENS_SOFT_HALO_GAIN));
+        #endif
     #endif
     /*
      * 溶岩の上は自分のブルーム (LAVA_BLOOM_GAIN 倍) が一様に乗って暗い殻が持ち上がり、模様が平らになる
@@ -150,7 +191,7 @@ void main() {
     lavaGlowShare = saturate(bloomMix * bands.lava / max(luminance(hdr), 1e-6));
 
     // ブルーミーフォグ: 遠くと雨・水中ほど広いブルームで霞ませる (全面の滲みは弱く)
-    float depth = texelFetch(depthtex0, texelL, 0).r;
+    float depth = texelFetch(depthtex0, texelG, 0).r;
     float dist = depth >= 1.0 ? far : linearizeDepth(fixHandDepth(depth));
     float fogFactor = (1.0 - exp(-dist / BLOOM_FOG_DISTANCE)) * (0.35 + 0.65 * rainStrength);
     float water = isEyeInWater == 1 ? 1.0 : 0.0;
@@ -166,7 +207,7 @@ void main() {
         // 汚れは近くの明るい光を散乱して光る (明るい物の周りだけ模様が浮かぶ)
         if (LP_DIRT > 0.0) {
             vec3 lit = max(bands.wide - LENS_SCREEN_THRESHOLD * 0.3 / exposure, 0.0);
-            hdr += lit * (lensDirt(uvL) * LP_DIRT * LENS_DIRT_BLOOM_GAIN * LENS_FLARE_STRENGTH);
+            hdr += lit * (lensDirt(uvFlare) * LP_DIRT * LENS_DIRT_BLOOM_GAIN * LENS_FLARE_STRENGTH);
         }
     #endif
     #if defined LENS_SCREEN_FLARE && defined LENS_FLARE
@@ -181,13 +222,14 @@ void main() {
         float vis = flareVisibility();
         if (vis > 0.0) {
             vec2 lightUv = viewToScreen(shadowLightPosition).xy;
+            if (distort && flareOutput) lightUv = lensForwardUv(lightUv);
             vec3 lightColor = sanitizeColor(frameData.shadowLightIrradiance.rgb);
             vec3 lightTint = lightColor / max(luminance(lightColor), 1e-6);
             // 太陽が沈むと光源は月に切り替わる (薄明は照度が小さいので境目は目立たない)
             float day = smoothstep(-0.1, 0.1, getSunDir().y);
             float gain = mix(LENS_MOON_FLARE, 1.0, day);
             float starGain = mix(LENS_MOON_STARBURST, 1.0, day);
-            hdr += lensFlare(uvL, lightUv, lightTint, starGain) * lightColor * (vis * gain * LENS_FLARE_STRENGTH);
+            hdr += lensFlare(uvFlare, lightUv, lightTint, starGain) * lightColor * (vis * gain * LENS_FLARE_STRENGTH);
         }
     }
 #endif
@@ -198,10 +240,14 @@ void main() {
         hdr *= tint / luminance(tint);
     }
 
-    // ---- レンズ: 周辺減光 (演出のビネット + 口径食) ----
+    // ---- レンズ: 周辺減光 (演出のビネット + 口径食。処方のあるレンズは自然減光込みの周辺光量の表) ----
     hdr *= vignette(uv);
 #ifdef LENS_OPTICAL_VIGNETTING
+    #ifdef LENS_RI_TABLE
+    hdr *= lensRelativeIllumination(rhoLens);
+    #else
     if (LP_CATS_EYE > 0.0) hdr *= lensOpticalVignette(uv);
+    #endif
 #endif
 
     // ---- フィルム: ハレーション (フィルムベースで反射した光が赤い層だけを感光させる。レンズの後段) ----
@@ -211,6 +257,8 @@ void main() {
         hdr += LENS_HALATION_TINT / luminance(LENS_HALATION_TINT) * (halation * LP_HALATION * LENS_HALATION_GAIN);
     }
 #endif
+
+    hdr *= inside;
 
     // ---- 目 / センサー: Purkinje 効果 -> 露出 ----
     hdr = applyPurkinje(hdr, frameData.averageLuminance, exposure);

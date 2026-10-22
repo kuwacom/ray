@@ -211,9 +211,10 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 
 /*------------------------------------------------------------------------------
   レンズ (post モジュール)。プリセットが各効果の強さを決め、ON/OFF は常に効く
-  個別の強さ (LENS_C_*) は LENS_PRESET = 6 (カスタム) の時だけ使う
+  個別の強さ (LENS_C_*) は LENS_PRESET = 0 (カスタム) の時だけ使う
+  番号は後ろに足していき、既存の番号は変えない (ユーザーの保存値を保つ)
 ------------------------------------------------------------------------------*/
-#define LENS_PRESET 0 // [0 1 2 3 4 5 6] 0=現代の単焦点 1=Helios 44-2 2=Super Takumar 50/1.4 3=Petzval 4=Canon FD 50/1.4 5=アナモルフィック 6=カスタム
+#define LENS_PRESET 1 // [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18] 0=カスタム 1=現代の単焦点 2=Helios 44-2 3=Super Takumar 50/1.4 4=Petzval 5=Canon FD 50/1.4 6=アナモルフィック 7=Sonnar 50/1.5 8=Summilux 35/1.4 9=Canon 50/1.2 10=Hologon 15/8 11=Flektogon 20/4 12=Fish-eye Rokkor 16/2.8 13=Gyogyotto 20/8 14=Ultra Wide-Heliar 12/5.6 15=New FD 14/2.8L 16=STF 135/2.8 17=FA 28/2.8 Soft 18=Canon 50/0.95
 #define LENS_QUALITY 2 // [0 1 2 3] ゴースト数と波長サンプル数
 #define LENS_FLARE // 太陽・月のレンズフレア
 #define LENS_FLARE_STRENGTH 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 5.0 7.5 10.0] フレア全体の倍率
@@ -223,7 +224,10 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 //#define LENS_HALO
 #define LENS_DIRT // レンズの汚れ
 #define LENS_VEILING_GLARE // ベーリンググレア (フレアによるコントラスト低下)
-#define LENS_DISTORTION // 歪曲収差
+#define LENS_DISTORTION // 歪曲収差と魚眼の写像
+#define LENS_DISTORTION_SCALE 1.0 // [0.0 0.5 1.0 1.5 2.0 3.0 4.0] 歪曲収差の強さ (1 = レンズの処方どおり。魚眼の写像には掛からない)
+#define LENS_FISHEYE_FIT 0 // [0 1] 魚眼の画面への合わせ方 0=隅まで埋める 1=横幅を合わせる (隅は黒)
+#define LENS_WARP_IN_TAA 0 // [0 1 2] 歪曲・魚眼を組み立てる所 0=自動 (魚眼と歪曲の強い時は TAA) 1=final (引き伸ばし) 2=TAA (ジッターで中央の細かさを戻す, TAA が必要)
 #define LENS_CHROMATIC // 倍率色収差
 #define LENS_AXIAL_CA // 軸上色収差 (被写界深度が必要)
 #define LENS_SOFT_FOCUS // 球面収差の滲み (ブルームが必要)
@@ -231,8 +235,8 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define LENS_OPTICAL_VIGNETTING // 口径食 (周辺の減光と猫目ボケ)
 #define LENS_HALATION // ハレーション (ブルームが必要)
 
-// カスタムレンズ (LENS_PRESET = 6 の時だけ有効)
-#define LENS_C_DESIGN 1 // [0 1 2] 0=ダブルガウス 6 枚 1=ダブルガウス 7 枚 2=Petzval
+// カスタムレンズ (LENS_PRESET = 0 の時だけ有効)
+#define LENS_C_DESIGN 1 // [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14] 0=ダブルガウス 6 枚 1=ダブルガウス 7 枚 2=Petzval 3=Sonnar 4=Summilux 35 5=Canon 50/1.2 6=Hologon 7=Flektogon 8=魚眼 Rokkor 9=Gyogyotto 10=UWH 12 11=FD 14 12=STF 135 13=FA 28 Soft 14=Canon 50/0.95 (ゴーストの設計)
 #define LENS_C_COATING 0 // [0 1 2] 0=マルチコート 1=単層コート 2=コート無し
 #define LENS_C_F_OPEN 1.8 // [0.95 1.2 1.4 1.8 2.0 2.8 4.0 5.6 8.0] 開放 F 値
 #define DOF_APERTURE_BLADES 0 // [0 5 6 7 8 9 10 13] 0=円形
@@ -248,14 +252,18 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define LENS_C_STREAK 0.0 // [0.0 0.25 0.5 1.0 2.0 4.0 6.0 8.0]
 #define LENS_C_SQUEEZE 1.0 // [1.0 1.33 1.5 1.8 2.0] アナモルフィックの圧縮率 (楕円ボケ)
 #define LENS_C_DISTORTION 0.0 // [-0.3 -0.2 -0.15 -0.1 -0.06 -0.03 0.0 0.03 0.06 0.1 0.15 0.2 0.3] 正=樽型 負=糸巻き型
-#define LENS_C_CA 0.3 // [0.0 0.15 0.3 0.5 0.75 1.0 1.5 2.0 3.0 4.0]
+#define LENS_C_DISTORTION2 0.0 // [-0.3 -0.2 -0.15 -0.1 -0.06 -0.03 0.0 0.03 0.06 0.1 0.15 0.2 0.3] 4 次の歪曲。LENS_C_DISTORTION と逆符号で陣笠型
+#define LENS_C_PROJECTION 0 // [0 1] 0=直線写像 1=魚眼
+#define LENS_C_FISHEYE_K 0.5 // [-0.5 0.0 0.25 0.5 0.564 0.75 1.0] 魚眼の写像 r = f sin(k θ) / k。-0.5=立体射影 0=等距離 0.5=等立体角 1=正射影
+#define LENS_C_CA 0.3 // [-1.0 -0.5 -0.3 -0.15 0.0 0.15 0.3 0.5 0.75 1.0 1.5 2.0 3.0 4.0] 正=赤い像が大きい 負=青い像が大きい
 #define LENS_C_AXIAL_CA 0.0 // [0.0 0.25 0.5 1.0 1.5 2.0 3.0 4.0]
 #define LENS_C_SOFT_FOCUS 0.0 // [0.0 0.1 0.2 0.3 0.5 0.75 1.0]
 #define LENS_C_SWIRL 0.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0]
-#define LENS_C_FIELD_CURVATURE 0.0 // [0.0 0.25 0.5 1.0 2.0 3.0 4.0]
+#define LENS_C_FIELD_CURVATURE 0.0 // [-2.0 -1.0 -0.5 -0.25 0.0 0.25 0.5 1.0 2.0 3.0 4.0] 正=周辺ほどピントが手前 負=奥
 #define LENS_C_CATS_EYE 0.2 // [0.0 0.2 0.4 0.6 0.8 1.0]
 #define LENS_C_HALATION 0.0 // [0.0 0.1 0.2 0.3 0.5 0.75 1.0]
 #define LENS_C_BOKEH_RIM 0.0 // [-0.5 -0.25 0.0 0.25 0.5 0.75 1.0] 正=縁の明るいボケ 負=中心の明るいボケ
+#define LENS_C_APODIZATION 0.0 // [0.0 0.5 1.0 1.96 3.0 4.0] ボケの縁を溶かす瞳の透過率 exp(-β ρ^2) の β (1.96 = STF 135)
 #define LENS_C_YELLOWING 0.0 // [0.0 0.25 0.5 0.75 1.0] トリウムレンズの黄変
 #define BLOOM
 #define BLOOM_STRENGTH 0.5 // [0.0 0.05 0.1 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0]
