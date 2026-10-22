@@ -1,0 +1,113 @@
+{
+  "_comment": "ゲーム内デバッグ用の定点シーンの最小例。このファイルを tools/scenes.json にコピーして、tp や clear_hostiles の座標を自分のワールドのものに書き換える。シーン名は uv run tools/run_scene.py <名前> で指定する。HUD は既定で非表示 (一人称の手も消える) なので手を見るシーンは {\"hud\": true} を入れる。シーンで summon するエンティティには Tags:[\"ray\"] を付ける (capture で消す)",
+  "setup": [
+    {
+      "close_screen": true
+    },
+    {
+      "cmd": "gamemode creative"
+    },
+    {
+      "pause_on_lost_focus": false
+    },
+    {
+      "cmd": "gamerule advance_time false"
+    },
+    {
+      "cmd": "gamerule advance_weather false"
+    },
+    {
+      "cmd": "gamerule spawn_mobs false"
+    },
+    {
+      "cmd": "weather clear"
+    },
+    {
+      "cmd": "kill @e[tag=ray]"
+    },
+    {
+      "clear_hostiles": [
+        0,
+        64,
+        0,
+        32
+      ]
+    },
+    {
+      "hud": false
+    }
+  ],
+  "scenes": {
+    "noon": [
+      {
+        "cmd": "time set 6000"
+      },
+      {
+        "cmd": "tp @s 0.5 64 0.5 135 5"
+      },
+      {
+        "cmd": "item replace entity @s weapon.mainhand with air"
+      },
+      {
+        "hud": true
+      }
+    ],
+    "night": [
+      {
+        "cmd": "time set 18000"
+      },
+      {
+        "cmd": "tp @s 0.5 64 0.5 135 -10"
+      },
+      {
+        "cmd": "item replace entity @s weapon.mainhand with air"
+      }
+    ],
+    "hand_torch": [
+      {
+        "cmd": "time set 6000"
+      },
+      {
+        "cmd": "tp @s 0.5 64 0.5 135 -10"
+      },
+      {
+        "cmd": "item replace entity @s weapon.mainhand with torch"
+      },
+      {
+        "cmd": "item replace entity @s weapon.offhand with air"
+      },
+      {
+        "hud": true
+      }
+    ]
+  },
+  "capture": [
+    {
+      "screenshot": "{name}",
+      "delay": 2.5
+    },
+    {
+      "wait": 1.5
+    },
+    {
+      "perspective": "first"
+    },
+    {
+      "hud": false
+    },
+    {
+      "cmd": "kill @e[tag=ray]"
+    }
+  ],
+  "teardown": [
+    {
+      "hud": true
+    },
+    {
+      "fov": "restore"
+    },
+    {
+      "pause_on_lost_focus": "restore"
+    }
+  ]
+}
