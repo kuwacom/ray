@@ -386,6 +386,12 @@ void main() {
 #endif
     g.wetness = max(wetAmount, puddle);
     g.emission = max(estimateEmission(albedo.rgb, materialId), sp.emission);
+#if defined GBUF_ENTITIES
+    // クリーパー・TNT は点滅の白さ (entityColor) の分だけ、発光エンティティと同じ式で明るい画素を光らせる。点滅していない時は光らない
+    if (isFlashEntity(entityId)) {
+        g.emission = max(g.emission, entityFlashStrength(entityColor) * smoothstep(0.55, 0.9, maxOf(albedo.rgb)));
+    }
+#endif
 #if defined GBUF_TERRAIN && DECORATIVE_BLOCK_LIGHTS > 0
     // 鉱物ブロック (DECORATIVE_BLOCK_LIGHTS)。光源ブロックより弱く、模様の明るい所ほど光らせる
     if (isDecorativeBlock(blockId)) g.emission = max(g.emission, DECOR_EMISSION * smoothstep(0.15, 0.85, maxOf(albedo.rgb)));

@@ -61,13 +61,24 @@ int blockIdToMaterial(int blockId) {
     return MAT_TERRAIN;
 }
 
+// 点滅の間だけ光るエンティティ (クリーパー・TNT・TNT 付きトロッコ)
+bool isFlashEntity(int entId) {
+    int light = getEntityLightIndex(entId);
+    return light == LIGHT_ENTITY_CREEPER || light == LIGHT_ENTITY_TNT || light == LIGHT_ENTITY_TNT_MINECART;
+}
+
+// 点滅 (entityColor) の強さ 0-1。白い点滅だけを数え、赤いダメージ表示 (rgb が赤) では光らせない
+float entityFlashStrength(vec4 entColor) {
+    return saturate(entColor.a * 2.0 - 0.2) * min(entColor.g, entColor.b);
+}
+
 int entityIdToMaterial(int entId, int itemId) {
     if (entId == ENTITY_CURRENT_PLAYER || entId == ENTITY_PLAYER) return MAT_PLAYER;
     if (entId == ENTITY_ITEM) return getItemLightIndex(itemId) != LIGHT_NONE ? MAT_EMISSIVE_ENTITY : MAT_ITEM_ENTITY;
     int light = getEntityLightIndex(entId);
     if (light == LIGHT_ENTITY_LIGHTNING) return MAT_LIGHTNING;
-    // 点滅の間だけ光る光源 (クリーパー・TNT) は、表面は普通のエンティティ。点滅の白さはバニラの entityColor が付ける
-    if (light == LIGHT_ENTITY_CREEPER || light == LIGHT_ENTITY_TNT || light == LIGHT_ENTITY_TNT_MINECART) return MAT_ENTITY;
+    // 点滅の間だけ光る光源 (クリーパー・TNT) は、表面は普通のエンティティ。点滅中の発光は gbuffers が entityColor から足す
+    if (isFlashEntity(entId)) return MAT_ENTITY;
     if (light != LIGHT_NONE) return MAT_EMISSIVE_ENTITY;
     return MAT_ENTITY;
 }

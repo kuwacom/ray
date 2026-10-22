@@ -103,7 +103,7 @@ int resolveEntityLight(int entId, int itemId, vec4 entColor, out float level) {
     level = d.params.z;
     // TNT・クリーパーは点滅 (entityColor.a) が強い間だけ光る
     if ((flags & LIGHT_FLAG_ENTITY_FLASH) != 0u) {
-        level *= saturate(entColor.a * 2.0 - 0.2);
+        level *= entityFlashStrength(entColor);
         if (level < 0.5) return LIGHT_NONE;
     }
     return index;
