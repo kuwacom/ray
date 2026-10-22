@@ -424,14 +424,26 @@ option.LENS_FLARE.comment=太陽・月のフレア (ゴースト・光条・ハ�
 option.LENS_FLARE_STRENGTH=フレア全体の倍率
 option.LENS_FLARE_STRENGTH.comment=どのプリセットでも効く。1 = プリセットどおり (ゴーストは反射率から計算した物理量)
 option.LENS_PRESET=レンズ
-option.LENS_PRESET.comment=レンズの個性 (フレアの色と形・光条の本数・収差) をまとめて選ぶ。個別の強さは「カスタム」の時だけ下の「カスタムレンズ」で変えられる。ON/OFF はどのレンズでも効く
-value.LENS_PRESET.0=現代の単焦点 (控えめ)
-value.LENS_PRESET.1=Helios 44-2
-value.LENS_PRESET.2=Super Takumar 50/1.4
-value.LENS_PRESET.3=Petzval
-value.LENS_PRESET.4=Canon FD 50/1.4 S.S.C.
-value.LENS_PRESET.5=アナモルフィック
-value.LENS_PRESET.6=カスタム
+option.LENS_PRESET.comment=レンズの個性 (フレアの色と形・光条の本数・収差) をまとめて選ぶ。個別の強さは「カスタム」の時だけ下の「カスタムレンズ」で変えられる。ON/OFF はどのレンズでも効く。Sonnar から魚眼までは実在のレンズの特許の処方から計算した値を使う。Sonnar: 高コントラストでゴーストが少なく、わずかに糸巻き型。Summilux 35: 開放で光がにじみ、周辺の玉ボケは猫目、四隅が暗い。Canon 50/1.2: 開放は柔らかく低コントラスト、周辺で背景が流れ、四隅が大きく落ちる。Hologon: 110 度でも直線がまっすぐ、四隅が大きく暗い、F8 固定 (FOV 68)。Flektogon: 中ほどで樽型・隅で糸巻き型の陣笠歪曲 (FOV 54)。魚眼: 魚眼の写り方で直線が曲がる (FOV 110。魚眼の合わせ方を「横幅を合わせる」にすると実物の画角)。FOV の目安は、35mm 判の横幅 36mm を画面の横幅に合わせた時の実物の画角 (16:9 なので 3:2 の上下が切れる): 縦の FOV = 2 atan(18 / f x 9 / 16)。ぎょぎょっと: 正射影寄りの魚眼で周辺が Rokkor より強く縮む、F8 固定。Ultra Wide-Heliar 12: 121 度、単純な樽型、絞っても四隅がとても暗い。New FD 14: 114 度、四隅で弱まる樽型、開放の四隅が暗く絞ると戻る。STF 135: アポダイゼーションフィルターでボケの縁が溶けて輪郭が出ない。FA 28 Soft: 開放でピントの合った所にもハローが付き、F5.6 までに消える (絞りは被写界深度の設定で)。Canon 50/0.95: 四隅が最も暗く、開放だけ光がにじむ。35mm = 32、20mm = 54、15mm = 68。50mm 以上はゲームの下限 30 より狭いので 30 (実物より少し広い)
+value.LENS_PRESET.0=カスタム
+value.LENS_PRESET.1=現代の単焦点 (控えめ)
+value.LENS_PRESET.2=Helios 44-2
+value.LENS_PRESET.3=Super Takumar 50/1.4
+value.LENS_PRESET.4=Petzval
+value.LENS_PRESET.5=Canon FD 50/1.4 S.S.C.
+value.LENS_PRESET.6=アナモルフィック
+value.LENS_PRESET.7=Zeiss Sonnar 50/1.5 (1932)
+value.LENS_PRESET.8=Leica Summilux 35/1.4 (1961, FOV 32)
+value.LENS_PRESET.9=Canon 50/1.2 (1956)
+value.LENS_PRESET.10=Zeiss Hologon 15/8 (超広角, FOV 68)
+value.LENS_PRESET.11=CZJ Flektogon 20/4 (広角, FOV 54)
+value.LENS_PRESET.12=Minolta Fish-eye Rokkor 16/2.8 (魚眼, FOV 110)
+value.LENS_PRESET.13=Nikon ぎょぎょっと 20/8 (魚眼, FOV 107)
+value.LENS_PRESET.14=Voigtländer Ultra Wide-Heliar 12/5.6 (FOV 80)
+value.LENS_PRESET.15=Canon New FD 14/2.8L (FOV 72)
+value.LENS_PRESET.16=Minolta STF 135/2.8 [T4.5]
+value.LENS_PRESET.17=Pentax FA 28/2.8 Soft (FOV 40)
+value.LENS_PRESET.18=Canon 50/0.95 (1961)
 option.LENS_QUALITY=レンズ効果の品質
 option.LENS_QUALITY.comment=ゴーストの数 (8 / 12 / 16 / 24) と色収差・ゴーストの波長サンプル数 (3 / 4 / 5 / 7)
 value.LENS_QUALITY.0=低
@@ -451,7 +463,18 @@ option.LENS_DIRT.comment=前玉のほこりや指紋が明るい光の近くで�
 option.LENS_VEILING_GLARE=ベーリンググレア
 option.LENS_VEILING_GLARE.comment=レンズ内の散乱で画面全体が薄く霞み、逆光でコントラストが下がる
 option.LENS_DISTORTION=歪曲収差
-option.LENS_DISTORTION.comment=直線が樽型 / 糸巻き型に曲がる (Brown-Conrady)
+option.LENS_DISTORTION.comment=直線が樽型 / 糸巻き型 / 陣笠型に曲がる (Brown-Conrady)。魚眼の写り方もこれに含む。OFF でゲームの直線写像のまま
+option.LENS_DISTORTION_SCALE=歪曲収差の強さ
+option.LENS_DISTORTION_SCALE.comment=1 = レンズの処方どおり (Flektogon の陣笠型は 2% ほどで控えめ)。上げると誇張する。魚眼の写り方は変わらない
+option.LENS_FISHEYE_FIT=魚眼の合わせ方
+option.LENS_FISHEYE_FIT.comment=魚眼を画面にどう合わせるか。隅まで埋める: 黒い部分なし (画角は少し狭い)。横幅を合わせる: 実物の画角に近く、描画の範囲外になる四隅は黒
+value.LENS_FISHEYE_FIT.0=隅まで埋める
+value.LENS_FISHEYE_FIT.1=横幅を合わせる
+option.LENS_WARP_IN_TAA=歪曲を TAA で組み立てる
+option.LENS_WARP_IN_TAA.comment=魚眼・歪曲の画面をどこで作るか。final: できた画面を引き伸ばすので、魚眼の中央 (FOV 110 で約 2.5 倍に拡大) が柔らかくなる。TAA: ジッターで毎フレームずれた画面から組み立てるので、止まっている時やゆっくり回る時に中央の細かさが戻る (速く動く時は final と同じくらい)。重さは final とほぼ同じ (1038x938 の計測で 1 ms 前後の差)。自動は魚眼と歪曲の強い時に TAA。TAA が必要
+value.LENS_WARP_IN_TAA.0=自動
+value.LENS_WARP_IN_TAA.1=final (引き伸ばし)
+value.LENS_WARP_IN_TAA.2=TAA
 option.LENS_CHROMATIC=倍率色収差
 option.LENS_CHROMATIC.comment=画面の端ほど縁が虹色にずれる (波長をサンプリング)
 option.LENS_AXIAL_CA=軸上色収差
@@ -472,6 +495,18 @@ option.LENS_C_DESIGN.comment=ゴーストの配置を決めるレンズ設計
 value.LENS_C_DESIGN.0=ダブルガウス 6 枚 4 群
 value.LENS_C_DESIGN.1=ダブルガウス 7 枚 6 群
 value.LENS_C_DESIGN.2=Petzval 4 枚 2 群
+value.LENS_C_DESIGN.3=Sonnar 7 枚 3 群
+value.LENS_C_DESIGN.4=Summilux 35 7 枚 5 群
+value.LENS_C_DESIGN.5=Canon 50/1.2 7 枚 5 群
+value.LENS_C_DESIGN.6=Hologon 3 枚 3 群
+value.LENS_C_DESIGN.7=Flektogon 10 枚 6 群
+value.LENS_C_DESIGN.8=魚眼 Rokkor 10 枚 7 群
+value.LENS_C_DESIGN.9=ぎょぎょっと 3 枚 2 群
+value.LENS_C_DESIGN.10=Ultra Wide-Heliar 12 10 枚 8 群
+value.LENS_C_DESIGN.11=New FD 14 14 枚 10 群
+value.LENS_C_DESIGN.12=STF 135 8 枚 6 群
+value.LENS_C_DESIGN.13=FA 28 Soft 5 枚 5 群
+value.LENS_C_DESIGN.14=Canon 50/0.95 7 枚 5 群
 option.LENS_C_COATING=コーティング
 option.LENS_C_COATING.comment=マルチ: ゴーストは淡い緑 / 紫。単層: 琥珀 / マゼンタで濃い。無し: 非常に強い
 value.LENS_C_COATING.0=マルチコート
@@ -493,16 +528,28 @@ option.LENS_C_DIRT_CONTRAST=汚れのコントラスト
 option.LENS_C_VEILING_GLARE=ベーリンググレアの強さ
 option.LENS_C_DISTORTION=歪曲
 option.LENS_C_DISTORTION.comment=正 = 樽型、負 = 糸巻き型
+option.LENS_C_DISTORTION2=歪曲 (4 次)
+option.LENS_C_DISTORTION2.comment=画面の端ほど効く。「歪曲」と逆の符号にすると、中ほどと端で曲がり方が逆の陣笠型になる
+option.LENS_C_PROJECTION=写像
+option.LENS_C_PROJECTION.comment=魚眼は画面を魚眼の写り方に再投影し、直線が曲がる。FOV 90〜110 で使う
+value.LENS_C_PROJECTION.0=直線写像
+value.LENS_C_PROJECTION.1=魚眼
+option.LENS_C_FISHEYE_K=魚眼の写像
+option.LENS_C_FISHEYE_K.comment=r = f sin(kθ) / k。-0.5 = 立体射影、0 = 等距離、0.5 = 等立体角、1 = 正射影。0.564 は Minolta Rokkor 16mm
 option.LENS_C_CA=倍率色収差の強さ
+option.LENS_C_CA.comment=正 = 赤い像が大きい、負 = 青い像が大きい
 option.LENS_C_AXIAL_CA=軸上色収差の強さ
 option.LENS_C_SOFT_FOCUS=球面収差の滲み
 option.LENS_C_SWIRL=ぐるぐるボケ (非点収差)
 option.LENS_C_FIELD_CURVATURE=像面湾曲
+option.LENS_C_FIELD_CURVATURE.comment=正 = 周辺ほどピントが手前、負 = 奥
 option.LENS_C_CATS_EYE=口径食 (猫目)
 option.LENS_C_SQUEEZE=アナモルフィック圧縮率
 option.LENS_C_SQUEEZE.comment=1.0 = 球面レンズ。大きいほどボケとゴーストが縦長の楕円になる
 option.LENS_C_BOKEH_RIM=ボケの縁の明るさ
 option.LENS_C_BOKEH_RIM.comment=正 = 縁の明るいバブルボケ、負 = 中心の明るい柔らかいボケ
+option.LENS_C_APODIZATION=アポダイゼーション
+option.LENS_C_APODIZATION.comment=絞りの縁ほど暗くして、ボケの縁を輪郭なしに溶かす。1.96 = Minolta STF 135。絞ると弱まる
 option.LENS_C_HALATION=ハレーションの強さ
 option.LENS_C_YELLOWING=黄変
 option.LENS_C_YELLOWING.comment=トリウムガラスの黄変 (青が落ちて暖色寄り)

@@ -47,6 +47,25 @@
 | Purkinje 効果の桿体輝度 | Larson et al., "A Visibility Matching Tone Reproduction Operator for High Dynamic Range Scenes", TVCG 1997 | lib/post/grading.glsl |
 | ASC CDL | American Society of Cinematographers, ASC Color Decision List | lib/post/tonemap.glsl, program/final.fsh |
 
+## レンズの処方の出典
+
+レンズプリセット 7-18 (lib/post/lens_presets.glsl, tools/gen_lens_ghosts.py) の処方は、次の特許の実施例の数値 (曲率半径・面間隔・屈折率・アッベ数) を公称焦点距離に拡大して使った。有効半径は特許に無いので、surfaceandstop.com (https://surfaceandstop.com/lenses/) の推定値を使った。13-18 は Bill Claff の PhotonsToPhotos Optical Bench (https://www.photonstophotos.net/GeneralTopics/Lenses/OpticalBench/OpticalBench.htm) の転記とも照合した (Canon 50mm f/0.95 はこの転記だけ)。ゴーストの光路は Lee & Eisemann, "Practical Real-Time Lens-Flare Rendering", EGSR 2013 の近軸行列近似で解いた
+
+| プリセット | 特許 |
+|---|---|
+| Zeiss Sonnar 50mm f/1.5 | US 2,186,621 (L. Bertele, 1940) Fig. 1 |
+| Leica Summilux 35mm f/1.4 | US 2,975,673 (W. Mandler, E. Wagner, 1961) Table 1 |
+| Canon 50mm f/1.2 | US 2,836,102 (H. Ito, 1958) Example 2 |
+| Zeiss Hologon 15mm f/8 | US 3,661,447 (E. Glatzel, H. Schulz, 1972) Table I |
+| Carl Zeiss Jena Flektogon 20mm f/4 | DE 1,192,845 B (VEB Carl Zeiss Jena, 1965) 実施例 1 |
+| Minolta Fish-eye Rokkor 16mm f/2.8 | US 3,589,798 (T. Ogura, 1971) Embodiment II |
+| Nikon Gyogyotto 20mm f/8 | US 5,949,588 (K. Ohshita, A. Shibayama, 1999) Table 8 |
+| Voigtländer Ultra Wide-Heliar 12mm f/5.6 | JP 2001-124985 A (コシナ, 2001) 実施例 1 |
+| Canon New FD 14mm f/2.8L | JP S57-64716 A (池森敬二, 1982) 実施例 1 |
+| Minolta STF 135mm f/2.8 [T4.5] | JP H11-231209 A (工藤吉信, 1999) 実施例 1 |
+| Pentax SMC FA 28mm f/2.8 Soft | US 5,822,132 (J. Hirakawa, 1998) Example 1 |
+| Canon 50mm f/0.95 | JP S39-10178 (キヤノン, 1964) 実施例 1 (原本は未確認) |
+
 ## 参考にしたシェーダー (コードは不使用)
 
 Rethinking Voxels (gri573), Shrimple (Null-MC), Photon (sixthsurge), iterationT (Tahnass), Nostalgia / Kappa (RRe36), Chocapic13, Bliss (X0nk), BSL (capt tatsu), Complementary (EminGT), Solas / Revelation (HaringPro) ほか。調査内容は `docs/` を参照。

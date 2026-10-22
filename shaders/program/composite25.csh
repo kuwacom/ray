@@ -49,7 +49,9 @@ uint flareVisibilityTap(uint index) {
         // SH の DC 項 x Y00 = 空の平均放射
         float skyLum = luminance(frameData.skySH[0].rgb) * 0.282095;
         if (skyLum > 1e-6) {
-            float l = luminance(sanitizeColor(textureLod(colortex0, clamped, 0.0).rgb));
+            // 歪曲・魚眼を TAA で組み立てた時は colortex0 が出力の座標なので、光源の出力の位置で読む
+            vec2 colorUv = LENS_WARP_TAA ? lensForwardUv(clamped) : clamped;
+            float l = luminance(sanitizeColor(textureLod(colortex0, colorUv, 0.0).rgb));
             vis *= saturate(log2(max(l / skyLum, 1.0) / 4.0) / 10.0);
         }
     }
@@ -195,7 +197,7 @@ void main() {
             vec2 uv = (vec2(cell) + jitter) / float(METER_GRID);
             ivec2 p = ivec2(uv * screen);
             // 手 (たいまつを持った手など) は露出を引っ張らないよう測らない
-            if (isHandDepth(texelFetch(depthtex0, p, 0).r)) continue;
+            if (isHandDepth(texelFetch(depthtex0, LENS_WARP_TAA ? postSourceTexel(uv) : p, 0).r)) continue;
             // テクセルの角で双線形サンプルすると 2x2 の平均が 1 回で取れる
             vec2 corner = vec2(max(p, ivec2(1))) / screen;
             float l = luminance(sanitizeColor(textureLod(colortex0, corner, 0.0).rgb));

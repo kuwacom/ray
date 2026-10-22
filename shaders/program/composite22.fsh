@@ -6,7 +6,7 @@
  * - 前景層: 中心より手前で大きくボケたサンプルは、覆っている割合をアルファにして上に重ねる (前ボケが輪郭の外へ広がる)
  * - 手は除外 (ぼかさず、周りへも滲ませない)。TAA より後なのでサンプル配置は固定 (時間ノイズを出さない)
  * - レンズの収差 (プリセット lib/post/lens_presets.glsl): 口径食 (猫目), 非点収差 (ぐるぐるボケ), 像面湾曲,
- *   軸上色収差 (チャンネルごとのボケ半径), アナモルフィックの楕円ボケ, 縁の明るいボケ (球面収差)
+ *   軸上色収差 (チャンネルごとのボケ半径), アナモルフィックの楕円ボケ, 縁の明るいボケ (球面収差), 縁の溶けるボケ (アポダイゼーション)
  * フォーカス距離は FrameData.focusDistance (composite25 が前フレームに平滑化して書いた値)
  * post モジュール (lib/post)
  */
@@ -48,19 +48,49 @@ float dofDistance(float depth) {
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
     vec4 centerRaw = texelFetch(colortex0, texel, 0);
-    float depth0 = texelFetch(depthtex0, texel, 0).r;
+    vec2 uv = (vec2(texel) + 0.5) * texelSize();
+    // 歪曲・魚眼を TAA で組み立てた時は colortex0 が出力の座標なので、深度は元画像の位置で読む (lib/post/lens.glsl)
+    float depth0 = texelFetch(depthtex0, LENS_WARP_TAA ? postSourceTexel(uv) : texel, 0).r;
     if (isHandDepth(depth0)) {
         outColor = centerRaw;
         return;
     }
 
-    vec2 uv = (vec2(texel) + 0.5) * texelSize();
+    // 収差の強さを決める半径。魚眼は final で再投影されるので、出力 (レンズの画角) 側の半径で引く
+#if LENS_PROJECTION == 1
+    float rhoField = lensFieldRho(uv);
+    float r2 = rhoField * rhoField;
+#else
     float r2 = lensRadius2(uv);
-    // 像面湾曲: 周辺ほどピントが手前に来る (背景のボケが周辺で増える)
-    float focus = max(frameData.focusDistance, 0.1) / (1.0 + FIELD_CURVATURE * r2);
-    float dist0 = dofDistance(depth0);
-    float cocSigned0 = circleOfConfusion(dist0, focus);
+    float rhoField = sqrt(r2);
+#endif
+    /*
+     * TAA で組み立てた時は、画面がすでに出力の座標なので出力の半径で引く
+     * ボケの大きさ (元画像の画素) は出力の拡大率を掛けて直し、放射と接線の拡大率の差はボケの縦横比にする
+     */
+    vec2 warpMag = postMagnification(uv);
+    float cocMag = 1.0;
+    if (LENS_WARP_TAA) {
+        lensProjectUv(uv, rhoField);
+        r2 = rhoField * rhoField;
+        cocMag = sqrt(warpMag.x * warpMag.y);
+    }
+    // 像面湾曲: 正は周辺ほどピントが手前に来る (背景のボケが周辺で増える)、負は奥に来る
+    float focus = max(frameData.focusDistance, 0.1) / max(1.0 + FIELD_CURVATURE * r2, LENS_FIELD_CURVATURE_MIN);
     float maxRadius = dofMaxRadius();
+    /*
+     * 処方の像面湾曲・非点収差 (lib/post/lens.glsl lensFieldDefocus): 像面の焦点ずれをボケ半径に足す
+     * 子午と球欠の平均はボケの大きさに、差はボケの縦横比 (下の axisScale) に効く
+     */
+#if defined LENS_SWIRL && defined LENS_FIELD_TABLE
+    vec2 fieldCoc = lensFieldDefocus(rhoField);
+#else
+    const vec2 fieldCoc = vec2(0.0);
+#endif
+    float cocBias = 0.5 * (fieldCoc.x + fieldCoc.y);
+    float dist0 = dofDistance(depth0);
+    float objectCoc0 = circleOfConfusion(dist0, focus) * cocMag;
+    float cocSigned0 = clamp(objectCoc0 + cocBias, -maxRadius, maxRadius);
 
     /*
      * 軸上色収差: 波長ごとにピント位置がずれる。緑を基準に赤と青 (マゼンタ) のボケ半径を負の側へずらすと、
@@ -86,11 +116,11 @@ void main() {
             float a = (float(i) + 0.5 * float(ring)) * (TAU / 8.0);
             vec2 p = uv + vec2(cos(a), sin(a)) * reach * texelSize();
             if (any(lessThan(p, vec2(0.0))) || any(greaterThan(p, vec2(1.0)))) continue;
-            float d = texelFetch(depthtex0, ivec2(p * viewSize()), 0).r;
+            float d = texelFetch(depthtex0, postSourceTexel(p), 0).r;
             if (isHandDepth(d)) continue;
             float dist = dofDistance(d);
             if (dist >= dist0) continue;
-            float c = -circleOfConfusion(dist, focus);
+            float c = -clamp(circleOfConfusion(dist, focus) * cocMag + cocBias, -maxRadius, maxRadius);
             if (c > reach * 0.5) nearCoc = max(nearCoc, c);
         }
     }
@@ -122,10 +152,17 @@ void main() {
      * 非点収差: 周辺のボケは接線方向と放射方向で大きさが違い、後ボケは接線方向に伸びて背景が渦を巻く (ぐるぐるボケ)
      * 前ボケでは伸びる向きが入れ替わる
      */
+#if defined LENS_SWIRL && defined LENS_FIELD_TABLE
+    // 処方の非点収差: 放射方向の広がりは子午、接線方向は球欠の焦点ずれで決まる (前ボケと後ボケで伸びる向きが入れ替わる)
+    vec2 axisScale = clamp(abs(vec2(objectCoc0) + fieldCoc) / max(abs(cocSigned0), 1.0), 0.25, 4.0);
+#else
     float stretch = 1.0 + SWIRL * r2;
     vec2 axisScale = cocSigned0 >= 0.0 ? vec2(1.0 / sqrt(stretch), stretch) : vec2(stretch, 1.0 / sqrt(stretch));
+#endif
+    // 魚眼の周辺は放射方向に縮むので、出力ではボケも放射方向に潰れる
+    if (LENS_WARP_TAA) axisScale *= warpMag / cocMag;
     // 口径食: 入射瞳 (半径 pupil) のうち、ずれた前玉の縁 (半径 1) の内側だけが通る -> 猫目 (レモン形) のボケ
-    vec2 catsEye = lensCatsEye(uv);
+    vec2 catsEye = lensCatsEyeRho(rhoField);
     float catsShift = max(catsEye.y - (1.0 - catsEye.x), 0.0) * 0.5 / catsEye.x;
 
     /*
@@ -154,6 +191,13 @@ void main() {
     float nearCocSum = 0.0;
     float nearCount = 0.0;
     float accepted = 0.0;
+    /*
+     * アポダイゼーションの瞳の透過率 exp(-β ρp^2)。絞ると開口の外側 (透過率の低い所) が切れて普通の円板に近づくので、
+     * ρp の範囲は開放の口径に対する今の口径の比まで。円板全体の平均の重みが 1 になるよう割る
+     */
+    float apodScale = clamp(LP_F_OPEN / lensFNumber(), 0.05, 1.0);
+    float apodBeta = LP_APODIZATION * apodScale * apodScale;
+    float apodNorm = apodBeta > 1e-4 ? apodBeta / (1.0 - exp(-apodBeta)) : 1.0;
 
     for (int i = 0; i < sampleCount; i++) {
         float r = sqrt((float(i) + 0.5) / sampleCountF);
@@ -173,15 +217,20 @@ void main() {
         vec2 uvS = uv + o * radius * texelSize();
         if (any(lessThan(uvS, vec2(0.0))) || any(greaterThan(uvS, vec2(1.0)))) continue;
 
-        float depthS = texelFetch(depthtex0, ivec2(uvS * viewSize()), 0).r;
+        float depthS = texelFetch(depthtex0, postSourceTexel(uvS), 0).r;
         if (isHandDepth(depthS)) continue;
         float distS = dofDistance(depthS);
-        float cocSignedS = circleOfConfusion(distS, focus);
+        float cocSignedS = clamp(circleOfConfusion(distS, focus) * cocMag + cocBias, -maxRadius, maxRadius);
         float cocS = abs(cocSignedS);
         vec3 cocS3 = abs(cocSignedS + lca);
         vec3 colorS = sanitizeColor(textureLod(colortex0, uvS, lod).rgb);
-        // 球面収差: ボケの縁が明るい (正) / 中心が明るい (負)。円板全体の平均の重みは 1 のまま
-        float rim = 1.0 + LP_BOKEH_RIM * (2.0 * r * r - 1.0);
+        /*
+         * 球面収差: ボケの縁が明るい (正) / 中心が明るい (負)。円板全体の平均の重みは 1 のまま
+         * LP_SA_RIM は後ボケの値で、前ボケでは符号が逆になる (補正不足のレンズは後ボケが柔らかく前ボケの縁が立つ)
+         */
+        float rim = 1.0 + (LP_BOKEH_RIM + (cocSignedS >= 0.0 ? LP_SA_RIM : -LP_SA_RIM)) * (2.0 * r * r - 1.0);
+        // アポダイゼーション (STF): ボケの円板の中での位置 rDisc / cocS を瞳の半径にして、周辺ほど暗くする
+        if (LP_APODIZATION > 0.0) rim *= exp(-apodBeta * sqr(min(rDisc / max(cocS, 0.5), 1.0))) * apodNorm;
 
         bool inFront = centerNear ? cocSignedS < 0.0 && distS < dist0 * 1.03 + 0.05
                                   : distS < dist0 * 0.97 - 0.05 && cocS > coc0;

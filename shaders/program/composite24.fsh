@@ -36,6 +36,8 @@ float sunMask(vec2 uv, float spreadPx) {
 #ifdef HAS_SKY
     if (shadowLightPosition.z >= 0.0) return 1.0;
     vec2 lightUv = viewToScreen(shadowLightPosition).xy;
+    // 歪曲・魚眼を TAA で組み立てた時は、ブルームのタイルも出力の座標
+    if (LENS_WARP_TAA) lightUv = lensForwardUv(lightUv);
     vec2 d = (uv - lightUv) * vec2(aspectRatio, 1.0);
     float r = 0.012 + spreadPx / viewHeight;
     return smoothstep(r, r * 2.0, length(d));

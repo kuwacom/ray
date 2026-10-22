@@ -107,13 +107,13 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 23 | composite1.vsh/fsh | surface | 半透明合成 (屈折・水中吸収・反射) | colortex0/4/5, reflectionImg | colortex0 | 画面 | 常時 |
 | 24 | composite10.csh | sky | VL / 高さフォグのレイマーチ (影マップ空間 + floodfill + 雲影) | 影マップ, flood, cloudShadow | colorimg12 (左上 1/VL_RES), fogHistoryImg | local 8², 1/VL_RES | VL |
 | 25 | composite11.vsh/fsh | sky | フォグ / VL の適用 (バイラテラルアップサンプル)、水中フォグ | colortex0/12 | colortex0 | 画面 | 常時 |
-| 26 | composite20.vsh/fsh | post | TAA | colortex0/13/15 | colortex0, colortex13 | 画面 | TAA |
+| 26 | composite20.vsh/fsh | post | TAA (LENS_WARP_TAA の時は歪曲・魚眼の組み立ても) | colortex0/13/15 | colortex0, colortex13 | 画面 | TAA |
 | 27 | composite21.vsh/fsh | post | モーションブラー | colortex0/15 | colortex0 | 画面 | MOTION_BLUR |
 | 28 | composite22.vsh/fsh | post | DoF (MIP-Bokeh, colortex0 ミップ) | colortex0, SSBO0 focus | colortex0 | 画面 | DOF |
 | 29 | composite23.vsh/fsh | post | ブルーム縮小タイル | colortex0 ミップ | colortex14 | 画面 | BLOOM |
 | 30 | composite24.vsh/fsh | post | ブルームぼかし | colortex14 | colortex14 | 画面 | BLOOM |
 | 31 | composite25.csh | post | 自動露出 (ヒストグラム) + オートフォーカス | colortex0, centerDepthSmooth | SSBO0 exposure/focus/histogram | local 16², (1,1,1) | 常時 |
-| 32 | final.vsh/fsh | post | ブルーム合成・フレア・露出・AgX・色調整・CAS・ディザ・デバッグ表示 | colortex0/14, SSBO0 | 画面 | 画面 | 常時 |
+| 32 | final.vsh/fsh | post | 歪曲と魚眼の再投影・ブルーム合成・フレア・露出・AgX・色調整・CAS・ディザ・デバッグ表示 | colortex0/14, SSBO0 | 画面 | 画面 | 常時 |
 
 補足
 - shadowcomp は使わない。floodfill を deferred に置くのは、gbuffers_entities (deferred より前) が登録した画面内のエンティティ光源を同じフレームで取り込むため (voxelEmitImg は毎フレームクリアされる)
@@ -386,6 +386,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | 露出 | ヒストグラム (FrameData.histogram) + 非対称の順応速度 (明るい方へ 3 倍速) + 範囲制限 | iterationt.md のタイル式 AE / rendering-research.md「トーンマップ / 色作り」の「自動露出」 | post |
 | トーンマップ | AgX (多項式近似, 公知) を既定、AgX Punchy / ACES / Reinhard-Jodie / AgX Golden / PBR Neutral を選択式 (TONEMAP 0-5)。後段で彩度・コントラスト・ホワイトバランス・CAS・ビネット・8bit ディザ | rendering-research.md「トーンマップ / 色作り」 | post |
 | レンズフレア | 太陽・月のレンズフレア。既定 ON (全プロファイルで ON) | - | post |
+| レンズプリセット | LENS_PRESET 0 はカスタム (LENS_C_*)、1 は現代の単焦点 (既定)、2-6 は推定値の味付け、7-18 は特許の処方から計算した値 (ゴースト表 `tools/gen_lens_ghosts.py`、歪曲 K1-K3、魚眼の写像、周辺光量と像面の焦点ずれの 9 点の表、STF のアポダイゼーション `LENS_APODIZATION_BETA` (composite22 のボケのサンプルに瞳の透過率を掛ける)、FA 28 Soft と Canon 50/0.95 の球面収差のハロー `LENS_SOFT_HALO_TABLE` (final で F 値ごとの半径に合うブルームのタイルを混ぜる))。新しいレンズは後ろに足し、既存の番号は変えない。歪曲と魚眼は TAA・DoF・ブルームの後、final の最初で出力 -> 元画像へ再投影し (`lensProjectUv`)、魚眼と歪曲の強い時 (LENS_WARP_IN_TAA の自動) は TAA (composite20) の中で出力の画面を組み立ててジッターで中央の細かさを戻す (以降の colortex0・colortex13・ブルームは出力の座標になり、深度・G バッファ・速度だけ `postSourceUv` で元画像の位置を読む)。太陽・月のフレアは光源を出力側へ写して (`lensForwardUv`) 出力の座標で描く。直線写像で歪曲 0 のプリセットでは再投影は定数畳み込みで消える | reference/techniques/vintage-lenses.md, lens-optics.md | post |
 
 ---
 

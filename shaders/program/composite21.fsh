@@ -18,7 +18,7 @@ float maxBlurLength() { return MOTION_BLUR_MAX_LENGTH * viewHeight; }
 
 // ピクセル単位の露光中の移動量 (今 - 前)。長さは上限で切る
 vec2 blurVelocity(vec2 uv, float depth) {
-    vec2 v = (uv - getPreviousUv(uv, depth)) * viewSize() * (MOTION_BLUR_SHUTTER * MOTION_BLUR_STRENGTH);
+    vec2 v = (uv - postPreviousUv(uv, depth)) * viewSize() * (MOTION_BLUR_SHUTTER * MOTION_BLUR_STRENGTH);
     float len = length(v);
     float maxLen = maxBlurLength();
     return len > maxLen ? v * (maxLen / len) : v;
@@ -38,7 +38,8 @@ void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
     vec4 centerRaw = texelFetch(colortex0, texel, 0);
     vec2 uv = (vec2(texel) + 0.5) * texelSize();
-    float depthX = texelFetch(depthtex0, texel, 0).r;
+    // 歪曲・魚眼を TAA で組み立てた時は colortex0 が出力の座標なので、深度は元画像の位置で読む (lib/post/lens.glsl)
+    float depthX = texelFetch(depthtex0, LENS_WARP_TAA ? postSourceTexel(uv) : texel, 0).r;
 
     if (isHandDepth(depthX)) {
         outColor = centerRaw;
@@ -56,7 +57,7 @@ void main() {
         float a = float(i) * (TAU / 8.0);
         vec2 p = uv + vec2(cos(a), sin(a)) * reach * texelSize();
         if (any(lessThan(p, vec2(0.0))) || any(greaterThan(p, vec2(1.0)))) continue;
-        float d = texelFetch(depthtex0, ivec2(p * viewSize()), 0).r;
+        float d = texelFetch(depthtex0, postSourceTexel(p), 0).r;
         if (isHandDepth(d)) continue;
         vec2 v = blurVelocity(p, d);
         float s = length(v);
@@ -83,7 +84,7 @@ void main() {
         vec2 uvY = uv + offsetPx * texelSize();
         if (any(lessThan(uvY, vec2(0.0))) || any(greaterThan(uvY, vec2(1.0)))) continue;
 
-        float depthY = texelFetch(depthtex0, ivec2(uvY * viewSize()), 0).r;
+        float depthY = texelFetch(depthtex0, postSourceTexel(uvY), 0).r;
         bool handY = isHandDepth(depthY);
         float speedY = handY ? 0.0 : length(blurVelocity(uvY, depthY));
         float distY = viewDistance(depthY);
