@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Editor/ OS
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# tmp
+/tmp/
+*.spv
+*.log
+
+# zip
+/dist/
+*.zip
+
+# dev
+docs/dev/
+docs/reference/
+/.work/
+
+# tools: 各自の環境で用意するもの
+# glslang は各自ダウンロードして置く
+/tools/glslang/
+# 検証ツールの成功キャッシュ (validate_shaders.py, gl_compile_check.py)
+/tools/.cache/
+# 定点シーンは自分のワールドの座標で作る (雛形は tools/scenes.example.json)
+/tools/scenes.json

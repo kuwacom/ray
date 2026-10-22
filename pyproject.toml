@@ -1,0 +1,16 @@
+[project]
+name = "ray-tools"
+version = "0.1.0a0"
+description = "Ray シェーダーパックの生成・検証・ゲーム内デバッグ用スクリプト (tools/)"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    # テクスチャ生成 (gen_*.py)。numpy 2 は float32 の型昇格が変わり、同じシードでも雲のノイズが同じ値にならない
+    "numpy>=1.24,<2",
+    # gl_compile_check.py が不可視ウィンドウで OpenGL コンテキストを作るため
+    "glfw>=2.7",
+    "PyOpenGL>=3.1",
+]
+
+[tool.uv]
+# tools/ はスクリプトの集まりでパッケージとしては配布しない
+package = false
