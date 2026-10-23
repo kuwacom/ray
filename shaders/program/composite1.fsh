@@ -437,7 +437,8 @@ vec3 foamRadiance(vec3 surfPlayer, vec3 n, vec2 lm, vec3 sunVis) {
 
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
-    vec3 scene = texelFetch(colortex0, texel, 0).rgb;
+    vec4 sceneIn = texelFetch(colortex0, texel, 0);
+    vec3 scene = sceneIn.rgb;
     vec4 translucent = texelFetch(colortex4, texel, 0);
     float d0 = texelFetch(depthtex0, texel, 0).r;
     float d1 = texelFetch(depthtex1, texel, 0).r;
@@ -453,7 +454,10 @@ void main() {
     if (!hasSurface) {
         vec3 color = scene;
         if (d1 < 1.0) color += opaqueEnvSpecular(texel, d1);
-        outColor = vec4(color * (1.0 - translucent.a) + translucent.rgb, 1.0);
+        vec3 result = color * (1.0 - translucent.a) + translucent.rgb;
+        // 水たまりの輝点 (deferred30 が a = 1 + 割合で渡す) の割合を、足した鏡面と重なった半透明の分だけ直して渡す
+        float sceneGlint = saturate(sceneIn.a - 1.0) * luminance(scene);
+        outColor = vec4(result, 1.0 + saturate(sceneGlint * (1.0 - translucent.a) / max(luminance(result), 1e-6)));
         return;
     }
 

@@ -54,6 +54,49 @@ vec3 lavaRadiance(vec3 albedo) {
 
 // 影マップの外での日向の判定 (スカイライトがこれ以上なら日向とみなす)
 const vec2 SHADOW_FALLBACK_SKYLIGHT = vec2(0.8, 0.97);
+const float PUDDLE_GLINT_MIN_VOH = 0.05;
+
+/*
+ * 水たまりの光 L の鏡面。傾きの分散 slopeVar で広げた滑らかなローブを (1 - share) 残し、share を輝点にする
+ * (lib/surface/water.glsl の waterSunGlint。composite1 の水面の sunGlint と同じ分け方)
+ * 戻り値 rgb = 鏡面の放射輝度, a = そのうち輝点の輝度 (composite20 の TAA を通さずに足す分)
+ */
+vec4 puddleSpecular(Material m, vec3 N, vec3 V, LightSample L, vec3 playerPos, vec3 geoNormal, float slopeVar, float share) {
+    Material rough = m;
+    rough.roughness = sqrt(sqr(m.roughness) + slopeVar);
+    vec3 lobe = evalDirectSpecular(rough, N, V, L);
+    if (maxOf(lobe) <= 0.0) return vec4(0.0);
+    float dist = length(playerPos);
+    float pixelWorld = dist * 2.0 / (gbufferProjection[1][1] * viewSize().y);
+    float NoVGeo = abs(dot(V, geoNormal));
+    vec3 H = normalize(V + L.direction);
+    /*
+     * waterSunGlint の円盤の面積は、光源の立体角を半ベクトルへ写す 1 / (4 VoH) を省いている。低い太陽を見る水たまり (VoH 0.1-0.3)
+     * では光源を映す面の数が数分の一になり、点が少なく、1 点が下の上限で切られて照り返しの明るさの大半が消えていた
+     * 水面は今の見た目で合わせてあるので変えず、ここで円盤の半径を広げて渡す
+     */
+    float facetRadius = L.angularSize * inversesqrt(max(dot(V, H), PUDDLE_GLINT_MIN_VOH));
+    vec2 gl = waterSunGlint(playerPos.xz + cameraPosition.xz, N, V, L.direction, slopeVar, facetRadius, pixelWorld, NoVGeo);
+    // 1 枚の面が映す明るさは光源の円盤の鏡像まで (GGX の裾と正規分布の裾の違いで出る極端な値を抑える)
+    vec3 mirror = L.irradiance * materialFresnel(m, saturate(dot(V, H))) / (PI * sqr(max(L.angularSize, 1e-3)));
+    vec3 point = min(lobe * gl.y, mirror) * share;
+    return vec4(lobe * (1.0 - share + share * (gl.x - gl.y)) + point, luminance(point));
+}
+
+// 直接光 (拡散 + 鏡面)。水たまり (share > 0) は鏡面を puddleSpecular に置き換え、輝点の輝度を glintLum に足す
+vec3 directLight(Material m, vec3 N, vec3 V, LightSample L, vec3 playerPos, vec3 geoNormal, float slopeVar, float share, inout float glintLum) {
+    if (share <= 0.0) return evalDirectLight(m, N, V, L);
+    vec4 s = puddleSpecular(m, N, V, L, playerPos, geoNormal, slopeVar, share);
+    glintLum += s.a;
+    return max(evalDirectLight(m, N, V, L) - evalDirectSpecular(m, N, V, L), 0.0) + s.rgb;
+}
+
+vec3 directSpecular(Material m, vec3 N, vec3 V, LightSample L, vec3 playerPos, vec3 geoNormal, float slopeVar, float share, inout float glintLum) {
+    if (share <= 0.0) return evalDirectSpecular(m, N, V, L);
+    vec4 s = puddleSpecular(m, N, V, L, playerPos, geoNormal, slopeVar, share);
+    glintLum += s.a;
+    return s.rgb;
+}
 
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
@@ -77,6 +120,11 @@ void main() {
     vec4 indirect = getIndirectLight(texel);
     float pomShadow, puddle;
     readSurfaceExtra(texel, pomShadow, puddle);
+    // 水たまりの照り返しを輝点に分ける割合と傾きの分散。縁の半分から内側を水面とみなす (solid.fsh の法線の混ぜ方と同じ)
+    float puddleWeight = hand ? 0.0 : saturate(puddle * 2.0);
+    float glintShare = WATER_GLINT * PUDDLE_GLINT_POINT_SHARE * puddleWeight;
+    float glintVar = puddleSlopeVar() * puddleWeight;
+    float glintLum = 0.0;
 
     // ---- 太陽 / 月 ----
     LightSample sun = getCelestialLight();
@@ -91,7 +139,7 @@ void main() {
     float cloudShadow = getCloudShadow(playerPos);
     LightSample sunLit = sun;
     sunLit.irradiance *= sunVis * cloudShadow;
-    vec3 color = evalDirectLight(m, g.normal, V, sunLit);
+    vec3 color = directLight(m, g.normal, V, sunLit, playerPos, g.geoNormal, glintVar, glintShare, glintLum);
 
     if (m.sss > 0.0) {
         // 厚みに応じた減衰。アルベドの色ほど通りやすい (葉は緑に透ける)
@@ -105,11 +153,11 @@ void main() {
     // ---- 手持ち光源・ブロックライトの鏡面 ----
     LightSample handMain, handOff;
     getHandLights(playerPos, g.geoNormal, dither, handMain, handOff);
-    color += evalDirectLight(m, g.normal, V, handMain) + evalTranslucency(m, g.normal, V, handMain);
-    color += evalDirectLight(m, g.normal, V, handOff) + evalTranslucency(m, g.normal, V, handOff);
+    color += directLight(m, g.normal, V, handMain, playerPos, g.geoNormal, glintVar, glintShare, glintLum) + evalTranslucency(m, g.normal, V, handMain);
+    color += directLight(m, g.normal, V, handOff, playerPos, g.geoNormal, glintVar, glintShare, glintLum) + evalTranslucency(m, g.normal, V, handOff);
     LightSample blockSpec[BLOCKLIGHT_SPECULAR_LIGHTS];
     int blockSpecCount = getBlockLightSpecular(texel, playerPos, g.geoNormal, blockSpec);
-    for (int j = 0; j < blockSpecCount; j++) color += evalDirectSpecular(m, g.normal, V, blockSpec[j]);
+    for (int j = 0; j < blockSpecCount; j++) color += directSpecular(m, g.normal, V, blockSpec[j], playerPos, g.geoNormal, glintVar, glintShare, glintLum);
 
     // ---- 環境光 (空・ブロックライト・GI) ----
     float ao = g.ao * indirect.a;
@@ -142,5 +190,6 @@ void main() {
 
     if (lava) color += lavaRadiance(g.albedo) * EMISSION_STRENGTH;
     else color += g.albedo * g.emission * getVisibleEmissionLuminance() * EMISSION_STRENGTH;
-    outColor = vec4(color, 1.0);
+    // 輝点の割合を a = 1 + 割合で composite1 -> composite11 -> composite20 (TAA の後に足す) へ渡す
+    outColor = vec4(color, 1.0 + saturate(glintLum / max(luminance(color), 1e-6)));
 }
