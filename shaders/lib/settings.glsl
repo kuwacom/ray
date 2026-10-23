@@ -68,6 +68,7 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define GI_MODE 1 // [0 1 2 3] 0=なし 1=RSM 2=SSGI 3=ボクセル RT
 #define GI_SAMPLES 2 // [1 2 4 8]
 #define GI_STRENGTH 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0 6.0 8.0]
+#define GI_MULTI_BOUNCE 1.0 // [0.0 0.25 0.5 0.75 1.0] 多重反射: GI のレイが当たった面に前フレームの GI を返す量 (フレームを重ねて反射の回数が増える) 0=1 回だけ
 #define GI_SKY_OCCLUSION 0.5 // [0.0 0.25 0.5 0.75 1.0] SSGI / ボクセル RT で空の光を GI のレイの遮蔽 (向きあり) にする割合 0=スカイライトだけ (以前と同じ)
 #define GI_GROUND_REPLACE 1.0 // [0.0 0.25 0.5 0.75 1.0] 空の環境光の灰色の地面の照り返しを GI (実際の地面の色) に置き換える割合 0=置き換えない (二重に数える)
 #define GI_RES 2 // [1 2] GI 解像度の分母

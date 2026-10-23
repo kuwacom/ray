@@ -96,7 +96,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 13 | deferred_a.csh | light | 光源をワールド空間ライトビン (8³ ブロック) に振り分け | SSBO2 | SSBO3 | local 64, (64,1,1) | 常時 |
 | 14 | deferred1.csh | light | LIGHT_TRACE_COUNT 光源 (上位 N-1 個 + 残りから確率的に 1 個) の DDA トレース (直接光) | SSBO3, voxel*, G バッファ | blockLightRawImg (影あり S), blockLightAuxImg (影なし U) (左上 1/RES) | local 8², workGroupsRender = 1/LIGHT_TRACE_RES | LIGHT_SHADOWS |
 | 15 | deferred2.vsh/fsh | light | 可視率 S/U の時空間デノイズ + フル解像度の影なし照度に掛ける | blockLightRaw/Aux, colortex7 | colortex6, colortex7 | 画面 | LIGHT_SHADOWS |
-| 16 | deferred10.csh | surface | GI / AO の生値 (RSM / SSGI / ボクセル RT) | G バッファ, shadowcolor, voxel, flood | giRawImg | local 8², 1/GI_RES | GI_MODE>0 or AO_MODE>0 |
+| 16 | deferred10.csh | surface | GI / AO の生値 (RSM / SSGI / ボクセル RT)。多重反射は画面に映るヒット点の前フレームの GI (colortex9) | G バッファ, shadowcolor, voxel, flood, colortex9 | giRawImg | local 8², 1/GI_RES | GI_MODE>0 or AO_MODE>0 |
 | 17 | deferred11.vsh/fsh | surface | GI / AO のデノイズ | giRaw, colortex9 | colortex8, colortex9 | 画面 | 同上 |
 | 18 | deferred20.vsh/fsh | sky | 体積雲レイマーチ (低解像度 + チェッカーボード) | weather, skyView | colortex10 (左上 1/CLOUD_RES) | 画面 (範囲外は早期終了) | CLOUDS>=2, world0 |
 | 19 | deferred21.vsh/fsh | sky | 雲の時間アップスケール | colortex10, 履歴 | colortex11 | 画面 | 同上 |
@@ -465,6 +465,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | GI_MODE | 1 | **0** | **0** | 1 | **2** | **3** |
 | GI_SAMPLES | 2 | **1** | **1** | 2 | **4** | **8** |
 | GI_STRENGTH | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
+| GI_MULTI_BOUNCE | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
 | GI_SKY_OCCLUSION | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 |
 | GI_GROUND_REPLACE | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
 | GI_RES | 2 | 2 | 2 | 2 | 2 | **1** |

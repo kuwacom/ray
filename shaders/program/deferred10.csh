@@ -206,7 +206,8 @@ vec3 ssgiIndirect(vec3 viewPos, vec3 normal, float skyLm, vec4 noise) {
         GBufferData h = readGBuffer(ht);
         if (dot(h.normal, dir) >= 0.0) continue;
         vec3 hitPlayer = screenToPlayer(hit.xyz);
-        sum += shadeSecondaryHit(hitPlayer, h.normal, h.albedo, h.lightmap.y)
+        vec3 prev = GI_MULTI_BOUNCE > 0.0 ? giHistoryAtPlayer(hitPlayer) : vec3(-1.0);
+        sum += shadeSecondaryHitGi(hitPlayer, h.normal, h.albedo, h.lightmap.y, prev)
             + h.albedo * RCP_PI * secondaryHitBlockLight(hitPlayer, h.normal, ht, handLightIndirectScale()) * SECONDARY_BLOCKLIGHT_GAIN
             + h.albedo * h.emission * EMISSION_LUMINANCE * EMISSION_STRENGTH;
     }

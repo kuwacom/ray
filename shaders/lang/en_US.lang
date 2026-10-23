@@ -137,6 +137,8 @@ value.GI_MODE.2=Screen Space
 value.GI_MODE.3=Voxel Ray Traced
 option.GI_SAMPLES=GI Samples
 option.GI_STRENGTH=GI Strength
+option.GI_MULTI_BOUNCE=Multiple Bounces
+option.GI_MULTI_BOUNCE.comment=How much of the previous frame's GI is fed back into the surfaces GI rays hit, so light bounces again with every frame. Lets light reach deeper into cave entrances and rooms at almost no cost. 0 = single bounce, 1 = physically correct (screen-space and voxel ray tracing only).
 option.GI_SKY_OCCLUSION=Sky Light Occlusion
 option.GI_SKY_OCCLUSION.comment=How much of the sky light is occluded by the GI rays. 1 = light only comes from directions that see the sky (eaves, cave entrances and the back of rooms get darker, and openings show their direction). 0 = the old skylight-only occlusion (no direction, counted twice with the bounce). The default 0.5 keeps rooms and cave entrances close to their old brightness, which full occlusion makes too dark even with multiple bounces. Screen-space and voxel ray tracing only.
 option.GI_GROUND_REPLACE=Ground Bounce Replacement

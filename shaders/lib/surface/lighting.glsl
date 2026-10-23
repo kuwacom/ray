@@ -15,16 +15,51 @@
  * 二次光線が当たった面の外向き放射輝度 (拡散のみ)
  * 太陽 (1 タップの色付き影 + 雲影) + floodfill + 空 (スカイライト)
  */
-vec3 shadeSecondaryHit(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm) {
+vec3 secondaryHitDirect(vec3 playerPos, vec3 normal) {
     LightSample sun = getCelestialLight();
     float NoL = saturate(dot(normal, sun.direction));
     vec3 E = vec3(0.0);
     if (NoL > 0.0) {
         E += sun.irradiance * NoL * sampleShadowVolume(playerPos + normal * 0.08) * getCloudShadow(playerPos);
     }
-    E += sampleFloodfill(playerPos, normal);
-    E += getSkyIrradiance(normal) * skylightCurve(skyLm);
+    return E + sampleFloodfill(playerPos, normal);
+}
+
+vec3 shadeSecondaryHit(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm) {
+    return albedo * RCP_PI * (secondaryHitDirect(playerPos, normal) + getSkyIrradiance(normal) * skylightCurve(skyLm));
+}
+
+/*
+ * 多重反射 (FB #61): GI のヒット点の間接光に前フレームの GI (colortex9 = deferred11 の履歴) を使う。
+ * 1 フレームのレイは増やさず、フレームを重ねるごとに反射が 1 回ずつ増える (Lambert の多重反射の等比級数に収束する)
+ * - 画面に映るヒット点だけ。映らない点は空の SH のまま (着色点の履歴で代用すると、地面を向く面のレイが当たる地面まで
+ *   その面と同じ暗さになり、軒下が今の 0.6 倍まで暗くなった。面の向きが違うと代用にならない)
+ * - 履歴は GI_STRENGTH 込みなので割ってから返す (返す量 x 反射率 < 1 で発散しない)
+ * - GI_TRACES_SKY では履歴に空の光も入っているので、ヒット点の空の SH (方向の無い空の光) を履歴で置き換える。
+ *   GI_SKY_OCCLUSION < 1 の時に deferred30 が空の環境光として足す分は履歴に入っていないので、その割合の SH を足す
+ * 履歴の無い点 (画面外・前フレームの画面外) は prevIndirect.x < 0 で、空の SH のまま
+ */
+vec3 shadeSecondaryHitGi(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm, vec3 prevIndirect) {
+    vec3 sky = getSkyIrradiance(normal) * skylightCurve(skyLm);
+    vec3 E = secondaryHitDirect(playerPos, normal);
+    if (prevIndirect.x >= 0.0) {
+#ifdef GI_TRACES_SKY
+        E += mix(sky, prevIndirect + sky * (1.0 - GI_SKY_OCCLUSION), GI_MULTI_BOUNCE);
+#else
+        E += sky + prevIndirect * GI_MULTI_BOUNCE;
+#endif
+    } else {
+        E += sky;
+    }
     return albedo * RCP_PI * E;
+}
+
+// GI の履歴 (照度, GI_STRENGTH を外した値)。前フレームの画面の外なら x = -1
+const float GI_HISTORY_EDGE = 0.002;
+vec3 giHistoryAtPlayer(vec3 playerPos) {
+    vec2 uv = playerToPrevScreen(playerPos).xy;
+    if (any(lessThan(uv, vec2(GI_HISTORY_EDGE))) || any(greaterThan(uv, vec2(1.0 - GI_HISTORY_EDGE)))) return vec3(-1.0);
+    return textureLod(colortex9, uv, 0.0).rgb / max(GI_STRENGTH, 1e-3);
 }
 
 /*
@@ -39,7 +74,8 @@ vec3 shadeSecondaryHit(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm) {
  * 閉じた洞窟・部屋の多重反射 (反射率 rho で 1 / (1 - rho) 倍) と、ヒット点の floodfill (近距離しか届かない) の不足を
  * まとめて SECONDARY_BLOCKLIGHT_GAIN で補う (GI だけ。反射に映る面は直接光そのまま)
  */
-const float SECONDARY_BLOCKLIGHT_GAIN = 1.5;
+// 多重反射 (GI_MULTI_BOUNCE) を入れた分は本物の多重反射が受け持つので、補いを 1 へ戻す
+const float SECONDARY_BLOCKLIGHT_GAIN = 1.5 - 0.5 * GI_MULTI_BOUNCE;
 
 /*
  * handScale: 手持ち光の分に掛ける倍率。GI では handLightIndirectScale() (HAND_LIGHT_SHADOW_STRENGTH) を渡す
@@ -155,10 +191,14 @@ vec4 traceVoxelRadiance(vec3 originPlayer, vec3 dir, float maxDist, float skyLm,
             screenTexel = t;
         }
     }
-    // useSceneColor = false は GI (多重反射の補い込み)、true は反射
-    vec3 E = useSceneColor ? secondaryHitBlockLight(hitPlayer, hitNormal, screenTexel, 1.0)
-                           : secondaryHitBlockLight(hitPlayer, hitNormal, screenTexel, handLightIndirectScale()) * SECONDARY_BLOCKLIGHT_GAIN;
-    return vec4(shadeSecondaryHit(hitPlayer, hitNormal, albedo, skyLm) + albedo * RCP_PI * E, 1.0);
+    // useSceneColor = false は GI (多重反射込み)、true は反射
+    if (useSceneColor) {
+        vec3 E = secondaryHitBlockLight(hitPlayer, hitNormal, screenTexel, 1.0);
+        return vec4(shadeSecondaryHit(hitPlayer, hitNormal, albedo, skyLm) + albedo * RCP_PI * E, 1.0);
+    }
+    vec3 E = secondaryHitBlockLight(hitPlayer, hitNormal, screenTexel, handLightIndirectScale()) * SECONDARY_BLOCKLIGHT_GAIN;
+    vec3 prev = GI_MULTI_BOUNCE > 0.0 && screenTexel.x >= 0 ? giHistoryAtPlayer(hitPlayer) : vec3(-1.0);
+    return vec4(shadeSecondaryHitGi(hitPlayer, hitNormal, albedo, skyLm, prev) + albedo * RCP_PI * E, 1.0);
 }
 
 #endif
