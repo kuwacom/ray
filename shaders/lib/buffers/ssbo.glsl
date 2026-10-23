@@ -9,6 +9,7 @@
 const int LIGHT_TABLE_SIZE = 256;   // 光源定義の数 (光源インデックス 0-255, 0 は「光らない」)
 const int SHAPE_TABLE_SIZE = 128;   // 遮蔽形状の数 (ブロック ID 300-399 -> 形状 0-99)
 const int TINT_TABLE_SIZE = 128;    // 透過色の数 (ブロック ID 200-299 -> 色 0-99)
+const int ALBEDO_TABLE_SIZE = 4096; // ブロックの平均の色の数 (ボクセルの 12bit ID をそのまま引く)
 const int MAX_GLOBAL_LIGHTS = 4096; // 1 フレームに登録できる光源インスタンス数
 
 const int LIGHT_BIN_SIZE = 8;       // ライトビン 1 辺のブロック数
@@ -47,7 +48,7 @@ layout(std430, binding = 0) buffer FrameDataBuffer {
 
 /*
  * binding 1: ブロックデータ表 (setup.csh が起動時に 1 回だけ書く。以降は読み取り専用)
- * 確保: 24576 バイト
+ * 確保: 40960 バイト (使用 36868)
  */
 struct LightDef {
     vec4 color;   // rgb = 線形色 (最大成分 1), a = 明るさ倍率
@@ -61,6 +62,12 @@ layout(std430, binding = 1) buffer BlockDataBuffer {
     uvec4 shapes[SHAPE_TABLE_SIZE]; // AABB 2 個: x/y = box0 min/max, z/w = box1 min/max (packUnorm4x8, min>max で無効)
     vec4 tints[TINT_TABLE_SIZE];    // rgb = 透過色 (線形), a = 不透明度
     uint initialized;
+    /*
+     * ボクセル ID ごとの平均の色 (sRGB 8bit を R | G << 8 | B << 16, lib/ids/block_albedo.glsl)
+     * 生成した定数配列を floodfill の全セルから直接引くと EXTREME で 37 -> 22 FPS に落ちた (この SSBO に移して 41 FPS)。
+     * 動的な添字の定数配列がスレッドごとのローカルメモリに展開されたとみられる
+     */
+    uint albedo[ALBEDO_TABLE_SIZE];
 } blockData;
 
 /*

@@ -49,6 +49,31 @@ vec3 loadPrevFlood(ivec3 cell) {
     return floodWritesA() ? imageLoad(floodImgB, prev).rgb : imageLoad(floodImgA, prev).rgb;
 }
 
+/*
+ * 照り返し (BLOCKLIGHT_BOUNCE): 隣の不透明なセルを、0 (光を吸う壁) の代わりに「自分の照度 x 壁の平均の色 x 係数」として数える
+ * 壁の色が伝搬に混ざり、色の付いた部屋では光がその色に寄る。1 面あたりの反射率を 1 未満に抑えるので、
+ * 1 ステップの増幅は 6 近傍平均 x FLOOD_DECAY (< 1) を超えず、どの係数でも発散しない (値は光源の放射以下に収まる)
+ * 壁の向こうへは何も渡さない (自分の照度を返すだけ) ので、薄い壁越しの漏れも増えない
+ * 1 面の反射率は BOUNCE_MAX_REFLECTANCE (lib/light/floodfill.glsl の wallBounceReflectance) で抑える
+ */
+
+// これより暗いセルは照り返しを計算しない (体積の大半は光の届かない暗いセルで、隣の壁を読む分だけ重くなるため)
+const float FLOOD_BOUNCE_MIN_ILLUMINANCE = 1e-4;
+
+vec3 floodBounce(ivec3 cell) {
+    vec3 self = loadPrevFlood(cell);
+    if (maxOf(self) < FLOOD_BOUNCE_MIN_ILLUMINANCE) return vec3(0.0);
+    vec3 reflectance = vec3(0.0);
+    for (int i = 0; i < 6; i++) {
+        ivec3 n = cell;
+        n[i >> 1] += (i & 1) == 0 ? 1 : -1;
+        if (!isInVoxelVolume(n)) continue;
+        int id = unpackVoxelBlockId(imageLoad(voxelBlockImg, n).r);
+        if (isVoxelOpaque(id)) reflectance += wallBounceReflectance(id);
+    }
+    return reflectance * self;
+}
+
 void registerLight(vec3 voxelPos, float range, vec3 emission, float size, bool isBlock) {
     uint slot = atomicAdd(globalLights.count, 1u);
     if (slot >= uint(MAX_GLOBAL_LIGHTS)) {
@@ -164,6 +189,7 @@ void main() {
         light = loadPrevFlood(cell + ivec3(1, 0, 0)) + loadPrevFlood(cell - ivec3(1, 0, 0))
               + loadPrevFlood(cell + ivec3(0, 1, 0)) + loadPrevFlood(cell - ivec3(0, 1, 0))
               + loadPrevFlood(cell + ivec3(0, 0, 1)) + loadPrevFlood(cell - ivec3(0, 0, 1));
+        if (BLOCKLIGHT_BOUNCE > 0.0) light += floodBounce(cell);
         light *= (FLOOD_DECAY / 6.0) * floodCellTransmittance(voxelId);
     }
     light = max(light, emission);

@@ -1,18 +1,31 @@
 """
-shaders/block.properties と shaders/item.properties を生成する (正本はこのスクリプト)
+shaders/block.properties と shaders/item.properties、ブロックの平均の色の表 shaders/lib/ids/block_albedo.glsl を生成する (正本はこのスクリプト)
 
 ID の番号帯は shaders/lib/ids/*.glsl と一致させること
 未登録のブロックはボクセルで「完全な固体」として扱われるので、光を通す形のブロックは必ずどこかに載せる。
+下の表に載っていないブロックのうち tools/block_colors.json に色のあるものは、色ごとに 2000 番台の ID (色の付いた固体) を振る
 
 使い方: uv run tools/gen_block_properties.py
 """
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SHADERS = ROOT / "shaders"
+BLOCK_COLORS = ROOT / "tools" / "block_colors.json"
+
+# 色の付いた固体の ID 帯 (lib/ids/block_ids.glsl の BLOCK_COLOR_FIRST)。ボクセルには 12bit しか入らない
+COLOR_BAND_FIRST = 2000
+COLOR_BAND_LAST = 4095
+# この刻み (sRGB 8bit) で同じになる色は 1 つの ID にまとめる。照り返しの色にはこれで十分
+COLOR_QUANT = 4
+# 色の分からない ID (未登録の固体・MOD のブロック) の色。線形 0.3 = 以前の一定のアルベド (VOXEL_HIT_ALBEDO)
+DEFAULT_ALBEDO_SRGB = (149, 149, 149)
+# 番号帯ごとに表を分ける (ID がまばらなので 1 本の表にすると無駄が多い)。光源帯は 1000 + 光源インデックス
+ALBEDO_BANDS = [(0, 100), (100, 200), (200, 300), (300, 400), (1000, 1256)]
 
 COLORS = ["white", "orange", "magenta", "light_blue", "yellow", "lime", "pink", "gray",
           "light_gray", "cyan", "purple", "blue", "brown", "green", "red", "black"]
@@ -256,10 +269,109 @@ def render(kind: str, entries: list[tuple[int, str, list[str]]]) -> str:
     return text
 
 
+def srgb_to_linear(c: float) -> float:
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def linear_to_srgb(c: float) -> float:
+    c = min(max(c, 0.0), 1.0)
+    return c * 12.92 if c <= 0.0031308 else 1.055 * c ** (1.0 / 2.4) - 0.055
+
+
+def mean_srgb(colors: list[list[int]]) -> tuple[int, int, int]:
+    """線形で平均してから sRGB 8bit へ (反射率の平均なので線形で取る)"""
+    lin = [sum(srgb_to_linear(c[i] / 255.0) for c in colors) / len(colors) for i in range(3)]
+    return tuple(int(round(linear_to_srgb(x) * 255.0)) for x in lin)
+
+
+def color_blocks(colors: dict[str, list[int]]) -> tuple[list[tuple[int, str, list[str]]], list[tuple[int, int, int]]]:
+    """表に無いブロックを色でまとめて 2000 番台の ID を振る。戻り値は (BLOCKS と同じ形の項目, ID 順の色)"""
+    # 状態付きで一部だけ載っているブロック (点灯したかまど等) は名前ごと外す。
+    # 名前だけの項目を足すと Iris の状態の対応がどちらになるか定まらないため (残りの状態は今どおり未登録の固体)
+    registered = {n.split(":")[0] for _, _, names in BLOCKS for n in names}
+    groups: dict[tuple[int, ...], list[str]] = {}
+    for name, c in colors.items():
+        if name in registered:
+            continue
+        groups.setdefault(tuple(v // COLOR_QUANT for v in c), []).append(name)
+    entries: list[tuple[int, str, list[str]]] = []
+    palette: list[tuple[int, int, int]] = []
+    for i, key in enumerate(sorted(groups)):
+        bid = COLOR_BAND_FIRST + i
+        if bid > COLOR_BAND_LAST:
+            raise SystemExit("色の付いた固体の ID が 4095 を超えた (COLOR_QUANT を大きくする)")
+        names = sorted(groups[key])
+        rgb = mean_srgb([colors[n] for n in names])
+        palette.append(rgb)
+        entries.append((bid, "colored solid #%02x%02x%02x" % rgb, names))
+    return entries, palette
+
+
+def pack_srgb(rgb: tuple[int, int, int]) -> str:
+    # unpackUnorm4x8 の x が最下位バイト
+    return "0x%06Xu" % (rgb[0] | (rgb[1] << 8) | (rgb[2] << 16))
+
+
+def render_albedo_glsl(colors: dict[str, list[int]], palette: list[tuple[int, int, int]]) -> str:
+    by_id: dict[int, tuple[int, int, int]] = {1: DEFAULT_ALBEDO_SRGB}
+    for bid, _, names in BLOCKS:
+        known = [colors[n.split(":")[0]] for n in names if n.split(":")[0] in colors]
+        if known:
+            by_id[bid] = mean_srgb(known)
+    default = pack_srgb(DEFAULT_ALBEDO_SRGB)
+
+    def table(name: str, values: list[str]) -> list[str]:
+        out = [f"const uint {name}[{len(values)}] = uint[{len(values)}]("]
+        for k in range(0, len(values), 8):
+            out.append("    " + ", ".join(values[k:k + 8]) + ("," if k + 8 < len(values) else ""))
+        out.append(");")
+        return out
+
+    lines = [
+        "/*",
+        " * ブロックの平均の色 (sRGB 8bit を R | G << 8 | B << 16 に詰めたもの)",
+        " * tools/gen_block_properties.py が tools/block_colors.json (バニラのテクスチャの平均) から生成する。手で編集しない",
+        " * 2000 番台 (色の付いた固体) は ID ごとの色、それ以外の番号帯は帯の ID に載せたブロックの平均",
+        " * バイオームで色が変わる草・葉・水は平原の色で代表させている",
+        " * setup.csh が SSBO (blockData.albedo) へ展開し、実行時は lib/light/block_data.glsl の getBlockAlbedo で引く",
+        " */",
+        "#ifndef IDS_BLOCK_ALBEDO_GLSL",
+        "#define IDS_BLOCK_ALBEDO_GLSL",
+        "",
+        f"const uint BLOCK_ALBEDO_DEFAULT = {default};",
+        "",
+    ]
+    body = []
+    for lo, hi in ALBEDO_BANDS:
+        ids = [i for i in by_id if lo <= i < hi]
+        if not ids:
+            continue
+        last = max(ids)
+        name = f"BLOCK_ALBEDO_{lo}"
+        lines += table(name, [pack_srgb(by_id[i]) if i in by_id else default for i in range(lo, last + 1)])
+        body.append(f"    if (id >= {lo} && id <= {last}) return {name}[id - {lo}];")
+    lines += table("BLOCK_ALBEDO_COLORED", [pack_srgb(c) for c in palette])
+    lines += [
+        "",
+        "uint blockAlbedoPacked(int id) {",
+        f"    if (id >= BLOCK_COLOR_FIRST) return id - BLOCK_COLOR_FIRST < {len(palette)} ? BLOCK_ALBEDO_COLORED[id - BLOCK_COLOR_FIRST] : BLOCK_ALBEDO_DEFAULT;",
+        *body,
+        "    return BLOCK_ALBEDO_DEFAULT;",
+        "}",
+        "",
+        "#endif",
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def main() -> None:
-    (SHADERS / "block.properties").write_text(render("block", BLOCKS), encoding="utf-8", newline="\n")
+    colors: dict[str, list[int]] = json.loads(BLOCK_COLORS.read_text(encoding="utf-8"))["colors"]
+    colored, palette = color_blocks(colors)
+    (SHADERS / "block.properties").write_text(render("block", BLOCKS + colored), encoding="utf-8", newline="\n")
     (SHADERS / "item.properties").write_text(render("item", ITEMS), encoding="utf-8", newline="\n")
-    print("block.properties / item.properties を生成した")
+    (SHADERS / "lib" / "ids" / "block_albedo.glsl").write_text(render_albedo_glsl(colors, palette), encoding="utf-8", newline="\n")
+    print(f"block.properties / item.properties / lib/ids/block_albedo.glsl を生成した (色の付いた固体 {len(palette)} 色)")
 
 
 if __name__ == "__main__":

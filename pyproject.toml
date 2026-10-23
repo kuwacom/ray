@@ -9,6 +9,8 @@ dependencies = [
     # gl_compile_check.py が不可視ウィンドウで OpenGL コンテキストを作るため
     "glfw>=2.7",
     "PyOpenGL>=3.1",
+    # gen_block_colors.py がクライアント jar のブロックのテクスチャ (PNG) を読むため
+    "pillow>=10",
 ]
 
 [tool.uv]

@@ -4,6 +4,7 @@
  */
 #include "/lib/common/common.glsl"
 #include "/lib/light/light.glsl"
+#include "/lib/ids/block_albedo.glsl"
 
 layout(local_size_x = 256) in;
 const ivec3 workGroups = ivec3(1, 1, 1);
@@ -13,6 +14,7 @@ void main() {
     blockData.lightDefs[i] = lightDefStatic(i);
     if (i < SHAPE_TABLE_SIZE) blockData.shapes[i] = shapeStatic(i);
     if (i < TINT_TABLE_SIZE) blockData.tints[i] = tintStatic(i);
+    for (int j = i; j < ALBEDO_TABLE_SIZE; j += 256) blockData.albedo[j] = blockAlbedoPacked(j);
 
     if (i == 0) {
         blockData.initialized = 1u;

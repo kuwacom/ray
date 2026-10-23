@@ -38,6 +38,8 @@ option.FLOODFILL=Colored Floodfill
 option.FLOODFILL.comment=Colored light that spreads through voxels. Used as indirect light when light shadows are on.
 option.FLOODFILL_STRENGTH=Floodfill Indirect Strength
 option.FLOODFILL_STRENGTH.comment=Strength of the floodfill bounce light when light source shadows are enabled.
+option.BLOCKLIGHT_BOUNCE=Block Light Wall Bounce
+option.BLOCKLIGHT_BOUNCE.comment=How much block light bounces off walls and picks up their color (a red room tints the light red). 0 = no bounce.
 option.BLOCKLIGHT_BRIGHTNESS=Block Light Brightness
 option.BLOCKLIGHT_WARMTH=Block Light Warmth
 option.BLOCKLIGHT_WARMTH.comment=0 = neutral white fire light, 1 = warm orange like vanilla.
@@ -86,6 +88,8 @@ option.HAND_LIGHT_RAYS.comment=Ray traced shadows for handheld lights.
 option.HAND_LIGHT_SS_SHADOWS=Handheld Light Contact Shadows
 option.HAND_LIGHT_SS_SHADOWS.comment=Screen space shadows from your hand and nearby entities.
 option.HAND_LIGHT_BRIGHTNESS=Handheld Light Brightness
+option.HAND_LIGHT_SHADOW_STRENGTH=Handheld Light Shadow Darkness
+option.HAND_LIGHT_SHADOW_STRENGTH.comment=How dark the shadows cast by a handheld light are. Lower lets more bounced light into the shadows, 1 = no bounce light from the handheld light.
 option.ENTITY_LIGHTS=Entity Lights
 option.ENTITY_LIGHTS.comment=Master switch for dynamic light from entities.
 option.ITEM_LIGHTS=Dropped Item Lights

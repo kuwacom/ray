@@ -200,9 +200,9 @@ float waterRefractScreenWeight(vec2 uv, vec2 tuv) {
 /*
  * 方式 D: 上から見た水面の屈折先をボクセルで辿る (画面外・手前の物の陰の水底)
  * 当たりが画面に映っていればその色。映っていなければ、ボクセル反射と同じ照明の近似 (太陽の影の 1 タップ・雲影・floodfill・空,
- * shadeSecondaryHit) で照らす。ボクセルにはブロックの色が無いので、この画素からまっすぐ見た水底 (画面に映っている同じ水の底)
+ * shadeSecondaryHit) で照らす。ボクセルにはテクスチャの模様が無いので、この画素からまっすぐ見た水底 (画面に映っている同じ水の底)
  * の周りの平均の色を、照明の近似の比 (当たり / まっすぐ見た水底) で明るさと向きの分だけ直して使う
- * (一定のアルベド VOXEL_HIT_ALBEDO で照らすと、砂の水底で画面の像との境に色と明るさの段が出る)
+ * (一定のアルベドで照らすと、砂の水底で画面の像との境に色と明るさの段が出た。借りられない時はブロックの平均の色の表を使う)
  * 戻り値 false = ボクセルの範囲外で分からない。true で何にも当たらなければ深い水 (pathLen = WATER_SKY_PATH, 色は 0)
  */
 bool waterRefractVoxel(vec3 surfPlayer, vec3 dir, vec3 floorPlayer, float d1, float skyLm, out vec3 color, out float pathLen) {
@@ -290,7 +290,7 @@ bool waterRefractVoxel(vec3 surfPlayer, vec3 dir, vec3 floorPlayer, float d1, fl
             hasRef = true;
         }
     }
-    if (!hasRef) voxelColor = shadeSecondaryHit(hitPlayer, hitNormal, vec3(VOXEL_HIT_ALBEDO), skyLm);
+    if (!hasRef) voxelColor = shadeSecondaryHit(hitPlayer, hitNormal, getBlockAlbedo(hitBlock), skyLm);
     color = mix(voxelColor, screenColor, wS);
     return true;
 }

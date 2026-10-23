@@ -161,6 +161,13 @@ LightSample evalHandLight(bool mainHand, vec3 playerPos, vec3 geoNormal, float d
  */
 const float HAND_LIGHT_FILL = 0.18;
 
+/*
+ * 手持ち光の照り返し (陰の中に回り込む分) の倍率。HAND_LIGHT_SHADOW_STRENGTH = 0.5 で以前と同じ、1 で照り返しなし
+ * 陰の中の明るさは、GI_MODE 0/1 ではほぼこの getHandLightFill だけ、GI_MODE 2/3 では GI のヒット点の手持ち光
+ * (lib/surface/lighting.glsl の secondaryHitBlockLight) と半分ずつ (実機 hand_shadow53 で計測)。両方に同じ倍率を掛ける
+ */
+float handLightIndirectScale() { return 2.0 * (1.0 - HAND_LIGHT_SHADOW_STRENGTH); }
+
 vec3 getHandLightFill(vec3 playerPos) {
 #ifdef HAND_LIGHT
     vec3 sum = vec3(0.0);
@@ -172,7 +179,7 @@ vec3 getHandLightFill(vec3 playerPos) {
         float dist = distance(getHandLightPosition(mainHand), playerPos);
         sum += lightEmission(d, float(level)) * lightFalloff(dist, lightRange(d, float(level)));
     }
-    return sum * (HAND_LIGHT_FILL * HAND_LIGHT_BRIGHTNESS);
+    return sum * (HAND_LIGHT_FILL * HAND_LIGHT_BRIGHTNESS * handLightIndirectScale());
 #else
     return vec3(0.0);
 #endif

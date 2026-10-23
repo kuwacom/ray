@@ -26,7 +26,7 @@ uint readVoxelEntity(ivec3 cell) {
 
 // 光を完全に通さないボクセルか (floodfill の壁)。部分形状・植物・半透明は通す
 bool isVoxelOpaque(int voxelId) {
-    if (voxelId == BLOCK_SOLID || (voxelId >= 10 && voxelId < 100) || voxelId == BLOCK_DOOR_CLOSED) return true;
+    if (isPlainSolidBlock(voxelId) || (voxelId >= 10 && voxelId < 100) || voxelId == BLOCK_DOOR_CLOSED) return true;
     int light = getBlockLightIndex(voxelId);
     return light != LIGHT_NONE && (getLightDef(light).info.x & LIGHT_FLAG_OCCLUDES) != 0u;
 }

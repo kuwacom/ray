@@ -8,6 +8,7 @@
  *   200-299  : 半透明 (透過色テーブル index = id - 200)
  *   300-399  : 部分形状 (形状テーブル index = id - 300)
  *   1001-1255: 光源 (光源インデックス = id - 1000, lib/ids/light_ids.glsl)
+ *   2000-4095: 色の付いた固体 (完全遮蔽。上の帯に無いブロックを平均の色ごとにまとめたもの。色は lib/ids/block_albedo.glsl)
  * ボクセルには下位 12bit しか入らないので 4095 を超える ID は作らない
  */
 #ifndef IDS_BLOCK_IDS_GLSL
@@ -63,5 +64,7 @@ const int BLOCK_SNOW_LAYER_2 = 310;     // 310-316 = 積もった雪 2-8 層 (�
 const int BLOCK_SNOW_LAYER_8 = 316;
 
 const int BLOCK_LIGHT_BASE = 1000;      // 1001-1255 が光源
+
+const int BLOCK_COLOR_FIRST = 2000;     // 2000 以降は色の付いた固体 (マテリアル・遮蔽は BLOCK_SOLID と同じ)
 
 #endif

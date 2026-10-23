@@ -5,7 +5,7 @@ Ray のテクスチャや ID 表の生成、シェーダーのコンパイル検
 
 ## 必要なもの
 
-- [uv](https://docs.astral.sh/uv/): Python 本体と依存パッケージ (numpy, glfw, PyOpenGL) はリポジトリ直下の `pyproject.toml` と `uv.lock` で管理しています
+- [uv](https://docs.astral.sh/uv/): Python 本体と依存パッケージ (numpy, glfw, PyOpenGL, Pillow) はリポジトリ直下の `pyproject.toml` と `uv.lock` で管理しています
 - glslang (Khronos) の `glslangValidator`: `validate_shaders.py` と `gl_compile_check.py` が前処理に使います。[Releases](https://github.com/KhronosGroup/glslang/releases) から取得して、PATH に置くか、環境変数 `RAY_GLSLANG` で場所を指定するか、`tools/glslang/bin/glslang.exe` に展開してください
 - [Minescript](https://minescript.net/): ゲーム内デバッグを使うときだけ必要です
 
@@ -27,7 +27,8 @@ uv sync
 | スクリプト | 生成するもの |
 |---|---|
 | `gen_wrappers.py` | `shaders/world0`, `world-1`, `world1` の include だけのラッパー。プログラムを追加・削除したときに実行します。`--check` で過不足の確認だけもできます |
-| `gen_block_properties.py` | `shaders/block.properties` と `shaders/item.properties`。ブロック・アイテム ID の表はこのスクリプトの中にあります |
+| `gen_block_properties.py` | `shaders/block.properties` と `shaders/item.properties`、ブロックの平均の色の表 `shaders/lib/ids/block_albedo.glsl`。ブロック・アイテム ID の表はこのスクリプトの中にあります。表に無いブロックは `block_colors.json` の色ごとに 2000 番台の ID にまとめます |
+| `gen_block_colors.py <client.jar>` | `tools/block_colors.json` (ブロックごとの平均の色)。Minecraft のクライアント jar のブロックモデルとテクスチャを読むだけで、jar は変更しません。バージョンを上げたときに実行し、続けて `gen_block_properties.py` を実行します |
 | `gen_blue_noise.py` | `shaders/textures/blue_noise.png` |
 | `gen_cloud_noise.py` | `shaders/textures/cloud_*.dat` |
 | `gen_water_waves.py` | `shaders/textures/water_waves.dat` |

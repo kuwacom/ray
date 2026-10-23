@@ -170,7 +170,7 @@ vec3 ssgiIndirect(vec3 viewPos, vec3 normal, vec4 noise) {
         if (dot(h.normal, dir) >= 0.0) continue;
         vec3 hitPlayer = screenToPlayer(hit.xyz);
         sum += shadeSecondaryHit(hitPlayer, h.normal, h.albedo, h.lightmap.y)
-            + h.albedo * RCP_PI * secondaryHitBlockLight(hitPlayer, h.normal, ht) * SECONDARY_BLOCKLIGHT_GAIN
+            + h.albedo * RCP_PI * secondaryHitBlockLight(hitPlayer, h.normal, ht, handLightIndirectScale()) * SECONDARY_BLOCKLIGHT_GAIN
             + h.albedo * h.emission * EMISSION_LUMINANCE * EMISSION_STRENGTH;
     }
     // 余弦重みサンプルの照度の推定量 E = pi / N * sum(L)

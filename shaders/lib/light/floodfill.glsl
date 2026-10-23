@@ -64,6 +64,53 @@ vec3 sampleFloodfill(vec3 playerPos, vec3 normal) {
 #endif
 }
 
+/*
+ * 着色点のすぐ横の壁からの照り返しの割合 (rgb, BLOCKLIGHT_BOUNCE)。照度に掛けて足す
+ * floodfill の伝搬にも壁の色を混ぜているが、光源シャドウ ON では floodfill は FLOODFILL_STRENGTH 倍の控えめな間接光なので、
+ * トレースした直接光に埋もれて壁の色がほとんど見えなかった (実機 b53h)。受け取り側で、法線に垂直な 4 方向
+ * BOUNCE_LOCAL_REACH ブロック以内の不透明な壁を探し、壁の平均の色 x 近さの重みを返す
+ * 壁に当たる光は分からないので、呼び出し側が着色点の照度で代用する (壁ぎわの床と壁はほぼ同じ距離で光源に照らされる)
+ */
+const float BOUNCE_LOCAL_REACH = 2.0;
+// 壁に接した所の重み (隣の大きな壁が見上げた半球の半分を占める時の形態係数)
+const float BOUNCE_LOCAL_FORM_FACTOR = 0.5;
+// 壁 1 面の反射率の上限 (伝搬の照り返しと同じ)
+const float BOUNCE_MAX_REFLECTANCE = 0.9;
+
+vec3 wallBounceReflectance(int voxelId) {
+    return min(getBlockAlbedo(voxelId) * BLOCKLIGHT_BOUNCE, vec3(BOUNCE_MAX_REFLECTANCE));
+}
+
+vec3 localWallBounce(vec3 playerPos, vec3 geoNormal) {
+    vec3 sum = vec3(0.0);
+#ifdef FLOODFILL
+    if (BLOCKLIGHT_BOUNCE <= 0.0) return sum;
+    vec3 v = playerToVoxel(playerPos + geoNormal * 0.5);
+    if (!isInVoxelVolume(v)) return sum;
+    vec3 an = abs(geoNormal);
+    int axis = an.x >= an.y && an.x >= an.z ? 0 : (an.y >= an.z ? 1 : 2);
+    for (int k = 0; k < 4; k++) {
+        int a = (axis + 1 + (k >> 1)) % 3;
+        int s = (k & 1) == 0 ? 1 : -1;
+        float f = fract(v[a]);
+        // 着色点から壁の面までの距離 = 自分のセルの境界まで + 越えたセルの数
+        float dist = s > 0 ? 1.0 - f : f;
+        ivec3 c = ivec3(floor(v));
+        for (int d = 0; d < int(BOUNCE_LOCAL_REACH); d++) {
+            if (dist >= BOUNCE_LOCAL_REACH) break;
+            c[a] += s;
+            int id = unpackVoxelBlockId(readVoxelBlock(c));
+            if (isVoxelOpaque(id)) {
+                sum += wallBounceReflectance(id) * (1.0 - dist / BOUNCE_LOCAL_REACH);
+                break;
+            }
+            dist += 1.0;
+        }
+    }
+#endif
+    return sum * BOUNCE_LOCAL_FORM_FACTOR;
+}
+
 // 体積内の任意点 (フォグ用。押し出しなし。大量に呼ばれるのでハードウェア補間で軽く済ませる)
 vec3 sampleFloodfillVolume(vec3 playerPos) {
 #ifdef FLOODFILL

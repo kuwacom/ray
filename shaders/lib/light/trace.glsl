@@ -80,7 +80,7 @@ bool shapeIntersect(int voxelId, vec3 ro, vec3 rdInv, float tEnter, float tLeave
  * ブロックボクセル 1 セルの透過率 (rgb)。origin/rdInv はレイ、[tEnter, tLeave] はセル内の区間
  */
 vec3 voxelCellTransmittance(int id, ivec3 cell, vec3 origin, vec3 rdInv, float tEnter, float tLeave, uint flags) {
-    if (id == BLOCK_SOLID || (id >= 10 && id < 100)) return vec3(0.0);
+    if (isPlainSolidBlock(id) || (id >= 10 && id < 100)) return vec3(0.0);
     if (id < 200) return id == BLOCK_LEAVES ? vec3(TRACE_LEAVES_TRANSMITTANCE) : vec3(1.0);
     if (id < 300) {
         if ((flags & TRACE_TINT) != 0u) {

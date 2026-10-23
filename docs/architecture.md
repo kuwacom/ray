@@ -81,7 +81,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 
 | # | プログラム | モジュール | 役割 | 主な入力 | 主な出力 | dispatch / 解像度 | 有効条件 |
 |---|---|---|---|---|---|---|---|
-| 1 | setup.csh | light | 光源・形状・透過色の表を SSBO に構築、FrameData 初期化 | `lib/light/light_table.glsl` | SSBO1 BlockData, SSBO0 | local 256, groups (1,1,1) | 常時 |
+| 1 | setup.csh | light | 光源・形状・透過色・ブロックの平均の色の表を SSBO に構築、FrameData 初期化 | `lib/light/light_table.glsl` | SSBO1 BlockData, SSBO0 | local 256, groups (1,1,1) | 常時 |
 | 2 | setup1.csh | sky | 大気の透過率 LUT (Hillaire 2020) | - | skyTransmittanceImg 256x64 | local 8x8, (32,8,1) | ATMOSPHERE_MODE=1, world0 |
 | 3 | setup2.csh | sky | 多重散乱 LUT | skyTransmittance | skyMultiScatterImg 32x32 | local 8x8, (4,4,1) | 同上 |
 | 4 | begin.csh | light | 光源リストとライトビンのクリア | - | SSBO2 カウンタ, SSBO3 binCount | local 256, (144,1,1) | 常時 |
@@ -198,7 +198,7 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 | binding | 名前 (アクセサ) | サイズ | 内容と書き込み権 |
 |---|---|---|---|
 | 0 | FrameDataBuffer (`frameData`) | 4096 | post: exposure, exposureTarget, averageLuminance, focusDistance, histogram[256], postParams[4] / sky: sunIrradiance, moonIrradiance, shadowLightIrradiance, skySH[9], skyParams[4] / light: lightStats / surface: surfaceParams[4]。setup.csh が初期値を入れる |
-| 1 | BlockDataBuffer (`blockData`) | 24576 | `LightDef lightDefs[256]`, `uvec4 shapes[128]`, `vec4 tints[128]`。setup.csh のみが書く |
+| 1 | BlockDataBuffer (`blockData`) | 40960 | `LightDef lightDefs[256]`, `uvec4 shapes[128]`, `vec4 tints[128]`, `uint albedo[4096]` (ブロックの平均の色)。setup.csh のみが書く |
 | 2 | GlobalLightsBuffer (`globalLights`) | 131088 | `count/blockCount/entityCount/overflow` + `LightInstance lights[4096]` (posRadius: ボクセル空間位置 + 到達半径, colorSize: 放射 + 光源半径)。light のみ |
 | 3 | LightBinsBuffer (`lightBins`) | 9584640 | `binCount[36864]`, `binLights[36864*64]`。ビン = 8³ ブロック。light のみ |
 | 4 | EntityTriangleBuffer (`entityTris`) | 838672 | `counts[4]`, `groupBounds`, `clusterBounds` + `EntityTriangle tris[16384]` (ボクセル空間の三角形 v0/e1/e2 + アルファマスク)。begin.csh がクリア、shadow_entities.gsh が書く。light のみ |
@@ -231,8 +231,10 @@ struct LightInstance {
 | 200-299 | 半透明 (透過色 index = id - 200) | 200 水, 201 氷, 202 ガラス, 203 ガラス板, 204 スライム, 205 ハチミツ, 206 遮光ガラス, 210-225 色付きガラス, 230-245 色付きガラス板 |
 | 300-399 | 部分形状 (形状 index = id - 300) | 300/301 ハーフ下/上, 302/303 階段下/上, 304 フェンス, 305 塀, 306 鉄格子, 307 背の低いブロック, 308 雪の層, 309 閉じたドア・トラップドア |
 | 1001-1255 | 光源 (光源インデックス = id - 1000) | 1001 たいまつ … 1062 トライアルスポナー |
+| 2000-4095 | 色の付いた固体 (遮蔽・マテリアルは未登録の固体と同じ)。上の帯に無いブロックを平均の色ごとにまとめたもの | 羊毛・コンクリート・石・板材 (今は 2000-2351) |
 
 - ボクセルには下位 12bit しか入らないので 4095 を超える ID は作らない
+- ブロックの平均の色は `tools/gen_block_colors.py` がクライアント jar のテクスチャから `tools/block_colors.json` に書き (面積と不透明度で重み付けした線形の平均。草・葉・水は平原の色で代表)、`gen_block_properties.py` が 2000 番台の ID と `lib/ids/block_albedo.glsl` (ID ごとの色の定数表) を作る。setup.csh が SSBO1 `blockData.albedo[4096]` に展開し、実行時は `getBlockAlbedo(voxelId)` で引く (floodfill の照り返し、ボクセル RT の画面外の当たり)。2000 番台以外の ID はその ID に載せたブロックの平均、未登録 (1) は線形 0.3 の灰色
 - ブロックの状態 (`lit=true`, `berries=true`, `waterlogged=true` 等) で光る状態だけを光源 ID に入れる。光らない状態は 106 等へ
 - 正本は `tools/gen_block_properties.py` (block.properties と item.properties を生成)。GLSL 側の定数は `lib/ids/block_ids.glsl`, `lib/ids/light_ids.glsl`
 - 状態フィルタは 1 プロパティ 1 値の完全一致 (Iris `BlockMaterialMapping.checkState`)。`charges=1,2,3,4` のようなカンマ区切りは何にも一致しないので、値ごとに別エントリに展開する (`state_values()`)
@@ -253,7 +255,7 @@ struct LightInstance {
 lib/light/light_table.glsl  lightDefStatic(index) / shapeStatic(i) / tintStatic(i)   (正本, sRGB で記述)
         | setup.csh が起動時に評価
         v
-SSBO1 blockData.lightDefs[256] / shapes[128] / tints[128]
+SSBO1 blockData.lightDefs[256] / shapes[128] / tints[128] / albedo[4096] (lib/ids/block_albedo.glsl から)
         | 実行時 (lib/light/block_data.glsl)
         v
 getLightDef(index) -> lightEmission(d, level), lightRange(d, level), lightFalloff(dist, range)
@@ -333,6 +335,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 - 手法: LPV 系の 6 近傍反復伝搬、ピンポン、1 フレーム 1 ステップ。カメラ移動はセルオフセットで追従
 - 値は照度単位 (BLOCKLIGHT_ILLUMINANCE 倍済み)。R11F_G11F_B10F に直接格納 (HSV 圧縮は不要な精度)
 - LIGHT_SHADOWS が OFF なら floodfill が全光量、ON なら間接光 (x FLOODFILL_STRENGTH)
+- 壁の照り返し (BLOCKLIGHT_BOUNCE): 伝搬で隣の不透明セルを 0 の代わりに「自分の照度 x min(壁の平均の色 x BLOCKLIGHT_BOUNCE, 0.9)」として数える (1 面の反射率 < 1 なので発散しない。壁の向こうへは渡さない)。暗いセル (照度 1e-4 未満) は省く。LIGHT_SHADOWS ON では floodfill が控えめな重みで壁の色が見えないので、deferred30 の受け取り側でも法線に垂直な 4 方向 2 ブロック以内の壁の色 x 近さ x 形態係数 0.5 を着色点の照度に掛けて足す (`localWallBounce`)
 - ボクセル体積の外は `voxelEdgeFade` でバニラのライトマップへ滑らかに戻す
 - 改善の余地: 固体セルを避けた手動トリリニア (漏れ対策, Shrimple `LPV_VOXEL_TEST`)、部分形状の方向別透過
 
@@ -413,6 +416,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | VOXEL_VOLUME | 2 | **0** | **1** | 2 | 2 | **3** |
 | FLOODFILL | ON | ON | ON | ON | ON | ON |
 | FLOODFILL_STRENGTH | 0.35 | 0.35 | 0.35 | 0.35 | 0.35 | 0.35 |
+| BLOCKLIGHT_BOUNCE | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 |
 | BLOCKLIGHT_BRIGHTNESS | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
 | BLOCKLIGHT_WARMTH | 0.6 | 0.6 | 0.6 | 0.6 | 0.6 | 0.6 |
 | LIGHT_FLICKER | ON | ON | ON | ON | ON | ON |
@@ -431,6 +435,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | HAND_LIGHT_RAYS | ON | **OFF** | ON | ON | ON | ON |
 | HAND_LIGHT_SS_SHADOWS | ON | **OFF** | ON | ON | ON | ON |
 | HAND_LIGHT_BRIGHTNESS | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
+| HAND_LIGHT_SHADOW_STRENGTH | 0.6 | 0.6 | 0.6 | 0.6 | 0.6 | 0.6 |
 | ENTITY_LIGHTS | ON | **OFF** | ON | ON | ON | ON |
 | ITEM_LIGHTS | ON | ON | ON | ON | ON | ON |
 | PROJECTILE_LIGHTS | ON | ON | ON | ON | ON | ON |

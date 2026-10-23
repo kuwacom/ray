@@ -10,6 +10,9 @@ int blockIdToVoxelId(int blockId) {
     return (blockId <= 0 || blockId > 4095) ? BLOCK_SOLID : blockId;
 }
 
+// 光を通さない普通の固体 (未登録 = BLOCK_SOLID と、色の表に載せた 2000 番台)
+bool isPlainSolidBlock(int blockId) { return blockId == BLOCK_SOLID || blockId >= BLOCK_COLOR_FIRST; }
+
 bool isDecorativeBlock(int blockId) { return blockId >= BLOCK_DECOR_LAPIS && blockId <= BLOCK_DECOR_AMETHYST; }
 
 int getBlockLightIndex(int blockId) {

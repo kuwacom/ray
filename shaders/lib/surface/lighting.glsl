@@ -6,8 +6,10 @@
 #ifndef SURFACE_LIGHTING_GLSL
 #define SURFACE_LIGHTING_GLSL
 
-// ボクセルのヒット面の色が画面に無い時の代わりのアルベド (Minecraft の地形の平均的な反射率)
-const float VOXEL_HIT_ALBEDO = 0.3;
+/*
+ * ボクセルのヒット面の色が画面に無い時は、ブロックの平均の色の表 (lib/ids/block_albedo.glsl) を使う
+ * 以前は一定の灰色 (線形 0.3) で、色の付いた壁の照り返しや反射の色が画面の外で抜けていた。表に無いブロックは同じ灰色になる
+ */
 
 /*
  * 二次光線が当たった面の外向き放射輝度 (拡散のみ)
@@ -39,7 +41,12 @@ vec3 shadeSecondaryHit(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm) {
  */
 const float SECONDARY_BLOCKLIGHT_GAIN = 1.5;
 
-vec3 secondaryHitBlockLight(vec3 playerPos, vec3 normal, ivec2 screenTexel) {
+/*
+ * handScale: 手持ち光の分に掛ける倍率。GI では handLightIndirectScale() (HAND_LIGHT_SHADOW_STRENGTH) を渡す
+ * GI_MODE 2/3 では手持ち光の陰の中の明るさの半分ほどがこの GI の照り返しで、残りが getHandLightFill なので、両方に同じ倍率を掛ける
+ * 反射に映る面は照り返しではなく直接見える面なので 1 を渡す
+ */
+vec3 secondaryHitBlockLight(vec3 playerPos, vec3 normal, ivec2 screenTexel, float handScale) {
 #ifdef LIGHT_SHADOWS
     vec3 E = vec3(0.0);
     if (screenTexel.x >= 0) {
@@ -75,7 +82,7 @@ vec3 secondaryHitBlockLight(vec3 playerPos, vec3 normal, ivec2 screenTexel) {
         float range = lightRange(d, float(level));
         if (dist >= range) continue;
         float ndl = sphereLightNdotL(normal, toLight / max(dist, EPS), dist, d.shape.w);
-        E += lightEmission(d, float(level)) * lightFalloff(dist, range) * (ndl * HAND_LIGHT_BRIGHTNESS);
+        E += lightEmission(d, float(level)) * lightFalloff(dist, range) * (ndl * HAND_LIGHT_BRIGHTNESS * handScale);
     }
     #endif
     return E;
@@ -132,7 +139,7 @@ vec4 traceVoxelRadiance(vec3 originPlayer, vec3 dir, float maxDist, float skyLm,
     int hitBlock;
     if (!traceVoxelRay(playerToVoxel(originPlayer), dir, maxDist, hitVoxel, hitNormal, hitBlock)) return vec4(0.0);
     vec3 hitPlayer = voxelToPlayer(hitVoxel);
-    vec3 albedo = vec3(VOXEL_HIT_ALBEDO);
+    vec3 albedo = getBlockAlbedo(hitBlock);
     ivec2 screenTexel = ivec2(-1);
     vec3 s = viewToScreen(playerToView(hitPlayer));
     if (all(greaterThan(s.xy, vec2(0.0))) && all(lessThan(s.xy, vec2(1.0))) && s.z > 0.0 && s.z < 1.0) {
@@ -146,7 +153,8 @@ vec4 traceVoxelRadiance(vec3 originPlayer, vec3 dir, float maxDist, float skyLm,
         }
     }
     // useSceneColor = false は GI (多重反射の補い込み)、true は反射
-    vec3 E = secondaryHitBlockLight(hitPlayer, hitNormal, screenTexel) * (useSceneColor ? 1.0 : SECONDARY_BLOCKLIGHT_GAIN);
+    vec3 E = useSceneColor ? secondaryHitBlockLight(hitPlayer, hitNormal, screenTexel, 1.0)
+                           : secondaryHitBlockLight(hitPlayer, hitNormal, screenTexel, handLightIndirectScale()) * SECONDARY_BLOCKLIGHT_GAIN;
     return vec4(shadeSecondaryHit(hitPlayer, hitNormal, albedo, skyLm) + albedo * RCP_PI * E, 1.0);
 }
 

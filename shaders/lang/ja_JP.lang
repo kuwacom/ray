@@ -38,6 +38,8 @@ option.FLOODFILL=色付き floodfill
 option.FLOODFILL.comment=ボクセルを伝わって広がる色付きの光。光源シャドウが ON のときは間接光として使う
 option.FLOODFILL_STRENGTH=floodfill 間接光の強さ
 option.FLOODFILL_STRENGTH.comment=光源シャドウ ON 時の floodfill の照り返しの強さ
+option.BLOCKLIGHT_BOUNCE=ブロックライトの壁の照り返し
+option.BLOCKLIGHT_BOUNCE.comment=ブロックライトが壁で跳ね返り、壁の色が光に混ざる濃さ (赤い部屋では光が赤みを帯びる)。0 = 照り返しなし
 option.BLOCKLIGHT_BRIGHTNESS=ブロックライトの明るさ
 option.BLOCKLIGHT_WARMTH=ブロックライトの暖かさ
 option.BLOCKLIGHT_WARMTH.comment=0 = 白に近い中性の炎の色、1 = バニラのような橙色
@@ -86,6 +88,8 @@ option.HAND_LIGHT_RAYS.comment=手持ち光源の影をレイトレースする
 option.HAND_LIGHT_SS_SHADOWS=手持ち光源の接触影
 option.HAND_LIGHT_SS_SHADOWS.comment=手や近くのエンティティによるスクリーンスペースの影
 option.HAND_LIGHT_BRIGHTNESS=手持ち光源の明るさ
+option.HAND_LIGHT_SHADOW_STRENGTH=手持ち光源の陰の濃さ
+option.HAND_LIGHT_SHADOW_STRENGTH.comment=手持ち光源で物の陰になる部分の暗さ。低いほど照り返しが陰に回り込んで薄くなり、1 で手持ち光源の照り返しなし
 option.ENTITY_LIGHTS=エンティティ光源
 option.ENTITY_LIGHTS.comment=エンティティによる動的な光の総スイッチ
 option.ITEM_LIGHTS=ドロップした光源アイテム

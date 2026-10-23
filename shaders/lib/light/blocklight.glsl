@@ -54,6 +54,8 @@ vec3 getBlockLightOpaque(ivec2 texel, vec3 playerPos, vec3 geoNormal, vec3 norma
 #ifdef LIGHT_SHADOWS
     vec3 direct = texelFetch(colortex6, texel, 0).rgb;
     vec3 voxelLight = direct + flood * FLOODFILL_STRENGTH;
+    // 壁の照り返し (floodfill の伝搬の照り返しは上の FLOODFILL_STRENGTH 倍では見えないため、すぐ横の壁の分を足す)
+    voxelLight += voxelLight * localWallBounce(playerPos, geoNormal);
 #else
     vec3 voxelLight = flood;
 #endif
