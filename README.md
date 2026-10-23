@@ -5,7 +5,13 @@
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.x%20%E2%80%93%2026.x-62b47a)
 ![License](https://img.shields.io/badge/license-TBD-lightgrey)
 
-Minecraft Java Edition 用の Iris シェーダーパックです
+Minecraft Java Edition - Iris シェーダーパック
+
+主に日常利用より、写真撮影や映画撮影に向いています  
+日常利用で臨場感を高めることにも利用できます  
+CGを利用することなくシネマティックルックをゲーム内で完璧に実装することを目標にしています
+
+## 特徴
 
 たいまつやランタンの光をボクセル上のレイトレースですべてに影響して影付けします  
 ブロックだけでなくプレイヤーやモブも光を遮るので、たいまつを持って歩くと自分やモブの影が壁に落ちます  
