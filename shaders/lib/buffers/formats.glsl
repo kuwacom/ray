@@ -49,7 +49,7 @@ const vec4 colortex14ClearColor = vec4(0.0, 0.0, 0.0, 0.0);
 const vec4 colortex15ClearColor = vec4(0.0, 0.0, 0.0, 0.0);
 
 const int shadowcolor0Format = RGBA8;  // 最も太陽側の面の色 (半透明は透過色, a = 不透明度)
-const int shadowcolor1Format = RGBA16; // rg = 法線 (oct), b = スカイライト, a = 種別 (0=不透明 0.5=半透明 1=水)
+const int shadowcolor1Format = RGBA16; // rg = 法線 (oct), b = スカイライト, a = 種別 (0=不透明 0.2=葉 0.5=半透明 1=水)
 const bool shadowcolor0Clear = true;
 const bool shadowcolor1Clear = true;
 const vec4 shadowcolor0ClearColor = vec4(1.0, 1.0, 1.0, 0.0);

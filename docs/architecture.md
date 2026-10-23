@@ -146,7 +146,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 15 | RGBA16F | 速度: rg = 前フレーム UV - 今の UV, a = 1 なら有効 (エンティティ・手) | surface (gbuffers, post の関数) | post | 毎フレーム |
 
 - gbuffers では colortex0-3 を読めない (Iris の仕様)
-- `shadowcolor0` RGBA8: 最も太陽側の面の色 (半透明は透過色 + a 不透明度、不透明は a=1)。`shadowcolor1` RGBA16: rg 法線 (oct), b スカイライト, a 種別 (0 不透明 / 0.5 半透明 / 1 水)。RSM (surface) と色付き影 (surface) と色付き光芒 (sky) が読む
+- `shadowcolor0` RGBA8: 最も太陽側の面の色 (半透明は透過色 + a 不透明度、不透明は a=1)。`shadowcolor1` RGBA16: rg 法線 (oct), b スカイライト, a 種別 (0 不透明 / 0.2 葉 / 0.5 半透明 / 1 水)。RSM (surface) と色付き影・葉の透過 (surface) と色付き光芒 (sky) が読む
 
 ### カスタムイメージ (16 枚すべて使用。正本は `lib/buffers/images.glsl` + shaders.properties。GLSL の宣言は下の「opt-in」を参照)
 
@@ -372,7 +372,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 
 | 項目 | 方式 | モジュール |
 |---|---|---|
-| 太陽 / 月の影 | 歪み付き単一影マップ (`lib/common/shadow_space.glsl`) + PCSS (ブロッカー探索と PCF 分離) + スクリーンスペース接触影 + 色付き影 (shadowcolor0)。SHADOW_FILTER=0 でハード | surface |
+| 太陽 / 月の影 | 歪み付き単一影マップ (`lib/common/shadow_space.glsl`) + PCSS (ブロッカー探索と PCF 分離) + スクリーンスペース接触影 + 色付き影 (shadowcolor0)。葉の透過 (SHADOW_LEAF_TINT): 不透明の影のうち葉で遮られた分を、影マップの葉の色 x 重なった枚数 (光源側の葉から受け点へボクセルを辿って数える) で透過させる。SHADOW_FILTER=0 でハード | surface |
 | 雲影 | prepare2 で 512² の雲影マップを作り `getCloudShadow()` で地形・VL に渡す | sky |
 | AO | GTAO (AO_MODE=2), 軽量は SSAO | surface |
 | GI | LOW/MED: なし、HIGH: RSM (shadowcolor0/1)、ULTRA: SSGI、EXTREME: ボクセル RT (light の `traceVoxelRay` + floodfill でヒット点を照らす) + SVGF 系デノイズ | surface |
@@ -455,6 +455,8 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | SHADOW_SAMPLES | 16 | **4** | **8** | 16 | **24** | **32** |
 | SHADOW_SOFTNESS | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
 | SHADOW_COLORED | ON | **OFF** | ON | ON | ON | ON |
+| SHADOW_LEAF_TINT | ON | **OFF** | ON | ON | ON | ON |
+| SHADOW_LEAF_TRANSMISSION | 0.15 | 0.15 | 0.15 | 0.15 | 0.15 | 0.15 |
 | ENTITY_SHADOWS | ON | **OFF** | **OFF** | ON | ON | ON |
 | BLOCK_ENTITY_SHADOWS | ON | **OFF** | **OFF** | ON | ON | ON |
 | SCREEN_SPACE_SHADOWS | ON | **OFF** | **OFF** | ON | ON | ON |

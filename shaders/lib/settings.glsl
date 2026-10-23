@@ -58,6 +58,8 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define SHADOW_SAMPLES 16 // [4 8 12 16 24 32]
 #define SHADOW_SOFTNESS 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0]
 #define SHADOW_COLORED // 半透明ブロックの色付き影
+#define SHADOW_LEAF_TINT // 葉を通った太陽光を葉の色で透過させる (木漏れ日・森の床が緑がかる)
+#define SHADOW_LEAF_TRANSMISSION 0.15 // [0.05 0.1 0.15 0.2 0.25 0.3 0.4 0.5] 葉 1 枚 (1 ブロック) が通す光の割合。重なるほどこの累乗で暗くなる
 #define ENTITY_SHADOWS // エンティティの太陽影
 #define BLOCK_ENTITY_SHADOWS // ブロックエンティティの太陽影
 #define SCREEN_SPACE_SHADOWS // 太陽影のスクリーンスペース接触影
@@ -395,6 +397,8 @@ const int noiseTextureResolution = 256;
 #ifdef GLOWING_ENTITY_LIGHTS
 #endif
 #ifdef SHADOW_COLORED
+#endif
+#ifdef SHADOW_LEAF_TINT
 #endif
 #ifdef ENTITY_SHADOWS
 #endif
