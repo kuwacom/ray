@@ -168,16 +168,23 @@ vec3 rsmIndirect(vec3 playerPos, vec3 normal, float rotation) {
 
 #if GI_MODE == 2 || GI_MODE == 3
 /*
- * 何にも当たらなかった下向きのレイは、遠くの地面 (deferred30 が空の SH から引いた灰色の地面) を見たとみなす
- * 画面の外へ出た SSGI のレイや、崖の上・空中の足場から届かないボクセルのレイで、地面の照り返しが丸ごと消えないように
- * 下半球の混ぜ方は prepare の SH と同じ (地平線から 0.1 で地面に切り替わる)
+ * 何にも当たらなかったレイの放射
+ * 下向きは遠くの地面 (deferred30 が空の SH から引いた灰色の地面) を見たとみなす。画面の外へ出た SSGI のレイや、
+ * 崖の上・空中の足場から届かないボクセルのレイで、地面の照り返しが丸ごと消えないように
+ * 上向きは方向ごとの空の色 (GI_TRACES_SKY。SH と同じ強さ・彩度の調整)。混ぜ方は prepare の SH と同じ (地平線から 0.1 で地面に切り替わる)
+ * gate: 空の光に掛ける絞り (ボクセルは giVoxelSkyGate、SSGI は画面外の遮蔽が分からないので従来のスカイライトの曲線)
  */
-vec3 giMissGround(vec3 dir, vec3 groundRadiance) {
-    return groundRadiance * smoothstep(0.0, 0.1, -dir.y);
+vec3 giGroundRadiance(float gate) {
+    return shSkyGrade(skyGroundIrradianceRaw()) * (GI_GROUND_REPLACE * RCP_PI * gate);
 }
 
-vec3 giGroundRadiance(float skyLm) {
-    return shSkyGrade(skyGroundIrradianceRaw()) * (GI_GROUND_REPLACE * RCP_PI * skylightCurve(skyLm));
+vec3 giMissRadiance(vec3 dir, vec3 groundRadiance, float gate) {
+    float toGround = smoothstep(0.0, 0.1, -dir.y);
+    vec3 r = groundRadiance * toGround;
+#ifdef GI_TRACES_SKY
+    r += shSkyGrade(getSkyRadiance(dir)) * ((1.0 - toGround) * gate * GI_SKY_OCCLUSION);
+#endif
+    return r;
 }
 #endif
 
@@ -186,12 +193,13 @@ vec3 ssgiIndirect(vec3 viewPos, vec3 normal, float skyLm, vec4 noise) {
     mat3 basis = tbnFromNormal(normal);
     vec3 start = viewPos + playerToViewDir(normal) * (0.05 - viewPos.z * 0.002);
     vec3 sum = vec3(0.0);
-    vec3 ground = giGroundRadiance(skyLm);
+    float gate = skylightCurve(skyLm);
+    vec3 ground = giGroundRadiance(gate);
     for (int i = 0; i < GI_SAMPLES; i++) {
         vec3 dir = basis * cosineHemisphere(fract(noise.xy + r2Sequence(i)));
         vec4 hit = traceScreenRay(start, playerToViewDir(dir), SSGI_DISTANCE, SSGI_STEPS, fract(noise.z + r1Sequence(i)));
         if (hit.w < 0.5) {
-            sum += giMissGround(dir, ground);
+            sum += giMissRadiance(dir, ground, gate);
             continue;
         }
         ivec2 ht = ivec2(hit.xy * viewSize());
@@ -211,13 +219,20 @@ vec3 ssgiIndirect(vec3 viewPos, vec3 normal, float skyLm, vec4 noise) {
 vec3 voxelIndirect(vec3 playerPos, vec3 normal, vec3 geoNormal, float skyLm, vec4 noise) {
     mat3 basis = tbnFromNormal(normal);
     vec3 origin = voxelRayOrigin(playerPos, geoNormal);
+    // ボクセル体積の外はレイを追えないので 0 (deferred30 が従来の空の環境光に戻す)
+    if (!isInVoxelVolume(playerToVoxel(origin))) return vec3(0.0);
     vec3 sum = vec3(0.0);
-    vec3 ground = giGroundRadiance(skyLm);
+#ifdef GI_TRACES_SKY
+    float gate = giVoxelSkyGate(skyLm);
+#else
+    float gate = skylightCurve(skyLm);
+#endif
+    vec3 ground = giGroundRadiance(gate);
     for (int i = 0; i < GI_SAMPLES; i++) {
         vec3 dir = basis * cosineHemisphere(fract(noise.xy + r2Sequence(i)));
         if (dot(dir, geoNormal) <= 0.0) continue;
         vec4 hit = traceVoxelRadiance(origin, dir, VOXEL_GI_DISTANCE, skyLm, false);
-        sum += hit.a > 0.5 ? hit.rgb : giMissGround(dir, ground);
+        sum += hit.a > 0.5 ? hit.rgb : giMissRadiance(dir, ground, gate);
     }
     return sum * PI / float(GI_SAMPLES);
 }

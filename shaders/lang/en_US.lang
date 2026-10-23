@@ -137,6 +137,8 @@ value.GI_MODE.2=Screen Space
 value.GI_MODE.3=Voxel Ray Traced
 option.GI_SAMPLES=GI Samples
 option.GI_STRENGTH=GI Strength
+option.GI_SKY_OCCLUSION=Sky Light Occlusion
+option.GI_SKY_OCCLUSION.comment=How much of the sky light is occluded by the GI rays. 1 = light only comes from directions that see the sky (eaves, cave entrances and the back of rooms get darker, and openings show their direction). 0 = the old skylight-only occlusion (no direction, counted twice with the bounce). The default 0.5 keeps rooms and cave entrances close to their old brightness, which full occlusion makes too dark even with multiple bounces. Screen-space and voxel ray tracing only.
 option.GI_GROUND_REPLACE=Ground Bounce Replacement
 option.GI_GROUND_REPLACE.comment=How much of the gray ground bounce built into the sky ambient is replaced by the real ground color picked up by GI (green on grass). 1 = physically correct (shade and downward faces take the ground color and get darker). 0 = the old brighter gray shade (bounce counted twice).
 option.GI_RES=GI Resolution

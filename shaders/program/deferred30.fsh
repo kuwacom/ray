@@ -2,6 +2,7 @@
  * deferred30: 不透明面のシェーディング (全モジュールの光をここで合成) と空の描画
  *   太陽/月: sky の getCelestialLight x surface の getSunShadow x sky の getCloudShadow
  *   空の環境光: sky の getSkyIrradiance x スカイライト x surface の AO
+ *     (SSGI / ボクセル RT では GI のレイが向きと遮蔽込みで空の光を運び、これを置き換える。GI_TRACES_SKY)
  *   ブロックライト: light の getBlockLightOpaque (+ 鏡面 getBlockLightSpecular)
  *   手持ち光源: light の getHandLights
  *   GI: surface の getIndirectLight
@@ -24,6 +25,11 @@ in vec2 texcoord;
 layout(location = 0) out vec4 outColor;
 
 const float AO_BLOCKLIGHT_WEIGHT = 0.5;
+// GI が空の光を運ぶ時 (GI_TRACES_SKY): テクスチャ法線の凹凸の戻し方の範囲、GTAO を掛ける割合、ボクセル体積の判定で面から浮かせる量
+const float GI_NORMAL_DETAIL_MIN = 0.5;
+const float GI_NORMAL_DETAIL_MAX = 1.5;
+const float GI_SKY_GTAO_WEIGHT = 0.5;
+const float GI_VOLUME_TEST_OFFSET = 0.1;
 // SSS の減衰 (1/ブロック, sss = 1 の時)。葉 1 枚 (~0.1 ブロック) は通し、葉ブロック 1 個分でかなり暗くなる
 const float SSS_DENSITY = 2.5;
 // 溶岩の面が受けるブロックライト・GI の割合
@@ -162,9 +168,24 @@ void main() {
     // ---- 環境光 (空・ブロックライト・GI) ----
     float ao = g.ao * indirect.a;
     vec3 skyE = getSkyIrradiance(g.normal);
+    bool giSky = false;
     // 地面の照り返しは GI が実際の色で足すので、SH の灰色の地面の分を引く (lib/sky/sky_color.glsl)。一人称の手には GI が無いので引かない
 #if GI_MODE == 2 || GI_MODE == 3
-    if (!hand) skyE = max(skyE - getSkyGroundIrradiance(g.normal) * GI_GROUND_REPLACE, 0.0);
+    #ifdef GI_TRACES_SKY
+        // GI のレイが空の光を向きと遮蔽込みで運ぶので、空の環境光は置き換えない分 (GI_SKY_OCCLUSION, GI_GROUND_REPLACE) だけ残す
+        // (lib/surface/gi.glsl)。ボクセル体積の外は GI が 0 なので従来どおり
+        #if GI_MODE == 3
+            giSky = !hand && isInVoxelVolume(playerToVoxel(playerPos + g.geoNormal * GI_VOLUME_TEST_OFFSET));
+        #else
+            giSky = !hand;
+        #endif
+        if (giSky) {
+            vec3 groundE = getSkyGroundIrradiance(g.normal);
+            skyE = max(skyE - groundE, 0.0) * (1.0 - GI_SKY_OCCLUSION) + groundE * (1.0 - GI_GROUND_REPLACE);
+        }
+    #else
+        if (!hand) skyE = max(skyE - getSkyGroundIrradiance(g.normal) * GI_GROUND_REPLACE, 0.0);
+    #endif
 #elif GI_MODE == 1 && defined HAS_SUN_SHADOWS
     // RSM が置き換えるのは影マップの中だけ (deferred10 と同じスカイライトの絞り)
     if (!hand) skyE = max(skyE - getSkyGroundIrradiance(g.normal) * (GI_GROUND_REPLACE * ss.fade * smoothstep(RSM_SKYLIGHT_MIN, RSM_SKYLIGHT_MAX, g.lightmap.y)), 0.0);
@@ -176,6 +197,12 @@ void main() {
     if (hand) blockLight = max(blockLight, blockLightmapFallback(g.lightmap.x));
     else blockLight += getHandLightFill(playerPos) * ao;
     vec3 indirectLight = indirect.rgb * g.ao;
+    if (giSky) {
+        // GI は幾何法線で張った半球なので、テクスチャ法線の凹凸は空の SH の向きによる差で戻す
+        float detail = luminance(getSkyIrradiance(g.normal)) / max(luminance(getSkyIrradiance(g.geoNormal)), 1e-6);
+        // ボクセルに入らない小物 (草・柵・エンティティ) の遮蔽は GTAO で足す。ブロックの遮蔽はレイが見ているので半分だけ
+        indirectLight *= clamp(detail, GI_NORMAL_DETAIL_MIN, GI_NORMAL_DETAIL_MAX) * mix(1.0, indirect.a, GI_SKY_GTAO_WEIGHT);
+    }
     bool lava = readMaterialId(texel) == MAT_LAVA;
     if (lava) {
         /*

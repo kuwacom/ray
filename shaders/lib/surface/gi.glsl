@@ -16,6 +16,22 @@ vec4 getIndirectLight(ivec2 texel) {
 #endif
 }
 
+/*
+ * GI のレイが空の光も運ぶ (SSGI / ボクセル RT, 空のあるディメンション)
+ * 空へ抜けたレイが方向ごとの空の色を返し、deferred30 は空の環境光 (方向の無いスカイライト x AO の遮蔽) をこれで置き換える。
+ * 以前は抜けたレイが 0 で、当たったレイの照り返しを空の光に足していたので、軒下・洞窟の入り口・森の中で空の光の向きが無く、
+ * 照り返しも二重だった (FB #60)。RSM (GI_MODE=1) は可視性を見ないので、空の環境光はスカイライトと AO のまま
+ */
+#if (GI_MODE == 2 || GI_MODE == 3) && defined HAS_SKY
+    #define GI_TRACES_SKY
+#endif
+/*
+ * ボクセル RT の空へ抜けたレイに掛けるスカイライトの絞り。遮蔽はレイが見るので、スカイライトは
+ * 届く距離 (VOXEL_GI_DISTANCE) より大きな洞窟の奥へ空の光が漏れるのを止めるだけに使う (スカイライト 0 で 0、5 段で 1)
+ */
+const float GI_SKY_GATE_LIGHTMAP = 0.35;
+float giVoxelSkyGate(float skyLm) { return smoothstep(0.0, GI_SKY_GATE_LIGHTMAP, skyLm); }
+
 // RSM は可視性を見ないので、スカイライトがこの範囲で 0 -> 1 になるように絞る (deferred10)。deferred30 が SH から引く地面の分も同じ絞り
 const float RSM_SKYLIGHT_MIN = 0.1;
 const float RSM_SKYLIGHT_MAX = 0.6;

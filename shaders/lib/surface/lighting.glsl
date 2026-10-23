@@ -149,6 +149,9 @@ vec4 traceVoxelRadiance(vec3 originPlayer, vec3 dir, float maxDist, float skyLm,
         if (distance(scenePlayer, hitPlayer) < VOXEL_TRACE_SCREEN_MATCH) {
             if (useSceneColor) return vec4(texelFetch(colortex0, t, 0).rgb, 1.0);
             albedo = srgbToLinear(texelFetch(colortex1, t, 0).rgb);
+            // 空の光は当たった面のスカイライトで絞る (着色点のスカイライトだと、明るい屋外から洞窟の奥の壁に当たったレイが空に照らされる)。
+            // 画面外の当たりは分からないので着色点の値のまま
+            skyLm = unpack2x8(texelFetch(colortex2, t, 0).a).y;
             screenTexel = t;
         }
     }

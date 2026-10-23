@@ -137,6 +137,8 @@ value.GI_MODE.2=スクリーンスペース
 value.GI_MODE.3=ボクセルレイトレース
 option.GI_SAMPLES=GI のサンプル数
 option.GI_STRENGTH=GI の強さ
+option.GI_SKY_OCCLUSION=空の光の遮蔽
+option.GI_SKY_OCCLUSION.comment=空の光を GI のレイで遮る割合。1 = 空の見える向きだけから光が入る (軒下・洞窟の入り口・室内の奥が暗くなり、入り口の向きが分かる)。0 = 以前と同じスカイライトだけの遮蔽 (向きが無く、照り返しと二重に数える)。既定の 0.5 は、多重反射を考えても暗くなりすぎる室内・洞窟の入り口を以前に近い明るさに保つため。スクリーンスペース / ボクセルレイトレースのみ
 option.GI_GROUND_REPLACE=地面の照り返しの置き換え
 option.GI_GROUND_REPLACE.comment=空の環境光に含まれる灰色の地面の照り返しを、GI が拾う実際の地面の色 (草地なら緑) に置き換える割合。1 = 物理的に正しい (日陰・下向きの面が地面の色に染まり暗くなる)。0 = 以前の明るく灰色の日陰 (照り返しを二重に数える)
 option.GI_RES=GI の解像度
