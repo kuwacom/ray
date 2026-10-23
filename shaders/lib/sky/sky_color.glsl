@@ -134,7 +134,7 @@ vec3 getSkyIrradiance(vec3 n) { return shEvalIrradiance(n); }
  */
 const float SH_GROUND_ALBEDO = 0.2;
 // 輝度を保ったまま SH の彩度を落とす割合と、SH 全体の強さ (理由は prepare.csh)
-const float SH_SKY_SATURATION = 0.3;
+const float SH_SKY_SATURATION = SKY_AMBIENT_SATURATION;
 const float SH_SKY_GAIN = 1.7;
 
 vec3 shSkyGrade(vec3 c) {

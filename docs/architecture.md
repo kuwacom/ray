@@ -507,6 +507,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | SUN_BRIGHTNESS | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
 | MOON_BRIGHTNESS | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
 | SKY_BRIGHTNESS | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
+| SKY_AMBIENT_SATURATION | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 |
 | SUN_MOON_STYLE | 1 | 1 | 1 | 1 | 1 | 1 |
 | STARS | ON | ON | ON | ON | ON | ON |
 | CLOUDS | 3 | **0** | **2** | 3 | 3 | 3 |

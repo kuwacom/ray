@@ -123,6 +123,7 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define SUN_BRIGHTNESS 1.0 // [0.25 0.5 0.75 1.0 1.1 1.25 1.5 2.0 3.0 4.0]
 #define MOON_BRIGHTNESS 1.0 // [0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0 4.0 6.0]
 #define SKY_BRIGHTNESS 1.0 // [0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0 4.0]
+#define SKY_AMBIENT_SATURATION 0.5 // [0.2 0.3 0.4 0.5 0.6 0.7 0.8 1.0] 空の環境光 (日陰を照らす空の光) の彩度。1 = 空の色のまま
 #define SUN_MOON_STYLE 1 // [0 1] 0=バニラテクスチャ 1=物理的な円盤
 #define STARS
 #define CLOUDS 3 // [0 1 2 3] 0=なし 1=バニラ 2=2D 押し出し体積雲 3=3D 体積雲

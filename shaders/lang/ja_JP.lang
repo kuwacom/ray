@@ -234,6 +234,8 @@ value.ATMOSPHERE_MODE.1=物理 (LUT)
 option.SUN_BRIGHTNESS=太陽の明るさ
 option.MOON_BRIGHTNESS=月の明るさ
 option.SKY_BRIGHTNESS=空の明るさ
+option.SKY_AMBIENT_SATURATION=空の環境光の彩度
+option.SKY_AMBIENT_SATURATION.comment=日陰を照らす空の光の色の濃さ。上げると日陰が青み、日向の暖色との差が出る。0.3 = 以前の控えめな色、1 = 空の色のまま (日陰の雪がかなり青くなる)
 option.SUN_MOON_STYLE=太陽と月
 value.SUN_MOON_STYLE.0=バニラ
 value.SUN_MOON_STYLE.1=丸

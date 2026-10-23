@@ -234,6 +234,8 @@ value.ATMOSPHERE_MODE.1=Physical (LUT)
 option.SUN_BRIGHTNESS=Sun Brightness
 option.MOON_BRIGHTNESS=Moon Brightness
 option.SKY_BRIGHTNESS=Sky Brightness
+option.SKY_AMBIENT_SATURATION=Sky Ambient Saturation
+option.SKY_AMBIENT_SATURATION.comment=How colorful the sky light that fills the shade is. Higher values make shade bluer against the warm sunlight. 0.3 = the old subtle color, 1 = the full sky color (shaded snow turns quite blue).
 option.SUN_MOON_STYLE=Sun & Moon
 value.SUN_MOON_STYLE.0=Vanilla
 value.SUN_MOON_STYLE.1=Round
