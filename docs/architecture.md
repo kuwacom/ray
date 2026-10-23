@@ -464,7 +464,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | AO_STRENGTH | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
 | GI_MODE | 1 | **0** | **0** | 1 | **2** | **3** |
 | GI_SAMPLES | 2 | **1** | **1** | 2 | **4** | **8** |
-| GI_STRENGTH | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
+| GI_STRENGTH | 2.0 | 2.0 | 2.0 | 2.0 | 2.0 | 2.0 |
 | GI_MULTI_BOUNCE | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
 | GI_SKY_OCCLUSION | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 |
 | GI_GROUND_REPLACE | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |

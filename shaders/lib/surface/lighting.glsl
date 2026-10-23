@@ -34,7 +34,7 @@ vec3 shadeSecondaryHit(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm) {
  * 1 フレームのレイは増やさず、フレームを重ねるごとに反射が 1 回ずつ増える (Lambert の多重反射の等比級数に収束する)
  * - 画面に映るヒット点だけ。映らない点は空の SH のまま (着色点の履歴で代用すると、地面を向く面のレイが当たる地面まで
  *   その面と同じ暗さになり、軒下が今の 0.6 倍まで暗くなった。面の向きが違うと代用にならない)
- * - 履歴は GI_STRENGTH 込みなので割ってから返す (返す量 x 反射率 < 1 で発散しない)
+ * - 履歴は GI_STRENGTH 込み (GI_EFFECTIVE_STRENGTH) なので割ってから返す (返す量 x 反射率 < 1 で発散しない)
  * - GI_TRACES_SKY では履歴に空の光も入っているので、ヒット点の空の SH (方向の無い空の光) を履歴で置き換える。
  *   GI_SKY_OCCLUSION < 1 の時に deferred30 が空の環境光として足す分は履歴に入っていないので、その割合の SH を足す
  * 履歴の無い点 (画面外・前フレームの画面外) は prevIndirect.x < 0 で、空の SH のまま
@@ -59,7 +59,7 @@ const float GI_HISTORY_EDGE = 0.002;
 vec3 giHistoryAtPlayer(vec3 playerPos) {
     vec2 uv = playerToPrevScreen(playerPos).xy;
     if (any(lessThan(uv, vec2(GI_HISTORY_EDGE))) || any(greaterThan(uv, vec2(1.0 - GI_HISTORY_EDGE)))) return vec3(-1.0);
-    return textureLod(colortex9, uv, 0.0).rgb / max(GI_STRENGTH, 1e-3);
+    return textureLod(colortex9, uv, 0.0).rgb / max(GI_EFFECTIVE_STRENGTH, 1e-3);
 }
 
 /*

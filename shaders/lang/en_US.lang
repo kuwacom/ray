@@ -137,6 +137,7 @@ value.GI_MODE.2=Screen Space
 value.GI_MODE.3=Voxel Ray Traced
 option.GI_SAMPLES=GI Samples
 option.GI_STRENGTH=GI Strength
+option.GI_STRENGTH.comment=Strength of the bounce light (and, with screen-space or voxel ray tracing, the sky light). Higher values brighten shade, downward faces and rooms and reduce the contrast with sunlight. 2 gives shade close to the old brightness. The effect is scaled per method so the same value looks similar (voxel x1, RSM x0.75, screen-space x0.5).
 option.GI_MULTI_BOUNCE=Multiple Bounces
 option.GI_MULTI_BOUNCE.comment=How much of the previous frame's GI is fed back into the surfaces GI rays hit, so light bounces again with every frame. Lets light reach deeper into cave entrances and rooms at almost no cost. 0 = single bounce, 1 = physically correct (screen-space and voxel ray tracing only).
 option.GI_SKY_OCCLUSION=Sky Light Occlusion

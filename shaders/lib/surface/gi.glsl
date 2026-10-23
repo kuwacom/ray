@@ -17,6 +17,21 @@ vec4 getIndirectLight(ivec2 texel) {
 }
 
 /*
+ * 方式ごとの GI_STRENGTH の効き。既定の GI_STRENGTH = 2 で、どの方式でも日陰・地面を向く面が以前 (7943c4c) に近い明るさになるように合わせた
+ * - ボクセル RT: 1 (2 倍)。日陰 0.77-0.80、洞窟の入り口 0.54-0.80、室内の床 1.08、森の床 1.09 倍
+ * - RSM: 0.75 (1.5 倍)。可視性を見ないので壁越しの照り返し (箱の奥の壁 1.36 倍) と、草の照り返しの緑の濃さが強くなりすぎる
+ * - SSGI: 0.5 (1 倍)。地面を向く面のレイの多くが画面外へ出て灰色の遠くの地面になり、2 倍では軒下が 1.8 倍と以前より明るくなった
+ */
+#if GI_MODE == 1
+    const float GI_MODE_GAIN = 0.75;
+#elif GI_MODE == 2
+    const float GI_MODE_GAIN = 0.5;
+#else
+    const float GI_MODE_GAIN = 1.0;
+#endif
+const float GI_EFFECTIVE_STRENGTH = GI_STRENGTH * GI_MODE_GAIN;
+
+/*
  * GI のレイが空の光も運ぶ (SSGI / ボクセル RT, 空のあるディメンション)
  * 空へ抜けたレイが方向ごとの空の色を返し、deferred30 は空の環境光 (方向の無いスカイライト x AO の遮蔽) をこれで置き換える。
  * 以前は抜けたレイが 0 で、当たったレイの照り返しを空の光に足していたので、軒下・洞窟の入り口・森の中で空の光の向きが無く、

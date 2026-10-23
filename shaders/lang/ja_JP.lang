@@ -137,6 +137,7 @@ value.GI_MODE.2=スクリーンスペース
 value.GI_MODE.3=ボクセルレイトレース
 option.GI_SAMPLES=GI のサンプル数
 option.GI_STRENGTH=GI の強さ
+option.GI_STRENGTH.comment=照り返し (と SSGI / ボクセルレイトレースでは空の光) の強さ。上げると日陰・地面を向く面・室内が明るくなり、日向との差が小さくなる。2 で以前に近い日陰の明るさ。同じ値でどの方式も近い明るさになるよう、内部で方式ごとに効きを変えている (ボクセル 1 倍、RSM 0.75 倍、スクリーンスペース 0.5 倍)
 option.GI_MULTI_BOUNCE=多重反射
 option.GI_MULTI_BOUNCE.comment=GI のレイが当たった面に前のフレームの GI を返し、フレームを重ねて照り返しを何回も跳ね返らせる量。洞窟の入り口や室内の奥まで光が回る。重さはほぼ変わらない。0 = 1 回だけ、1 = 物理的に正しい (SSGI / ボクセルレイトレースのみ)
 option.GI_SKY_OCCLUSION=空の光の遮蔽

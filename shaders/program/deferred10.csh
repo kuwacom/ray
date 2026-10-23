@@ -3,7 +3,7 @@
  * GI_MODE: 1=RSM (shadowcolor0/1) 2=SSGI 3=ボクセル RT (light モジュールの traceVoxelRay + floodfill で着色)
  * surface モジュール (lib/surface)
  *
- * 出力 giRawImg (左上 1/GI_RES): rgb = 間接光の照度 (GI_STRENGTH 込み), a = AO (AO_STRENGTH 込み)
+ * 出力 giRawImg (左上 1/GI_RES): rgb = 間接光の照度 (GI_STRENGTH と方式ごとの効き GI_MODE_GAIN 込み), a = AO (AO_STRENGTH 込み)
  * GI_RES=2 では 2x2 ブロックのうち lowResOffset(frameCounter) の 1 ピクセルだけを計算し、deferred11 が時空間で埋める
  *
  * AO
@@ -285,7 +285,7 @@ void main() {
 #elif GI_MODE == 3
     gi = voxelIndirect(playerPos, g.geoNormal, g.geoNormal, g.lightmap.y, noise);
 #endif
-    gi *= GI_STRENGTH;
+    gi *= GI_EFFECTIVE_STRENGTH;
 
     imageStore(giRawImg, low, vec4(max(gi, 0.0), ao));
 }
