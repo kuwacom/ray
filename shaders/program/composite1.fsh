@@ -296,13 +296,26 @@ bool waterRefractVoxel(vec3 surfPlayer, vec3 dir, vec3 floorPlayer, float d1, fl
 }
 #endif
 
-// 水中の内散乱の光源 (水面の太陽 + 空)。水中フォグ (B) と同じ係数 (lib/surface/water.glsl) を使う
-vec3 waterInscatterSource(float skyLm, vec3 sunVis) {
+/*
+ * 水の上から見た水中の内散乱 (水面の太陽 + 空)。水中フォグ (B) と同じ係数 (lib/surface/water.glsl) を使う
+ * 水面から入った光は深さ z で E0 exp(-Kd z) に弱まる (太陽は水中で屈折した向きに沿って Kd = c / mu_sun、空の光は Kd = c で、
+ * 水中フォグの marchWaterFog と同じ)。屈折した視線に沿って s 進んだ点の深さは s mu_view で、そこから戻る光は exp(-c s) で弱まるので、
+ * 経路 [0, S] の積分は E0 b (1 - exp(-(c + Kd mu_view) S)) / (c + Kd mu_view) で閉じる
+ * -> 以前は光源の照度を深さによらず一定にしていて、深い所ほど内散乱が水面の明るさのまま飽和し、浅瀬 (底の照り返し) との差が出なかった
+ * muView: 屈折した視線の下向きの cos (側面から入る水平の視線は 0 で深さが変わらない), pathLen: 水の中の経路長
+ */
+vec3 waterInscatter(float skyLm, vec3 sunVis, float muView, float pathLen) {
     LightSample sun = getCelestialLight();
-    vec3 sunE = sun.irradiance * saturate(sun.direction.y) * sunVis;
+    vec3 ext = waterExtinction();
+    float sunY = saturate(sun.direction.y);
+    float muSun = sqrt(max(1.0 - (1.0 - sunY * sunY) / sqr(WATER_IOR), 0.0));
+    vec3 sunE = sun.irradiance * sunY * sunVis;
     vec3 skyE = getSkyIrradiance(vec3(0.0, 1.0, 0.0)) * skylightCurve(skyLm);
+    vec3 kSun = ext * (1.0 + muView / muSun);
+    vec3 kSky = ext * (1.0 + muView);
+    vec3 E = sunE * (1.0 - exp(-kSun * pathLen)) / kSun + skyE * (1.0 - exp(-kSky * pathLen)) / kSky;
     // 等方散乱 1/(4 pi) を多重散乱分だけ持ち上げ、上へ戻る (後方散乱の) 割合を掛ける
-    return (sunE + skyE) * (0.25 * RCP_PI) * WATER_MULTI_SCATTER * WATER_BACKSCATTER;
+    return E * waterScattering() * ((0.25 * RCP_PI) * WATER_MULTI_SCATTER * WATER_BACKSCATTER);
 }
 
 // 屈折先の UV が水面の向こう側の物を指しているか (手前の地形を水に引き込まないため)
@@ -638,8 +651,8 @@ void main() {
         if (!below) {
             vec3 ext = waterExtinction();
             vec3 T = exp(-ext * pathLen);
-            vec3 inscatter = waterInscatterSource(lmT.y, sunVis) * waterScattering() / ext * (1.0 - T);
-            behind = behind * T + inscatter;
+            float muView = dot(refrDir, refrDir) > 0.5 ? saturate(-refrDir.y) : saturate(V.y);
+            behind = behind * T + waterInscatter(lmT.y, sunVis, muView, pathLen);
         }
 
         // ---- 反射と太陽 ----

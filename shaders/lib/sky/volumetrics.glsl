@@ -14,6 +14,13 @@
 const float VL_DISTRIBUTION = 3.0;
 // 水中のマーチ範囲 (ブロック)。これより先は透過率がほぼ 0
 const float VL_WATER_MAX_DIST = 48.0;
+// 水の粒子の位相関数: Henyey-Greenstein の非対称度と、等方散乱を混ぜる割合 (海の粒子は前方に強く尖る, Petzold の g は 0.9 前後)
+const float WATER_PHASE_G = 0.75;
+const float WATER_PHASE_ISO = 0.3;
+// 水中のブロックライトの位相関数の向きを求めるのに見るライトビンの光源の数
+const int WATER_PHASE_MAX_LIGHTS = 8;
+// 水中のブロックライトの内散乱の倍率 (空気のフォグの FOG_BLOCKLIGHT_STRENGTH に掛ける)。水は空気の霧より散乱が多く、光源の周りがよく光る
+const float WATER_BLOCKLIGHT_SCATTER = 4.0;
 // 洞窟内でも霧が完全な黒にならない最低限の明るさ
 const float VL_MIN_AMBIENT_SCALE = 0.25;
 // ネザーは溶岩がどこにでもあり、一様な霧がその光で一面に光って地形を覆う。霧が照らされる量だけ弱める
@@ -150,23 +157,59 @@ vec4 marchAirFog(vec3 dir, float endDist, float dither) {
     return vec4(scattering, transmittance);
 }
 
+// 水の粒子の位相関数 (前方に尖る)。太陽とブロックライトで同じ形を使う
+float waterPhase(float cosTheta) {
+    return mix(skyPhaseHG(cosTheta, WATER_PHASE_G), SKY_PHASE_ISOTROPIC, WATER_PHASE_ISO);
+}
+
+#ifdef FOG_BLOCKLIGHT
+/*
+ * 水中のブロックライトの前方散乱の重み (等方散乱を 1 とした倍率)
+ * floodfill の照度は遮蔽込みだが向きを持たないので、散乱点のライトビンの光源の向きから位相関数を照度で重み付け平均する
+ * 視線の先にある光源ほど、カメラとの間の水が強く光る (水中の光源の周りのにじみ)
+ * voxelPos: 散乱点 (voxel 空間), dir: 視線 (カメラ -> 散乱点)
+ */
+float waterBlockLightPhaseWeight(vec3 voxelPos, vec3 dir) {
+    if (!isInVoxelVolume(voxelPos)) return 1.0;
+    int bin = lightBinIndex(ivec3(voxelPos));
+    uint n = min(lightBinCount(bin), uint(WATER_PHASE_MAX_LIGHTS));
+    float sumE = 0.0;
+    float sumP = 0.0;
+    for (uint k = 0u; k < n; k++) {
+        LightInstance L = globalLights.lights[lightBinEntry(bin, k)];
+        vec3 toL = L.posRadius.xyz - voxelPos;
+        float d = length(toL);
+        if (d >= L.posRadius.w) continue;
+        float e = luminance(L.colorSize.rgb) * lightFalloff(d, L.posRadius.w);
+        // 光は光源 -> 散乱点へ進み、カメラ (-dir) へ曲がる。その角の cos は dot(toL, dir) / d
+        sumP += e * waterPhase(dot(toL, dir) / max(d, 1e-3));
+        sumE += e;
+    }
+    return sumE > 0.0 ? sumP / (sumE * SKY_PHASE_ISOTROPIC) : 1.0;
+}
+#endif
+
 /*
  * 水中 (カメラが水の中): 水面からの光の減衰込みの光芒。透過率は composite11 が距離から解析的に掛けるので内散乱だけ返す
+ * ステップは空気と同じ指数分布 (近くを細かく)。等間隔では 1 歩が 3-6 ブロックになり、近くの光源の周りの光り方が粗かった
  */
 vec3 marchWaterFog(vec3 dir, float endDist, float dither) {
     LightSample celestial = getCelestialLight();
-    float phase = mix(skyPhaseHG(dot(dir, celestial.direction), 0.75), SKY_PHASE_ISOTROPIC, 0.3);
+    float phase = waterPhase(dot(dir, celestial.direction));
     vec3 skyUp = shEvalIrradiance(vec3(0.0, 1.0, 0.0));
     vec3 extinction = waterExtinction();
     vec3 scatter = waterScattering();
     float lightY = max(celestial.direction.y, 0.1);
 
     float marchEnd = min(endDist, VL_WATER_MAX_DIST);
-    float dt = marchEnd / float(VL_SAMPLES);
     vec3 result = vec3(0.0);
     vec3 transmittance = vec3(1.0);
+    float tPrev = 0.0;
     for (int i = 0; i < VL_SAMPLES; i++) {
-        float t = (float(i) + dither) * dt;
+        float tNext = vlStepDistance(float(i + 1) / float(VL_SAMPLES), marchEnd);
+        float dt = tNext - tPrev;
+        float t = tPrev + dt * dither;
+        tPrev = tNext;
         vec3 p = dir * t;
         bool inside;
         vec3 shadow = vlShadow(p, inside);
@@ -176,7 +219,11 @@ vec3 marchWaterFog(vec3 dir, float endDist, float dither) {
         vec3 ambientT = exp(-extinction * column * lightY);
         vec3 light = celestial.irradiance * shadow * lightT * phase * VL_STRENGTH + skyUp * ambientT * (0.5 * RCP_PI);
 #ifdef FOG_BLOCKLIGHT
-        light += sampleBlockLightVolume(p) * (FOG_BLOCKLIGHT_STRENGTH * RCP_PI);
+        vec3 blockE = sampleBlockLightVolume(p);
+        if (maxOf(blockE) > 1e-5) {
+            light += blockE * (FOG_BLOCKLIGHT_STRENGTH * WATER_BLOCKLIGHT_SCATTER * RCP_PI)
+                * waterBlockLightPhaseWeight(playerToVoxel(p), dir);
+        }
 #endif
         vec3 stepT = exp(-extinction * dt);
         result += transmittance * light * scatter * (1.0 - stepT) / extinction;

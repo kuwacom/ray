@@ -85,8 +85,12 @@ const float WATER_FLOW_CYCLE = 1.6;            // 流れの 2 相の切り替え
     // 散乱は外洋の粒子散乱の下限寄り (0.03-0.05 では浅瀬が底まで透けて浅いプールに見えた)
     // 緑と青の吸収 0.09 / 0.03 では手前の水が底の砂の照り返しで明るいターコイズに浮いた (iterationT の約 4 倍の明るさ)。
     // 緑を青より強く吸わせて紺に寄せる
-    const vec3 WATER_ABSORPTION_COEFF = vec3(0.45, 0.20, 0.09);
-    const vec3 WATER_SCATTERING_COEFF = vec3(0.090, 0.110, 0.130);
+    // -> (0.45, 0.20, 0.09) / (0.09, 0.11, 0.13) は消散が緑 0.31 / 青 0.22 で、水中の見通しが 10 ブロックほどしかなく、光源も
+    //    すぐ水の色に埋もれた。深い所の暗さは内散乱の光源を深さで弱める式 (composite1 の waterInscatter) で出すようにしたので、
+    //    吸収を純水 (Pope & Fry 1997) + 少量のクロロフィルに戻す。消散は緑 0.21 / 青 0.15 で 15-25 ブロック先まで見える
+    //    (緑の吸収 0.10 では上から見た浅瀬が明るいターコイズに寄りすぎたので、緑を少し多めに吸わせる)
+    const vec3 WATER_ABSORPTION_COEFF = vec3(0.38, 0.12, 0.05);
+    const vec3 WATER_SCATTERING_COEFF = vec3(0.070, 0.085, 0.100);
 #endif
 vec3 waterAbsorption() { return WATER_ABSORPTION_COEFF * WATER_FOG_DENSITY; }
 vec3 waterScattering() { return WATER_SCATTERING_COEFF * WATER_FOG_DENSITY; }

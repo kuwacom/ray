@@ -54,10 +54,30 @@ vec4 upsampleVolumetrics(ivec2 texel, float linearDepth) {
 }
 
 /*
- * 点光源 (手持ち) からの内散乱を視線に沿って解析積分 (逆二乗 1 / (d^2 + 1) の積分は atan で閉じる)
- * 影と減衰は無視する (手の周りの数ブロックの淡い光の暈なので見た目に差が出ない)
+ * 水中の手持ち光源の内散乱。光源 -> 散乱点 -> カメラの経路で水に弱まるので atan の閉じた形が使えない
+ * t - t0 = a tan(theta) と置くと 1 / ((t - t0)^2 + a^2) dt = dtheta / a になるので、角度を等分した中点で数値積分する
+ * (equiangular sampling, Kulla & Fajardo 2012 の考え方。光源の近くほど細かく区切られる)
  */
-vec3 handLightGlow(vec3 dir, float dist, float scatterCoeff) {
+const int HAND_GLOW_WATER_STEPS = 6;
+
+// t0: 視線上で光源に最も近い点までの距離, a = sqrt(h^2 + 1), h2: 光源と視線の距離の 2 乗, ext: 消散係数
+vec3 handLightGlowWater(float t0, float a, float h2, float dist, vec3 ext) {
+    float thA = atan(-t0 / a);
+    float thB = atan((dist - t0) / a);
+    float dTh = (thB - thA) / float(HAND_GLOW_WATER_STEPS);
+    vec3 sum = vec3(0.0);
+    for (int i = 0; i < HAND_GLOW_WATER_STEPS; i++) {
+        float s = a * tan(thA + (float(i) + 0.5) * dTh);
+        sum += exp(-ext * (t0 + s + sqrt(s * s + h2)));
+    }
+    return sum * (dTh / a);
+}
+
+/*
+ * 点光源 (手持ち) からの内散乱を視線に沿って解析積分 (逆二乗 1 / (d^2 + 1) の積分は atan で閉じる)
+ * 影は無視する (手の周りの数ブロックの淡い光の暈なので見た目に差が出ない)。水中だけ水の吸収と散乱で弱める
+ */
+vec3 handLightGlow(vec3 dir, float dist, vec3 scatterCoeff, bool inWater) {
     vec3 glow = vec3(0.0);
 #ifdef HAND_LIGHT
     for (int hand = 0; hand < 2; hand++) {
@@ -69,9 +89,13 @@ vec3 handLightGlow(vec3 dir, float dist, float scatterCoeff) {
         vec3 intensity = lightEmission(d, float(level)) * HAND_LIGHT_BRIGHTNESS;
         vec3 lightPos = getHandLightPosition(mainHand);
         float t0 = dot(lightPos, dir);
-        float a = sqrt(max(dot(lightPos, lightPos) - t0 * t0, 0.0) + 1.0);
-        float integral = (atan((dist - t0) / a) - atan(-t0 / a)) / a;
-        glow += intensity * integral;
+        float h2 = max(dot(lightPos, lightPos) - t0 * t0, 0.0);
+        float a = sqrt(h2 + 1.0);
+        if (inWater) {
+            glow += intensity * handLightGlowWater(t0, a, h2, dist, waterExtinction());
+        } else {
+            glow += intensity * ((atan((dist - t0) / a) - atan(-t0 / a)) / a);
+        }
     }
 #endif
     return glow * scatterCoeff * SKY_PHASE_ISOTROPIC;
@@ -122,7 +146,7 @@ void main() {
 #endif
     }
 
-    float scatterCoeff;
+    vec3 scatterCoeff;
     if (isEyeInWater == 1) {
         vec3 extinction = waterExtinction();
         vec3 transmittance = exp(-extinction * dist);
@@ -133,16 +157,16 @@ void main() {
         vec3 inscatter = ambient * waterScattering() / extinction * (1.0 - transmittance) * exp(-extinction * 3.0);
 #endif
         color = color * transmittance + inscatter * WATER_FOG_INSCATTER;
-        scatterCoeff = dot(waterScattering(), vec3(1.0 / 3.0));
+        scatterCoeff = waterScattering();
     } else if (isEyeInWater == 2) {
         vec3 transmittance = exp(-FOG_LAVA_EXTINCTION * dist);
         color = color * transmittance + FOG_LAVA_RADIANCE * (1.0 - transmittance);
-        scatterCoeff = 0.0;
+        scatterCoeff = vec3(0.0);
     } else if (isEyeInWater == 3) {
         vec3 transmittance = exp(-FOG_POWDER_SNOW_EXTINCTION * dist);
         vec3 snowLight = (shEvalIrradiance(vec3(0.0, 1.0, 0.0)) + getCelestialLight().irradiance * 0.3) * RCP_PI * 0.8 + MIN_AMBIENT;
         color = color * transmittance + snowLight * (1.0 - transmittance);
-        scatterCoeff = 0.0;
+        scatterCoeff = vec3(0.0);
     } else {
 #ifdef VL
         vec4 fog = upsampleVolumetrics(texel, linearizeDepth(fixedDepth));
@@ -154,15 +178,15 @@ void main() {
         glint *= fog.a;
 #if defined HAS_SKY
         vec2 localDensity = fogDensityAt(vec3(0.0), fogHazeAmount(), fogMistAmount());
-        scatterCoeff = (localDensity.x + localDensity.y) * FOG_ALBEDO;
+        scatterCoeff = vec3((localDensity.x + localDensity.y) * FOG_ALBEDO);
 #elif defined WORLD_END
-        scatterCoeff = END_FOG_EXTINCTION * END_FOG_DENSITY;
+        scatterCoeff = vec3(END_FOG_EXTINCTION * END_FOG_DENSITY);
 #else
-        scatterCoeff = netherFogExtinction();
+        scatterCoeff = vec3(netherFogExtinction());
 #endif
     }
 
-    if (scatterCoeff > 0.0) color += handLightGlow(dir, min(dist, 32.0), scatterCoeff);
+    if (maxOf(scatterCoeff) > 0.0) color += handLightGlow(dir, min(dist, 32.0), scatterCoeff, isEyeInWater == 1);
 
     // 盲目・暗闇: 近く以外を黒へ (バニラと同じく視界を奪う効果)
     float blindFog = max(blindness, darknessFactor * (0.6 + 0.4 * darknessLightFactor));
