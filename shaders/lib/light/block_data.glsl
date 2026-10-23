@@ -11,6 +11,11 @@ uvec4 getShape(int index) { return blockData.shapes[clamp(index, 0, SHAPE_TABLE_
 vec3 getBlockAlbedo(int voxelId) {
     return srgbToLinear(unpackUnorm4x8(blockData.albedo[voxelId & (ALBEDO_TABLE_SIZE - 1)]).rgb);
 }
+// 面の向きが分かる時 (レイの当たり)。上向きの面は上面の色 (草ブロックは全体の平均だと側面の土で茶色になる)
+vec3 getBlockAlbedo(int voxelId, vec3 faceNormal) {
+    int i = voxelId & (ALBEDO_TABLE_SIZE - 1);
+    return srgbToLinear(unpackUnorm4x8(faceNormal.y > 0.5 ? blockData.albedoUp[i] : blockData.albedo[i]).rgb);
+}
 
 // 光源の実効レベル。at_midBlock.w (Iris 1.7+) が 0 ならテーブルの既定値を使う
 float resolveLightLevel(LightDef d, float attributeLevel) {

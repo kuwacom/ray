@@ -125,6 +125,36 @@ LightSample getCelestialLight() {
 // 法線 n の面が空から受ける拡散照度 (遮蔽なし。AO・スカイライトは受け取り側が掛ける)
 vec3 getSkyIrradiance(vec3 n) { return shEvalIrradiance(n); }
 
+/*
+ * 空の SH の下半球 (地面の照り返し)。prepare が平らで一様な灰色の地面 (反射率 SH_GROUND_ALBEDO) として SH に入れている
+ * 一様な下半球からの照度は L1 までで表せて、法線 n の面では E (1 - n.y) / 2 (L2 の係数は 0)
+ * GI (RSM / SSGI / ボクセル RT) は近くの地面の照り返しを実際の色で足すので、受け取り側でこの分を SH から引く。
+ * 引かないと二重に数えたうえ、反射率 0.2 x SH_SKY_GAIN = 0.34 の灰色が草の照り返し (草の上面の反射率は輝度 0.13) を埋めて、
+ * 草地に立つ白い柱の側面の照度の 5 割近くがこの灰色になり、緑が乗らなかった (FB #55)
+ */
+const float SH_GROUND_ALBEDO = 0.2;
+// 輝度を保ったまま SH の彩度を落とす割合と、SH 全体の強さ (理由は prepare.csh)
+const float SH_SKY_SATURATION = 0.3;
+const float SH_SKY_GAIN = 1.7;
+
+vec3 shSkyGrade(vec3 c) {
+    c *= SH_SKY_GAIN;
+    return mix(vec3(luminance(c)), c, SH_SKY_SATURATION);
+}
+
+// 地面が受ける光 (太陽・月の直達 + 真上の空) x 反射率。prepare は SH を作る前、ここの shEvalIrradiance は前フレームの SH
+vec3 skyGroundIrradianceRaw() {
+#ifdef HAS_SKY
+    return (getSunIrradiance() * max(getSunDir().y, 0.0) + getMoonIrradiance() * max(getMoonDir().y, 0.0)
+          + shEvalIrradiance(vec3(0.0, 1.0, 0.0))) * SH_GROUND_ALBEDO;
+#else
+    return vec3(0.0);
+#endif
+}
+
+// 法線 n の面が SH の下半球から受ける照度 (SH の彩度・強さの調整込み)
+vec3 getSkyGroundIrradiance(vec3 n) { return shSkyGrade(skyGroundIrradianceRaw()) * (0.5 - 0.5 * n.y); }
+
 // 洞窟の度合い (0 = 屋外, 1 に近いほど空が見えない)。目の位置のスカイライトから (Kappa / Nostalgia と同じ考え方)
 float getCaveFactor() {
 #ifdef HAS_SKYLIGHT

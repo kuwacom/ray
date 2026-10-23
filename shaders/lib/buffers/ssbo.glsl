@@ -48,7 +48,7 @@ layout(std430, binding = 0) buffer FrameDataBuffer {
 
 /*
  * binding 1: ブロックデータ表 (setup.csh が起動時に 1 回だけ書く。以降は読み取り専用)
- * 確保: 40960 バイト (使用 36868)
+ * 確保: 57344 バイト (使用 53252)
  */
 struct LightDef {
     vec4 color;   // rgb = 線形色 (最大成分 1), a = 明るさ倍率
@@ -68,6 +68,8 @@ layout(std430, binding = 1) buffer BlockDataBuffer {
      * 動的な添字の定数配列がスレッドごとのローカルメモリに展開されたとみられる
      */
     uint albedo[ALBEDO_TABLE_SIZE];
+    // 上向きの面の色 (同じ詰め方)。上面の色が違うブロック (草ブロック・原木など) 以外は albedo と同じ
+    uint albedoUp[ALBEDO_TABLE_SIZE];
 } blockData;
 
 /*

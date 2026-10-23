@@ -14,7 +14,10 @@ void main() {
     blockData.lightDefs[i] = lightDefStatic(i);
     if (i < SHAPE_TABLE_SIZE) blockData.shapes[i] = shapeStatic(i);
     if (i < TINT_TABLE_SIZE) blockData.tints[i] = tintStatic(i);
-    for (int j = i; j < ALBEDO_TABLE_SIZE; j += 256) blockData.albedo[j] = blockAlbedoPacked(j);
+    for (int j = i; j < ALBEDO_TABLE_SIZE; j += 256) {
+        blockData.albedo[j] = blockAlbedoPacked(j);
+        blockData.albedoUp[j] = blockAlbedoTopPacked(j);
+    }
 
     if (i == 0) {
         blockData.initialized = 1u;

@@ -198,7 +198,7 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 | binding | 名前 (アクセサ) | サイズ | 内容と書き込み権 |
 |---|---|---|---|
 | 0 | FrameDataBuffer (`frameData`) | 4096 | post: exposure, exposureTarget, averageLuminance, focusDistance, histogram[256], postParams[4] / sky: sunIrradiance, moonIrradiance, shadowLightIrradiance, skySH[9], skyParams[4] / light: lightStats / surface: surfaceParams[4]。setup.csh が初期値を入れる |
-| 1 | BlockDataBuffer (`blockData`) | 40960 | `LightDef lightDefs[256]`, `uvec4 shapes[128]`, `vec4 tints[128]`, `uint albedo[4096]` (ブロックの平均の色)。setup.csh のみが書く |
+| 1 | BlockDataBuffer (`blockData`) | 57344 | `LightDef lightDefs[256]`, `uvec4 shapes[128]`, `vec4 tints[128]`, `uint albedo[4096]` (ブロックの平均の色), `uint albedoUp[4096]` (上向きの面の色)。setup.csh のみが書く |
 | 2 | GlobalLightsBuffer (`globalLights`) | 131088 | `count/blockCount/entityCount/overflow` + `LightInstance lights[4096]` (posRadius: ボクセル空間位置 + 到達半径, colorSize: 放射 + 光源半径)。light のみ |
 | 3 | LightBinsBuffer (`lightBins`) | 9584640 | `binCount[36864]`, `binLights[36864*64]`。ビン = 8³ ブロック。light のみ |
 | 4 | EntityTriangleBuffer (`entityTris`) | 838672 | `counts[4]`, `groupBounds`, `clusterBounds` + `EntityTriangle tris[16384]` (ボクセル空間の三角形 v0/e1/e2 + アルファマスク)。begin.csh がクリア、shadow_entities.gsh が書く。light のみ |
@@ -234,7 +234,7 @@ struct LightInstance {
 | 2000-4095 | 色の付いた固体 (遮蔽・マテリアルは未登録の固体と同じ)。上の帯に無いブロックを平均の色ごとにまとめたもの | 羊毛・コンクリート・石・板材 (今は 2000-2351) |
 
 - ボクセルには下位 12bit しか入らないので 4095 を超える ID は作らない
-- ブロックの平均の色は `tools/gen_block_colors.py` がクライアント jar のテクスチャから `tools/block_colors.json` に書き (面積と不透明度で重み付けした線形の平均。草・葉・水は平原の色で代表)、`gen_block_properties.py` が 2000 番台の ID と `lib/ids/block_albedo.glsl` (ID ごとの色の定数表) を作る。setup.csh が SSBO1 `blockData.albedo[4096]` に展開し、実行時は `getBlockAlbedo(voxelId)` で引く (floodfill の照り返し、ボクセル RT の画面外の当たり)。2000 番台以外の ID はその ID に載せたブロックの平均、未登録 (1) は線形 0.3 の灰色
+- ブロックの平均の色は `tools/gen_block_colors.py` がクライアント jar のテクスチャから `tools/block_colors.json` に書き (面積と不透明度で重み付けした線形の平均。草・葉・水は平原の色で代表)、`gen_block_properties.py` が 2000 番台の ID と `lib/ids/block_albedo.glsl` (ID ごとの色の定数表) を作る。setup.csh が SSBO1 `blockData.albedo[4096]` に展開し、実行時は `getBlockAlbedo(voxelId)` で引く (floodfill の照り返し、ボクセル RT の画面外の当たり)。上面の色が全体の平均と違うブロック (草ブロック・原木など) は json の `top` に上面だけの平均を持ち、`blockData.albedoUp[4096]` に展開してレイの当たりで `getBlockAlbedo(voxelId, faceNormal)` が上向きの面に使う (草ブロックの全面の平均は側面の土で茶色)。2000 番台以外の ID はその ID に載せたブロックの平均、未登録 (1) は線形 0.3 の灰色
 - ブロックの状態 (`lit=true`, `berries=true`, `waterlogged=true` 等) で光る状態だけを光源 ID に入れる。光らない状態は 106 等へ
 - 正本は `tools/gen_block_properties.py` (block.properties と item.properties を生成)。GLSL 側の定数は `lib/ids/block_ids.glsl`, `lib/ids/light_ids.glsl`
 - 状態フィルタは 1 プロパティ 1 値の完全一致 (Iris `BlockMaterialMapping.checkState`)。`charges=1,2,3,4` のようなカンマ区切りは何にも一致しないので、値ごとに別エントリに展開する (`state_values()`)
@@ -255,7 +255,7 @@ struct LightInstance {
 lib/light/light_table.glsl  lightDefStatic(index) / shapeStatic(i) / tintStatic(i)   (正本, sRGB で記述)
         | setup.csh が起動時に評価
         v
-SSBO1 blockData.lightDefs[256] / shapes[128] / tints[128] / albedo[4096] (lib/ids/block_albedo.glsl から)
+SSBO1 blockData.lightDefs[256] / shapes[128] / tints[128] / albedo[4096] / albedoUp[4096] (lib/ids/block_albedo.glsl から)
         | 実行時 (lib/light/block_data.glsl)
         v
 getLightDef(index) -> lightEmission(d, level), lightRange(d, level), lightFalloff(dist, range)
@@ -463,6 +463,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | GI_MODE | 1 | **0** | **0** | 1 | **2** | **3** |
 | GI_SAMPLES | 2 | **1** | **1** | 2 | **4** | **8** |
 | GI_STRENGTH | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
+| GI_GROUND_REPLACE | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
 | GI_RES | 2 | 2 | 2 | 2 | 2 | **1** |
 | GI_DENOISE | 2 | 2 | 2 | 2 | 2 | 2 |
 

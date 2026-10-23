@@ -290,7 +290,7 @@ bool waterRefractVoxel(vec3 surfPlayer, vec3 dir, vec3 floorPlayer, float d1, fl
             hasRef = true;
         }
     }
-    if (!hasRef) voxelColor = shadeSecondaryHit(hitPlayer, hitNormal, getBlockAlbedo(hitBlock), skyLm);
+    if (!hasRef) voxelColor = shadeSecondaryHit(hitPlayer, hitNormal, getBlockAlbedo(hitBlock, hitNormal), skyLm);
     color = mix(voxelColor, screenColor, wS);
     return true;
 }

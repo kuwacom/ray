@@ -284,8 +284,11 @@ def mean_srgb(colors: list[list[int]]) -> tuple[int, int, int]:
     return tuple(int(round(linear_to_srgb(x) * 255.0)) for x in lin)
 
 
-def color_blocks(colors: dict[str, list[int]]) -> tuple[list[tuple[int, str, list[str]]], list[tuple[int, int, int]]]:
-    """表に無いブロックを色でまとめて 2000 番台の ID を振る。戻り値は (BLOCKS と同じ形の項目, ID 順の色)"""
+Rgb = tuple[int, int, int]
+
+
+def color_blocks(colors: dict[str, list[int]], tops: dict[str, list[int]]) -> tuple[list[tuple[int, str, list[str]]], list[Rgb], list[Rgb]]:
+    """表に無いブロックを色 (全体と上面) でまとめて 2000 番台の ID を振る。戻り値は (BLOCKS と同じ形の項目, ID 順の色, ID 順の上面の色)"""
     # 状態付きで一部だけ載っているブロック (点灯したかまど等) は名前ごと外す。
     # 名前だけの項目を足すと Iris の状態の対応がどちらになるか定まらないため (残りの状態は今どおり未登録の固体)
     registered = {n.split(":")[0] for _, _, names in BLOCKS for n in names}
@@ -293,9 +296,11 @@ def color_blocks(colors: dict[str, list[int]]) -> tuple[list[tuple[int, str, lis
     for name, c in colors.items():
         if name in registered:
             continue
-        groups.setdefault(tuple(v // COLOR_QUANT for v in c), []).append(name)
+        top = tops.get(name, c)
+        groups.setdefault(tuple(v // COLOR_QUANT for v in c) + tuple(v // COLOR_QUANT for v in top), []).append(name)
     entries: list[tuple[int, str, list[str]]] = []
-    palette: list[tuple[int, int, int]] = []
+    palette: list[Rgb] = []
+    palette_top: list[Rgb] = []
     for i, key in enumerate(sorted(groups)):
         bid = COLOR_BAND_FIRST + i
         if bid > COLOR_BAND_LAST:
@@ -303,8 +308,9 @@ def color_blocks(colors: dict[str, list[int]]) -> tuple[list[tuple[int, str, lis
         names = sorted(groups[key])
         rgb = mean_srgb([colors[n] for n in names])
         palette.append(rgb)
+        palette_top.append(mean_srgb([tops.get(n, colors[n]) for n in names]))
         entries.append((bid, "colored solid #%02x%02x%02x" % rgb, names))
-    return entries, palette
+    return entries, palette, palette_top
 
 
 def pack_srgb(rgb: tuple[int, int, int]) -> str:
@@ -312,16 +318,23 @@ def pack_srgb(rgb: tuple[int, int, int]) -> str:
     return "0x%06Xu" % (rgb[0] | (rgb[1] << 8) | (rgb[2] << 16))
 
 
-def render_albedo_glsl(colors: dict[str, list[int]], palette: list[tuple[int, int, int]]) -> str:
-    by_id: dict[int, tuple[int, int, int]] = {1: DEFAULT_ALBEDO_SRGB}
+def render_albedo_glsl(colors: dict[str, list[int]], tops: dict[str, list[int]], palette: list[Rgb], palette_top: list[Rgb]) -> str:
+    by_id: dict[int, Rgb] = {1: DEFAULT_ALBEDO_SRGB}
+    top_by_id: dict[int, Rgb] = {}
     for bid, _, names in BLOCKS:
-        known = [colors[n.split(":")[0]] for n in names if n.split(":")[0] in colors]
+        known = [n.split(":")[0] for n in names if n.split(":")[0] in colors]
         if known:
-            by_id[bid] = mean_srgb(known)
+            by_id[bid] = mean_srgb([colors[n] for n in known])
+            top = mean_srgb([tops.get(n, colors[n]) for n in known])
+            if top != by_id[bid]:
+                top_by_id[bid] = top
+    for i, (c, top) in enumerate(zip(palette, palette_top)):
+        if top != c:
+            top_by_id[COLOR_BAND_FIRST + i] = top
     default = pack_srgb(DEFAULT_ALBEDO_SRGB)
 
-    def table(name: str, values: list[str]) -> list[str]:
-        out = [f"const uint {name}[{len(values)}] = uint[{len(values)}]("]
+    def table(name: str, values: list[str], kind: str = "uint") -> list[str]:
+        out = [f"const {kind} {name}[{len(values)}] = {kind}[{len(values)}]("]
         for k in range(0, len(values), 8):
             out.append("    " + ", ".join(values[k:k + 8]) + ("," if k + 8 < len(values) else ""))
         out.append(");")
@@ -334,6 +347,7 @@ def render_albedo_glsl(colors: dict[str, list[int]], palette: list[tuple[int, in
         " * 2000 番台 (色の付いた固体) は ID ごとの色、それ以外の番号帯は帯の ID に載せたブロックの平均",
         " * バイオームで色が変わる草・葉・水は平原の色で代表させている",
         " * setup.csh が SSBO (blockData.albedo) へ展開し、実行時は lib/light/block_data.glsl の getBlockAlbedo で引く",
+        " * 上面の色が違うブロック (草ブロック・原木など) は BLOCK_ALBEDO_TOP に上面だけの色を持つ (blockData.albedoUp)",
         " */",
         "#ifndef IDS_BLOCK_ALBEDO_GLSL",
         "#define IDS_BLOCK_ALBEDO_GLSL",
@@ -359,6 +373,18 @@ def render_albedo_glsl(colors: dict[str, list[int]], palette: list[tuple[int, in
         "    return BLOCK_ALBEDO_DEFAULT;",
         "}",
         "",
+    ]
+    top_ids = sorted(top_by_id)
+    lines += table("BLOCK_ALBEDO_TOP_ID", [str(i) for i in top_ids], "int")
+    lines += table("BLOCK_ALBEDO_TOP", [pack_srgb(top_by_id[i]) for i in top_ids])
+    lines += [
+        "",
+        "// 上面の色 (setup で 1 回だけ引くので線形探索)",
+        "uint blockAlbedoTopPacked(int id) {",
+        f"    for (int k = 0; k < {len(top_ids)}; k++) if (BLOCK_ALBEDO_TOP_ID[k] == id) return BLOCK_ALBEDO_TOP[k];",
+        "    return blockAlbedoPacked(id);",
+        "}",
+        "",
         "#endif",
         "",
     ]
@@ -366,11 +392,13 @@ def render_albedo_glsl(colors: dict[str, list[int]], palette: list[tuple[int, in
 
 
 def main() -> None:
-    colors: dict[str, list[int]] = json.loads(BLOCK_COLORS.read_text(encoding="utf-8"))["colors"]
-    colored, palette = color_blocks(colors)
+    data = json.loads(BLOCK_COLORS.read_text(encoding="utf-8"))
+    colors: dict[str, list[int]] = data["colors"]
+    tops: dict[str, list[int]] = data.get("top", {})
+    colored, palette, palette_top = color_blocks(colors, tops)
     (SHADERS / "block.properties").write_text(render("block", BLOCKS + colored), encoding="utf-8", newline="\n")
     (SHADERS / "item.properties").write_text(render("item", ITEMS), encoding="utf-8", newline="\n")
-    (SHADERS / "lib" / "ids" / "block_albedo.glsl").write_text(render_albedo_glsl(colors, palette), encoding="utf-8", newline="\n")
+    (SHADERS / "lib" / "ids" / "block_albedo.glsl").write_text(render_albedo_glsl(colors, tops, palette, palette_top), encoding="utf-8", newline="\n")
     print(f"block.properties / item.properties / lib/ids/block_albedo.glsl を生成した (色の付いた固体 {len(palette)} 色)")
 
 

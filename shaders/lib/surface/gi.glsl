@@ -16,6 +16,10 @@ vec4 getIndirectLight(ivec2 texel) {
 #endif
 }
 
+// RSM は可視性を見ないので、スカイライトがこの範囲で 0 -> 1 になるように絞る (deferred10)。deferred30 が SH から引く地面の分も同じ絞り
+const float RSM_SKYLIGHT_MIN = 0.1;
+const float RSM_SKYLIGHT_MAX = 0.6;
+
 /*
  * バニラのスカイライト [0,1] -> 空の照度に掛ける可視率
  * バニラは 1 段 = 1/15 の線形だが、実際の空の見え方は開口部から離れると急に落ちる。

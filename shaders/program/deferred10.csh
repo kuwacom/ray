@@ -41,6 +41,7 @@ const int SSAO_SAMPLES = 8;
 
 const float RSM_RADIUS = 10.0;        // VPL を集める半径 (ブロック)
 const float RSM_MIN_DIST2 = 1.0;      // 近接 VPL の 1/d^2 の発散を抑える
+const float RSM_SKY_MIN_COS = 0.2;    // 空の光の分で VPL の面積を太陽への投影から戻す時の下限 (かすめ角の発散を抑える)
 const float SSGI_DISTANCE = 16.0;
 const int SSGI_STEPS = 16;
 const float VOXEL_GI_DISTANCE = 32.0;
@@ -128,6 +129,7 @@ vec3 rsmIndirect(vec3 playerPos, vec3 normal, float rotation) {
     vec3 clip = playerToShadowClip(playerPos + normal * 0.25);
     vec2 clipPerBlock = shadowClipPerBlock();
     vec3 sum = vec3(0.0);
+    vec3 sumSky = vec3(0.0);
     for (int i = 0; i < count; i++) {
         vec2 c = clip.xy + vogelDisk(i, count, rotation) * RSM_RADIUS * clipPerBlock;
         vec2 uv = shadowClipToUv(c);
@@ -148,23 +150,50 @@ vec3 rsmIndirect(vec3 playerPos, vec3 normal, float rotation) {
         float cosV = saturate(dot(nV, dir));
         float cosR = saturate(-dot(normal, dir));
         vec3 albedo = srgbToLinear(textureLod(shadowcolor0, uv, 0.0).rgb);
-        sum += albedo * (cosV * cosR / max(dist2, RSM_MIN_DIST2));
+        vec3 w = albedo * (cosV * cosR / max(dist2, RSM_MIN_DIST2));
+        sum += w;
+        sumSky += w / max(dot(nV, sun.direction), RSM_SKY_MIN_COS);
     }
-    // 影マップ上の 1 サンプルが受け持つ面積 (光源方向への投影面積なので太陽の照度をそのまま掛けられる)
+    /*
+     * 影マップ上の 1 サンプルが受け持つ面積 (光源方向への投影面積なので太陽の照度をそのまま掛けられる)
+     * VPL (太陽から見える面) は空からも照らされている。deferred30 は空の SH の地面の分を丸ごと引くので、空に照らされた分もここで足す
+     * (空の照度は真上向きの面の値で代表する。面積は投影面積を太陽との角度の余弦で割って実面積に戻す)
+     * 足さないと雲の影の中で照り返しがほぼ消えて、草地の照り返しが SH の灰色のままだった (FB #55)
+     */
     float area = PI * RSM_RADIUS * RSM_RADIUS / float(count);
-    return sum * sun.irradiance * area * RCP_PI * getCloudShadow(playerPos);
+    vec3 skyUp = getSkyIrradiance(vec3(0.0, 1.0, 0.0));
+    return (sum * sun.irradiance * getCloudShadow(playerPos) + sumSky * (skyUp * GI_GROUND_REPLACE)) * area * RCP_PI;
+}
+#endif
+
+#if GI_MODE == 2 || GI_MODE == 3
+/*
+ * 何にも当たらなかった下向きのレイは、遠くの地面 (deferred30 が空の SH から引いた灰色の地面) を見たとみなす
+ * 画面の外へ出た SSGI のレイや、崖の上・空中の足場から届かないボクセルのレイで、地面の照り返しが丸ごと消えないように
+ * 下半球の混ぜ方は prepare の SH と同じ (地平線から 0.1 で地面に切り替わる)
+ */
+vec3 giMissGround(vec3 dir, vec3 groundRadiance) {
+    return groundRadiance * smoothstep(0.0, 0.1, -dir.y);
+}
+
+vec3 giGroundRadiance(float skyLm) {
+    return shSkyGrade(skyGroundIrradianceRaw()) * (GI_GROUND_REPLACE * RCP_PI * skylightCurve(skyLm));
 }
 #endif
 
 #if GI_MODE == 2
-vec3 ssgiIndirect(vec3 viewPos, vec3 normal, vec4 noise) {
+vec3 ssgiIndirect(vec3 viewPos, vec3 normal, float skyLm, vec4 noise) {
     mat3 basis = tbnFromNormal(normal);
     vec3 start = viewPos + playerToViewDir(normal) * (0.05 - viewPos.z * 0.002);
     vec3 sum = vec3(0.0);
+    vec3 ground = giGroundRadiance(skyLm);
     for (int i = 0; i < GI_SAMPLES; i++) {
         vec3 dir = basis * cosineHemisphere(fract(noise.xy + r2Sequence(i)));
         vec4 hit = traceScreenRay(start, playerToViewDir(dir), SSGI_DISTANCE, SSGI_STEPS, fract(noise.z + r1Sequence(i)));
-        if (hit.w < 0.5) continue;
+        if (hit.w < 0.5) {
+            sum += giMissGround(dir, ground);
+            continue;
+        }
         ivec2 ht = ivec2(hit.xy * viewSize());
         GBufferData h = readGBuffer(ht);
         if (dot(h.normal, dir) >= 0.0) continue;
@@ -183,10 +212,12 @@ vec3 voxelIndirect(vec3 playerPos, vec3 normal, vec3 geoNormal, float skyLm, vec
     mat3 basis = tbnFromNormal(normal);
     vec3 origin = voxelRayOrigin(playerPos, geoNormal);
     vec3 sum = vec3(0.0);
+    vec3 ground = giGroundRadiance(skyLm);
     for (int i = 0; i < GI_SAMPLES; i++) {
         vec3 dir = basis * cosineHemisphere(fract(noise.xy + r2Sequence(i)));
         if (dot(dir, geoNormal) <= 0.0) continue;
-        sum += traceVoxelRadiance(origin, dir, VOXEL_GI_DISTANCE, skyLm, false).rgb;
+        vec4 hit = traceVoxelRadiance(origin, dir, VOXEL_GI_DISTANCE, skyLm, false);
+        sum += hit.a > 0.5 ? hit.rgb : giMissGround(dir, ground);
     }
     return sum * PI / float(GI_SAMPLES);
 }
@@ -232,9 +263,9 @@ void main() {
     vec3 gi = vec3(0.0);
 #if GI_MODE == 1 && defined HAS_SUN_SHADOWS
     // RSM は可視性を見ないので、空の見えない屋内・洞窟へ壁越しに漏れないようスカイライトで絞る
-    gi = rsmIndirect(playerPos, g.geoNormal, noise.z * TAU) * smoothstep(0.1, 0.6, g.lightmap.y);
+    gi = rsmIndirect(playerPos, g.geoNormal, noise.z * TAU) * smoothstep(RSM_SKYLIGHT_MIN, RSM_SKYLIGHT_MAX, g.lightmap.y);
 #elif GI_MODE == 2
-    gi = ssgiIndirect(viewPos, g.geoNormal, noise);
+    gi = ssgiIndirect(viewPos, g.geoNormal, g.lightmap.y, noise);
 #elif GI_MODE == 3
     gi = voxelIndirect(playerPos, g.geoNormal, g.geoNormal, g.lightmap.y, noise);
 #endif

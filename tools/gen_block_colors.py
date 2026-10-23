@@ -2,6 +2,8 @@
 ブロックごとの平均の色 (アルベド) を Minecraft のクライアント jar のテクスチャから計算し、tools/block_colors.json に書く
 
 floodfill の照り返しとボクセル RT の画面外の当たりに使う (表の持ち方は gen_block_properties.py が決める)
+上面の色が全体の平均と違うブロック (草ブロック・原木など) は、上面だけの平均を "top" に別に書く。
+GI のレイは地面の上面に当たることが多く、草ブロックの全面の平均 (側面の土込み) は茶色で、草地の照り返しが緑にならなかった (FB #55)
 jar は読むだけ。バージョンを上げた時だけ実行し、結果の JSON をリポジトリに入れる
 
 使い方: uv run tools/gen_block_colors.py <client.jar>
@@ -40,6 +42,8 @@ TINT_BY_BLOCK = {
 # 要素 (elements) を持たず particle のテクスチャで代用するブロック (液体)
 PARTICLE_ONLY = {"water": WATER_TINT, "bubble_column": WATER_TINT, "lava": None}
 ALPHA_CUTOFF = 0.1
+# 上面の色がこれ (sRGB 8bit のどれかの成分の差) 以上違う時だけ "top" に書く
+TOP_COLOR_MIN_DIFF = 8
 
 
 def srgb_to_linear(c: np.ndarray) -> np.ndarray:
@@ -115,13 +119,15 @@ def face_area(frm: list[float], to: list[float], face: str) -> float:
     return d[1] * d[2]
 
 
-def average_model(assets: Assets, model: dict, tint: tuple[int, int, int]) -> np.ndarray | None:
-    """面積と不透明度で重み付けした線形 RGB の平均"""
+def average_model(assets: Assets, model: dict, tint: tuple[int, int, int], faces: set[str] | None = None) -> np.ndarray | None:
+    """面積と不透明度で重み付けした線形 RGB の平均。faces を渡すとその向きの面だけ"""
     tint_lin = srgb_to_linear(np.array(tint, dtype=np.float64) / 255.0)
     total = np.zeros(3)
     weight = 0.0
     for el in model["elements"] or []:
         for face, spec in el.get("faces", {}).items():
+            if faces is not None and face not in faces:
+                continue
             ref = resolve_texture(model["textures"], spec.get("texture", ""))
             tex = assets.texture(ref) if ref else None
             if tex is None:
@@ -163,6 +169,7 @@ def main() -> None:
     assets = Assets(Path(sys.argv[1]))
     prefix = "assets/minecraft/blockstates/"
     colors: dict[str, list[int]] = {}
+    tops: dict[str, list[int]] = {}
     for path in sorted(n for n in assets.names if n.startswith(prefix) and n.endswith(".json")):
         name = path[len(prefix):-5]
         ref = first_model(assets.json(path) or {})
@@ -184,11 +191,19 @@ def main() -> None:
             if rgb is None:
                 continue
         colors[name] = [int(round(x)) for x in linear_to_srgb(rgb) * 255.0]
+        if name not in PARTICLE_ONLY:
+            top = average_model(assets, model, tint, {"up"})
+            if top is not None:
+                top8 = [int(round(x)) for x in linear_to_srgb(top) * 255.0]
+                if max(abs(a - b) for a, b in zip(top8, colors[name])) >= TOP_COLOR_MIN_DIFF:
+                    tops[name] = top8
     # 差分が読めるように 1 ブロック 1 行で書く
     lines = [f'  "{k}": [{v[0]}, {v[1]}, {v[2]}]' for k, v in colors.items()]
-    body = '{\n "source": ' + json.dumps(Path(sys.argv[1]).name) + ',\n "colors": {\n' + ",\n".join(lines) + "\n }\n}\n"
+    top_lines = [f'  "{k}": [{v[0]}, {v[1]}, {v[2]}]' for k, v in tops.items()]
+    body = ('{\n "source": ' + json.dumps(Path(sys.argv[1]).name) + ',\n "colors": {\n' + ",\n".join(lines) + "\n },\n"
+            + ' "top": {\n' + ",\n".join(top_lines) + "\n }\n}\n")
     OUT.write_text(body, encoding="utf-8", newline="\n")
-    print(f"{OUT.relative_to(ROOT)}: {len(colors)} ブロック")
+    print(f"{OUT.relative_to(ROOT)}: {len(colors)} ブロック (上面が違う {len(tops)})")
 
 
 if __name__ == "__main__":

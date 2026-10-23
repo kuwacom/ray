@@ -113,7 +113,15 @@ void main() {
 
     // ---- 環境光 (空・ブロックライト・GI) ----
     float ao = g.ao * indirect.a;
-    vec3 skyAmbient = getSkyIrradiance(g.normal) * skylightCurve(g.lightmap.y) * aoMultiBounce(ao, m.albedo + m.f0 * m.metalness);
+    vec3 skyE = getSkyIrradiance(g.normal);
+    // 地面の照り返しは GI が実際の色で足すので、SH の灰色の地面の分を引く (lib/sky/sky_color.glsl)。一人称の手には GI が無いので引かない
+#if GI_MODE == 2 || GI_MODE == 3
+    if (!hand) skyE = max(skyE - getSkyGroundIrradiance(g.normal) * GI_GROUND_REPLACE, 0.0);
+#elif GI_MODE == 1 && defined HAS_SUN_SHADOWS
+    // RSM が置き換えるのは影マップの中だけ (deferred10 と同じスカイライトの絞り)
+    if (!hand) skyE = max(skyE - getSkyGroundIrradiance(g.normal) * (GI_GROUND_REPLACE * ss.fade * smoothstep(RSM_SKYLIGHT_MIN, RSM_SKYLIGHT_MAX, g.lightmap.y)), 0.0);
+#endif
+    vec3 skyAmbient = skyE * skylightCurve(g.lightmap.y) * aoMultiBounce(ao, m.albedo + m.f0 * m.metalness);
     vec3 blockLight = getBlockLightOpaque(texel, playerPos, g.geoNormal, g.normal, g.lightmap.x) * mix(1.0, ao, AO_BLOCKLIGHT_WEIGHT);
     // 手の見える面は大抵カメラ (= 光源の反対側) を向くので直接光が当たらず真っ黒になる
     // 画面に貼り付いた小物なので、立ち位置のバニラのライトマップ相当を下限にする

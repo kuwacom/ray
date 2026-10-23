@@ -139,7 +139,7 @@ vec4 traceVoxelRadiance(vec3 originPlayer, vec3 dir, float maxDist, float skyLm,
     int hitBlock;
     if (!traceVoxelRay(playerToVoxel(originPlayer), dir, maxDist, hitVoxel, hitNormal, hitBlock)) return vec4(0.0);
     vec3 hitPlayer = voxelToPlayer(hitVoxel);
-    vec3 albedo = getBlockAlbedo(hitBlock);
+    vec3 albedo = getBlockAlbedo(hitBlock, hitNormal);
     ivec2 screenTexel = ivec2(-1);
     vec3 s = viewToScreen(playerToView(hitPlayer));
     if (all(greaterThan(s.xy, vec2(0.0))) && all(lessThan(s.xy, vec2(1.0))) && s.z > 0.0 && s.z < 1.0) {

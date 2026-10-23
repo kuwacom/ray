@@ -16,21 +16,20 @@ layout(local_size_x = 1) in;
 const ivec3 workGroups = ivec3(1, 1, 1);
 
 const int SH_SAMPLES = 128;
-// 地面 (草地・土) の平均アルベド。空の SH の下半球に使う
-const float SH_GROUND_ALBEDO = 0.2;
 /*
+ * SH の下半球は地面 (草地・土) の平均の反射率 SH_GROUND_ALBEDO の照り返し (lib/sky/sky_color.glsl)
+ * 以下の SH_SKY_SATURATION / SH_SKY_GAIN も GI のある時に受け取り側が地面の分を引くので sky_color.glsl に置く (shSkyGrade)
+ *
  * 空の環境光の彩度。LUT の空をそのまま積分した照度は R/B = 0.25 (晴れの正午) と、
  * 実測の日陰の色 (7000-10000K, R/B 0.6 前後) よりずっと青く、日陰の雪が青灰色、室内の木材がオリーブ色に転んだ
  * 周囲の地形・植生の照り返しとカメラの WB が打ち消す分として半分に落とす (空そのものの描画は変えない)
  * getSkyRadiance が見た目用に彩度を SKY_COLOR_SATURATION (1.25) 倍しているので、ここは 0.3 で LUT 比 0.375 になる
  * (0.4 では noon の日陰の雪がまだ青灰色だった)
  */
-const float SH_SKY_SATURATION = 0.3;
 /*
  * 空の環境光の強さ。LUT は雲の無い空なので、白く明るい雲・遠景の照り返しの分が入っておらず、
  * 晴れの正午で空/太陽の照度比が 0.09 (実測の晴天は 0.12-0.2) と日陰が暗く、日陰の雪・草がくすんだ
  */
-const float SH_SKY_GAIN = 1.7;
 // 雨の日の直達光の減衰 (雨雲が雲影マップで覆いきれない分)
 const float RAIN_DIRECT_DIMMING = 0.6;
 // worldTime がこれ以上飛んだら時間方向の履歴を捨てる (/time set 等)
@@ -73,7 +72,8 @@ void main() {
     frameData.skyParams[0] = vec4(cloudLitBySun ? sunAtCloud : moonAtCloud, cloudLitBySun ? 1.0 : -1.0);
 
     // 空の放射を SH L2 へ射影 (フィボナッチ球の一様サンプル)。下半球は地面の照り返し
-    vec3 groundIrradiance = (sun * max(sunDir.y, 0.0) + moon * max(moonDir.y, 0.0) + shEvalIrradiance(vec3(0.0, 1.0, 0.0))) * SH_GROUND_ALBEDO;
+    // frameData の太陽・月は上で書いたので skyGroundIrradianceRaw は今フレームの値を読む
+    vec3 groundIrradiance = skyGroundIrradianceRaw();
     vec3 groundRadiance = groundIrradiance * RCP_PI;
     vec3 sh[9];
     for (int i = 0; i < 9; i++) sh[i] = vec3(0.0);
@@ -89,9 +89,9 @@ void main() {
     }
     for (int k = 0; k < 9; k++) {
         // 輝度を保ったまま彩度だけ落とす (SH は線形なので係数ごとに掛けてよい)
-        vec3 c = sh[k] * (4.0 * PI / float(SH_SAMPLES) * SH_SKY_GAIN);
-        frameData.skySH[k] = vec4(mix(vec3(luminance(c)), c, SH_SKY_SATURATION), 0.0);
-        sh[k] = c;
+        vec3 c = sh[k] * (4.0 * PI / float(SH_SAMPLES));
+        frameData.skySH[k] = vec4(shSkyGrade(c), 0.0);
+        sh[k] = c * SH_SKY_GAIN;
     }
     // 雲が受ける真上からの空の照度は彩度を落とさない。灰色にすると夕方の雲の陰が
     // 空の青紫にならず、残った橙の太陽光で茶色く濁る

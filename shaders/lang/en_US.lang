@@ -133,6 +133,8 @@ value.GI_MODE.2=Screen Space
 value.GI_MODE.3=Voxel Ray Traced
 option.GI_SAMPLES=GI Samples
 option.GI_STRENGTH=GI Strength
+option.GI_GROUND_REPLACE=Ground Bounce Replacement
+option.GI_GROUND_REPLACE.comment=How much of the gray ground bounce built into the sky ambient is replaced by the real ground color picked up by GI (green on grass). 1 = physically correct (shade and downward faces take the ground color and get darker). 0 = the old brighter gray shade (bounce counted twice).
 option.GI_RES=GI Resolution
 value.GI_RES.1=Full
 value.GI_RES.2=Half
