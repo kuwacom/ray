@@ -152,6 +152,16 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define SUN_MOON_STYLE 1 // [0 1] 0=バニラテクスチャ 1=物理的な円盤
 #define STARS
 #define CLOUDS 3 // [0 1 2 3] 0=なし 1=バニラ 2=2D 押し出し体積雲 3=3D 体積雲
+#define CLOUD_STYLE 1 // [0 1 2 3 4 5 6 7 8] 雲の形のプリセット 0=カスタム 1=Ray 2=Bliss 風 3=Nostalgia 風 4=現実に忠実 5=綿あめ 6=入道雲 7=まばらな晴天積雲 8=層積雲の曇り
+#define CLOUD_S_SHAPE 0 // [0 1] カスタム: 0=積雲 1=角の丸い平らな板
+#define CLOUD_S_HEIGHT 1.0 // [0.4 0.6 0.8 1.0 1.25 1.5 2.0] カスタム: 積雲の背丈
+#define CLOUD_S_CONVECTION 1.0 // [0.25 0.5 0.75 1.0 1.25 1.5 2.0] カスタム: 対流の強さ
+#define CLOUD_S_TYPE_SHIFT 0.0 // [-0.6 -0.4 -0.2 0.0 0.1 0.2] カスタム: 雲種のずらし (負で層積雲)
+#define CLOUD_S_SPACING 1.0 // [0.5 0.75 1.0 1.25 1.5] カスタム: 大きな雲のまわりの晴れ間
+#define CLOUD_S_LOBES 1.0 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5] カスタム: こぶの段
+#define CLOUD_S_BASE_RAGGED 1.0 // [0.0 0.5 1.0 1.5 2.0] カスタム: 雲底のちぎれ
+#define CLOUD_S_LOBE_SHADE 0.3 // [0.0 0.1 0.2 0.3 0.4 0.5 0.7] カスタム: こぶの陰の深さ
+#define CLOUD_S_MULTISCATTER 1.0 // [0.5 0.75 1.0 1.25 1.5 2.0] カスタム: 多重散乱 (日向の明るさ)
 #define CLOUD_QUALITY 1 // [0 1 2 3]
 #define CLOUD_RES 2 // [1 2 4] 雲解像度の分母
 #define CLOUD_TEMPORAL // チェッカーボード + 時間アップスケール
