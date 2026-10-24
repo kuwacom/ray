@@ -13,7 +13,7 @@
  *   CS_FRACTUS: 断片雲, CS_HAZE: 縁の外のもや, CS_EDGE: 縁の柔らかさ (立ち上がりの幅)
  *   CS_DENSITY: 晴天の雲全体の濃さ, CS_CORE: 芯の濃さ
  *   CS_LOBE_SHADE: こぶの陰の深さ (置き換え), CS_SILVER: 逆光の銀の縁, CS_POWDER: 順光の縁の暗さ,
- *   CS_MS: 多重散乱 (日向の明るさ), CS_AMBIENT: 空の光, CS_BASE_SHADE: 雲底の暗さ
+ *   CS_SUN: 雲に当たる日光の強さ (空に対する雲の明るさ), CS_MS: 多重散乱 (日向の明るさ), CS_AMBIENT: 空の光, CS_BASE_SHADE: 雲底の暗さ
  *   CS_SLAB: 1 で角の丸い平らな板の雲 (積雲の 3D の形を作らない)。CS_SLAB_GRID: 板の格子 (参照 m), CS_SLAB_DEPTH: 板の厚み (参照 m)
  */
 #ifndef SKY_CLOUD_STYLES_GLSL
@@ -40,6 +40,7 @@ const float CS_CORE = 1.0;
 const float CS_LOBE_SHADE = 0.3;
 const float CS_SILVER = 1.0;
 const float CS_POWDER = 1.0;
+const float CS_SUN = 1.0;
 const float CS_MS = 1.0;
 const float CS_AMBIENT = 1.0;
 const float CS_BASE_SHADE = 1.0;
@@ -68,6 +69,7 @@ const float CS_CORE = 1.6;
 const float CS_LOBE_SHADE = 0.38;
 const float CS_SILVER = 1.3;
 const float CS_POWDER = 1.2;
+const float CS_SUN = 1.0;
 const float CS_MS = 1.15;
 const float CS_AMBIENT = 0.95;
 const float CS_BASE_SHADE = 1.1;
@@ -76,7 +78,7 @@ const float CS_SLAB_GRID = 180.0;
 const float CS_SLAB_DEPTH = 120.0;
 
 #elif CLOUD_STYLE == 3
-// Nostalgia 風: バニラの雲の格子を角の丸い平らな板にした雲。浸食もこぶも無いなめらかな面で、陰は浅く全体に明るい
+// Nostalgia 風: バニラの雲の格子を角の丸い平らな板にした雲。浸食もこぶも無いなめらかな面で、陰は浅く、日向も空に対して控えめな明るさ
 const float CS_LOW_COVER = 0.6;
 const float CS_MID_COVER = 0.7;
 const float CS_HIGH_COVER = 0.5;
@@ -96,8 +98,9 @@ const float CS_CORE = 1.0;
 const float CS_LOBE_SHADE = 0.0;
 const float CS_SILVER = 0.6;
 const float CS_POWDER = 0.3;
+const float CS_SUN = 0.45;
 const float CS_MS = 0.6;
-const float CS_AMBIENT = 1.0;
+const float CS_AMBIENT = 0.6;
 const float CS_BASE_SHADE = 1.0;
 const int CS_SLAB = 1;
 const float CS_SLAB_GRID = 180.0;
@@ -124,6 +127,7 @@ const float CS_CORE = 1.5;
 const float CS_LOBE_SHADE = 0.3;
 const float CS_SILVER = 0.0;
 const float CS_POWDER = 0.0;
+const float CS_SUN = 1.0;
 const float CS_MS = 1.0;
 const float CS_AMBIENT = 1.0;
 const float CS_BASE_SHADE = 1.0;
@@ -152,6 +156,7 @@ const float CS_CORE = 0.5;
 const float CS_LOBE_SHADE = 0.1;
 const float CS_SILVER = 1.5;
 const float CS_POWDER = 0.0;
+const float CS_SUN = 1.0;
 const float CS_MS = 1.4;
 const float CS_AMBIENT = 1.4;
 const float CS_BASE_SHADE = 0.4;
@@ -180,6 +185,7 @@ const float CS_CORE = 1.5;
 const float CS_LOBE_SHADE = 0.5;
 const float CS_SILVER = 1.0;
 const float CS_POWDER = 1.0;
+const float CS_SUN = 1.0;
 const float CS_MS = 1.4;
 const float CS_AMBIENT = 1.2;
 const float CS_BASE_SHADE = 1.3;
@@ -208,6 +214,7 @@ const float CS_CORE = 1.0;
 const float CS_LOBE_SHADE = 0.3;
 const float CS_SILVER = 1.0;
 const float CS_POWDER = 1.0;
+const float CS_SUN = 1.0;
 const float CS_MS = 1.0;
 const float CS_AMBIENT = 1.0;
 const float CS_BASE_SHADE = 1.0;
@@ -236,6 +243,7 @@ const float CS_CORE = 1.0;
 const float CS_LOBE_SHADE = 0.2;
 const float CS_SILVER = 1.0;
 const float CS_POWDER = 1.0;
+const float CS_SUN = 1.0;
 const float CS_MS = 1.0;
 const float CS_AMBIENT = 1.0;
 const float CS_BASE_SHADE = 1.2;
@@ -264,6 +272,7 @@ const float CS_CORE = 1.0;
 const float CS_LOBE_SHADE = CLOUD_S_LOBE_SHADE;
 const float CS_SILVER = 1.0;
 const float CS_POWDER = 1.0;
+const float CS_SUN = 1.0;
 const float CS_MS = CLOUD_S_MULTISCATTER;
 const float CS_AMBIENT = 1.0;
 const float CS_BASE_SHADE = 1.0;

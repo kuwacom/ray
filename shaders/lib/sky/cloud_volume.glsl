@@ -1189,6 +1189,7 @@ CloudLighting cloudLightingSetup(vec3 viewDir, float rain) {
     // 厚い雨雲の中の光は拡散しきっていて、こぶ単位の陰は見えない (雷雨の雲には陰を付けない)
     l.lobeShade = CLOUD_LOBE_SHADE * (1.0 - rain);
     float style = 1.0 - rain;
+    l.lightIrradiance *= mix(1.0, CS_SUN, style);
     l.msGain = CLOUD_MS_GAIN * mix(1.0, CS_MS, style);
     l.silverBoost = CLOUD_SILVER_BOOST * mix(1.0, CS_SILVER, style);
     l.powder = min(CLOUD_POWDER_STRENGTH * mix(1.0, CS_POWDER, style), 1.0);
