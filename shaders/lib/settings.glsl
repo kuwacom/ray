@@ -133,7 +133,7 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define WATER_RIVER_WAVES 0.4 // [0.0 0.2 0.4 0.6 0.8 1.0 1.5 2.0] 川の風の強さ (海に対する割合)
 #define WATER_PARALLAX // 水面の視差
 #define WATER_REFRACTION 1 // [0 1 2] 0=なし 1=スクリーンスペース 2=レイトレース
-#define WATER_REFRACTION_MODE 2 // [0 1 2] 上から見た水の屈折の方式 0=A 波で曲がった分だけ (水底は実際の深さ) 1=B 屈折のまま画面の端で弱める 2=D 屈折のまま画面外はボクセルで辿る (水底が浅く見える)
+#define WATER_REFRACTION_MODE 2 // [0 1 2] 上から見た水の屈折の方式 0=波の分だけ (水底は実際の深さ) 1=端で弱める (屈折のまま画面の端で弱める) 2=ボクセルで辿る (屈折のまま画面外はボクセルで辿る。水底が浅く見える)
 //#define WATER_CAUSTICS // 水中のコースティクス
 //#define WATER_TEXTURE // バニラの水テクスチャを重ねる
 #define WATER_FOG_DENSITY 1.0 // [0.05 0.1 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0 6.0]
