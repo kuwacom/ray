@@ -190,8 +190,19 @@ vec3 getHandLightFill(vec3 playerPos) {
  */
 void getHandLights(vec3 playerPos, vec3 geoNormal, float dither, out LightSample mainHand, out LightSample offHand) {
 #ifdef HAND_LIGHT
-    mainHand = evalHandLight(true, playerPos, geoNormal, dither);
-    offHand = evalHandLight(false, playerPos, geoNormal, dither);
+    /*
+     * 両手を 1 つのループで回す。2 回並べて呼ぶと evalHandLight (光源シャドウのトレース) が 2 つ展開され、
+     * NVIDIA のリンクが数秒延びる。回数を uniform で決めてループを展開させない
+     * (左手が光らなければ evalHandLight(false) は noLight なので、1 回で止めても結果は同じ)
+     */
+    mainHand = noLight();
+    offHand = noLight();
+    int handCount = heldBlockLightValue2 > 0 ? 2 : 1;
+    for (int i = 0; i < handCount; i++) {
+        LightSample s = evalHandLight(i == 0, playerPos, geoNormal, dither);
+        if (i == 0) mainHand = s;
+        else offHand = s;
+    }
 #else
     mainHand = noLight();
     offHand = noLight();

@@ -1635,15 +1635,22 @@ vec4 renderClouds(vec3 dir, float maxDist, vec2 dither) {
         segLow.y = segMid.y;
     }
     float starts[4] = float[4](segLow.y > segLow.x ? segLow.x : 1e30, segMid.y > segMid.x ? segMid.x : 1e30, segHigh.y > segHigh.x ? segHigh.x : 1e30, segLowFar.y > segLowFar.x ? segLowFar.x : 1e30);
-    for (int k = 0; k < 4; k++) {
+    /*
+     * 回数は区間のある層の数 (それより先は starts が全部 1e30 で抜ける)。定数の 4 回にするとドライバがループを展開し、
+     * 各層のマーチが 4 組ずつ複製されてリンクが数秒延びる
+     */
+    int layerCount = 0;
+    for (int m = 0; m < 4; m++) layerCount += starts[m] < 1e29 ? 1 : 0;
+    for (int k = 0; k < layerCount; k++) {
         int idx = 0;
         for (int m = 1; m < 4; m++) if (starts[m] < starts[idx]) idx = m;
         if (starts[idx] >= 1e29 || transmittance < CLOUD_MIN_TRANSMITTANCE) break;
         starts[idx] = 1e30;
-        if (idx == 0) {
-            cloudComposite(ctx, scattering, transmittance, cloudMarchLow(ctx, l, dir, segLow, dither, lowShare), dir, skyColor, CLOUD_MAX_DISTANCE);
-        } else if (idx == 3) {
-            cloudComposite(ctx, scattering, transmittance, cloudMarchLow(ctx, l, dir, segLowFar, dither, 1.0 - lowShare), dir, skyColor, CLOUD_MAX_DISTANCE);
+        // 低層の手前と奥 (積乱雲で分けた分) は同じ呼び出しで回す (2 か所に書くとマーチが 2 つ展開される)
+        if (idx == 0 || idx == 3) {
+            bool far = idx == 3;
+            cloudComposite(ctx, scattering, transmittance, cloudMarchLow(ctx, l, dir, far ? segLowFar : segLow, dither, far ? 1.0 - lowShare : lowShare),
+                           dir, skyColor, CLOUD_MAX_DISTANCE);
         }
 #ifdef CLOUD_MID_LAYER
         else if (idx == 1) {
