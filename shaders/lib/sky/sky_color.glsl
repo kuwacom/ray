@@ -28,8 +28,11 @@ const vec3 SKY_DISTANT_SNOW_ALBEDO = vec3(0.55, 0.58, 0.62);  // 雪と針葉樹
 const vec3 SKY_DISTANT_SAND_ALBEDO = vec3(0.42, 0.34, 0.24);
 // 海の外は地平線近くの空を映す水面 (かすめ角のフレネル)
 const float SKY_DISTANT_OCEAN_REFLECTANCE = 0.8;
-const float SKY_DISTANT_GROUND_HAZE = 70.0;    // 実際の大気の何倍の濃さで霞ませるか (描画距離内の空中遠近 14 倍 + もや分)
-const float SKY_DISTANT_GROUND_RAIN = 4.0;    // 雨でエアロゾルが何倍になるか (空中遠近と同じ)
+// 虚空の明るさの上限: 太陽からこの角度より離れた方位では地平線の空の SKY_VOID_MAX_GAIN 倍まで、太陽の近くは SKY_VOID_MAX_GAIN_SUN 倍まで
+const float SKY_VOID_MAX_GAIN = 1.05;
+const float SKY_VOID_MAX_GAIN_SUN = 4.0;
+const float SKY_VOID_SUN_COS_NEAR = 0.94;  // 20 度
+const float SKY_VOID_SUN_COS_FAR = 0.866;  // 30 度
 const float SKY_DISTANT_GROUND_OVERCAST = 0.85; // 雨雲で直達光が減る割合
 const float SKY_DISTANT_GROUND_MIN_HEIGHT = 8.0; // 海面より低い視点でも地面までの距離を 0 にしない
 const float SKY_HORIZON_SAMPLE_MU = 0.004;    // 地平線の色を読む高さ (地平線の真上の LUT の継ぎ目を避ける)
@@ -225,6 +228,7 @@ vec3 getSkyRadiance(vec3 dir) {
  * 地面までの距離で地面の色から地平線の色へ移るので、遠くほど霞む奥行きのある遠景になり、朝夕は暗い地面が地平線の照りへ溶ける
  * 描画距離端のフォグ (getBorderFogColor) も同じ色を使い、地形が溶ける色と虚空の色を揃える
  */
+vec3 fogVoidTransmittance(vec3 dir, float groundDist); // fog.glsl
 vec3 skyBelowHorizon(vec3 dir, vec3 sky) {
 #if defined HAS_SKY
     float horizonMu = atmoHorizonMu(atmoViewerRadius());
@@ -241,8 +245,8 @@ vec3 skyBelowHorizon(vec3 dir, vec3 sky) {
     horizon = mix(horizon, getSkyRadiance(vec3(dir.x, SKY_SHADOWED_HAZE_MU, dir.z)), shadowedHaze);
     float height = max(cameraPosition.y - SKY_SEA_LEVEL, SKY_DISTANT_GROUND_MIN_HEIGHT);
     float dist = height / max(below, 1e-4);
-    vec3 extinction = ATMO_RAYLEIGH_SCATTER + ATMO_MIE_EXTINCT * (1.0 + SKY_DISTANT_GROUND_RAIN * rainStrength);
-    vec3 transmittance = exp(-extinction * (1e-3 * SKY_DISTANT_GROUND_HAZE * LOOK_FOG_DENSITY) * dist);
+    // 描画距離の中の地形と同じフォグの式で、仮想の地面まで積む (描画距離の端で地形と継ぎ目が出ない)
+    vec3 transmittance = fogVoidTransmittance(dir, dist);
     vec3 irradiance = getSunIrradiance() * max(getSunDir().y, 0.0) * (1.0 - SKY_DISTANT_GROUND_OVERCAST * rainStrength)
                     + getMoonIrradiance() * max(getMoonDir().y, 0.0) + getSkyIrradiance(vec3(0.0, 1.0, 0.0));
     vec3 albedo = mix(SKY_DISTANT_GROUND_ALBEDO, SKY_DISTANT_SNOW_ALBEDO, saturate(distantSnow));
@@ -251,7 +255,12 @@ vec3 skyBelowHorizon(vec3 dir, vec3 sky) {
     // 海: 同じ方位で地平線から同じ角度だけ上の空を映す
     vec3 sea = getSkyRadiance(vec3(dir.x, horizonMu + below, dir.z)) * SKY_DISTANT_OCEAN_REFLECTANCE;
     ground = mix(ground, sea, saturate(distantOcean));
-    return mix(horizon, ground, transmittance);
+    vec3 result = mix(horizon, ground, transmittance);
+    // 太陽から離れた方位では地平線の空より明るくしない (日の当たる霞の上面が空より明るく光るのは太陽の近くだけ)
+    vec3 horizonSky = getSkyRadiance(vec3(dir.x, horizonMu + SKY_HORIZON_SAMPLE_MU, dir.z));
+    float awayFromSun = smoothstep(SKY_VOID_SUN_COS_NEAR, SKY_VOID_SUN_COS_FAR, dot(dir, getSunDir()));
+    float maxLum = luminance(horizonSky) * mix(SKY_VOID_MAX_GAIN_SUN, SKY_VOID_MAX_GAIN, awayFromSun);
+    return result * min(1.0, maxLum / max(luminance(result), 1e-9));
 #else
     return sky;
 #endif

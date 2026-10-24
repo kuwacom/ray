@@ -48,7 +48,7 @@ void main() {
     vec3 playerPos = screenToPlayer(vec3(uv, isSky ? 1.0 : fixHandDepth(depth)));
     vec3 dir = normalize(playerPos);
     // 空は描画距離までフォグを積む (描画距離端で地形が溶ける先と同じ量)
-    float dist = isSky ? far : length(playerPos);
+    float dist = isSky ? fogRenderDistance() : length(playerPos);
     float dither = blueNoise(texel).g;
 
     vec4 raw = vec4(0.0, 0.0, 0.0, 1.0);

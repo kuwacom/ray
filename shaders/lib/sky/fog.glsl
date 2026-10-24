@@ -5,6 +5,9 @@
  *   2. 高さフォグ: もや (海面からの指数減衰, Kappa / Nostalgia の 2 成分モデル) + 地表の霧 (FOG_MIST, 3D ノイズ)
  *      VL ON なら composite10 が影マップ空間でマーチ、OFF なら解析積分 (指数高さフォグの閉形式)
  *   3. 描画距離端のフォグ: 地形の端を空へ溶かす
+ * 景色の成分 (もやと空中遠近) は、遠景が同じ方位の地平線の空の色へ収束するように内散乱を空の色から作り、
+ * 描画距離 R の端で光学的深さが FOG_EDGE_DEPTH になるよう距離を d (1 + d / D) に写して縮める (手前の霞み方は R によらない)。
+ * 地表の霧は縮めない (霧の中の距離は本当の距離で見える)
  * 不透明・半透明の大半は composite10/11 (sky のパス) でまとめて掛ける
  * 前方シェーディングで個別に掛ける必要があるもの (パーティクル・雨) だけが applyForwardFog を使う
  */
@@ -25,9 +28,24 @@ const float FOG_ALBEDO = 0.95;
 // 空中遠近を実際の大気の何倍の濃さで掛けるか (描画距離は数百ブロックしかないので誇張する)
 const float AERIAL_PERSPECTIVE_SCALE = 10.0;
 const float AERIAL_PERSPECTIVE_RAIN = 3.0;
-// 描画距離に対する割合。0.78 では描画距離の 8-9 割にある島や岸がほぼ空の色に溶けて見えなかった。
-// バニラのフォグの始まり (描画距離 - 約 1.4 チャンク) に近い 0.9 にする
-const float BORDER_FOG_START = 0.9;
+// 描画距離に対する割合。端の霞みは景色の成分の写像 (FOG_EDGE_DEPTH) が作り、その先は虚空 (skyBelowHorizon) が同じ式で続けるので、
+// 端のフォグは地形の切れ目を隠すだけにする
+const float BORDER_FOG_START = 0.95;
+
+/*
+ * 景色の成分の距離の写像
+ * FOG_EDGE_DEPTH: 晴れた昼に y FOG_SCENIC_REF_Y から水平に見た描画距離の端の光学的深さ (透過率 0.4)。尾根の重なりが読める濃さ
+ * FOG_SCENIC_SIGMA0: その高さの景色の成分の消散 (もや + 空中遠近の緑)。D はこれと R から決める
+ */
+const float FOG_EDGE_DEPTH = 0.9;
+const float FOG_SCENIC_REF_Y = 70.0;
+const float FOG_SCENIC_SIGMA0 = FOG_HAZE_DENSITY * 0.88 + (13.558e-3 + ATMO_MIE_EXTINCT) * 1e-3 * AERIAL_PERSPECTIVE_SCALE;
+// D の下限 (R に対する割合)。短い描画距離で手前まで急に霞まないように
+const float FOG_SCENIC_MIN_D = 0.15;
+// 遠景の空の色のうち、太陽の単散乱とみなして影で引いてよい割合の上限 (残りは多重散乱と空の光)
+const float FOG_HAZE_SUN_SHARE = 0.8;
+// 影の中のもやに残す空の色の割合の下限
+const float FOG_HAZE_SHADOW_FLOOR = 0.1;
 
 /*
  * ネザーの霧は煤混じりの煙として、環境光より暗く (アルベド低め) 薄く掛ける。
@@ -64,6 +82,23 @@ float fogMorningFactor() {
 }
 
 float fogRainFactor() { return max(rainStrength, wetness * 0.4); }
+
+/*
+ * フォグを積む描画距離 R (空の画素はここまで積み、景色の成分の写像もこれで決まる)
+ * Distant Horizons に対応する時は、ここを DH の描画距離にする。その時は σ0 R が FOG_EDGE_DEPTH を超えるので縮めず (D = 無限)、
+ * 代わりに景色の成分の濃さを FOG_EDGE_DEPTH / R まで下げる (docs/architecture.md「フォグ」)
+ */
+float fogRenderDistance() { return far; }
+
+// 景色の成分の写像の 1 / D。物理のままで端の光学的深さが FOG_EDGE_DEPTH に届くなら 0 (縮めない)
+float fogScenicInvD() {
+    float R = fogRenderDistance();
+    float ratio = FOG_EDGE_DEPTH / (FOG_SCENIC_SIGMA0 * R);
+    return min(max(ratio - 1.0, 0.0) / R, 1.0 / (FOG_SCENIC_MIN_D * R));
+}
+
+// 景色の成分の写像した距離 d (1 + d / D)
+float fogScenicDistance(float d, float invD) { return d * (1.0 + d * invD); }
 
 // もやの海面での消散係数 (時間帯・天気・バイオームの湿度で変わる)
 float fogHazeAmount() {
@@ -144,6 +179,8 @@ struct FogLighting {
     float phaseHaze;
     float phaseMist;
     vec3 ambient;
+    vec3 air;      // 景色の成分の飽和した放射 (同じ方位の空の色。地平線より下は地平線の色)
+    vec3 airSun;   // air のうち太陽の単散乱の分 (影の中で引く)
 };
 
 // もやの位相: g を半分ずつにしたオクターブ和 (多重散乱で位相が丸くなる近似, Kappa の 4 オクターブと同じ考え方)
@@ -168,12 +205,36 @@ FogLighting fogLightingSetup(vec3 dir) {
     vec3 skyUp = shEvalIrradiance(vec3(0.0, 1.0, 0.0));
     vec3 skyDown = shEvalIrradiance(vec3(0.0, -1.0, 0.0));
     f.ambient = (skyUp + skyDown) * (SH_LOOK_UNDO / TAU);
+    // SH は日陰の見た目のために彩度を落としてあるので、霧の光としては空の彩度に戻す (灰色の霧にしない)
+    float ambientLum = luminance(f.ambient);
+    f.ambient = max(vec3(ambientLum) + (f.ambient - ambientLum) / max(SH_SKY_SATURATION, 0.05), 0.0);
+    /*
+     * もやと空中遠近は消散と内散乱を組にし、内散乱は同じ方位の空の色にする (遠い霞は地平線の空に収束する)。
+     * 空の色は太陽の単散乱を含むので、影の中の点ではその分を引いて光芒にする。引く分は空の色の FOG_HAZE_SUN_SHARE までに留める
+     */
+    f.air = getSkyRadiance(dir);
+    vec3 sunScatter = f.light * f.phaseHaze * FOG_HAZE_TINT * FOG_ALBEDO;
+    f.airSun = sunScatter * min(1.0, FOG_HAZE_SUN_SHARE * luminance(f.air) / max(luminance(sunScatter), 1e-9));
 #elif defined WORLD_END
     f.ambient = END_FOG_COLOR * 0.05;
+    f.air = vec3(0.0);
+    f.airSun = vec3(0.0);
 #else
     f.ambient = getNetherFogRadiance();
+    f.air = vec3(0.0);
+    f.airSun = vec3(0.0);
 #endif
     return f;
+}
+
+/*
+ * もや (景色の成分) の内散乱の放射 (消散 1 あたり)
+ * sunVisibility: 太陽の見え方 (影), ambientVisibility: 空の見え方 (洞窟)
+ * 日の当たる所は空の色そのもの (VL_STRENGTH で太陽の分を増減)、影の中は太陽の単散乱を引いた空の光だけ
+ */
+vec3 fogHazeRadiance(FogLighting fl, float sunVisibility, float ambientVisibility) {
+    vec3 lit = fl.air * ambientVisibility + fl.airSun * (sunVisibility * VL_STRENGTH - 1.0);
+    return max(lit, fl.air * (FOG_HAZE_SHADOW_FLOOR * ambientVisibility));
 }
 
 /*
@@ -187,13 +248,15 @@ vec4 fogAnalyticSegment(vec3 dir, float startDist, float endDist, FogLighting fl
 #if defined HAS_SKY
     float y0 = cameraPosition.y + dir.y * startDist;
     float y1 = cameraPosition.y + dir.y * endDist;
-    float odHaze = fogHazeAmount() * len * fogHazeProfileMean(y0, y1);
+    float invD = fogScenicInvD();
+    float scenicLen = fogScenicDistance(endDist, invD) - fogScenicDistance(startDist, invD);
+    float odHaze = fogHazeAmount() * scenicLen * fogHazeProfileMean(y0, y1);
     float odMist = fogMistAmount() * len * 0.35 * fogMistHeightFade(0.5 * (y0 + y1));
     float od = odHaze + odMist;
     if (od <= 1e-6) return vec4(0.0, 0.0, 0.0, 1.0);
     float transmittance = exp(-od);
-    float phase = (odHaze * fl.phaseHaze + odMist * fl.phaseMist) / od;
-    vec3 radiance = (fl.light * phase * sunVisibility + fl.ambient * ambientVisibility) * FOG_HAZE_TINT * FOG_ALBEDO;
+    vec3 mistRadiance = (fl.light * fl.phaseMist * sunVisibility * VL_STRENGTH + fl.ambient * ambientVisibility) * FOG_ALBEDO;
+    vec3 radiance = (odHaze * fogHazeRadiance(fl, sunVisibility, ambientVisibility) + odMist * mistRadiance) / od;
     return vec4(radiance * (1.0 - transmittance), transmittance);
 #elif defined WORLD_END
     float transmittance = exp(-END_FOG_EXTINCTION * END_FOG_DENSITY * len);
@@ -209,15 +272,46 @@ vec4 fogAnalyticSegment(vec3 dir, float startDist, float endDist, FogLighting fl
  * 空中遠近: カメラから playerPos までの大気の減衰と、その方向の地平線の空の色への溶け込み
  * 洞窟の中では空の色に溶かさない (遠い洞窟の壁が青くならないように)
  */
+#if defined HAS_SKY
+/*
+ * 空中遠近の消散係数 (1/ブロック)。高さ y0 から y1 までの直線上の平均
+ * ミー散乱 (エアロゾル) は高さで速く減るので閉形式の平均にする (山頂どうしの視線は霞まず、谷底は霞む)
+ */
+vec3 fogAerialExtinction(float y0, float y1) {
+    float h0 = max(y0 - SKY_SEA_LEVEL, 0.0) * 1e-3;
+    float h1 = max(y1 - SKY_SEA_LEVEL, 0.0) * 1e-3;
+    float mie = abs(h1 - h0) < 1e-4 ? exp(-0.5 * (h0 + h1) / ATMO_MIE_HEIGHT)
+              : ATMO_MIE_HEIGHT * (exp(-h0 / ATMO_MIE_HEIGHT) - exp(-h1 / ATMO_MIE_HEIGHT)) / (h1 - h0);
+    vec3 extinction = ATMO_RAYLEIGH_SCATTER * exp(-0.5 * (h0 + h1) / ATMO_RAYLEIGH_HEIGHT)
+                    + ATMO_MIE_EXTINCT * mie * (1.0 + AERIAL_PERSPECTIVE_RAIN * fogRainFactor());
+    return extinction * (1e-3 * AERIAL_PERSPECTIVE_SCALE * LOOK_FOG_DENSITY);
+}
+
+/*
+ * 地平線より下の虚空 (描画距離の外) の視線の透過率。仮想の地面までの距離 groundDist まで、描画距離の中の地形と同じ式で積む
+ * 空中遠近は全区間、もやと地表の霧は描画距離の外の区間だけ (中の区間は composite10/11 が空の画素に積む)
+ */
+vec3 fogVoidTransmittance(vec3 dir, float groundDist) {
+    float R = min(fogRenderDistance(), groundDist);
+    float invD = fogScenicInvD();
+    float yC = cameraPosition.y;
+    float yR = yC + dir.y * R;
+    float yG = yC + dir.y * groundDist;
+    float scenicG = fogScenicDistance(groundDist, invD);
+    vec3 od = fogAerialExtinction(yC, yG) * scenicG;
+    od += fogHazeAmount() * (scenicG - fogScenicDistance(R, invD)) * fogHazeProfileMean(yR, yG);
+    od += fogMistAmount() * (groundDist - R) * 0.35 * fogMistHeightFade(0.5 * (yR + yG));
+    return exp(-od);
+}
+#endif
+
 vec3 applyAerialPerspective(vec3 color, vec3 playerPos) {
 #if defined HAS_SKY
     float dist = length(playerPos);
     vec3 dir = playerPos / max(dist, EPS);
-    float hKm = max(cameraPosition.y + 0.5 * playerPos.y - SKY_SEA_LEVEL, 0.0) * 1e-3;
-    vec3 extinction = ATMO_RAYLEIGH_SCATTER * exp(-hKm / ATMO_RAYLEIGH_HEIGHT)
-                    + ATMO_MIE_EXTINCT * exp(-hKm / ATMO_MIE_HEIGHT) * (1.0 + AERIAL_PERSPECTIVE_RAIN * fogRainFactor());
+    vec3 extinction = fogAerialExtinction(cameraPosition.y, cameraPosition.y + playerPos.y);
     float outdoor = 1.0 - getCaveFactor();
-    vec3 transmittance = exp(-extinction * (1e-3 * AERIAL_PERSPECTIVE_SCALE * LOOK_FOG_DENSITY) * dist * mix(0.2, 1.0, outdoor));
+    vec3 transmittance = exp(-extinction * fogScenicDistance(dist, fogScenicInvD()) * mix(0.2, 1.0, outdoor));
     return color * transmittance + getSkyRadiance(dir) * (1.0 - transmittance) * outdoor;
 #else
     return color;

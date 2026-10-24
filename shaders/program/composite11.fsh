@@ -121,7 +121,7 @@ void main() {
     float fixedDepth = isSky ? 1.0 : fixHandDepth(depth);
     vec3 playerPos = screenToPlayer(vec3(texcoord, fixedDepth));
     vec3 dir = normalize(playerPos);
-    float dist = isSky ? far : length(playerPos);
+    float dist = isSky ? fogRenderDistance() : length(playerPos);
 
     // 遠景 (空気中のみ。水中・溶岩の中からは遠景が見えないので媒質のフォグだけで十分)
     if (!isSky && isEyeInWater == 0) {

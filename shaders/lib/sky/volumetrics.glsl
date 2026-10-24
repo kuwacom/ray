@@ -97,9 +97,12 @@ vec4 marchAirFog(vec3 dir, float endDist, float dither) {
 #endif
 
 #ifdef HAS_SUN_SHADOWS
-    float marchEnd = min(endDist, min(shadowDistance, far));
+    float marchEnd = min(endDist, min(shadowDistance, fogRenderDistance()));
 #else
-    float marchEnd = min(endDist, far);
+    float marchEnd = min(endDist, fogRenderDistance());
+#endif
+#if defined HAS_SKY
+    float invD = fogScenicInvD();
 #endif
 
     vec3 scattering = vec3(0.0);
@@ -114,6 +117,8 @@ vec4 marchAirFog(vec3 dir, float endDist, float dither) {
 
 #if defined HAS_SKY
         vec2 density = fogDensityAt(p, haze, mist);
+        // 景色の成分は写像した距離で積む (d (1 + d / D) の微分)
+        density.x *= 1.0 + 2.0 * t * invD;
 #else
         // ネザー・エンドは一様な霞に、ゆっくり漂う濃淡だけを付ける
         vec3 wp = p + cameraPosition + vec3(frameTimeCounter * 0.4, frameTimeCounter * 0.15, 0.0);
@@ -133,9 +138,18 @@ vec4 marchAirFog(vec3 dir, float endDist, float dither) {
         float sunVisibility = inside ? 1.0 : farSunVisibility;
         float skyVisibility = inside ? max(outdoor, luminance(shadow)) : outdoor;
 
+        float ambientVisibility = max(skyVisibility, VL_MIN_AMBIENT_SCALE * MIN_AMBIENT / max(luminance(fl.ambient), 1e-6));
+#if defined HAS_SKY
+        // もやは空の色から影の分を引き (fogHazeRadiance)、霧は太陽と空の光で照らす
+        float sunShadow = luminance(shadow) * sunVisibility;
+        vec3 hazeLight = fogHazeRadiance(fl, sunShadow, ambientVisibility);
+        vec3 mistLight = (fl.light * shadow * (fl.phaseMist * sunVisibility * VL_STRENGTH) + fl.ambient * ambientVisibility) * FOG_ALBEDO;
+        vec3 light = (density.x * hazeLight + density.y * mistLight) / extinction;
+#else
         float phase = (density.x * fl.phaseHaze + density.y * fl.phaseMist) / extinction;
         vec3 light = fl.light * shadow * (phase * sunVisibility * VL_STRENGTH);
-        light += fl.ambient * max(skyVisibility, VL_MIN_AMBIENT_SCALE * MIN_AMBIENT / max(luminance(fl.ambient), 1e-6));
+        light += fl.ambient * ambientVisibility;
+#endif
 #ifdef FOG_BLOCKLIGHT
         light += sampleBlockLightVolume(p) * (FOG_BLOCKLIGHT_STRENGTH * VL_BLOCKLIGHT_SCALE * RCP_PI);
 #endif
@@ -145,10 +159,6 @@ vec4 marchAirFog(vec3 dir, float endDist, float dither) {
         transmittance *= stepT;
         if (transmittance < 0.005) break;
     }
-#if defined HAS_SKY
-    scattering *= FOG_HAZE_TINT * FOG_ALBEDO;
-#endif
-
     if (endDist > marchEnd && transmittance > 0.005) {
         vec4 rest = fogAnalyticSegment(dir, marchEnd, endDist, fl, farSunVisibility, outdoor);
         scattering += transmittance * rest.rgb;
