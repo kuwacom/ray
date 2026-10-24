@@ -28,11 +28,15 @@ const vec3 SKY_DISTANT_SNOW_ALBEDO = vec3(0.55, 0.58, 0.62);  // 雪と針葉樹
 const vec3 SKY_DISTANT_SAND_ALBEDO = vec3(0.42, 0.34, 0.24);
 // 海の外は地平線近くの空を映す水面 (かすめ角のフレネル)
 const float SKY_DISTANT_OCEAN_REFLECTANCE = 0.8;
-// 虚空の明るさの上限: 太陽からこの角度より離れた方位では地平線の空の SKY_VOID_MAX_GAIN 倍まで、太陽の近くは SKY_VOID_MAX_GAIN_SUN 倍まで
+/*
+ * 虚空の明るさの上限: 太陽から SKY_VOID_SUN_COS_FAR の角度より離れた方位では地平線の空の SKY_VOID_MAX_GAIN 倍まで、
+ * 太陽に近づくにつれて SKY_VOID_MAX_GAIN_SUN 倍までなめらかに緩める。4 倍から 20-30 度で 1.05 倍へ切り替えていた時は、
+ * 日没後に太陽の下の虚空が縦の縁のある赤い四角に見えた
+ */
 const float SKY_VOID_MAX_GAIN = 1.05;
-const float SKY_VOID_MAX_GAIN_SUN = 4.0;
-const float SKY_VOID_SUN_COS_NEAR = 0.94;  // 20 度
-const float SKY_VOID_SUN_COS_FAR = 0.866;  // 30 度
+const float SKY_VOID_MAX_GAIN_SUN = 1.6;
+const float SKY_VOID_SUN_COS_NEAR = 0.9986; // 3 度
+const float SKY_VOID_SUN_COS_FAR = 0.866;   // 30 度
 const float SKY_DISTANT_GROUND_OVERCAST = 0.85; // 雨雲で直達光が減る割合
 const float SKY_DISTANT_GROUND_MIN_HEIGHT = 8.0; // 海面より低い視点でも地面までの距離を 0 にしない
 const float SKY_HORIZON_SAMPLE_MU = 0.004;    // 地平線の色を読む高さ (地平線の真上の LUT の継ぎ目を避ける)
@@ -260,8 +264,8 @@ vec3 skyBelowHorizon(vec3 dir, vec3 sky) {
     vec3 result = mix(horizon, ground, transmittance);
     // 太陽から離れた方位では地平線の空より明るくしない (日の当たる霞の上面が空より明るく光るのは太陽の近くだけ)
     vec3 horizonSky = getSkyRadiance(vec3(dir.x, horizonMu + SKY_HORIZON_SAMPLE_MU, dir.z));
-    float awayFromSun = smoothstep(SKY_VOID_SUN_COS_NEAR, SKY_VOID_SUN_COS_FAR, dot(dir, getSunDir()));
-    float maxLum = luminance(horizonSky) * mix(SKY_VOID_MAX_GAIN_SUN, SKY_VOID_MAX_GAIN, awayFromSun);
+    float nearSun = sqr(smoothstep(SKY_VOID_SUN_COS_FAR, SKY_VOID_SUN_COS_NEAR, dot(dir, getSunDir())));
+    float maxLum = luminance(horizonSky) * mix(SKY_VOID_MAX_GAIN, SKY_VOID_MAX_GAIN_SUN, nearSun);
     return result * min(1.0, maxLum / max(luminance(result), 1e-9));
 #else
     return sky;

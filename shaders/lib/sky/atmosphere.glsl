@@ -31,7 +31,8 @@ const vec3 ATMO_GROUND_ALBEDO = vec3(0.3);
  * 成層圏のエアロゾル (高度 20 km 中心、半幅 5 km の薄いミー散乱)。日没後に太陽が -2 度から -6 度の時、
  * 赤くなった光を散らして太陽側の上 15-25 度に紫の光 (purple light) を出す (Lee & Hernandez-Andres 2003)
  */
-const float ATMO_STRAT_SCATTER = 8e-4;    // 1/km (層の中心)
+// 8e-4 では日没後 3 度の空全体が紫に寄り、反対側の上空の b/r が 1.5 に留まった
+const float ATMO_STRAT_SCATTER = 4e-4;    // 1/km (層の中心)
 const float ATMO_STRAT_CENTER = 20.0;     // km
 const float ATMO_STRAT_HALF_WIDTH = 5.0;  // km
 
