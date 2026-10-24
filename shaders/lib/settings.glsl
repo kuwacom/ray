@@ -219,6 +219,13 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define CLOUD_BASE_SHADE 1.0 // [0.0 0.5 1.0 1.5 2.0 3.0] 雲底の暗さ
 #define CLOUD_DRAW_DISTANCE 80.0 // [20.0 30.0 40.0 60.0 80.0 120.0 160.0] 低層・中層の雲の描画距離 (参照空間の km)
 #define FOG_DENSITY 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0 6.0 8.0]
+#define FOG_STYLE 0 // [0 1 2 3] 0=Ray (物理) 1=Bliss 風 2=Nostalgia 風 3=カスタム
+#define FOG_C_HAZE 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0 6.0 8.0] カスタム時のもやの濃さの倍率
+#define FOG_C_EDGE 0.9 // [0.3 0.5 0.7 0.9 1.2 1.5 2.0 3.0] カスタム時の描画距離の端の霞み (光学的深さ)
+#define FOG_C_LAYER 1.0 // [0.0 0.25 0.5 1.0 1.5 2.0 3.0 4.0] カスタム時の霧の層の濃さの倍率
+#define FOG_C_GROUND 1.0 // [0.0 0.25 0.5 1.0 1.5 2.0 3.0 4.0 6.0] カスタム時の地表の霧の濃さの倍率
+#define FOG_C_FORWARD 1.0 // [0.5 0.75 1.0 1.5 2.0 3.0] カスタム時の日の当たる霧の輝きの倍率
+#define FOG_BIOME // バイオームでフォグを変える
 #define FOG_HEIGHT_PRESET 4 // [0 1 2 3 4] 0=バニラ (-64..320) 1=高さ拡張ワールド 2=実寸 (1 ブロック 1 m) 3=カスタム 4=雲に合わせる
 #define FOG_C_SEA_LEVEL 63 // [0 32 48 63 64 80 100 128 160 200 256] カスタム時の基準の海面 (ワールド y)
 #define FOG_C_HAZE_TOP 0.0 // [0.0 100.0 120.0 143.0 160.0 200.0 250.0 300.0 406.0 500.0 750.0 1000.0 1141.0 1500.0 2000.0] カスタム時の昼のもやの上端 (ワールド y, 0 = 雲底の 3/4)
@@ -486,6 +493,8 @@ const int noiseTextureResolution = 256;
 #ifdef CLOUD_SHADOWS
 #endif
 #ifdef FOG_LAYER
+#endif
+#ifdef FOG_BIOME
 #endif
 #ifdef FOG_MIST
 #endif

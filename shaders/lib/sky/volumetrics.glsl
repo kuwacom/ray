@@ -100,7 +100,7 @@ float vlFarScreenVisibility(vec3 dir, float nearDist, float farDist, float dithe
         // 画面の外は遮るものが分からないので見えるとする
         if (any(lessThan(p, vec2(0.0))) || any(greaterThan(p, vec2(1.0)))) break;
         float depth = texelFetch(depthtex0, ivec2(p * viewSize()), 0).r;
-        if (depth < 1.0 && linearizeDepth(depth) < -q.z * (1.0 - VL_FAR_DEPTH_BIAS)) return 1.0 - weight;
+        if (depth < 1.0 && linearizeDepth(depth) < -q.z * (1.0 - VL_FAR_DEPTH_BIAS)) return 1.0 - weight * FS_VL_FAR;
     }
     return 1.0;
 }
@@ -178,7 +178,7 @@ vec4 marchAirFog(vec3 dir, float endDist, float dither, float farVisibility) {
         // もやは空の色から影の分を引き (fogHazeRadiance)、霧は太陽と空の光で照らす
         float sunShadow = luminance(shadow) * sunVisibility;
         vec3 hazeLight = fogHazeRadiance(fl, sunShadow, ambientVisibility);
-        vec3 mistLight = (fl.light * shadow * (fl.phaseMist * sunVisibility * VL_STRENGTH) + fl.ambient * ambientVisibility) * FOG_ALBEDO;
+        vec3 mistLight = (fl.light * shadow * (fl.phaseMist * sunVisibility * FOG_VL_STRENGTH) + fl.ambient * ambientVisibility) * FOG_ALBEDO;
         vec3 light = (density.x * hazeLight + density.y * mistLight) / extinction;
 #else
         float phase = (density.x * fl.phaseHaze + density.y * fl.phaseMist) / extinction;

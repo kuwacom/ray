@@ -450,6 +450,25 @@ option.CLOUD_C_MID.comment=Custom climate only. Average amount of altocumulus an
 option.CLOUD_C_HIGH.comment=Custom climate only. Average amount of cirrus (varies by day)
 
 # Fog
+option.FOG_STYLE=Fog Style
+option.FOG_STYLE.comment=Shape and balance of the fog layers. Ray: physically based, a haze layer with a flat top, morning fog banks and valley mist. Bliss-like: denser haze and distance fade, more fog banks, mist also in the evening and at night, and a strong glow on the sun side. Nostalgia-like: no fog bank, haze that thins out gradually with height, a light distance fade, mist only in the morning and in rain. Custom: the sliders in Custom Fog Style. Distant air always fades into the horizon sky of the same direction. Overall strength is set by Fog Density and the Look preset
+value.FOG_STYLE.0=Ray (Physical)
+value.FOG_STYLE.1=Bliss-like
+value.FOG_STYLE.2=Nostalgia-like
+value.FOG_STYLE.3=Custom
+screen.FOG_STYLE_SCREEN=Custom Fog Style
+option.FOG_C_HAZE=Haze
+option.FOG_C_HAZE.comment=Custom style only. Multiplies the haze density
+option.FOG_C_EDGE=Distance Fade
+option.FOG_C_EDGE.comment=Custom style only. Optical depth of the haze at the edge of the render distance. 0.9 leaves 40% of the terrain visible, higher fades the distance more
+option.FOG_C_LAYER=Fog Layer
+option.FOG_C_LAYER.comment=Custom style only. Multiplies the density of the mid-level fog layer
+option.FOG_C_GROUND=Ground Mist
+option.FOG_C_GROUND.comment=Custom style only. Multiplies the density of the ground mist
+option.FOG_C_FORWARD=Sunlit Glow
+option.FOG_C_FORWARD.comment=Custom style only. How brightly sunlit haze and fog glow toward the sun (multiplies Light Shaft Strength)
+option.FOG_BIOME=Biome Fog
+option.FOG_BIOME.comment=Swamps and jungles get more fog and mist, deserts and badlands only dusty haze, snowy biomes thinner haze, oceans less valley mist
 option.FOG_DENSITY=Fog Density
 option.FOG_DENSITY.comment=Multiplies the Look preset value (1 with Natural)
 option.FOG_HEIGHT_PRESET=Fog Height Template

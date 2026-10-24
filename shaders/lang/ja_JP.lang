@@ -450,6 +450,25 @@ option.CLOUD_C_MID.comment=気候がカスタムの時だけ。高積雲・高�
 option.CLOUD_C_HIGH.comment=気候がカスタムの時だけ。巻雲の量の平均 (日によって変わる)
 
 # フォグ
+option.FOG_STYLE=フォグのスタイル
+option.FOG_STYLE.comment=フォグの層の形と比。Ray: 物理ベース。上面の平らなもやの層、朝の霧の土手と谷霧。Bliss 風: 濃いめのもやと遠景の霞み、霧の土手が多く、夕方と夜にも地表の霧、太陽側の霧が強く光る。Nostalgia 風: 霧の土手なし。もやは上へなだらかに薄れ、遠景の霞みは軽く、地表の霧は朝と雨だけ。カスタム: 「フォグのスタイル (カスタム)」のスライダー。どのスタイルでも遠景の空気は同じ方位の地平線の空の色に溶ける。全体の濃さはフォグの濃さとルックのプリセットで決まる
+value.FOG_STYLE.0=Ray (物理)
+value.FOG_STYLE.1=Bliss 風
+value.FOG_STYLE.2=Nostalgia 風
+value.FOG_STYLE.3=カスタム
+screen.FOG_STYLE_SCREEN=フォグのスタイル (カスタム)
+option.FOG_C_HAZE=もや
+option.FOG_C_HAZE.comment=スタイルがカスタムの時だけ。もやの濃さの倍率
+option.FOG_C_EDGE=遠景の霞み
+option.FOG_C_EDGE.comment=スタイルがカスタムの時だけ。描画距離の端のもやの光学的深さ。0.9 で地形が 4 割見え、上げるほど遠景が霞む
+option.FOG_C_LAYER=霧の層
+option.FOG_C_LAYER.comment=スタイルがカスタムの時だけ。中くらいの高さの霧の層の濃さの倍率
+option.FOG_C_GROUND=地表の霧
+option.FOG_C_GROUND.comment=スタイルがカスタムの時だけ。地表の霧の濃さの倍率
+option.FOG_C_FORWARD=日の当たる霧の輝き
+option.FOG_C_FORWARD.comment=スタイルがカスタムの時だけ。日の当たるもやと霧が太陽の方向で光る強さ (光芒の強さに掛ける)
+option.FOG_BIOME=バイオームのフォグ
+option.FOG_BIOME.comment=湿地とジャングルは霧が多く、砂漠と荒地は砂塵のもやだけ、雪のバイオームはもやが薄く、海は谷霧が少ない
 option.FOG_DENSITY=フォグの濃さ
 option.FOG_DENSITY.comment=ルックのプリセットの値 (ナチュラルでは 1) に掛ける
 option.FOG_HEIGHT_PRESET=フォグの高さテンプレート

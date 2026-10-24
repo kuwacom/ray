@@ -56,6 +56,9 @@ uniform float netherBasalt;
 uniform float distantSnow;
 uniform float distantSand;
 uniform float distantOcean;
+// フォグの湿ったバイオーム (shaders.properties のカスタム uniform, 8 秒で切り替わる)
+uniform float fogSwamp;
+uniform float fogJungle;
 
 // ID
 uniform int entityId;
