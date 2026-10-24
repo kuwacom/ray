@@ -21,9 +21,9 @@
 
 #if CLOUD_STYLE == 1
 // Ray: 雲量のほかは各設定がそのまま効く基準
-const float CS_LOW_COVER = 1.0;
-const float CS_MID_COVER = 1.0;
-const float CS_HIGH_COVER = 1.0;
+const float CS_LOW_COVER = 0.75;
+const float CS_MID_COVER = 0.7;
+const float CS_HIGH_COVER = 0.8;
 const float CS_SIZE = 1.0;
 const float CS_HEIGHT = 1.0;
 const float CS_CONVECTION = 1.0;
@@ -245,9 +245,9 @@ const float CS_SLAB_DEPTH = 120.0;
 
 #else
 // カスタム (CLOUD_STYLE 0): スタイルにしか無い値は CLOUD_S_*、既存の設定があるものは Ray の基準 (設定がそのまま効く)
-const float CS_LOW_COVER = 1.0;
-const float CS_MID_COVER = 1.0;
-const float CS_HIGH_COVER = 1.0;
+const float CS_LOW_COVER = 0.75;
+const float CS_MID_COVER = 0.7;
+const float CS_HIGH_COVER = 0.8;
 const float CS_SIZE = 1.0;
 const float CS_HEIGHT = CLOUD_S_HEIGHT;
 const float CS_CONVECTION = CLOUD_S_CONVECTION;
