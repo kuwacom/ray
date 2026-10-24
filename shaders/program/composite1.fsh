@@ -129,8 +129,12 @@ vec3 opaqueEnvSpecular(ivec2 texel, float depth) {
 }
 
 // 面での太陽の可視率 (影 + 雲影)。PCSS は重いので 1 ピクセル 1 回にして鏡面・内散乱・泡で使い回す
-vec3 surfaceSunVisibility(vec3 playerPos, vec3 geoNormal, float dither) {
-    return getSunShadow(playerPos, geoNormal, dither) * getCloudShadow(playerPos);
+// specular: 太陽の照り返しに使う分 (葉を透過した拡散光を除く。葉越しの太陽が緑の光源として映らないように)
+vec3 surfaceSunVisibility(vec3 playerPos, vec3 geoNormal, float dither, out vec3 specular) {
+    float cloud = getCloudShadow(playerPos);
+    vec3 vis = getSunShadow(playerPos, geoNormal, dither, specular) * cloud;
+    specular *= cloud;
+    return vis;
 }
 
 // 太陽の鏡面だけ。f0 と alpha を与えた誘電体として
@@ -501,9 +505,11 @@ void main() {
         /*
          * 側面の日向はスカイライトと雲影で近似する (影マップは滝の水柱自身の影に掛かり、PCSS のノイズが泡の白に出て砂嵐のようにざらついた)
          */
+        vec3 sunSpecVis = vec3(0.0);
         vec3 sunVis = below ? vec3(0.0)
             : side ? vec3(smoothstep(0.6, 0.95, lmT.y)) * getCloudShadow(surfPlayer)
-            : surfaceSunVisibility(surfPlayer, vec3(0.0, 1.0, 0.0), dither);
+            : surfaceSunVisibility(surfPlayer, vec3(0.0, 1.0, 0.0), dither, sunSpecVis);
+        if (side) sunSpecVis = sunVis;
 
         // ---- 側面から入った光が水を出る所 (水の厚み) ----
         vec3 exitOutward = vec3(0.0);
@@ -681,10 +687,10 @@ void main() {
             float sunAlpha = sqrt(sqr(WATER_ROUGHNESS) + unresolvedVar);
             // 上向きの水面は照り返しの一部を輝点にする。輝点の傾きの分布は画素より細かい波の全部 (表面張力波を含む)
             float g = N.y > 0.5 ? WATER_GLINT * WATER_GLINT_POINT_SHARE : 0.0;
-            color += sunSpecular(N, V, 0.02, sunAlpha, sunVis) * (1.0 - g);
+            color += sunSpecular(N, V, 0.02, sunAlpha, sunSpecVis) * (1.0 - g);
             if (g > 0.0) {
                 float glintVar = unresolvedVar + sea.microVar * (1.0 - WATER_MICRO_ROUGHNESS);
-                vec4 glint = sunGlint(surfPlayer, N, V, glintVar, sunVis, dist, NoVGeo);
+                vec4 glint = sunGlint(surfPlayer, N, V, glintVar, sunSpecVis, dist, NoVGeo);
                 color += glint.rgb * g;
                 glintLum = glint.a * g;
             }
@@ -736,8 +742,10 @@ void main() {
         vec3 R = reflect(-V, N);
         vec3 refl = reflectionAt(texel, dist, R, lmT.y, roughness, vec3(0.0));
         if (roughness < MIRROR_ROUGHNESS) refl = mirrorReflection(refl, surfView, surfPlayer, N, R, dist, false, false, dither);
+        vec3 glassSunVis;
+        surfaceSunVisibility(surfPlayer, N, dither, glassSunVis);
         color = behind * transmit * (1.0 - F) + translucent.rgb + refl * F
-            + sunSpecular(N, V, 0.04, max(roughness * roughness, WATER_ROUGHNESS), surfaceSunVisibility(surfPlayer, N, dither));
+            + sunSpecular(N, V, 0.04, max(roughness * roughness, WATER_ROUGHNESS), glassSunVis);
         outColor = vec4(color, 1.0);
         return;
     }

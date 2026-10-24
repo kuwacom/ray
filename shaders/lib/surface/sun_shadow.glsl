@@ -12,6 +12,7 @@
  * 色付き影: shadowtex0 (半透明込み) と shadowtex1 (不透明のみ) の差分に shadowcolor0 の透過色を掛ける
  *   水 (shadowcolor1.a = 1) は透過色の代わりに水深による吸収 + コースティクス
  * 葉の透過 (SHADOW_LEAF_TINT): 不透明に遮られた分のうち葉の分を、葉の色 x 重なった枚数 (ボクセルで数える) で透過させる
+ *   透過した分は SunShadow.leaf に分けて返し、拡散だけに使う (鏡面の太陽を緑に染めない)
  */
 #ifndef SURFACE_SUN_SHADOW_GLSL
 #define SURFACE_SUN_SHADOW_GLSL
@@ -35,7 +36,9 @@ const float SHADOW_EDGE_FADE = 0.1;            // 影の範囲の外周 10% で�
 #endif
 
 struct SunShadow {
-    vec3 visibility; // 直接光の色付き透過率
+    vec3 visibility; // 直接光の色付き透過率 (葉を透過した光を含む)
+    // visibility のうち葉を透過した分。葉の中で散乱して広がった光なので拡散だけに使い、鏡面の太陽 (水面・水たまり・金属の照り返し) には使わない
+    vec3 leaf;
     float thickness; // 受け点から光源側の最寄りの不透明物までの距離 (ブロック, SSS 用。遮蔽なしなら 0)
     float fade;      // 1 = 影マップの範囲内。0 に近いほど呼び出し側のフォールバックを使う
 };
@@ -167,6 +170,7 @@ vec3 shadowLeafTransmittance(vec3 receiver, vec2 uv, float occluderDist, bool ce
 SunShadow evalSunShadow(vec3 playerPos, vec3 geoNormal, float sss, float dither) {
     SunShadow r;
     r.visibility = vec3(1.0);
+    r.leaf = vec3(0.0);
     r.thickness = 0.0;
     r.fade = 0.0;
 #ifdef HAS_SUN_SHADOWS
@@ -291,10 +295,14 @@ SunShadow evalSunShadow(vec3 playerPos, vec3 geoNormal, float sss, float dither)
             float dc = texture(shadowtex1, uv0).r;
             bool centerOpen = dc >= z0;
             float occluderDist = centerOpen ? r.thickness : (z0 - dc) / depthPerBlock;
-            r.visibility += (1.0 - vo) * shadowLeafTransmittance(biased, uv0, occluderDist, centerOpen);
+            r.leaf = (1.0 - vo) * shadowLeafTransmittance(biased, uv0, occluderDist, centerOpen);
+            r.visibility += r.leaf;
         }
     #endif
-    if (NoL <= 0.0) r.visibility = vec3(0.0);
+    if (NoL <= 0.0) {
+        r.visibility = vec3(0.0);
+        r.leaf = vec3(0.0);
+    }
 #endif
     return r;
 }
@@ -322,6 +330,16 @@ vec3 sampleShadowVolume(vec3 playerPos) {
  */
 vec3 getSunShadow(vec3 playerPos, vec3 geoNormal, float dither) {
     SunShadow s = evalSunShadow(playerPos, geoNormal, 0.0, dither);
+    return mix(vec3(1.0), s.visibility, s.fade);
+}
+
+/*
+ * 面の太陽影と、鏡面の太陽に使う透過率 specular (葉を透過した拡散光を除く)
+ * 葉の隙間を抜けた光は白いまま照り返すが、葉を透過した光は散乱して向きを失っているので太陽の鏡像を作らない
+ */
+vec3 getSunShadow(vec3 playerPos, vec3 geoNormal, float dither, out vec3 specular) {
+    SunShadow s = evalSunShadow(playerPos, geoNormal, 0.0, dither);
+    specular = mix(vec3(1.0), s.visibility - s.leaf, s.fade);
     return mix(vec3(1.0), s.visibility, s.fade);
 }
 

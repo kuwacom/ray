@@ -137,15 +137,29 @@ void main() {
     SunShadow ss = evalSunShadow(playerPos, g.geoNormal, m.sss, dither);
     float fallback = smoothstep(SHADOW_FALLBACK_SKYLIGHT.x, SHADOW_FALLBACK_SKYLIGHT.y, g.lightmap.y);
     vec3 sunVis = mix(vec3(fallback), ss.visibility, ss.fade) * pomShadow;
+    // 葉を透過した分 (拡散だけに使う。鏡面の太陽は葉の隙間を抜けた光だけで照り返す)
+    vec3 leafVis = ss.leaf * (ss.fade * pomShadow);
     // 一人称の手は影マップ上で自分の体の影の中にあるので、スカイライトから日向を推定する
-    if (hand) sunVis = vec3(fallback);
+    if (hand) {
+        sunVis = vec3(fallback);
+        leafVis = vec3(0.0);
+    }
 #ifdef SCREEN_SPACE_SHADOWS
-    if (!hand && maxOf(sunVis) > 0.0) sunVis *= screenSpaceShadow(viewPos, playerToViewDir(g.geoNormal), playerToViewDir(sun.direction), dither);
+    if (!hand && maxOf(sunVis) > 0.0) {
+        float contact = screenSpaceShadow(viewPos, playerToViewDir(g.geoNormal), playerToViewDir(sun.direction), dither);
+        sunVis *= contact;
+        leafVis *= contact;
+    }
 #endif
     float cloudShadow = getCloudShadow(playerPos);
     LightSample sunLit = sun;
-    sunLit.irradiance *= sunVis * cloudShadow;
+    sunLit.irradiance *= max(sunVis - leafVis, 0.0) * cloudShadow;
     vec3 color = directLight(m, g.normal, V, sunLit, playerPos, g.geoNormal, glintVar, glintShare, glintLum);
+    if (maxOf(leafVis) > 0.0) {
+        LightSample leafLit = sun;
+        leafLit.irradiance *= leafVis * cloudShadow;
+        color += max(evalDirectLight(m, g.normal, V, leafLit) - evalDirectSpecular(m, g.normal, V, leafLit), 0.0);
+    }
 
     if (m.sss > 0.0) {
         // 厚みに応じた減衰。アルベドの色ほど通りやすい (葉は緑に透ける)
