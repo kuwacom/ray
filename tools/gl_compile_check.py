@@ -400,6 +400,10 @@ SSBO_BLOCK_RE = re.compile(r"layout\s*\(\s*std430\s*,\s*binding\s*=\s*(\d+)\s*\)
 SSBO_TAIL_RE = re.compile(r"\w+\s+\w+\s*\[\s*\]\s*;[^\n]*要素数:\s*(\w+)")
 
 
+# 1 回の実行で大きさなしの配列の要素数を確保量と比べられた binding (どのプログラムにも定数が無ければ検査が抜ける)
+TAIL_CHECKED: set[int] = set()
+
+
 def ssbo_tail_counts() -> dict[int, str]:
     """binding -> 大きさなしの最後の配列の要素数を表す定数名 (lib/buffers/ssbo.glsl の注記から読む)"""
     text = (vs.SHADERS / "lib" / "buffers" / "ssbo.glsl").read_text(encoding="utf-8")
@@ -658,8 +662,12 @@ def check_usage(name: str, stages: list[StageSource], res: ProgramResult, limits
                 continue  # glslang が無く定数を評価できない
             count = values.get(const)
             if count is None:
-                problems.append(f"SSBO binding {binding}: 要素数の定数 {const} を評価できない")
+                # 設定で変わる要素数は使うモジュールのヘッダにだけある (lib/light/light_bins.glsl)。
+                # 定数を持たないプログラムはその配列を添字で引けないので見なくてよい (1 回の実行で一度も見なければ main が警告する)
+                if re.search(rf"\b{const}\b", pre_all):
+                    problems.append(f"SSBO binding {binding}: 要素数の定数 {const} を評価できない")
                 continue
+            TAIL_CHECKED.add(binding)
             need = start + u[f"ssboTailStride.{binding}"] * count
             u[f"ssboNeed.{binding}"] = need
             if alloc is not None and need > alloc:
@@ -953,6 +961,11 @@ def main() -> int:
         glfw.destroy_window(win)
         glfw.terminate()
     persist.save()
+    # 全プログラムをリンクした時だけ、大きさなしの配列の検査が抜けていないか見る (キャッシュや絞り込みで省いたプログラムは見ていない)
+    if glslang and not args.filter and not sections and persisted == 0 and checked:
+        for binding, const in sorted(ssbo_tail_counts().items()):
+            if binding not in TAIL_CHECKED:
+                static_problems.append(f"SSBO binding {binding}: 要素数 {const} を定義したプログラムが無く、確保量と比べられなかった")
 
     if args.report:
         cols = ["declImages", "activeImages", "activeSamplers", "activeSSBO", "localInvocations", "sharedBytes"]

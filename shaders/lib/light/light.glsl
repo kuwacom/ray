@@ -5,6 +5,7 @@
 #ifndef LIGHT_LIGHT_GLSL
 #define LIGHT_LIGHT_GLSL
 
+#include "/lib/light/light_bins.glsl"
 #include "/lib/light/light_table.glsl"
 #include "/lib/light/block_data.glsl"
 #include "/lib/light/voxel.glsl"

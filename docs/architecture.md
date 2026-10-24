@@ -199,6 +199,7 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 
 - 各ブロックの最後の配列は大きさなし (`[]`) で宣言し、確保量は shaders.properties の `bufferObject.N` で決める。NVIDIA のリンクは、使っていなくても宣言された固定長の配列の要素数に比例して時間がかかり (`binLights` が 266 万要素あった時は main が空のプログラムでも vs+fs で 7-10 秒)、全プログラムに入るので読み込み全体が数倍になる
 - 大きさなしの配列の要素数は宣言の行の注記 `// 要素数: <定数>` に書き、添字の上限もその定数で見る (`.length()` は使わない)。`tools/gl_compile_check.py` が注記を読み、配列の先頭 + 要素の間隔 x 要素数が `bufferObject.N` に収まるかをプログラムごとに確かめる
+- ssbo.glsl には設定の値を入れない (全プログラムに入るので、設定の値が前処理後の本文に残ると、その設定を変えるたびに全プログラムのドライバのキャッシュが外れる)。設定で変わる大きさ (`MAX_GLOBAL_LIGHTS`, `LIGHT_BIN_CAPACITY` / `STRIDE` / `STRIDE_ALLOC` / `GRID`, `LIGHT_BIN_KEYS_ALLOC`) は `lib/light/light_bins.glsl` に置き、`lib/light/light.glsl` を include するプログラム (world0 で 23 個) だけが読む。LIGHT_BIN_LIGHTS・LIGHT_MAX_COUNT・LIGHT_CULL_MODE を変えた時に作り直すのはこの 23 個 (前は 53 個全部)。VOXEL_VOLUME は `lib/common/voxel_space.glsl` の `VOXEL_SIZE` が全プログラムに入るので、まだ全部作り直しになる
 - ブロックの途中の配列 (`albedo`, `lights`, `binCount`, `entityAcc`, `groupBounds`, `clusterBounds`) は固定長のまま。合わせても 1 プログラム 0.4 秒程度で、並べ替えるとレイアウトが変わるので動かしていない
 
 | binding | 名前 (アクセサ) | サイズ | 内容と書き込み権 |

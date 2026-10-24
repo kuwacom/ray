@@ -15,29 +15,15 @@ const int LIGHT_TABLE_SIZE = 256;   // 光源定義の数 (光源インデック
 const int SHAPE_TABLE_SIZE = 128;   // 遮蔽形状の数 (ブロック ID 300-399 -> 形状 0-99)
 const int TINT_TABLE_SIZE = 128;    // 透過色の数 (ブロック ID 200-299 -> 色 0-99)
 const int ALBEDO_TABLE_SIZE = 4096; // ブロックの平均の色の数 (ボクセルの 12bit ID をそのまま引く)
-const int MAX_GLOBAL_LIGHTS = LIGHT_MAX_COUNT; // 1 フレームに登録できる光源インスタンス数
 const int MAX_GLOBAL_LIGHTS_ALLOC = 8192;      // 確保数 (LIGHT_MAX_COUNT の最大)。ビンのキーの下位 13 bit に入る数
 
 const int LIGHT_BIN_SIZE = 8;       // ライトビン 1 辺のブロック数
-const int LIGHT_BIN_CAPACITY = LIGHT_BIN_LIGHTS; // ビン 1 つに入る光源数
-/*
- * ビン 1 つの枠の数。LIGHT_CULL_MODE 1/2 は重要度の降順に LIGHT_BIN_CAPACITY 個を持ち、
- * 最後の 1 枠に外れた光源のうち最も重要なもののキーを持つ (境界で弱めるため, lib/light/light_select.glsl)
- */
-const int LIGHT_BIN_STRIDE = LIGHT_BIN_CAPACITY + 1;
-#if LIGHT_BIN_LIGHTS > 64
-    const int LIGHT_BIN_STRIDE_ALLOC = 129;
-#else
-    const int LIGHT_BIN_STRIDE_ALLOC = 65;
-#endif
-#if LIGHT_CULL_MODE == 0
-    const ivec3 LIGHT_BIN_GRID = ivec3(VOXEL_SIZE_X, VOXEL_SIZE_Y, VOXEL_SIZE_Z) / LIGHT_BIN_SIZE;
-#else
-    // ビンをワールドの 8 ブロック格子にそろえる (カメラの 1 ブロックの移動でビンの境界が動かないように)。端の分 1 つ多い
-    const ivec3 LIGHT_BIN_GRID = ivec3(VOXEL_SIZE_X, VOXEL_SIZE_Y, VOXEL_SIZE_Z) / LIGHT_BIN_SIZE + 1;
-#endif
 const int LIGHT_BIN_MAX = 40960;    // 最大体積 (384x128x384) のワールド格子のビン数 49x17x49 を 256 の倍数に。確保量はこれで固定
-const int LIGHT_BIN_KEYS_ALLOC = LIGHT_BIN_MAX * LIGHT_BIN_STRIDE_ALLOC; // binLights の確保数
+/*
+ * 設定で変わる大きさ (LIGHT_MAX_COUNT, LIGHT_BIN_LIGHTS, VOXEL_VOLUME, LIGHT_CULL_MODE) はこのファイルに入れない
+ * (lib/light/light_bins.glsl)。ここは全プログラムに入るので、設定の値が前処理後の本文に残ると、その設定を変えるたびに
+ * 全プログラムのドライバのキャッシュが外れて作り直しになる
+ */
 
 // 光源を間引く距離 (LIGHT_CULL_MODE 1/2) の分布の段数と 1 段の幅 (ブロック)
 const int LIGHT_CULL_BUCKETS = 64;
