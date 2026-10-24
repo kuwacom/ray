@@ -412,6 +412,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 - 素の既定値 = HIGH (iterationT 方式。`tools/validate_shaders.py` が不一致を検出する)
 - 個別スイッチ (プロファイルと独立に ON/OFF 可): LIGHT_SHADOWS (光源シャドウ) / LIGHT_ENTITY_OCCLUSION / LIGHT_PLAYER_OCCLUSION (エンティティ遮蔽) / HAND_LIGHT・HAND_LIGHT_RAYS・HAND_LIGHT_SS_SHADOWS (手持ちレイ) / ENTITY_LIGHTS と ITEM_LIGHTS・PROJECTILE_LIGHTS・BURNING_ENTITY_LIGHTS・GLOWING_ENTITY_LIGHTS (ドロップ等の光源)
 - shadowDistance は常にボクセル半径 (voxelDistance) 以上 (reversed culling の制約)
+- 雲の形と陰影は MEDIUM 以上で同じ。CLOUD_QUALITY は視線方向の歩数だけを変え (光源方向・真上方向の歩数は品質 0 でも 1 と同じ)、中層は全品質で描く。CLOUD_MULTISCATTER が 8 より少ない時は残りのオクターブの寄与 (等比の和) を最後のオクターブにまとめる
 
 太字は既定値 (= HIGH) と異なる値。
 
@@ -546,7 +547,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | SUN_MOON_STYLE | 1 | 1 | 1 | 1 | 1 | 1 |
 | STARS | ON | ON | ON | ON | ON | ON |
 | TWILIGHT_STRETCH | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
-| CLOUDS | 3 | **0** | **2** | 3 | 3 | 3 |
+| CLOUDS | 3 | **0** | 3 | 3 | 3 | 3 |
 | CLOUD_QUALITY | 1 | **0** | **0** | 1 | **2** | **3** |
 | CLOUD_RES | 2 | **4** | **4** | 2 | 2 | **1** |
 | CLOUD_TEMPORAL | ON | ON | ON | ON | ON | ON |
@@ -555,7 +556,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | CLOUD_ALTITUDE | 1500.0 | 1500.0 | 1500.0 | 1500.0 | 1500.0 | 1500.0 |
 | CLOUD_THICKNESS | 4500.0 | 4500.0 | 4500.0 | 4500.0 | 4500.0 | 4500.0 |
 | CLOUD_SPEED | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
-| CLOUD_MULTISCATTER | 4 | **2** | **2** | 4 | **8** | **8** |
+| CLOUD_MULTISCATTER | 4 | **2** | 4 | 4 | **8** | **8** |
 | CLOUD_CIRRUS | ON | **OFF** | ON | ON | ON | ON |
 | CLOUD_CIRRUS_COVERAGE | 0.1 | 0.1 | 0.1 | 0.1 | 0.1 | 0.1 |
 | CLOUD_SHADOWS | ON | **OFF** | **OFF** | ON | ON | ON |

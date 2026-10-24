@@ -40,7 +40,8 @@ uniform sampler2D cloudNoiseTex;
 
 #include "/lib/sky/cloud_styles.glsl"
 
-#if CLOUDS == 3 && CLOUD_QUALITY >= 1
+// 中層は品質によらず描く (品質で変えるのは歩数だけにして、雲の形と陰影をそろえる)
+#if CLOUDS == 3
     #define CLOUD_MID_LAYER
 #endif
 #if CLOUDS == 3 && defined CLOUD_CUMULONIMBUS
@@ -348,6 +349,9 @@ const float CLOUD_MS_ATTENUATION = 0.45;  // オクターブごとの光学的�
 const float CLOUD_MS_CONTRIBUTION = 0.55; // オクターブごとの寄与 (b)
 const float CLOUD_MS_ECCENTRICITY = 0.5;  // オクターブごとの位相の非対称性 (c)
 const float CLOUD_MS_DIFFUSION = 0.1;     // 光学的深さの倍率の下限 (拡散近似の減衰 sqrt(3(1-g)(1-albedo)) 程度)
+// 見た目の基準のオクターブ数。CLOUD_MULTISCATTER がこれより少ない時は、残りの寄与を最後のオクターブにまとめる
+// (オクターブ数で厚い雲の奥の明るさが変わらないようにして、品質で変えるのを重さだけにする)
+const int CLOUD_MS_REF_OCTAVES = 8;
 // 高次の散乱のエネルギー。単散乱 + 数オクターブでは厚い雲の日なたが暗すぎるので、局所の厚みに応じて
 // 残りの次数の和 (アルベドの等比級数) を見込んで底上げする (Hillaire 2016 のエネルギー補正と同じ考え方)
 // 小さいと晴天の雲が全体に暗く、日向の頂も白くならず灰色寄りになる。環境光の底上げ (CLOUD_AMBIENT_MS)・雲底の残り (CLOUD_BOTTOM_*)・
@@ -394,8 +398,9 @@ const float CLOUD_BOTTOM_REACH = 0.6;    // この高さで 1 に戻る
 #if CLOUD_QUALITY == 0
     const int CLOUD_LOW_STEPS = 24;
     const int CLOUD_MID_STEPS = 8;
-    const int CLOUD_LIGHT_STEPS = 4;
-    const int CLOUD_SKY_STEPS = 1;
+    // 光源方向と真上方向の歩数は 1 と同じ (減らすと厚い雲の奥と陰の側が明るくなり、形と陰影が品質で変わる)。減らすのは視線方向だけ
+    const int CLOUD_LIGHT_STEPS = 6;
+    const int CLOUD_SKY_STEPS = 2;
     const int CLOUD_HIGH_STEPS = 3;
     const int CLOUD_SHAFT_STEPS = 6;
 #elif CLOUD_QUALITY == 1
@@ -1217,7 +1222,9 @@ vec3 cloudInscatter(CloudLighting l, float extinction, float odLight, float odNe
     float ms = 0.0;
     float a = CLOUD_MS_ATTENUATION, b = CLOUD_MS_CONTRIBUTION, c = CLOUD_MS_ECCENTRICITY;
     for (int i = 1; i < CLOUD_MULTISCATTER; i++) {
-        ms += b * cloudPhase(l.cosTheta, anisotropy * c) * cloudLightTransmittance(odLight * a);
+        // 最後のオクターブは基準の数までの残りの寄与 (b の等比の和) を持つ。a は 3 つ目で下限に張り付くので透過率はほぼ同じ
+        float w = i == CLOUD_MULTISCATTER - 1 ? b * (1.0 - pow(CLOUD_MS_CONTRIBUTION, float(max(CLOUD_MS_REF_OCTAVES - i, 1)))) / (1.0 - CLOUD_MS_CONTRIBUTION) : b;
+        ms += w * cloudPhase(l.cosTheta, anisotropy * c) * cloudLightTransmittance(odLight * a);
         // 拡散光も吸収と横への漏れで減衰するので、高次のオクターブでも透過率の傾きを 0 にしない
         // (0 にすると厚い雲の底まで上面とほぼ同じ明るさになり、立体感が消える)
         a = max(a * CLOUD_MS_ATTENUATION, CLOUD_MS_DIFFUSION);
