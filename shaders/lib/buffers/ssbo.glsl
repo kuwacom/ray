@@ -2,6 +2,11 @@
  * SSBO のレイアウト (全シェーダーで同一でなければならない。Iris の仕様)
  * サイズは shaders.properties の bufferObject.N と一致させること
  * 書き込むモジュールをフィールドごとに明記。それ以外は読むだけ
+ *
+ * 各ブロックの最後の配列は大きさなし ([]) で宣言し、確保数は bufferObject.N で決める
+ * NVIDIA のリンクは、使っていなくても宣言された固定長の配列の要素数に比例して遅くなる (全プログラムに入るので読み込みが数倍になる)
+ * 添字の上限は「要素数:」に書いた定数で見る (.length() は使わない)。tools/gl_compile_check.py がこの注記を読み、
+ * 配列の先頭 + 要素数 x 間隔が bufferObject.N に収まるかを確かめる
  */
 #ifndef BUFFERS_SSBO_GLSL
 #define BUFFERS_SSBO_GLSL
@@ -32,6 +37,7 @@ const int LIGHT_BIN_STRIDE = LIGHT_BIN_CAPACITY + 1;
     const ivec3 LIGHT_BIN_GRID = ivec3(VOXEL_SIZE_X, VOXEL_SIZE_Y, VOXEL_SIZE_Z) / LIGHT_BIN_SIZE + 1;
 #endif
 const int LIGHT_BIN_MAX = 40960;    // 最大体積 (384x128x384) のワールド格子のビン数 49x17x49 を 256 の倍数に。確保量はこれで固定
+const int LIGHT_BIN_KEYS_ALLOC = LIGHT_BIN_MAX * LIGHT_BIN_STRIDE_ALLOC; // binLights の確保数
 
 // 光源を間引く距離 (LIGHT_CULL_MODE 1/2) の分布の段数と 1 段の幅 (ブロック)
 const int LIGHT_CULL_BUCKETS = 64;
@@ -47,6 +53,7 @@ const int ENTITY_ACC_UINTS = ENTITY_ACC_SIZE * ENTITY_ACC_STRIDE;
  * binding 0: フレーム共有データ (永続)
  * 確保: 4096 バイト
  */
+const int FRAME_POST_PARAMS = 4;
 layout(std430, binding = 0) buffer FrameDataBuffer {
     // post (composite25 で書く)
     float exposure;           // 線形の露出倍率。シーン色に掛けて使う
@@ -69,7 +76,7 @@ layout(std430, binding = 0) buffer FrameDataBuffer {
 
     // post
     uint histogram[256];         // 露出ヒストグラム (composite25 内で毎フレームクリア)
-    vec4 postParams[4];          // post の自由領域
+    vec4 postParams[];           // post の自由領域。要素数: FRAME_POST_PARAMS
 } frameData;
 
 /*
@@ -95,7 +102,7 @@ layout(std430, binding = 1) buffer BlockDataBuffer {
      */
     uint albedo[ALBEDO_TABLE_SIZE];
     // 上向きの面の色 (同じ詰め方)。上面の色が違うブロック (草ブロック・原木など) 以外は albedo と同じ
-    uint albedoUp[ALBEDO_TABLE_SIZE];
+    uint albedoUp[]; // 要素数: ALBEDO_TABLE_SIZE
 } blockData;
 
 /*
@@ -119,7 +126,7 @@ layout(std430, binding = 2) buffer GlobalLightsBuffer {
     uint cullPad1;
     uint cullHist[LIGHT_CULL_BUCKETS]; // 登録しようとした光源の距離の分布 (deferred が足し、deferred_a が読んで 0 に戻す)
     LightInstance lights[MAX_GLOBAL_LIGHTS_ALLOC];
-    float lightPower[MAX_GLOBAL_LIGHTS_ALLOC]; // 揺らぎを掛ける前の放射の輝度 (ビンの重要度用。揺らぎで順位が入れ替わらないように)
+    float lightPower[]; // 揺らぎを掛ける前の放射の輝度 (ビンの重要度用。揺らぎで順位が入れ替わらないように)。要素数: MAX_GLOBAL_LIGHTS_ALLOC
 } globalLights;
 
 /*
@@ -132,7 +139,7 @@ layout(std430, binding = 3) buffer LightBinsBuffer {
     // エンティティ光源の蓄積表。begin でクリア -> shadow / gbuffers で蓄積 -> deferred で読む
     uint entityAcc[ENTITY_ACC_UINTS];
     // ビンの中身 (キー, lib/light/light_select.glsl)。下位 13 bit が globalLights.lights のインデックス
-    uint binLights[LIGHT_BIN_MAX * LIGHT_BIN_STRIDE_ALLOC];
+    uint binLights[]; // 要素数: LIGHT_BIN_KEYS_ALLOC
 } lightBins;
 
 /*
@@ -160,7 +167,7 @@ layout(std430, binding = 4) buffer EntityTriangleBuffer {
     uint counts[4]; // 0 = プレイヤー, 1 = カメラ近傍, 2 = 遠方 の確保要求数 (容量超過を含む), 3 = 溢れ数
     uint groupBounds[ENT_TRI_MAX_GROUPS * 6];
     uint clusterBounds[ENT_TRI_MAX_CLUSTERS * 6];
-    EntityTriangle tris[ENT_TRI_MAX];
+    EntityTriangle tris[]; // 要素数: ENT_TRI_MAX
 } entityTris;
 
 // binding 5-8 は予備

@@ -23,7 +23,7 @@ void main() {
      * 1 回だけなので 1 ワークグループで足りる (約 5M uint)
      */
     for (int j = i; j < LIGHT_BIN_MAX; j += 256) lightBins.binCount[j] = 0u;
-    for (int j = i; j < LIGHT_BIN_MAX * LIGHT_BIN_STRIDE_ALLOC; j += 256) lightBins.binLights[j] = 0u;
+    for (int j = i; j < LIGHT_BIN_KEYS_ALLOC; j += 256) lightBins.binLights[j] = 0u;
     if (i < LIGHT_CULL_BUCKETS) globalLights.cullHist[i] = 0u;
 
     if (i == 0) {

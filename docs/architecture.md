@@ -197,13 +197,17 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 
 ### SSBO (正本は `lib/buffers/ssbo.glsl`)
 
+- 各ブロックの最後の配列は大きさなし (`[]`) で宣言し、確保量は shaders.properties の `bufferObject.N` で決める。NVIDIA のリンクは、使っていなくても宣言された固定長の配列の要素数に比例して時間がかかり (`binLights` が 266 万要素あった時は main が空のプログラムでも vs+fs で 7-10 秒)、全プログラムに入るので読み込み全体が数倍になる
+- 大きさなしの配列の要素数は宣言の行の注記 `// 要素数: <定数>` に書き、添字の上限もその定数で見る (`.length()` は使わない)。`tools/gl_compile_check.py` が注記を読み、配列の先頭 + 要素の間隔 x 要素数が `bufferObject.N` に収まるかをプログラムごとに確かめる
+- ブロックの途中の配列 (`albedo`, `lights`, `binCount`, `entityAcc`, `groupBounds`, `clusterBounds`) は固定長のまま。合わせても 1 プログラム 0.4 秒程度で、並べ替えるとレイアウトが変わるので動かしていない
+
 | binding | 名前 (アクセサ) | サイズ | 内容と書き込み権 |
 |---|---|---|---|
-| 0 | FrameDataBuffer (`frameData`) | 4096 | post: exposure, exposureTarget, averageLuminance, focusDistance, histogram[256], postParams[4] / sky: sunIrradiance, moonIrradiance, shadowLightIrradiance, skySH[9], skyParams[4] / light: lightStats / surface: surfaceParams[4]。setup.csh が初期値を入れる |
-| 1 | BlockDataBuffer (`blockData`) | 57344 | `LightDef lightDefs[256]`, `uvec4 shapes[128]`, `vec4 tints[128]`, `uint albedo[4096]` (ブロックの平均の色), `uint albedoUp[4096]` (上向きの面の色)。setup.csh のみが書く |
-| 2 | GlobalLightsBuffer (`globalLights`) | 295200 | `count/blockCount/entityCount/overflow`, `cullDistance/culled` + `cullHist[64]` (間引き距離と距離の分布), `LightInstance lights[8192]` (posRadius: ボクセル空間位置 + 到達半径, colorSize: 放射 + 光源半径), `lightPower[8192]` (揺らぎ前の放射の輝度)。使うのは LIGHT_MAX_COUNT 個まで。light のみ |
-| 3 | LightBinsBuffer (`lightBins`) | 10944512 (LIGHT_BIN_LIGHTS > 64 で 21430272) | `binCount[40960]`, `entityAcc[32768]` (エンティティ光源の蓄積表), `binLights[40960*65]` (> 64 で `*129`)。ビン = 8³ ブロック、1 ビン LIGHT_BIN_LIGHTS + 1 枠。枠のキー = 重要度 19 bit + 光源インデックス 13 bit。light のみ |
-| 4 | EntityTriangleBuffer (`entityTris`) | 838672 | `counts[4]`, `groupBounds`, `clusterBounds` + `EntityTriangle tris[16384]` (ボクセル空間の三角形 v0/e1/e2 + アルファマスク)。begin.csh がクリア、shadow_entities.gsh が書く。light のみ |
+| 0 | FrameDataBuffer (`frameData`) | 4096 | post: exposure, exposureTarget, averageLuminance, focusDistance, histogram[256], postParams[] (4 個) / sky: sunIrradiance, moonIrradiance, shadowLightIrradiance, skySH[9], skyParams[4] / light: lightStats / surface: surfaceParams[4]。setup.csh が初期値を入れる |
+| 1 | BlockDataBuffer (`blockData`) | 57344 | `LightDef lightDefs[256]`, `uvec4 shapes[128]`, `vec4 tints[128]`, `uint albedo[4096]` (ブロックの平均の色), `uint albedoUp[]` (上向きの面の色、4096 個)。setup.csh のみが書く |
+| 2 | GlobalLightsBuffer (`globalLights`) | 295200 | `count/blockCount/entityCount/overflow`, `cullDistance/culled` + `cullHist[64]` (間引き距離と距離の分布), `LightInstance lights[8192]` (posRadius: ボクセル空間位置 + 到達半径, colorSize: 放射 + 光源半径), `lightPower[]` (揺らぎ前の放射の輝度、8192 個)。使うのは LIGHT_MAX_COUNT 個まで。light のみ |
+| 3 | LightBinsBuffer (`lightBins`) | 10944512 (LIGHT_BIN_LIGHTS > 64 で 21430272) | `binCount[40960]`, `entityAcc[32768]` (エンティティ光源の蓄積表), `binLights[]` (40960 x 65 個、> 64 で x 129)。ビン = 8³ ブロック、1 ビン LIGHT_BIN_LIGHTS + 1 枠。枠のキー = 重要度 19 bit + 光源インデックス 13 bit。light のみ |
+| 4 | EntityTriangleBuffer (`entityTris`) | 838672 | `counts[4]`, `groupBounds`, `clusterBounds` + `EntityTriangle tris[]` (16384 個) (ボクセル空間の三角形 v0/e1/e2 + アルファマスク)。begin.csh がクリア、shadow_entities.gsh が書く。light のみ |
 | 5-8 | - | - | 予備 |
 
 ```glsl

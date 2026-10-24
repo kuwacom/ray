@@ -366,6 +366,51 @@ def int_consts(pre: str) -> dict[str, int]:
     return {m.group(1): int(m.group(2)) for m in re.finditer(r"const\s+u?int\s+(\w+)\s*=\s*(\d+)u?\s*;", pre)}
 
 
+INT_CONST_EXPR_RE = re.compile(r"const\s+u?int\s+(\w+)\s*=\s*([^;]+);")
+
+
+def int_const_values(pre: str) -> dict[str, int]:
+    """
+    整数の定数を、他の定数を使った四則の式まで評価する (`A * B + 1` など)
+    値が要るのは SSBO の要素数のような単純な式だけなので、関数呼び出しや三項演算子を含む式は評価しない
+    """
+    exprs = {m.group(1): m.group(2).strip() for m in INT_CONST_EXPR_RE.finditer(pre)}
+    values: dict[str, int] = {}
+    progress = True
+    while progress:
+        progress = False
+        for name, expr in exprs.items():
+            if name in values:
+                continue
+            body = re.sub(r"\b(\d+)u\b", r"\1", expr)
+            refs = re.findall(r"[A-Za-z_]\w*", body)
+            if any(r not in values for r in refs) or not re.fullmatch(r"[\w\s+\-*/%()]+", body):
+                continue
+            body = re.sub(r"[A-Za-z_]\w*", lambda m: str(values[m.group(0)]), body).replace("/", "//")
+            try:
+                values[name] = int(eval(body, {"__builtins__": {}}))  # noqa: S307 - 数字と四則演算子だけに絞ってある
+            except (SyntaxError, ZeroDivisionError):
+                continue
+            progress = True
+    return values
+
+
+# ssbo.glsl の大きさなしの配列の注記: `uint binLights[]; // 要素数: LIGHT_BIN_KEYS_ALLOC`
+SSBO_BLOCK_RE = re.compile(r"layout\s*\(\s*std430\s*,\s*binding\s*=\s*(\d+)\s*\)\s*buffer\s+\w+\s*\{(.*?)\}", re.S)
+SSBO_TAIL_RE = re.compile(r"\w+\s+\w+\s*\[\s*\]\s*;[^\n]*要素数:\s*(\w+)")
+
+
+def ssbo_tail_counts() -> dict[int, str]:
+    """binding -> 大きさなしの最後の配列の要素数を表す定数名 (lib/buffers/ssbo.glsl の注記から読む)"""
+    text = (vs.SHADERS / "lib" / "buffers" / "ssbo.glsl").read_text(encoding="utf-8")
+    out: dict[int, str] = {}
+    for m in SSBO_BLOCK_RE.finditer(text):
+        t = SSBO_TAIL_RE.search(m.group(2))
+        if t:
+            out[int(m.group(1))] = t.group(1)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # GL でのコンパイルとリンク
 # ---------------------------------------------------------------------------
@@ -458,11 +503,34 @@ def introspect(prog: int, stages: list[str]) -> dict[str, int]:
     ssbo = _active_count(prog, GL.GL_SHADER_STORAGE_BLOCK)
     usage["activeSSBO"] = ssbo
     max_binding = -1
+    block_binding: dict[int, int] = {}
     for i in range(ssbo):
         binding, size = _resource_props(prog, GL.GL_SHADER_STORAGE_BLOCK, i, [GL.GL_BUFFER_BINDING, GL.GL_BUFFER_DATA_SIZE])
         max_binding = max(max_binding, binding)
+        block_binding[i] = binding
         usage[f"ssboSize.{binding}"] = size
     usage["maxSSBOBinding"] = max_binding
+    # 大きさなしの配列は GL_BUFFER_DATA_SIZE に 1 要素分しか入らないので、先頭の位置と要素の間隔を別に取っておき、
+    # check_usage で要素数を掛けて確保量と比べる
+    # 構造体の配列は GL_TOP_LEVEL_ARRAY_SIZE が 0、スカラー・ベクトルの配列は GL_ARRAY_SIZE が 0 で出る (NVIDIA)
+    for i in range(_active_count(prog, GL.GL_BUFFER_VARIABLE)):
+        block, arr_size, arr_stride, top_size, top_stride, offset = _resource_props(
+            prog, GL.GL_BUFFER_VARIABLE, i,
+            [GL.GL_BLOCK_INDEX, GL.GL_ARRAY_SIZE, GL.GL_ARRAY_STRIDE, GL.GL_TOP_LEVEL_ARRAY_SIZE, GL.GL_TOP_LEVEL_ARRAY_STRIDE, GL.GL_OFFSET])
+        if block not in block_binding:
+            continue
+        if top_size == 0:
+            stride = top_stride
+        elif arr_size == 0:
+            stride = arr_stride
+        else:
+            continue
+        b = block_binding[block]
+        # 構造体の配列はアクティブなメンバーごとに出る。先頭のメンバーが使われていないこともあるので、
+        # 「ブロックの大きさ - 1 要素」とも比べて小さい方を配列の先頭とみなす (どちらも本当の先頭以上)
+        start = min(offset, usage[f"ssboSize.{b}"] - stride)
+        usage[f"ssboTailOffset.{b}"] = min(start, usage.get(f"ssboTailOffset.{b}", start))
+        usage[f"ssboTailStride.{b}"] = stride
     if "comp" in stages:
         ls = (ctypes.c_int * 3)()
         GL.glGetProgramiv(prog, GL.GL_COMPUTE_WORK_GROUP_SIZE, ls)
@@ -574,6 +642,28 @@ def check_usage(name: str, stages: list[StageSource], res: ProgramResult, limits
             problems.append(f"SSBO binding {binding} に対応する bufferObject.{binding} が shaders.properties に無い")
         elif size > alloc:
             problems.append(f"SSBO binding {binding} のブロック {size} bytes > bufferObject.{binding} = {alloc}")
+    # 大きさなしの最後の配列は、ssbo.glsl の注記の定数 (要素数) を掛けた大きさで比べる
+    tails = {int(k.split(".")[1]): v for k, v in u.items() if k.startswith("ssboTailOffset.")}
+    if tails:
+        names = ssbo_tail_counts()
+        pre_all = "\n".join(s.preprocessed for s in stages if s.preprocessed)
+        values = int_const_values(pre_all) if pre_all else {}
+        for binding, start in sorted(tails.items()):
+            alloc = buffer_sizes.get(binding)
+            const = names.get(binding)
+            if const is None:
+                problems.append(f"SSBO binding {binding} の大きさなしの配列に「要素数:」の注記が無い (lib/buffers/ssbo.glsl)")
+                continue
+            if not pre_all:
+                continue  # glslang が無く定数を評価できない
+            count = values.get(const)
+            if count is None:
+                problems.append(f"SSBO binding {binding}: 要素数の定数 {const} を評価できない")
+                continue
+            need = start + u[f"ssboTailStride.{binding}"] * count
+            u[f"ssboNeed.{binding}"] = need
+            if alloc is not None and need > alloc:
+                problems.append(f"SSBO binding {binding} の {const} 要素で {need} bytes > bufferObject.{binding} = {alloc}")
     declared_images_total = 0
     for s in stages:
         pre = s.preprocessed
