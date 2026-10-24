@@ -19,9 +19,9 @@
 #define SKY_FOG_STYLES_GLSL
 
 #if FOG_STYLE == 0
-// Ray (物理): 混合層のもや、朝に霧の層と谷霧、端は透過率 0.4
+// Ray (物理): 混合層のもや、朝に霧の層と谷霧、端は透過率 0.55
 const float FS_HAZE = 1.0;
-const float FS_EDGE = 0.9;
+const float FS_EDGE = 0.6;
 const float FS_HAZE_MORNING = 1.6;
 const float FS_HAZE_EVENING = 1.3;
 const float FS_HAZE_NIGHT = 1.2;
@@ -48,7 +48,7 @@ const float FS_MIST_G = 0.82;
  * 夜の地表の霧は Bliss の既定の半分 (夜に何も見えなくならないように)
  */
 const float FS_HAZE = 1.2;
-const float FS_EDGE = 1.2;
+const float FS_EDGE = 0.85;
 const float FS_HAZE_MORNING = 1.4;
 const float FS_HAZE_EVENING = 1.3;
 const float FS_HAZE_NIGHT = 1.6;
@@ -71,11 +71,11 @@ const float FS_MIST_G = 0.88;
 
 #elif FOG_STYLE == 2
 /*
- * Nostalgia 風: 霧の層なし。もやは上へなだらかに薄れ (指数に近い形)、端は透過率 0.5 の軽い霞み。
+ * Nostalgia 風: 霧の層なし。もやは上へなだらかに薄れ (指数に近い形)、端は透過率 0.65 の軽い霞み。
  * 朝が最も濃く、夕と夜は薄い。地表の霧は朝と雨だけ
  */
 const float FS_HAZE = 1.4;
-const float FS_EDGE = 0.7;
+const float FS_EDGE = 0.45;
 const float FS_HAZE_MORNING = 1.4;
 const float FS_HAZE_EVENING = 0.85;
 const float FS_HAZE_NIGHT = 0.65;

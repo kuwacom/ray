@@ -75,16 +75,18 @@ const float AERIAL_PERSPECTIVE_RAIN = 1.5;
 const float BORDER_FOG_START = 0.95;
 
 /*
- * 景色の成分の距離の写像
- * FOG_EDGE_DEPTH: 晴れた昼に y FOG_SCENIC_REF_Y から水平に見た描画距離の端の光学的深さ (透過率 0.4)。尾根の重なりが読める濃さ
+ * 景色の成分の距離の写像 d (1 + (d / D)^2)
+ * 手前から描画距離の中ほどまではほぼ本当の距離のまま霞み、端に近づくほど強く縮めて、描画距離の外の遠景の霞みを端の手前に入れる。
+ * d (1 + d / D) では D が描画距離の 1/4 ほどになり、高い所から見下ろす中景 (描画距離の半分前後) まで白く霞んだ
+ * FOG_EDGE_DEPTH: 晴れた昼に y FOG_SCENIC_REF_Y から水平に見た描画距離の端の光学的深さ。尾根の重なりが読める濃さ
  * FOG_SCENIC_SIGMA0: その高さの景色の成分の消散 (もや + 空中遠近の緑)。D はこれと R から決める
  */
 const float FOG_EDGE_DEPTH = FS_EDGE;
 const float FOG_SCENIC_REF_Y = 70.0;
 const float FOG_SCENIC_SIGMA0 = FOG_HAZE_DENSITY * FS_HAZE * (1.0 + FOG_HAZE_FREE_SHARE)
     + (13.558e-3 + ATMO_MIE_EXTINCT * exp(-(FOG_SCENIC_REF_Y - FOG_T_SEA) * FOG_T_LIGHT_SCALE * 1e-3 / ATMO_MIE_HEIGHT)) * 1e-3 * AERIAL_PERSPECTIVE_SCALE;
-// D の下限 (R に対する割合)。短い描画距離で手前まで急に霞まないように
-const float FOG_SCENIC_MIN_D = 0.15;
+// (R / D)^2 の上限。短い描画距離で中景まで急に霞まないように
+const float FOG_SCENIC_MAX_STRETCH = 20.0;
 // 遠景の空の色のうち、太陽の単散乱とみなして影で引いてよい割合の上限 (残りは多重散乱と空の光)
 const float FOG_HAZE_SUN_SHARE = 0.8;
 // 影の中のもやに残す空の色の割合の下限
@@ -152,11 +154,12 @@ float fogRenderDistance() { return far; }
 float fogScenicInvD() {
     float R = fogRenderDistance();
     float ratio = FOG_EDGE_DEPTH / (FOG_SCENIC_SIGMA0 * R);
-    return min(max(ratio - 1.0, 0.0) / R, 1.0 / (FOG_SCENIC_MIN_D * R));
+    return sqrt(min(max(ratio - 1.0, 0.0), FOG_SCENIC_MAX_STRETCH)) / R;
 }
 
-// 景色の成分の写像した距離 d (1 + d / D)
-float fogScenicDistance(float d, float invD) { return d * (1.0 + d * invD); }
+// 景色の成分の写像した距離 d (1 + (d / D)^2) と、その d の微分 (レイマーチの 1 歩の重み)
+float fogScenicDistance(float d, float invD) { return d * (1.0 + sqr(d * invD)); }
+float fogScenicStretch(float d, float invD) { return 1.0 + 3.0 * sqr(d * invD); }
 
 float fogSoftplus(float x) { return max(x, 0.0) + log(1.0 + exp(-abs(x))); }
 // 上端 top、幅 w のロジスティック (下で 1、上で 0) と、その y の原始関数 (閉形式で光学的深さを出す)
@@ -376,7 +379,8 @@ vec3 fogAirSkyDir(vec3 dir, float mu) {
  */
 vec3 fogAirRadiance(vec3 dir, out vec3 sunPart) {
     float horizonMu = atmoHorizonMu(atmoViewerRadius());
-    vec3 sky = getSkyRadiance(dir.y > horizonMu ? dir : fogAirSkyDir(dir, horizonMu));
+    // 地平線より下は虚空 (skyBelowHorizon) と同じ高さの地平線の色を読む (虚空ともやの色を揃える)
+    vec3 sky = getSkyRadiance(dir.y > horizonMu ? dir : fogAirSkyDir(dir, horizonMu + SKY_HORIZON_SAMPLE_MU));
     LightSample celestial = getCelestialLight();
     vec3 sunScatter = celestial.irradiance * fogPhaseHaze(dot(dir, celestial.direction)) * (FOG_HAZE_TINT * FOG_ALBEDO);
     sunPart = sunScatter * min(1.0, FOG_HAZE_SUN_SHARE * luminance(sky) / max(luminance(sunScatter), 1e-9));

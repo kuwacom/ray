@@ -152,8 +152,8 @@ vec4 marchAirFog(vec3 dir, float endDist, float dither, float farVisibility) {
 
 #if defined HAS_SKY
         vec2 density = fogDensityAt(p, medium);
-        // 景色の成分は写像した距離で積む (d (1 + d / D) の微分)
-        density.x *= 1.0 + 2.0 * t * invD;
+        // 景色の成分は写像した距離で積む
+        density.x *= fogScenicStretch(t, invD);
 #else
         // ネザー・エンドは一様な霞に、ゆっくり漂う濃淡だけを付ける
         vec3 wp = p + cameraPosition + vec3(frameTimeCounter * 0.4, frameTimeCounter * 0.15, 0.0);
