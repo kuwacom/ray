@@ -53,6 +53,7 @@
 #define LIGHT_OCCLUSION_MODE 1 // [0 1] エンティティ遮蔽の方式 0=ボクセル (0.5 ブロックの箱) 1=三角形 (形状どおり)
 #define LIGHT_ENTITY_TRIANGLES 4096 // [2048 4096 8192 16384] 三角形方式で保持する三角形の上限
 #define LIGHT_CONTACT_SHADOWS // スクリーンスペース接触影でボクセル外の細部を補う
+#define LIGHT_CULL_MODE 2 // [0 1 2] 光源が上限を超えた時に残す光源の選び方 0=到着順 (毎フレーム入れ替わる) 1=近い順 2=明るさ x 近さ
 #define HAND_LIGHT // 手持ち光源
 #define HAND_LIGHT_RAYS // 手持ち光源のレイトレース影
 #define HAND_LIGHT_SS_SHADOWS // 手持ち光源のスクリーンスペース影 (手・エンティティの遮蔽)

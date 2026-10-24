@@ -103,7 +103,7 @@ void main() {
 
         for (uint k = 0u; k < n; k++) {
             int li = lightBinEntry(bin, k);
-            vec3 e = evalLightIrradiance(globalLights.lights[li], fromVoxel, geoNormal, geoNormal);
+            vec3 e = evalLightIrradiance(lightBinLight(bin, k), fromVoxel, geoNormal, geoNormal);
             float w = luminance(e);
             if (w <= 0.0) continue;
             // 上位 DET_COUNT 個を挿入ソートで保つ。押し出された光源は残りの集合 (リザーバ) へ

@@ -94,7 +94,7 @@ vec3 getBlockLightForwardEntity(vec3 playerPos, vec3 geoNormal, vec3 normal, flo
         uint flags = blockLightTraceFlags() & ~(TRACE_ENTITIES | TRACE_PLAYER);
         int traced = 0;
         for (uint k = 0u; k < n && traced < FORWARD_TRACED_LIGHTS; k++) {
-            LightInstance L = globalLights.lights[lightBinEntry(bin, k)];
+            LightInstance L = lightBinLight(bin, k);
             float dist = distance(L.posRadius.xyz, fromVoxel);
             if (dist >= L.posRadius.w) continue;
             // 半影の揺らぎは入れない (この経路はデノイズも TAA の速度も無いので、ノイズがそのまま残る)
@@ -128,12 +128,13 @@ int getBlockLightSpecular(ivec2 texel, vec3 playerPos, vec3 geoNormal, out Light
     if (!isInVoxelVolume(fromVoxel)) return 0;
     int bin = lightBinIndex(ivec3(fromVoxel));
     uint n = lightBinCount(bin);
+    // ビンの中の枠の番号 (境界の重みを lightBinLight で掛けるため、光源のインデックスではなく枠で持つ)
     int topIdx[BLOCKLIGHT_SPECULAR_LIGHTS];
     float topW[BLOCKLIGHT_SPECULAR_LIGHTS];
     for (int j = 0; j < BLOCKLIGHT_SPECULAR_LIGHTS; j++) { topIdx[j] = -1; topW[j] = 0.0; }
     for (uint k = 0u; k < n; k++) {
-        int ci = lightBinEntry(bin, k);
-        float cw = luminance(evalLightIrradiance(globalLights.lights[ci], fromVoxel, geoNormal, geoNormal));
+        int ci = int(k);
+        float cw = luminance(evalLightIrradiance(lightBinLight(bin, k), fromVoxel, geoNormal, geoNormal));
         if (cw <= 0.0) continue;
         for (int j = 0; j < BLOCKLIGHT_SPECULAR_LIGHTS; j++) {
             if (cw > topW[j]) {
@@ -148,7 +149,7 @@ int getBlockLightSpecular(ivec2 texel, vec3 playerPos, vec3 geoNormal, out Light
     int count = 0;
     for (int j = 0; j < BLOCKLIGHT_SPECULAR_LIGHTS; j++) {
         if (topIdx[j] < 0) break;
-        LightInstance L = globalLights.lights[topIdx[j]];
+        LightInstance L = lightBinLight(bin, uint(topIdx[j]));
         vec3 toL = L.posRadius.xyz - voxelPos;
         float dist = length(toL);
         s[j].direction = toL / max(dist, EPS);

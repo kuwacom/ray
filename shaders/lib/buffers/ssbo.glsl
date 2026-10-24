@@ -11,11 +11,33 @@ const int SHAPE_TABLE_SIZE = 128;   // 遮蔽形状の数 (ブロック ID 300-3
 const int TINT_TABLE_SIZE = 128;    // 透過色の数 (ブロック ID 200-299 -> 色 0-99)
 const int ALBEDO_TABLE_SIZE = 4096; // ブロックの平均の色の数 (ボクセルの 12bit ID をそのまま引く)
 const int MAX_GLOBAL_LIGHTS = 4096; // 1 フレームに登録できる光源インスタンス数
+const int MAX_GLOBAL_LIGHTS_ALLOC = MAX_GLOBAL_LIGHTS; // 確保数。ビンのキーの下位 13 bit に入る数
 
 const int LIGHT_BIN_SIZE = 8;       // ライトビン 1 辺のブロック数
 const int LIGHT_BIN_CAPACITY = 64;  // ビン 1 つに入る光源数
-const ivec3 LIGHT_BIN_GRID = ivec3(VOXEL_SIZE_X, VOXEL_SIZE_Y, VOXEL_SIZE_Z) / LIGHT_BIN_SIZE;
-const int LIGHT_BIN_MAX = 36864;    // 最大体積 (384x128x384) のビン数。確保量はこれで固定
+/*
+ * ビン 1 つの枠の数。LIGHT_CULL_MODE 1/2 は重要度の降順に LIGHT_BIN_CAPACITY 個を持ち、
+ * 最後の 1 枠に外れた光源のうち最も重要なもののキーを持つ (境界で弱めるため, lib/light/light_select.glsl)
+ */
+const int LIGHT_BIN_STRIDE = LIGHT_BIN_CAPACITY + 1;
+const int LIGHT_BIN_STRIDE_ALLOC = LIGHT_BIN_STRIDE;
+#if LIGHT_CULL_MODE == 0
+    const ivec3 LIGHT_BIN_GRID = ivec3(VOXEL_SIZE_X, VOXEL_SIZE_Y, VOXEL_SIZE_Z) / LIGHT_BIN_SIZE;
+#else
+    // ビンをワールドの 8 ブロック格子にそろえる (カメラの 1 ブロックの移動でビンの境界が動かないように)。端の分 1 つ多い
+    const ivec3 LIGHT_BIN_GRID = ivec3(VOXEL_SIZE_X, VOXEL_SIZE_Y, VOXEL_SIZE_Z) / LIGHT_BIN_SIZE + 1;
+#endif
+const int LIGHT_BIN_MAX = 40960;    // 最大体積 (384x128x384) のワールド格子のビン数 49x17x49 を 256 の倍数に。確保量はこれで固定
+
+// 光源を間引く距離 (LIGHT_CULL_MODE 1/2) の分布の段数と 1 段の幅 (ブロック)
+const int LIGHT_CULL_BUCKETS = 64;
+const float LIGHT_CULL_BUCKET_WIDTH = 4.0;
+const float LIGHT_CULL_NONE = 1e9;  // 間引かない時の cullDistance
+
+// エンティティ光源の蓄積表 (lib/light/entity_light.glsl)
+const int ENTITY_ACC_SIZE = 4096;      // エントリ数 (2 のべき乗)
+const int ENTITY_ACC_STRIDE = 8;       // 1 エントリの uint 数: key, count, sumX, sumY, sumZ, 予備 x3
+const int ENTITY_ACC_UINTS = ENTITY_ACC_SIZE * ENTITY_ACC_STRIDE;
 
 /*
  * binding 0: フレーム共有データ (永続)
@@ -36,7 +58,7 @@ layout(std430, binding = 0) buffer FrameDataBuffer {
     vec4 skyParams[4];           // sky の自由領域
 
     // light (deferred / deferred_a で書く)
-    uvec4 lightStats;            // x = 前フレームの光源数, y = 溢れ数, z = エンティティ光源の登録締め切りフラグ (light), w = 予備
+    uvec4 lightStats;            // x = 前フレームの光源数, y = 溢れ数, z = エンティティ光源の登録締め切りフラグ (light), w = 前フレームに距離で間引いた数
 
     // surface の自由領域
     vec4 surfaceParams[4];
@@ -75,7 +97,7 @@ layout(std430, binding = 1) buffer BlockDataBuffer {
 /*
  * binding 2: 今フレームの光源インスタンス (light)
  * begin.csh で count 等を 0 に戻し、shadow / gbuffers_entities / deferred.csh が追加する
- * 確保: 131088 バイト
+ * 確保: 147744 バイト
  */
 struct LightInstance {
     vec4 posRadius;  // xyz = ボクセル空間の位置 (今フレーム), w = 到達半径 (ブロック)
@@ -87,18 +109,26 @@ layout(std430, binding = 2) buffer GlobalLightsBuffer {
     uint blockCount;  // うちブロック光源
     uint entityCount; // うちエンティティ光源 (ドロップ・投擲・燃焼・発光)
     uint overflow;    // 容量超過で捨てた数
-    LightInstance lights[MAX_GLOBAL_LIGHTS];
+    float cullDistance; // これより遠い光源は登録しない (LIGHT_CULL_MODE 1/2, 永続。deferred_a が前フレームの分布から更新)
+    uint culled;        // cullDistance で間引いた数
+    uint cullPad0;
+    uint cullPad1;
+    uint cullHist[LIGHT_CULL_BUCKETS]; // 登録しようとした光源の距離の分布 (deferred が足し、deferred_a が読んで 0 に戻す)
+    LightInstance lights[MAX_GLOBAL_LIGHTS_ALLOC];
+    float lightPower[MAX_GLOBAL_LIGHTS_ALLOC]; // 揺らぎを掛ける前の放射の輝度 (ビンの重要度用。揺らぎで順位が入れ替わらないように)
 } globalLights;
 
 /*
  * binding 3: ワールド空間のライトビン (light, deferred_a.csh が書く)
  * ビン = LIGHT_BIN_SIZE^3 ブロック。index = x + y*GRID.x + z*GRID.x*GRID.y
- * 確保: 9584640 バイト
+ * 確保: 10944512 バイト
  */
 layout(std430, binding = 3) buffer LightBinsBuffer {
-    uint binCount[LIGHT_BIN_MAX];
-    // globalLights.lights のインデックス。先頭はフレーム前半 (deferred_a より前) に light が一時表として使う
-    uint binLights[LIGHT_BIN_MAX * LIGHT_BIN_CAPACITY];
+    uint binCount[LIGHT_BIN_MAX]; // 登録しようとした数 (容量超過を含む)
+    // エンティティ光源の蓄積表。begin でクリア -> shadow / gbuffers で蓄積 -> deferred で読む
+    uint entityAcc[ENTITY_ACC_UINTS];
+    // ビンの中身 (キー, lib/light/light_select.glsl)。下位 13 bit が globalLights.lights のインデックス
+    uint binLights[LIGHT_BIN_MAX * LIGHT_BIN_STRIDE_ALLOC];
 } lightBins;
 
 /*

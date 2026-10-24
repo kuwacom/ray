@@ -18,6 +18,13 @@ void main() {
         blockData.albedo[j] = blockAlbedoPacked(j);
         blockData.albedoUp[j] = blockAlbedoTopPacked(j);
     }
+    /*
+     * ライトビンを全部 0 にする。begin は前フレームに使った枠だけを戻すので、確保直後の中身が 0 でないと残り続ける
+     * 1 回だけなので 1 ワークグループで足りる (約 5M uint)
+     */
+    for (int j = i; j < LIGHT_BIN_MAX; j += 256) lightBins.binCount[j] = 0u;
+    for (int j = i; j < LIGHT_BIN_MAX * LIGHT_BIN_STRIDE_ALLOC; j += 256) lightBins.binLights[j] = 0u;
+    if (i < LIGHT_CULL_BUCKETS) globalLights.cullHist[i] = 0u;
 
     if (i == 0) {
         blockData.initialized = 1u;
@@ -27,5 +34,7 @@ void main() {
         frameData.averageLuminance = 0.18;
         frameData.focusDistance = DOF_MANUAL_FOCUS;
         frameData.lightStats = uvec4(0u);
+        globalLights.cullDistance = LIGHT_CULL_NONE;
+        globalLights.culled = 0u;
     }
 }

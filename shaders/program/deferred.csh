@@ -74,7 +74,40 @@ vec3 floodBounce(ivec3 cell) {
     return reflectance * self;
 }
 
-void registerLight(vec3 voxelPos, float range, vec3 emission, float size, bool isBlock) {
+/*
+ * 光源の総数が MAX_GLOBAL_LIGHTS を超える時の間引き (LIGHT_CULL_MODE 1/2)
+ * 到着順で溢れた分を捨てると、毎フレーム違う光源が消えてちらつく。代わりにカメラからの距離で遠い光源から外す
+ * 距離は 1 = 光源まで, 2 = 光源の届く球の縁まで (明るく遠くまで届く光源ほど残る)
+ * 間引く距離 (deferred_a が前フレームの分布から決め、ゆっくり動かす) の手前 LIGHT_CULL_FADE ブロックで滑らかに弱める
+ */
+const float LIGHT_CULL_FADE = 8.0;
+
+float lightCullDistance(vec3 voxelPos, float range) {
+    float d = distance(voxelPos, playerToVoxel(vec3(0.0)));
+#if LIGHT_CULL_MODE == 1
+    return d;
+#else
+    return max(d - range, 0.0);
+#endif
+}
+
+void registerLight(vec3 voxelPos, float range, vec3 emission, float power, float size, bool isBlock) {
+#if LIGHT_CULL_MODE != 0
+    float cullDist = lightCullDistance(voxelPos, range);
+    int bucket = min(int(cullDist / LIGHT_CULL_BUCKET_WIDTH), LIGHT_CULL_BUCKETS - 1);
+    atomicAdd(globalLights.cullHist[bucket], 1u);
+    float cutoff = globalLights.cullDistance;
+    // 0 (起動直後) と LIGHT_CULL_NONE は間引かない
+    if (cutoff > 0.0 && cutoff < LIGHT_CULL_NONE) {
+        if (cullDist >= cutoff) {
+            atomicAdd(globalLights.culled, 1u);
+            return;
+        }
+        float fade = 1.0 - smoothstep(cutoff - LIGHT_CULL_FADE, cutoff, cullDist);
+        emission *= fade;
+        power *= fade;
+    }
+#endif
     uint slot = atomicAdd(globalLights.count, 1u);
     if (slot >= uint(MAX_GLOBAL_LIGHTS)) {
         atomicAdd(globalLights.overflow, 1u);
@@ -84,6 +117,7 @@ void registerLight(vec3 voxelPos, float range, vec3 emission, float size, bool i
     else atomicAdd(globalLights.entityCount, 1u);
     globalLights.lights[slot].posRadius = vec4(voxelPos, range);
     globalLights.lights[slot].colorSize = vec4(emission, size);
+    globalLights.lightPower[slot] = power;
 }
 
 int cellRank(ivec3 c) { return c.x + c.y * VOXEL_SIZE.x + c.z * VOXEL_SIZE.x * VOXEL_SIZE.y; }
@@ -155,10 +189,10 @@ void main() {
             bool anchor = ((worldCell.x | worldCell.z) & (FLUID_LIGHT_SPACING - 1)) == 0;
             if (surface && anchor && level > 0.5) {
                 registerLight(vec3(cell) + d.shape.xyz, range * FLUID_LIGHT_RANGE_MUL,
-                    flickered * FLUID_LIGHT_EMISSION_MUL, FLUID_LIGHT_SIZE, true);
+                    flickered * FLUID_LIGHT_EMISSION_MUL, luminance(emission) * FLUID_LIGHT_EMISSION_MUL, FLUID_LIGHT_SIZE, true);
             }
         } else if (level > 0.5) {
-            registerLight(vec3(cell) + d.shape.xyz, range, flickered, d.shape.w, true);
+            registerLight(vec3(cell) + d.shape.xyz, range, flickered, luminance(emission), d.shape.w, true);
         }
     }
 
@@ -168,7 +202,7 @@ void main() {
         LightDef d = getLightDef(int(emitKey & 255u));
         float level = float((emitKey >> 8u) & 15u);
         vec3 e = lightEmission(d, level);
-        registerLight(entityLightCentroid(cell, emitKey), lightRange(d, level), e * lightFlicker(d.params.y, uvec3(worldCell + 0x8000)), d.shape.w, false);
+        registerLight(entityLightCentroid(cell, emitKey), lightRange(d, level), e * lightFlicker(d.params.y, uvec3(worldCell + 0x8000)), luminance(e), d.shape.w, false);
         emission = max(emission, e);
     }
 
@@ -178,7 +212,7 @@ void main() {
         vec3 p = playerToVoxel(lightningBoltPosition.xyz + vec3(0.0, LIGHTNING_HEIGHT, 0.0));
         if (isInVoxelVolume(p)) {
             LightDef d = getLightDef(LIGHT_ENTITY_LIGHTNING);
-            registerLight(p, lightRange(d, 15.0) * LIGHTNING_RANGE_MUL, lightEmission(d, 15.0), d.shape.w, false);
+            registerLight(p, lightRange(d, 15.0) * LIGHTNING_RANGE_MUL, lightEmission(d, 15.0), luminance(lightEmission(d, 15.0)), d.shape.w, false);
         }
     }
 #endif

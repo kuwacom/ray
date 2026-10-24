@@ -7,19 +7,16 @@
  *   2. deferred.csh: 発光セルの塊ごとに代表セルを 1 つ選び (局所最大)、蓄積表から重心を求めて
  *      グローバル光源リストへ 1 個だけ登録する (大きいエンティティが複数セルにまたがっても 1 光源になる)
  *
- * 蓄積表は SSBO3 lightBins.binLights の先頭を一時領域として借りる。
- * binLights は deferred_a.csh が書くまで使われない (begin でクリア -> shadow / gbuffers で蓄積 -> deferred で読む -> deferred_a で上書き)
+ * 蓄積表は SSBO3 lightBins.entityAcc (begin でクリア -> shadow / gbuffers で蓄積 -> deferred で読む)。大きさは lib/buffers/ssbo.glsl
+ * 以前は binLights の先頭を借りていたが、ビンを重要度順に詰める方式 (LIGHT_CULL_MODE 1/2) は枠が 0 で始まる必要があるので分けた
  */
 #ifndef LIGHT_ENTITY_LIGHT_GLSL
 #define LIGHT_ENTITY_LIGHT_GLSL
 
-const int ENTITY_ACC_SIZE = 4096;      // エントリ数 (2 のべき乗)
-const int ENTITY_ACC_STRIDE = 8;       // 1 エントリの uint 数: key, count, sumX, sumY, sumZ, 予備 x3
 const int ENTITY_ACC_PROBES = 8;       // 線形探索の上限
 const float ENTITY_ACC_SCALE = 256.0;  // セル内位置の固定小数点倍率
-const int ENTITY_ACC_UINTS = ENTITY_ACC_SIZE * ENTITY_ACC_STRIDE;
 
-// 登録の締め切りフラグ (frameData.lightStats.z)。deferred_a 以降 (半透明エンティティ等) の登録は蓄積表を壊すので受け付けない
+// 登録の締め切りフラグ (frameData.lightStats.z)。deferred_a 以降 (半透明エンティティ等) の登録は deferred が読み終えた後なので受け付けない
 bool entityLightsClosed() { return frameData.lightStats.z != 0u; }
 
 uint entityCellKey(ivec3 cell) {
@@ -36,13 +33,13 @@ void entityAccAdd(ivec3 cell, vec3 local) {
     uint h = pcgHash(key);
     for (int i = 0; i < ENTITY_ACC_PROBES; i++) {
         uint base = entityAccSlot(h, i);
-        uint prev = atomicCompSwap(lightBins.binLights[base], 0u, key);
+        uint prev = atomicCompSwap(lightBins.entityAcc[base], 0u, key);
         if (prev == 0u || prev == key) {
             uvec3 q = uvec3(saturate(local) * ENTITY_ACC_SCALE + 0.5);
-            atomicAdd(lightBins.binLights[base + 1u], 1u);
-            atomicAdd(lightBins.binLights[base + 2u], q.x);
-            atomicAdd(lightBins.binLights[base + 3u], q.y);
-            atomicAdd(lightBins.binLights[base + 4u], q.z);
+            atomicAdd(lightBins.entityAcc[base + 1u], 1u);
+            atomicAdd(lightBins.entityAcc[base + 2u], q.x);
+            atomicAdd(lightBins.entityAcc[base + 3u], q.y);
+            atomicAdd(lightBins.entityAcc[base + 4u], q.z);
             return;
         }
     }
@@ -56,11 +53,11 @@ bool entityAccFind(ivec3 cell, out float count, out vec3 localSum) {
     localSum = vec3(0.0);
     for (int i = 0; i < ENTITY_ACC_PROBES; i++) {
         uint base = entityAccSlot(h, i);
-        uint k = lightBins.binLights[base];
+        uint k = lightBins.entityAcc[base];
         if (k == 0u) return false;
         if (k == key) {
-            count = float(lightBins.binLights[base + 1u]);
-            localSum = vec3(lightBins.binLights[base + 2u], lightBins.binLights[base + 3u], lightBins.binLights[base + 4u]) / ENTITY_ACC_SCALE;
+            count = float(lightBins.entityAcc[base + 1u]);
+            localSum = vec3(lightBins.entityAcc[base + 2u], lightBins.entityAcc[base + 3u], lightBins.entityAcc[base + 4u]) / ENTITY_ACC_SCALE;
             return count > 0.0;
         }
     }
