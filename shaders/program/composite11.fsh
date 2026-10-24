@@ -177,7 +177,7 @@ void main() {
         color = color * fog.a + fog.rgb;
         glint *= fog.a;
 #if defined HAS_SKY
-        vec2 localDensity = fogDensityAt(vec3(0.0), fogHazeAmount(), fogMistAmount());
+        vec2 localDensity = fogDensityAt(vec3(0.0), fogMedium());
         scatterCoeff = vec3((localDensity.x + localDensity.y) * FOG_ALBEDO);
 #elif defined WORLD_END
         scatterCoeff = vec3(END_FOG_EXTINCTION * END_FOG_DENSITY);

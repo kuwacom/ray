@@ -14,12 +14,29 @@
 #ifndef SKY_FOG_GLSL
 #define SKY_FOG_GLSL
 
-const float FOG_HAZE_DENSITY = 3.5e-4;     // 晴れた昼の海面高度でのもやの消散係数 (1/ブロック)
-const float FOG_HAZE_HEIGHT = 55.0;      // もやの高さ方向の減衰長 (ブロック)
-const float FOG_HAZE_MORNING = 2.2;      // 朝のもやの倍率
-const float FOG_HAZE_NIGHT = 1.4;
-// 7 では雨の中景 (50-150 ブロック) の地形が白いもやに埋もれ、空の重さに対して地上だけ明るく白っぽく見えた
-const float FOG_HAZE_RAIN = 5.0;
+#include "/lib/sky/fog_template.glsl"
+
+/*
+ * もや: 上端のある混合層 (上端は FOG_T_HAZE_TOP、ロジスティックで柔らかく) + 上に残る薄いもや (FOG_HAZE_FREE_SHARE)
+ * 上端は朝と夜に低く、昼に雲底の 3/4 まで上がる (現実の混合層は朝夜 100-500 m、昼 1-2 km で積雲の雲底とほぼ同じ)
+ */
+const float FOG_HAZE_DENSITY = 5.0e-4;   // 晴れた昼の海面のもやの消散係数 (1/ブロック, 視程 約 8 km 相当)
+const float FOG_HAZE_FREE_SHARE = 0.1;   // 上端より上に残る薄いもやの割合
+// 時間帯の倍率: 夜明け前 (太陽 -12 度から 0 度)、朝 (0 度から 15 度)、夕、夜
+const float FOG_HAZE_DAWN = 1.5;
+const float FOG_HAZE_MORNING = 1.6;
+const float FOG_HAZE_EVENING = 1.3;
+const float FOG_HAZE_NIGHT = 1.2;
+// 上端の高さ (昼の厚みに対する割合)
+const float FOG_HAZE_TOP_MORNING = 0.5;
+const float FOG_HAZE_TOP_EVENING = 0.75;
+const float FOG_HAZE_TOP_NIGHT = 0.5;
+// 太陽が低い (朝夕) とみなす高さ (sin 15 度) と、夜とみなす高さ (sin -12 度)
+const float FOG_LOW_SUN_Y = 0.26;
+const float FOG_NIGHT_SUN_Y = -0.21;
+// 雨・雪のもやの倍率。5 では雨の中景 (50-150 ブロック) の地形が白いもやに埋もれ、空の重さに対して地上だけ明るく白っぽく見えた
+const float FOG_HAZE_RAIN = 4.0;
+const float FOG_HAZE_SNOW = 6.0;
 const float FOG_CAVE_DENSITY = 2.5;      // 海面より深い所 (洞窟) の空気の濁りの倍率
 const float FOG_CAVE_DEPTH = 32.0;       // 海面からこの深さで洞窟の倍率に達する
 const float FOG_MIST_DENSITY = 0.012;    // 地表の霧の最大消散係数
@@ -39,7 +56,8 @@ const float BORDER_FOG_START = 0.95;
  */
 const float FOG_EDGE_DEPTH = 0.9;
 const float FOG_SCENIC_REF_Y = 70.0;
-const float FOG_SCENIC_SIGMA0 = FOG_HAZE_DENSITY * 0.88 + (13.558e-3 + ATMO_MIE_EXTINCT) * 1e-3 * AERIAL_PERSPECTIVE_SCALE;
+const float FOG_SCENIC_SIGMA0 = FOG_HAZE_DENSITY * (1.0 + FOG_HAZE_FREE_SHARE)
+    + (13.558e-3 + ATMO_MIE_EXTINCT * exp(-(FOG_SCENIC_REF_Y - FOG_T_SEA) * FOG_T_LIGHT_SCALE * 1e-3 / ATMO_MIE_HEIGHT)) * 1e-3 * AERIAL_PERSPECTIVE_SCALE;
 // D の下限 (R に対する割合)。短い描画距離で手前まで急に霞まないように
 const float FOG_SCENIC_MIN_D = 0.15;
 // 遠景の空の色のうち、太陽の単散乱とみなして影で引いてよい割合の上限 (残りは多重散乱と空の光)
@@ -100,54 +118,88 @@ float fogScenicInvD() {
 // 景色の成分の写像した距離 d (1 + d / D)
 float fogScenicDistance(float d, float invD) { return d * (1.0 + d * invD); }
 
-// もやの海面での消散係数 (時間帯・天気・バイオームの湿度で変わる)
-float fogHazeAmount() {
-    float night = smoothstep(0.02, -0.1, getSunDir().y);
-    float amount = FOG_HAZE_DENSITY * LOOK_FOG_DENSITY;
-    amount *= mix(1.0, FOG_HAZE_MORNING, fogMorningFactor());
-    amount *= mix(1.0, FOG_HAZE_NIGHT, night);
-    amount *= mix(1.0, FOG_HAZE_RAIN, fogRainFactor());
-    amount *= 0.8 + 0.4 * saturate(rainfall);
-    return amount;
-}
+/*
+ * 視線ごとに 1 回だけ決める媒質の量 (時間帯・天気・バイオームの湿度)
+ * haze: もやの上端より下の消散係数 (1/ブロック), hazeTop: もやの上端 (y), mist: 地表の霧の最大消散係数
+ */
+struct FogMedium {
+    float haze;
+    float hazeTop;
+    float mist;
+};
 
-float fogMistAmount() {
+FogMedium fogMedium() {
+    FogMedium m;
+    float sunY = getSunDir().y;
+    // 日の出から正午までと、真夜中から日の出までを「朝の側」とする (切り替わる正午と真夜中では下の重みが 0 か 1 なので段差は出ない)
+    float rising = (sunAngle > 0.75 || sunAngle < 0.25) ? 1.0 : 0.0;
+    float lowSun = 1.0 - smoothstep(0.0, FOG_LOW_SUN_Y, sunY);
+    float night = 1.0 - smoothstep(FOG_NIGHT_SUN_Y, 0.0, sunY);
+    float dawn = smoothstep(0.85, 0.97, sunAngle);
+    float rain = fogRainFactor();
+
+    float k = mix(1.0, mix(FOG_HAZE_EVENING, FOG_HAZE_MORNING, rising), lowSun);
+    k = mix(k, mix(FOG_HAZE_NIGHT, FOG_HAZE_DAWN, dawn), night);
+    k *= mix(1.0, mix(FOG_HAZE_RAIN, FOG_HAZE_SNOW, saturate(distantSnow)), rain);
+    k *= 0.8 + 0.4 * saturate(rainfall);
+    m.haze = FOG_HAZE_DENSITY * LOOK_FOG_DENSITY * k;
+
+    float top = mix(1.0, mix(FOG_HAZE_TOP_EVENING, FOG_HAZE_TOP_MORNING, rising), lowSun);
+    top = mix(top, FOG_HAZE_TOP_NIGHT, night);
+    // 雨の日は雲底まで混ざる
+    top = mix(top, 1.0, rain);
+    m.hazeTop = FOG_T_SEA + top * (FOG_T_HAZE_TOP - FOG_T_SEA);
+
 #ifdef FOG_MIST
-    return FOG_MIST_DENSITY * LOOK_FOG_DENSITY * saturate(fogMorningFactor() + fogRainFactor() * 1.5 + 0.12 * saturate(rainfall));
+    m.mist = FOG_MIST_DENSITY * LOOK_FOG_DENSITY * saturate(fogMorningFactor() + rain * 1.5 + 0.12 * saturate(rainfall));
 #else
-    return 0.0;
+    m.mist = 0.0;
 #endif
+    return m;
 }
 
-float fogHazeProfile(float y) {
-    float above = exp(-max(y - SKY_SEA_LEVEL, 0.0) / FOG_HAZE_HEIGHT);
-    float cave = mix(1.0, FOG_CAVE_DENSITY, saturate((SKY_SEA_LEVEL - y) / FOG_CAVE_DEPTH));
-    return above * cave;
+float fogSoftplus(float x) { return max(x, 0.0) + log(1.0 + exp(-abs(x))); }
+// 上端 top、幅 w のロジスティック (下で 1、上で 0) と、その y の原始関数 (閉形式で光学的深さを出す)
+float fogLogistic(float y, float top, float w) { return 1.0 / (1.0 + exp((y - top) / w)); }
+float fogLogisticIntegral(float y, float top, float w) { return y - w * fogSoftplus((y - top) / w); }
+
+// 海面より深い所 (洞窟) の空気の濁りの倍率
+float fogCaveScale(float y) { return mix(1.0, FOG_CAVE_DENSITY, saturate((FOG_T_SEA - y) / FOG_CAVE_DEPTH)); }
+
+// 上に残る薄いもやの y の原始関数 (海面より下は一定として連続につなぐ)
+float fogHazeFreeIntegral(float y) {
+    float h = y - FOG_T_SEA;
+    return h <= 0.0 ? h - FOG_T_HAZE_FREE : -FOG_T_HAZE_FREE * exp(-h / FOG_T_HAZE_FREE);
 }
 
-// 高さ y0 から y1 までの直線上でのもや密度の平均 (指数の不定積分の差。海面より下は一定として連続につなぐ)
-float fogHazeProfileMean(float y0, float y1) {
-    if (abs(y1 - y0) < 0.05) return fogHazeProfile(0.5 * (y0 + y1));
-    float f0 = y0 <= SKY_SEA_LEVEL ? (y0 - SKY_SEA_LEVEL) - FOG_HAZE_HEIGHT : -FOG_HAZE_HEIGHT * exp(-(y0 - SKY_SEA_LEVEL) / FOG_HAZE_HEIGHT);
-    float f1 = y1 <= SKY_SEA_LEVEL ? (y1 - SKY_SEA_LEVEL) - FOG_HAZE_HEIGHT : -FOG_HAZE_HEIGHT * exp(-(y1 - SKY_SEA_LEVEL) / FOG_HAZE_HEIGHT);
-    float cave = mix(1.0, FOG_CAVE_DENSITY, saturate((SKY_SEA_LEVEL - 0.5 * (y0 + y1)) / FOG_CAVE_DEPTH));
-    return (f1 - f0) / (y1 - y0) * cave;
+float fogHazeProfile(float y, float top) {
+    float free = FOG_HAZE_FREE_SHARE * exp(-max(y - FOG_T_SEA, 0.0) / FOG_T_HAZE_FREE);
+    return (fogLogistic(y, top, FOG_T_HAZE_SOFT) + free) * fogCaveScale(y);
 }
 
-// 地表の霧の高さの範囲 (FOG_MIST_ALTITUDE で頭打ち、谷に溜まる)
+// 高さ y0 から y1 までの直線上でのもや密度の平均
+float fogHazeProfileMean(float y0, float y1, float top) {
+    if (abs(y1 - y0) < 0.05) return fogHazeProfile(0.5 * (y0 + y1), top);
+    float layer = fogLogisticIntegral(y1, top, FOG_T_HAZE_SOFT) - fogLogisticIntegral(y0, top, FOG_T_HAZE_SOFT);
+    float free = FOG_HAZE_FREE_SHARE * (fogHazeFreeIntegral(y1) - fogHazeFreeIntegral(y0));
+    return (layer + free) / (y1 - y0) * fogCaveScale(0.5 * (y0 + y1));
+}
+
+// 地表の霧の高さの範囲 (テンプレートの上端で頭打ち、谷に溜まる)
 float fogMistHeightFade(float y) {
-    return (1.0 - smoothstep(FOG_MIST_ALTITUDE - 14.0, FOG_MIST_ALTITUDE + 6.0, y)) * smoothstep(SKY_SEA_LEVEL - 24.0, SKY_SEA_LEVEL - 4.0, y);
+    return (1.0 - smoothstep(FOG_T_GROUND_TOP - 14.0, FOG_T_GROUND_TOP + 6.0, y)) * smoothstep(FOG_T_SEA - 24.0, FOG_T_SEA - 4.0, y);
 }
 
 /*
  * ワールド位置での消散係数: x = もや, y = 霧
  * playerPos: player 空間 (ノイズの座標にはカメラ位置を足す)
  */
-vec2 fogDensityAt(vec3 playerPos, float haze, float mist) {
+vec2 fogDensityAt(vec3 playerPos, FogMedium m) {
     float y = playerPos.y + cameraPosition.y;
-    vec2 density = vec2(haze * fogHazeProfile(y), 0.0);
+    vec2 density = vec2(m.haze * fogHazeProfile(y, m.hazeTop), 0.0);
 #ifdef FOG_MIST
     float fade = fogMistHeightFade(y);
+    float mist = m.mist;
     if (mist > 0.0 && fade > 0.0) {
         vec3 p = playerPos + cameraPosition + vec3(frameTimeCounter * 0.7, 0.0, frameTimeCounter * 0.35);
         float n = valueNoise3d(p * 0.035) * 0.65 + valueNoise3d(p * 0.09 + 13.0) * 0.35;
@@ -155,6 +207,11 @@ vec2 fogDensityAt(vec3 playerPos, float haze, float mist) {
     }
 #endif
     return density;
+}
+
+// 局所の成分 (縮めない霧) の高さ y0 から y1、長さ len の区間の光学的深さ (ノイズは平均の濃さで近似)
+float fogLocalDepth(FogMedium m, float y0, float y1, float len) {
+    return m.mist * len * 0.35 * fogMistHeightFade(0.5 * (y0 + y1));
 }
 
 #ifdef WORLD_NETHER
@@ -250,8 +307,9 @@ vec4 fogAnalyticSegment(vec3 dir, float startDist, float endDist, FogLighting fl
     float y1 = cameraPosition.y + dir.y * endDist;
     float invD = fogScenicInvD();
     float scenicLen = fogScenicDistance(endDist, invD) - fogScenicDistance(startDist, invD);
-    float odHaze = fogHazeAmount() * scenicLen * fogHazeProfileMean(y0, y1);
-    float odMist = fogMistAmount() * len * 0.35 * fogMistHeightFade(0.5 * (y0 + y1));
+    FogMedium m = fogMedium();
+    float odHaze = m.haze * scenicLen * fogHazeProfileMean(y0, y1, m.hazeTop);
+    float odMist = fogLocalDepth(m, y0, y1, len);
     float od = odHaze + odMist;
     if (od <= 1e-6) return vec4(0.0, 0.0, 0.0, 1.0);
     float transmittance = exp(-od);
@@ -278,8 +336,8 @@ vec4 fogAnalyticSegment(vec3 dir, float startDist, float endDist, FogLighting fl
  * ミー散乱 (エアロゾル) は高さで速く減るので閉形式の平均にする (山頂どうしの視線は霞まず、谷底は霞む)
  */
 vec3 fogAerialExtinction(float y0, float y1) {
-    float h0 = max(y0 - SKY_SEA_LEVEL, 0.0) * 1e-3;
-    float h1 = max(y1 - SKY_SEA_LEVEL, 0.0) * 1e-3;
+    float h0 = max(y0 - FOG_T_SEA, 0.0) * (FOG_T_LIGHT_SCALE * 1e-3);
+    float h1 = max(y1 - FOG_T_SEA, 0.0) * (FOG_T_LIGHT_SCALE * 1e-3);
     float mie = abs(h1 - h0) < 1e-4 ? exp(-0.5 * (h0 + h1) / ATMO_MIE_HEIGHT)
               : ATMO_MIE_HEIGHT * (exp(-h0 / ATMO_MIE_HEIGHT) - exp(-h1 / ATMO_MIE_HEIGHT)) / (h1 - h0);
     vec3 extinction = ATMO_RAYLEIGH_SCATTER * exp(-0.5 * (h0 + h1) / ATMO_RAYLEIGH_HEIGHT)
@@ -299,8 +357,9 @@ vec3 fogVoidTransmittance(vec3 dir, float groundDist) {
     float yG = yC + dir.y * groundDist;
     float scenicG = fogScenicDistance(groundDist, invD);
     vec3 od = fogAerialExtinction(yC, yG) * scenicG;
-    od += fogHazeAmount() * (scenicG - fogScenicDistance(R, invD)) * fogHazeProfileMean(yR, yG);
-    od += fogMistAmount() * (groundDist - R) * 0.35 * fogMistHeightFade(0.5 * (yR + yG));
+    FogMedium m = fogMedium();
+    od += m.haze * (scenicG - fogScenicDistance(R, invD)) * fogHazeProfileMean(yR, yG, m.hazeTop);
+    od += fogLocalDepth(m, yR, yG, groundDist - R);
     return exp(-od);
 }
 #endif

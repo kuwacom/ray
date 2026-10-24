@@ -420,8 +420,25 @@ option.CLOUD_C_HIGH.comment=気候がカスタムの時だけ。巻雲の量の�
 # フォグ
 option.FOG_DENSITY=フォグの濃さ
 option.FOG_DENSITY.comment=ルックのプリセットの値 (ナチュラルでは 1) に掛ける
+option.FOG_HEIGHT_PRESET=フォグの高さテンプレート
+option.FOG_HEIGHT_PRESET.comment=もや・中くらいの高さの霧の層・地表の霧の高さを、ワールドの高さに合わせて選ぶ。バニラ: 昼のもやは y 143 まで、霧の層 y 70-105、地表の霧 y 71 まで。高さ拡張: もや y 406 まで、霧の層 y 90-200。実寸: 1 ブロック 1 m (もや 1.1 km、霧の層 100-440 m)。カスタム: 「フォグの高さ」のスライダー。雲に合わせる: 雲の高さテンプレートに従う (もやの上端は雲底の 3/4)
+value.FOG_HEIGHT_PRESET.0=バニラ (-64 -> 320)
+value.FOG_HEIGHT_PRESET.1=高さ拡張ワールド (~2000)
+value.FOG_HEIGHT_PRESET.2=実寸 (1 ブロック 1 m)
+value.FOG_HEIGHT_PRESET.3=カスタム
+value.FOG_HEIGHT_PRESET.4=雲に合わせる
+screen.FOG_HEIGHT_SCREEN=フォグの高さ
+option.FOG_C_SEA_LEVEL=海面の高さ
+option.FOG_C_SEA_LEVEL.comment=テンプレートがカスタムの時だけ。もやと霧の高さの基準
+option.FOG_C_HAZE_TOP=もやの上端
+option.FOG_C_HAZE_TOP.comment=テンプレートがカスタムの時だけ。昼のもやの上端 (朝と夜は低くなる)。0 = 雲底の 3/4
+option.FOG_C_LAYER_BASE=霧の層の下面
+option.FOG_C_LAYER_BASE.comment=テンプレートがカスタムの時だけ。中くらいの高さの霧の層の下面
+option.FOG_C_LAYER_THICKNESS=霧の層の厚み
+option.FOG_C_LAYER_THICKNESS.comment=テンプレートがカスタムの時だけ
 option.FOG_MIST=地表の霧
 option.FOG_MIST_ALTITUDE=霧の高度
+option.FOG_MIST_ALTITUDE.comment=テンプレートがカスタムの時だけ。地表の霧の上端
 option.VL=ボリューメトリックライト
 option.VL_SAMPLES=ボリューメトリックのサンプル数
 option.VL_RES=ボリューメトリックの解像度

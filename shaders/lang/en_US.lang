@@ -420,8 +420,25 @@ option.CLOUD_C_HIGH.comment=Custom climate only. Average amount of cirrus (varie
 # Fog
 option.FOG_DENSITY=Fog Density
 option.FOG_DENSITY.comment=Multiplies the Look preset value (1 with Natural)
+option.FOG_HEIGHT_PRESET=Fog Height Template
+option.FOG_HEIGHT_PRESET.comment=Heights of the haze, the mid-level fog layer and the ground mist for worlds of different height. Vanilla: haze up to y 143 at noon, fog layer y 70-105, mist up to y 71. Tall World: haze up to y 406, fog layer y 90-200. Realistic: 1 block = 1 m (haze 1.1 km, fog layer 100-440 m). Custom: the sliders in Fog Heights. Match Clouds: follows the Cloud Height Template (the haze top stays at 3/4 of the cloud base)
+value.FOG_HEIGHT_PRESET.0=Vanilla (-64 to 320)
+value.FOG_HEIGHT_PRESET.1=Tall World (~2000)
+value.FOG_HEIGHT_PRESET.2=Realistic (1 block = 1 m)
+value.FOG_HEIGHT_PRESET.3=Custom
+value.FOG_HEIGHT_PRESET.4=Match Clouds
+screen.FOG_HEIGHT_SCREEN=Fog Heights
+option.FOG_C_SEA_LEVEL=Sea Level
+option.FOG_C_SEA_LEVEL.comment=Custom template only. The height the haze and fog are measured from
+option.FOG_C_HAZE_TOP=Haze Top
+option.FOG_C_HAZE_TOP.comment=Custom template only. Top of the haze at noon (lower in the morning and at night). 0 = 3/4 of the cloud base
+option.FOG_C_LAYER_BASE=Fog Layer Base
+option.FOG_C_LAYER_BASE.comment=Custom template only. Bottom of the mid-level fog layer
+option.FOG_C_LAYER_THICKNESS=Fog Layer Thickness
+option.FOG_C_LAYER_THICKNESS.comment=Custom template only
 option.FOG_MIST=Ground Mist
 option.FOG_MIST_ALTITUDE=Mist Altitude
+option.FOG_MIST_ALTITUDE.comment=Custom template only. Top of the ground mist
 option.VL=Volumetric Light
 option.VL_SAMPLES=Volumetric Samples
 option.VL_RES=Volumetric Resolution

@@ -86,8 +86,7 @@ vec4 marchAirFog(vec3 dir, float endDist, float dither) {
 #endif
 
 #if defined HAS_SKY
-    float haze = fogHazeAmount();
-    float mist = fogMistAmount();
+    FogMedium medium = fogMedium();
 #elif defined WORLD_END
     float haze = END_FOG_EXTINCTION * END_FOG_DENSITY;
     float mist = 0.0;
@@ -116,7 +115,7 @@ vec4 marchAirFog(vec3 dir, float endDist, float dither) {
         vec3 p = dir * t;
 
 #if defined HAS_SKY
-        vec2 density = fogDensityAt(p, haze, mist);
+        vec2 density = fogDensityAt(p, medium);
         // 景色の成分は写像した距離で積む (d (1 + d / D) の微分)
         density.x *= 1.0 + 2.0 * t * invD;
 #else
