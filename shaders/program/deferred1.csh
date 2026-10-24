@@ -35,7 +35,7 @@ layout(local_size_x = 8, local_size_y = 8) in;
     const int DET_COUNT = 1;
 #endif
 // 接触影を付ける光源数 (寄与の大きい順)。全光源に付けると EXTREME で重くなり過ぎる
-const int CONTACT_SHADOW_LIGHTS = 4;
+const int CONTACT_SHADOW_LIGHTS = LIGHT_CONTACT_SHADOW_COUNT;
 const float CONTACT_SHADOW_LENGTH = 1.25;
 const int CONTACT_SHADOW_STEPS = 8;
 

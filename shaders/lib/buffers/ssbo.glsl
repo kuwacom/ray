@@ -10,17 +10,21 @@ const int LIGHT_TABLE_SIZE = 256;   // 光源定義の数 (光源インデック
 const int SHAPE_TABLE_SIZE = 128;   // 遮蔽形状の数 (ブロック ID 300-399 -> 形状 0-99)
 const int TINT_TABLE_SIZE = 128;    // 透過色の数 (ブロック ID 200-299 -> 色 0-99)
 const int ALBEDO_TABLE_SIZE = 4096; // ブロックの平均の色の数 (ボクセルの 12bit ID をそのまま引く)
-const int MAX_GLOBAL_LIGHTS = 4096; // 1 フレームに登録できる光源インスタンス数
-const int MAX_GLOBAL_LIGHTS_ALLOC = MAX_GLOBAL_LIGHTS; // 確保数。ビンのキーの下位 13 bit に入る数
+const int MAX_GLOBAL_LIGHTS = LIGHT_MAX_COUNT; // 1 フレームに登録できる光源インスタンス数
+const int MAX_GLOBAL_LIGHTS_ALLOC = 8192;      // 確保数 (LIGHT_MAX_COUNT の最大)。ビンのキーの下位 13 bit に入る数
 
 const int LIGHT_BIN_SIZE = 8;       // ライトビン 1 辺のブロック数
-const int LIGHT_BIN_CAPACITY = 64;  // ビン 1 つに入る光源数
+const int LIGHT_BIN_CAPACITY = LIGHT_BIN_LIGHTS; // ビン 1 つに入る光源数
 /*
  * ビン 1 つの枠の数。LIGHT_CULL_MODE 1/2 は重要度の降順に LIGHT_BIN_CAPACITY 個を持ち、
  * 最後の 1 枠に外れた光源のうち最も重要なもののキーを持つ (境界で弱めるため, lib/light/light_select.glsl)
  */
 const int LIGHT_BIN_STRIDE = LIGHT_BIN_CAPACITY + 1;
-const int LIGHT_BIN_STRIDE_ALLOC = LIGHT_BIN_STRIDE;
+#if LIGHT_BIN_LIGHTS > 64
+    const int LIGHT_BIN_STRIDE_ALLOC = 129;
+#else
+    const int LIGHT_BIN_STRIDE_ALLOC = 65;
+#endif
 #if LIGHT_CULL_MODE == 0
     const ivec3 LIGHT_BIN_GRID = ivec3(VOXEL_SIZE_X, VOXEL_SIZE_Y, VOXEL_SIZE_Z) / LIGHT_BIN_SIZE;
 #else
@@ -97,7 +101,7 @@ layout(std430, binding = 1) buffer BlockDataBuffer {
 /*
  * binding 2: 今フレームの光源インスタンス (light)
  * begin.csh で count 等を 0 に戻し、shadow / gbuffers_entities / deferred.csh が追加する
- * 確保: 147744 バイト
+ * 確保: 295200 バイト (MAX_GLOBAL_LIGHTS_ALLOC 個分)
  */
 struct LightInstance {
     vec4 posRadius;  // xyz = ボクセル空間の位置 (今フレーム), w = 到達半径 (ブロック)
@@ -121,7 +125,7 @@ layout(std430, binding = 2) buffer GlobalLightsBuffer {
 /*
  * binding 3: ワールド空間のライトビン (light, deferred_a.csh が書く)
  * ビン = LIGHT_BIN_SIZE^3 ブロック。index = x + y*GRID.x + z*GRID.x*GRID.y
- * 確保: 10944512 バイト
+ * 確保: LIGHT_BIN_LIGHTS <= 64 で 10944512 バイト, それより上で 21430272 バイト
  */
 layout(std430, binding = 3) buffer LightBinsBuffer {
     uint binCount[LIGHT_BIN_MAX]; // 登録しようとした数 (容量超過を含む)

@@ -95,7 +95,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 10 | prepare2.csh | sky | 雲の天気マップと雲影マップ | - | cloudWeatherImg, cloudShadowImg 512² | local 16², (32,32,1) | CLOUDS>=2, world0 |
 | 11 | gbuffers_* (不透明) | surface (空/雲は sky) | G バッファ書き込み、TAA ジッター、エンティティ光源登録 (light の関数) | アトラス | colortex1,2,3,15 / voxelEmitImg, SSBO2 | 画面 | 常時 |
 | 12 | deferred.csh | light | floodfill 1 ステップ伝搬 + ブロック光源・エンティティ光源をグローバルリストへ | voxelBlock/Emit, flood(前) | flood(今), SSBO2 | local 8³, VOXEL_SIZE/8 | 常時 |
-| 13 | deferred_a.csh | light | 光源をワールド空間ライトビン (8³ ブロック) に重要度の降順で振り分け (LIGHT_CULL_MODE)、次フレームの間引き距離を更新 | SSBO2 | SSBO3, SSBO2 cullDistance | local 64, (64,1,1) | 常時 |
+| 13 | deferred_a.csh | light | 光源をワールド空間ライトビン (8³ ブロック) に重要度の降順で振り分け (LIGHT_CULL_MODE)、次フレームの間引き距離を更新 | SSBO2 | SSBO3, SSBO2 cullDistance | local 64, (LIGHT_MAX_COUNT/64,1,1) | 常時 |
 | 14 | deferred1.csh | light | LIGHT_TRACE_COUNT 光源 (上位 N-1 個 + 残りから確率的に 1 個) の DDA トレース (直接光) | SSBO3, voxel*, G バッファ | blockLightRawImg (影あり S), blockLightAuxImg (影なし U) (左上 1/RES) | local 8², workGroupsRender = 1/LIGHT_TRACE_RES | LIGHT_SHADOWS |
 | 15 | deferred2.vsh/fsh | light | 可視率 S/U の時空間デノイズ + フル解像度の影なし照度に掛ける | blockLightRaw/Aux, colortex7 | colortex6, colortex7 | 画面 | LIGHT_SHADOWS |
 | 16 | deferred10.csh | surface | GI / AO の生値 (RSM / SSGI / ボクセル RT)。多重反射は画面に映るヒット点の前フレームの GI (colortex9) | G バッファ, shadowcolor, voxel, flood, colortex9 | giRawImg | local 8², 1/GI_RES | GI_MODE>0 or AO_MODE>0 |
@@ -201,8 +201,8 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 |---|---|---|---|
 | 0 | FrameDataBuffer (`frameData`) | 4096 | post: exposure, exposureTarget, averageLuminance, focusDistance, histogram[256], postParams[4] / sky: sunIrradiance, moonIrradiance, shadowLightIrradiance, skySH[9], skyParams[4] / light: lightStats / surface: surfaceParams[4]。setup.csh が初期値を入れる |
 | 1 | BlockDataBuffer (`blockData`) | 57344 | `LightDef lightDefs[256]`, `uvec4 shapes[128]`, `vec4 tints[128]`, `uint albedo[4096]` (ブロックの平均の色), `uint albedoUp[4096]` (上向きの面の色)。setup.csh のみが書く |
-| 2 | GlobalLightsBuffer (`globalLights`) | 147744 | `count/blockCount/entityCount/overflow`, `cullDistance/culled` + `cullHist[64]` (間引き距離と距離の分布), `LightInstance lights[4096]` (posRadius: ボクセル空間位置 + 到達半径, colorSize: 放射 + 光源半径), `lightPower[4096]` (揺らぎ前の放射の輝度)。light のみ |
-| 3 | LightBinsBuffer (`lightBins`) | 10944512 | `binCount[40960]`, `entityAcc[32768]` (エンティティ光源の蓄積表), `binLights[40960*65]`。ビン = 8³ ブロック、1 ビン 64 + 1 枠。枠のキー = 重要度 19 bit + 光源インデックス 13 bit。light のみ |
+| 2 | GlobalLightsBuffer (`globalLights`) | 295200 | `count/blockCount/entityCount/overflow`, `cullDistance/culled` + `cullHist[64]` (間引き距離と距離の分布), `LightInstance lights[8192]` (posRadius: ボクセル空間位置 + 到達半径, colorSize: 放射 + 光源半径), `lightPower[8192]` (揺らぎ前の放射の輝度)。使うのは LIGHT_MAX_COUNT 個まで。light のみ |
+| 3 | LightBinsBuffer (`lightBins`) | 10944512 (LIGHT_BIN_LIGHTS > 64 で 21430272) | `binCount[40960]`, `entityAcc[32768]` (エンティティ光源の蓄積表), `binLights[40960*65]` (> 64 で `*129`)。ビン = 8³ ブロック、1 ビン LIGHT_BIN_LIGHTS + 1 枠。枠のキー = 重要度 19 bit + 光源インデックス 13 bit。light のみ |
 | 4 | EntityTriangleBuffer (`entityTris`) | 838672 | `counts[4]`, `groupBounds`, `clusterBounds` + `EntityTriangle tris[16384]` (ボクセル空間の三角形 v0/e1/e2 + アルファマスク)。begin.csh がクリア、shadow_entities.gsh が書く。light のみ |
 | 5-8 | - | - | 予備 |
 
@@ -344,7 +344,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 ### 光源シャドウ (直接光)
 
 - 光源の選別: ワールド空間ライトビン (Shrimple の bin) + ピクセルごとの重み (影なし照度の輝度) による選択。RV のタイル別リスト + ビットニックソートより単純で、GI・VL・反射からも同じビンを引ける
-- 上限を超えた時 (LIGHT_CULL_MODE 1/2, deferred_a.csh / deferred.csh): ビンの枠を「atomicMax で大きい方を残し小さい方を次の枠へ運ぶ」鎖にして、到着順に関係なく重要度 (2 = 揺らぎ前の放射 x ビンの箱までの距離減衰、1 = 近さ) の上位 64 個を残す。最後の 1 枠に外れたうち最大のキーを持ち、重要度がその 1.15 倍までの光源を弱める。ビンはワールドの 8 ブロック格子にそろえる。総数 4096 は前フレームの距離の分布から間引き距離を決め (2 = 光の届く球の縁までの距離)、1 フレームに 0.5 ブロック広げ / 2 ブロック縮める速さで動かし、手前 8 ブロックで弱める。0 は以前の到着順 (atomicAdd の先着。毎フレーム入れ替わってちらつく)
+- 上限を超えた時 (LIGHT_CULL_MODE 1/2, deferred_a.csh / deferred.csh): ビンの枠を「atomicMax で大きい方を残し小さい方を次の枠へ運ぶ」鎖にして、到着順に関係なく重要度 (2 = 揺らぎ前の放射 x ビンの箱までの距離減衰、1 = 近さ) の上位 LIGHT_BIN_LIGHTS 個を残す。最後の 1 枠に外れたうち最大のキーを持ち、重要度がその 1.15 倍までの光源を弱める。ビンはワールドの 8 ブロック格子にそろえる。総数 LIGHT_MAX_COUNT は前フレームの距離の分布から間引き距離を決め (2 = 光の届く球の縁までの距離)、1 フレームに 0.5 ブロック広げ / 2 ブロック縮める速さで動かし、手前 8 ブロックで弱める。0 は以前の到着順 (atomicAdd の先着。毎フレーム入れ替わってちらつく)
 - 選び方 (N = LIGHT_TRACE_COUNT, deferred1.csh): 上位 N-1 個は確定でトレースし、残り全部からリザーバサンプリングで 1 個を重みに比例して選び、1/確率 倍してトレースする。選ばれなかった光源も影付きで不偏に寄与する。N = 1 の時は上位 1 個だけをトレースし、残りの光源の照度にはその可視率 (輝度) を掛けて近似する
 - 比の推定 (Heitz et al. 2018, `lib/light/light_select.glsl`): deferred1 が同じ光源選択で影あり S と影なし U を低解像度で求め、deferred2 が可視率 S/U だけを時空間フィルタして、フル解像度で求めたビン内全光源の影なし照度に掛ける。減衰・法線の細部はフル解像度のまま残り、ノイズのある可視率だけがぼける
 - 遮蔽判定: Amanatides & Woo DDA (自前実装) で voxelBlock を辿り、部分形状は AABB テスト (LIGHT_SHAPE_TRACE)、半透明は透過色を乗算 (LIGHT_TRANSLUCENT_TINT)、エンティティはサブセルのビット (LIGHT_ENTITY_OCCLUSION / LIGHT_PLAYER_OCCLUSION)。光源側・着色点側のセルは判定しない
@@ -446,6 +446,11 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | LIGHT_PLAYER_OCCLUSION | ON | **OFF** | ON | ON | ON | ON |
 | LIGHT_CONTACT_SHADOWS | ON | **OFF** | **OFF** | ON | ON | ON |
 | LIGHT_CULL_MODE | 2 | 2 | 2 | 2 | 2 | 2 |
+| LIGHT_MAX_COUNT | 4096 | **2048** | 4096 | 4096 | 4096 | **8192** |
+| LIGHT_BIN_LIGHTS | 64 | **32** | **48** | 64 | 64 | **96** |
+| LIGHT_TRACE_STEPS | 96 | **64** | 96 | 96 | 96 | **128** |
+| LIGHT_SPECULAR_COUNT | 4 | **2** | **2** | 4 | 4 | 4 |
+| LIGHT_CONTACT_SHADOW_COUNT | 4 | **1** | **2** | 4 | 4 | 4 |
 | HAND_LIGHT | ON | ON | ON | ON | ON | ON |
 | HAND_LIGHT_RAYS | ON | **OFF** | ON | ON | ON | ON |
 | HAND_LIGHT_SS_SHADOWS | ON | **OFF** | ON | ON | ON | ON |

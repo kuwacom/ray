@@ -112,7 +112,7 @@ vec3 getBlockLightForwardEntity(vec3 playerPos, vec3 geoNormal, vec3 normal, flo
 }
 
 // 鏡面ハイライトを足す光源の数の上限 (着色点のビンの中で照度の大きい順)
-const int BLOCKLIGHT_SPECULAR_LIGHTS = 4;
+const int BLOCKLIGHT_SPECULAR_LIGHTS = LIGHT_SPECULAR_COUNT;
 
 /*
  * ブロックライトの鏡面ハイライト用の光 (LIGHT_SPECULAR)。照度の大きい順に最大 BLOCKLIGHT_SPECULAR_LIGHTS 個を s に入れ、個数を返す

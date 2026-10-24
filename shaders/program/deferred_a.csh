@@ -15,7 +15,16 @@
 #include "/lib/light/light.glsl"
 
 layout(local_size_x = 64) in;
-const ivec3 workGroups = ivec3(64, 1, 1); // MAX_GLOBAL_LIGHTS / 64
+// Iris はリテラルしか読めないので LIGHT_MAX_COUNT ごとに書く (LIGHT_MAX_COUNT / 64)
+#if LIGHT_MAX_COUNT == 1024
+    const ivec3 workGroups = ivec3(16, 1, 1);
+#elif LIGHT_MAX_COUNT == 2048
+    const ivec3 workGroups = ivec3(32, 1, 1);
+#elif LIGHT_MAX_COUNT == 4096
+    const ivec3 workGroups = ivec3(64, 1, 1);
+#else
+    const ivec3 workGroups = ivec3(128, 1, 1);
+#endif
 
 #if LIGHT_CULL_MODE != 0
 /*

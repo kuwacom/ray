@@ -14,7 +14,8 @@ const uint TRACE_TINT = 4u;     // 半透明ブロックで色付け
 const uint TRACE_SHAPES = 8u;   // 部分形状の AABB で判定
 
 // 最大ステップ数。到達半径 15 の光源を対角に辿ると 45 セル前後、雷 (半径 30) で 90 セル前後
-const int TRACE_MAX_STEPS = 96;
+// 足りないと遠い光源の影が途中で打ち切られて光が漏れる (打ち切り = 見通せる扱い)
+const int TRACE_MAX_STEPS = LIGHT_TRACE_STEPS;
 // 透過率がこれを下回ったら完全な影として打ち切る
 const float TRACE_MIN_TRANSMITTANCE = 0.01;
 // 葉 1 セルの透過率 (完全に遮るとまばらな木の下が真っ暗になる)
