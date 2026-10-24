@@ -228,21 +228,23 @@ vec3 getSkyRadiance(vec3 dir) {
  * 地面までの距離で地面の色から地平線の色へ移るので、遠くほど霞む奥行きのある遠景になり、朝夕は暗い地面が地平線の照りへ溶ける
  * 描画距離端のフォグ (getBorderFogColor) も同じ色を使い、地形が溶ける色と虚空の色を揃える
  */
-vec3 fogVoidTransmittance(vec3 dir, float groundDist); // fog.glsl
+// fog.glsl
+vec3 fogVoidTransmittance(vec3 dir, float groundDist);
+vec3 fogAirSkyDir(vec3 dir, float mu);
 vec3 skyBelowHorizon(vec3 dir, vec3 sky) {
 #if defined HAS_SKY
     float horizonMu = atmoHorizonMu(atmoViewerRadius());
     float below = horizonMu - dir.y;
     if (below <= 0.0) return sky;
-    // 地平線の少し上の空の色 (同じ方位)
-    vec3 horizon = getSkyRadiance(vec3(dir.x, horizonMu + SKY_HORIZON_SAMPLE_MU, dir.z));
+    // 地平線の少し上の空の色。方位は太陽との角度が視線と同じになる所 (太陽の真下の虚空が太陽の横の輝きで光る柱にならないように)
+    vec3 horizon = getSkyRadiance(fogAirSkyDir(dir, horizonMu + SKY_HORIZON_SAMPLE_MU));
     // 朝夕は地表近くのもやが地球の影に入り、直射の照りではなく空の光で光る。地平線の照りの色のままだと赤茶色の面になるので、
     // 太陽が低いほど少し上の空 (同じ方位) の色に寄せる
     float lowSun = 1.0 - smoothstep(0.02, 0.15, getSunDir().y);
     // 地平線のすぐ下 (海面近くから見た描画距離の外の数ピクセル) は照りの色のまま残す。ここを上の空の紫灰色にすると、
     // 夕方の海で水面の端と地平線の間に灰色の線が出た
     float shadowedHaze = SKY_SHADOWED_HAZE * lowSun * smoothstep(0.0, SKY_SHADOWED_HAZE_FADE_MU, below);
-    horizon = mix(horizon, getSkyRadiance(vec3(dir.x, SKY_SHADOWED_HAZE_MU, dir.z)), shadowedHaze);
+    horizon = mix(horizon, getSkyRadiance(fogAirSkyDir(dir, SKY_SHADOWED_HAZE_MU)), shadowedHaze);
     float height = max(cameraPosition.y - SKY_SEA_LEVEL, SKY_DISTANT_GROUND_MIN_HEIGHT);
     float dist = height / max(below, 1e-4);
     // 描画距離の中の地形と同じフォグの式で、仮想の地面まで積む (描画距離の端で地形と継ぎ目が出ない)

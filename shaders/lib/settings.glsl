@@ -214,7 +214,8 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define FOG_C_HAZE_TOP 0.0 // [0.0 100.0 120.0 143.0 160.0 200.0 250.0 300.0 406.0 500.0 750.0 1000.0 1141.0 1500.0 2000.0] カスタム時の昼のもやの上端 (ワールド y, 0 = 雲底の 3/4)
 #define FOG_C_LAYER_BASE 70.0 // [64.0 66.0 70.0 75.0 80.0 90.0 100.0 120.0 160.0 200.0 300.0 500.0] カスタム時の霧の層の下面 (ワールド y)
 #define FOG_C_LAYER_THICKNESS 35.0 // [8.0 16.0 24.0 35.0 50.0 75.0 110.0 160.0 250.0 340.0 500.0] カスタム時の霧の層の厚み (ブロック)
-//#define FOG_MIST // 地表の霧
+#define FOG_LAYER // 中くらいの高さの霧の層
+#define FOG_MIST // 地表の霧
 #define FOG_MIST_ALTITUDE 72 // [32 48 63 64 72 80 96 128 160 192 256]
 #define VL // ボリューメトリックライト (光芒)
 #define VL_SAMPLES 8 // [4 6 8 12 16 24 32]
@@ -472,6 +473,8 @@ const int noiseTextureResolution = 256;
 #ifdef CLOUD_CUMULONIMBUS
 #endif
 #ifdef CLOUD_SHADOWS
+#endif
+#ifdef FOG_LAYER
 #endif
 #ifdef FOG_MIST
 #endif

@@ -15,6 +15,7 @@
 #define SKY_FOG_GLSL
 
 #include "/lib/sky/fog_template.glsl"
+#include "/lib/sky/climate.glsl"
 
 /*
  * もや: 上端のある混合層 (上端は FOG_T_HAZE_TOP、ロジスティックで柔らかく) + 上に残る薄いもや (FOG_HAZE_FREE_SHARE)
@@ -35,16 +36,43 @@ const float FOG_HAZE_TOP_NIGHT = 0.5;
 const float FOG_LOW_SUN_Y = 0.26;
 const float FOG_NIGHT_SUN_Y = -0.21;
 // 雨・雪のもやの倍率。5 では雨の中景 (50-150 ブロック) の地形が白いもやに埋もれ、空の重さに対して地上だけ明るく白っぽく見えた
-const float FOG_HAZE_RAIN = 4.0;
-const float FOG_HAZE_SNOW = 6.0;
+const float FOG_HAZE_RAIN = 1.6;
+const float FOG_HAZE_SNOW = 2.5;
 const float FOG_CAVE_DENSITY = 2.5;      // 海面より深い所 (洞窟) の空気の濁りの倍率
 const float FOG_CAVE_DEPTH = 32.0;       // 海面からこの深さで洞窟の倍率に達する
-const float FOG_MIST_DENSITY = 0.012;    // 地表の霧の最大消散係数
+/*
+ * 中くらいの高さの霧の層 (霧の土手): 上下の面のある帯。濃さ FOG_LAYER_DENSITY に、時間帯で変わる雲量の割合だけ
+ * FOG_LAYER_SCALE ブロックの大きさの塊が浮かぶ。光学的深さ 0.3-1.5 で光芒が最もよく見える
+ */
+const float FOG_LAYER_DENSITY = 4.0e-3;
+const float FOG_LAYER_SCALE = 450.0;
+const float FOG_LAYER_DRIFT = 0.6;       // 塊の流れる速さ (ブロック/秒)
+// 時間帯ごとの雲量 (朝 / 昼 / 夕 / 夜 / 雨)
+const float FOG_LAYER_COVER_MORNING = 0.4;
+const float FOG_LAYER_COVER_NOON = 0.15;
+const float FOG_LAYER_COVER_EVENING = 0.3;
+const float FOG_LAYER_COVER_NIGHT = 0.3;
+const float FOG_LAYER_COVER_RAIN = 0.7;
+// 塊の縁の柔らかさ (雲量の閾値の幅)
+const float FOG_LAYER_EDGE = 0.18;
+/*
+ * 地表の霧 (放射霧・谷霧): 海面から FOG_T_GROUND_TOP までに溜まる。夜に増え、明け方に最大、日の出から約 2 時間 (sunAngle 0.08) で消える
+ * 晴れて湿った日ほど濃い (日替わりの湿度)
+ */
+const float FOG_GROUND_DAWN = 6.0e-3;
+const float FOG_GROUND_EVENING = 2.0e-3;
+const float FOG_GROUND_NIGHT = 4.0e-3;
+const float FOG_GROUND_RAIN = 3.0e-3;
+const float FOG_GROUND_BURN_OFF = 0.08;  // 日の出からこの sunAngle で消える
+// 3D ノイズの濃淡で薄い所が抜けるので、ノイズの閾値を超えた所の濃さはこの倍率にする (平均で上の値に近くなる)
+const float FOG_GROUND_PEAK = 2.0;
+// ノイズの濃淡を含めた地表の霧の平均の割合 (解析積分で使う)
+const float FOG_GROUND_NOISE_MEAN = 0.35;
 const vec3 FOG_HAZE_TINT = vec3(0.88, 0.94, 1.0); // もやの散乱色 (わずかにレイリー寄りの青)
 const float FOG_ALBEDO = 0.95;
 // 空中遠近を実際の大気の何倍の濃さで掛けるか (描画距離は数百ブロックしかないので誇張する)
 const float AERIAL_PERSPECTIVE_SCALE = 10.0;
-const float AERIAL_PERSPECTIVE_RAIN = 3.0;
+const float AERIAL_PERSPECTIVE_RAIN = 1.5;
 // 描画距離に対する割合。端の霞みは景色の成分の写像 (FOG_EDGE_DEPTH) が作り、その先は虚空 (skyBelowHorizon) が同じ式で続けるので、
 // 端のフォグは地形の切れ目を隠すだけにする
 const float BORDER_FOG_START = 0.95;
@@ -92,13 +120,6 @@ ivec2 vlLowResSize() { return (ivec2(viewWidth, viewHeight) + VL_RES - 1) / VL_R
 ivec2 vlSampleTexel(ivec2 lowTexel) { return min(lowTexel * VL_RES + VL_RES / 2, ivec2(viewWidth, viewHeight) - 1); }
 bool vlWritesColortex12() { return (frameCounter & 1) == 0; }
 
-// 朝 (日の出前後) の度合い。もやと霧が濃くなる
-float fogMorningFactor() {
-    float beforeSunrise = smoothstep(0.90, 0.98, sunAngle);
-    float afterSunrise = 1.0 - smoothstep(0.03, 0.14, sunAngle);
-    return saturate(beforeSunrise + (sunAngle < 0.5 ? afterSunrise : 0.0));
-}
-
 float fogRainFactor() { return max(rainStrength, wetness * 0.4); }
 
 /*
@@ -118,13 +139,21 @@ float fogScenicInvD() {
 // 景色の成分の写像した距離 d (1 + d / D)
 float fogScenicDistance(float d, float invD) { return d * (1.0 + d * invD); }
 
+float fogSoftplus(float x) { return max(x, 0.0) + log(1.0 + exp(-abs(x))); }
+// 上端 top、幅 w のロジスティック (下で 1、上で 0) と、その y の原始関数 (閉形式で光学的深さを出す)
+float fogLogistic(float y, float top, float w) { return 1.0 / (1.0 + exp((y - top) / w)); }
+float fogLogisticIntegral(float y, float top, float w) { return y - w * fogSoftplus((y - top) / w); }
+
 /*
  * 視線ごとに 1 回だけ決める媒質の量 (時間帯・天気・バイオームの湿度)
- * haze: もやの上端より下の消散係数 (1/ブロック), hazeTop: もやの上端 (y), mist: 地表の霧の最大消散係数
+ * haze: もやの上端より下の消散係数 (1/ブロック), hazeTop: もやの上端 (y)
+ * layer: 霧の層の塊の中の消散係数, layerCover: 霧の層の雲量 (0..1), mist: 地表の霧の濃い所の消散係数
  */
 struct FogMedium {
     float haze;
     float hazeTop;
+    float layer;
+    float layerCover;
     float mist;
 };
 
@@ -137,12 +166,14 @@ FogMedium fogMedium() {
     float night = 1.0 - smoothstep(FOG_NIGHT_SUN_Y, 0.0, sunY);
     float dawn = smoothstep(0.85, 0.97, sunAngle);
     float rain = fogRainFactor();
+    vec3 region = climateFogRegion();
+    float humidity = climateHumidity();
 
     float k = mix(1.0, mix(FOG_HAZE_EVENING, FOG_HAZE_MORNING, rising), lowSun);
     k = mix(k, mix(FOG_HAZE_NIGHT, FOG_HAZE_DAWN, dawn), night);
     k *= mix(1.0, mix(FOG_HAZE_RAIN, FOG_HAZE_SNOW, saturate(distantSnow)), rain);
     k *= 0.8 + 0.4 * saturate(rainfall);
-    m.haze = FOG_HAZE_DENSITY * LOOK_FOG_DENSITY * k;
+    m.haze = FOG_HAZE_DENSITY * LOOK_FOG_DENSITY * k * region.x;
 
     float top = mix(1.0, mix(FOG_HAZE_TOP_EVENING, FOG_HAZE_TOP_MORNING, rising), lowSun);
     top = mix(top, FOG_HAZE_TOP_NIGHT, night);
@@ -150,18 +181,47 @@ FogMedium fogMedium() {
     top = mix(top, 1.0, rain);
     m.hazeTop = FOG_T_SEA + top * (FOG_T_HAZE_TOP - FOG_T_SEA);
 
+#ifdef FOG_LAYER
+    float cover = mix(FOG_LAYER_COVER_NOON, mix(FOG_LAYER_COVER_EVENING, FOG_LAYER_COVER_MORNING, rising), lowSun);
+    cover = mix(cover, mix(FOG_LAYER_COVER_NIGHT, FOG_LAYER_COVER_MORNING, dawn), night);
+    // 湿った日ほど多く、雨の日は一面に広がる
+    cover = saturate(cover * mix(0.5, 1.5, humidity) * region.y);
+    m.layerCover = mix(cover, max(cover, FOG_LAYER_COVER_RAIN), rain);
+    m.layer = FOG_LAYER_DENSITY * LOOK_FOG_DENSITY;
+#else
+    m.layerCover = 0.0;
+    m.layer = 0.0;
+#endif
+
 #ifdef FOG_MIST
-    m.mist = FOG_MIST_DENSITY * LOOK_FOG_DENSITY * saturate(fogMorningFactor() + rain * 1.5 + 0.12 * saturate(rainfall));
+    // 朝の側の日中は日の出からの時間で消える。日の出前 (sunAngle が 1 に近い) は夜の側の値を使う
+    float sinceSunrise = sunAngle < 0.5 ? sunAngle : 0.0;
+    float dayMist = rising > 0.5 ? FOG_GROUND_DAWN * (1.0 - smoothstep(0.0, FOG_GROUND_BURN_OFF, sinceSunrise)) : FOG_GROUND_EVENING * lowSun;
+    float ground = mix(dayMist, mix(FOG_GROUND_NIGHT, FOG_GROUND_DAWN, dawn), night);
+    // 放射霧は晴れて湿った夜にでき、雨の後の朝は濃い
+    ground *= mix(0.25, 1.5, humidity) * (1.0 + 0.5 * climateClearDay()) * (1.0 + 0.5 * wetness);
+    ground += FOG_GROUND_RAIN * rain;
+    m.mist = ground * FOG_GROUND_PEAK * LOOK_FOG_DENSITY * region.z;
 #else
     m.mist = 0.0;
 #endif
     return m;
 }
 
-float fogSoftplus(float x) { return max(x, 0.0) + log(1.0 + exp(-abs(x))); }
-// 上端 top、幅 w のロジスティック (下で 1、上で 0) と、その y の原始関数 (閉形式で光学的深さを出す)
-float fogLogistic(float y, float top, float w) { return 1.0 / (1.0 + exp((y - top) / w)); }
-float fogLogisticIntegral(float y, float top, float w) { return y - w * fogSoftplus((y - top) / w); }
+// 霧の層の雲量の塊 (0..1)。平均が cover になるよう、2 オクターブの値ノイズを閾値で切る
+float fogLayerCoverAt(vec2 worldXZ, float cover) {
+    if (cover >= 0.999) return 1.0;
+    vec2 q = (worldXZ + frameTimeCounter * FOG_LAYER_DRIFT) / FOG_LAYER_SCALE;
+    float n = valueNoise3d(vec3(q, 0.5)) * 0.7 + valueNoise3d(vec3(q * 2.7 + 7.3, 1.5)) * 0.3;
+    // 2 オクターブの和は中央に寄るので、閾値を雲量から分布の幅に合わせて決める
+    float threshold = 0.5 + (0.5 - cover) * 0.6;
+    return smoothstep(threshold - FOG_LAYER_EDGE, threshold + FOG_LAYER_EDGE, n);
+}
+
+// 霧の層の帯 (下面と上面の間で 1)
+float fogLayerBand(float y) {
+    return fogLogistic(y, FOG_T_LAYER_TOP, FOG_T_LAYER_SOFT) - fogLogistic(y, FOG_T_LAYER_BASE, FOG_T_LAYER_SOFT);
+}
 
 // 海面より深い所 (洞窟) の空気の濁りの倍率
 float fogCaveScale(float y) { return mix(1.0, FOG_CAVE_DENSITY, saturate((FOG_T_SEA - y) / FOG_CAVE_DEPTH)); }
@@ -185,9 +245,9 @@ float fogHazeProfileMean(float y0, float y1, float top) {
     return (layer + free) / (y1 - y0) * fogCaveScale(0.5 * (y0 + y1));
 }
 
-// 地表の霧の高さの範囲 (テンプレートの上端で頭打ち、谷に溜まる)
+// 地表の霧の高さの範囲 (テンプレートの上端で頭打ち、谷に溜まる。海面より深い洞窟には入れない)
 float fogMistHeightFade(float y) {
-    return (1.0 - smoothstep(FOG_T_GROUND_TOP - 14.0, FOG_T_GROUND_TOP + 6.0, y)) * smoothstep(FOG_T_SEA - 24.0, FOG_T_SEA - 4.0, y);
+    return fogLogistic(y, FOG_T_GROUND_TOP, FOG_T_GROUND_SOFT) * smoothstep(FOG_T_SEA - 24.0, FOG_T_SEA - 4.0, y);
 }
 
 /*
@@ -197,21 +257,42 @@ float fogMistHeightFade(float y) {
 vec2 fogDensityAt(vec3 playerPos, FogMedium m) {
     float y = playerPos.y + cameraPosition.y;
     vec2 density = vec2(m.haze * fogHazeProfile(y, m.hazeTop), 0.0);
+#ifdef FOG_LAYER
+    float band = fogLayerBand(y);
+    if (m.layerCover > 0.0 && band > 1e-3) {
+        density.y += m.layer * band * fogLayerCoverAt(playerPos.xz + cameraPosition.xz, m.layerCover);
+    }
+#endif
 #ifdef FOG_MIST
     float fade = fogMistHeightFade(y);
     float mist = m.mist;
-    if (mist > 0.0 && fade > 0.0) {
+    if (mist > 0.0 && fade > 0.01) {
         vec3 p = playerPos + cameraPosition + vec3(frameTimeCounter * 0.7, 0.0, frameTimeCounter * 0.35);
         float n = valueNoise3d(p * 0.035) * 0.65 + valueNoise3d(p * 0.09 + 13.0) * 0.35;
-        density.y = mist * fade * smoothstep(0.38, 0.72, n + fade * 0.2);
+        density.y += mist * fade * smoothstep(0.38, 0.72, n + fade * 0.2);
     }
 #endif
     return density;
 }
 
-// 局所の成分 (縮めない霧) の高さ y0 から y1、長さ len の区間の光学的深さ (ノイズは平均の濃さで近似)
+// 区間の高さ y0..y1 での平均 (ロジスティックの閉形式)
+float fogLogisticMean(float y0, float y1, float top, float w) {
+    if (abs(y1 - y0) < 0.05) return fogLogistic(0.5 * (y0 + y1), top, w);
+    return (fogLogisticIntegral(y1, top, w) - fogLogisticIntegral(y0, top, w)) / (y1 - y0);
+}
+
+// 局所の成分 (縮めない霧の層と地表の霧) の高さ y0 から y1、長さ len の区間の光学的深さ (塊とノイズは平均の濃さで近似)
 float fogLocalDepth(FogMedium m, float y0, float y1, float len) {
-    return m.mist * len * 0.35 * fogMistHeightFade(0.5 * (y0 + y1));
+    float od = 0.0;
+#ifdef FOG_LAYER
+    float band = fogLogisticMean(y0, y1, FOG_T_LAYER_TOP, FOG_T_LAYER_SOFT) - fogLogisticMean(y0, y1, FOG_T_LAYER_BASE, FOG_T_LAYER_SOFT);
+    od += m.layer * m.layerCover * band * len;
+#endif
+#ifdef FOG_MIST
+    float ground = fogLogisticMean(y0, y1, FOG_T_GROUND_TOP, FOG_T_GROUND_SOFT) * smoothstep(FOG_T_SEA - 24.0, FOG_T_SEA - 4.0, 0.5 * (y0 + y1));
+    od += m.mist * FOG_GROUND_NOISE_MEAN * ground * len;
+#endif
+    return od;
 }
 
 #ifdef WORLD_NETHER
@@ -250,6 +331,43 @@ float fogPhaseMist(float cosTheta) {
     return mix(skyPhaseCS(cosTheta, 0.82), skyPhaseHG(cosTheta, -0.25), 0.19);
 }
 
+#if defined HAS_SKY
+/*
+ * 地平線より下の視線の空気の色を読む方向: 地平線の上 (高さ mu) で、太陽との角度が視線と同じになる方位
+ * 同じ方位の地平線を読むと、太陽の真下の地形や虚空が太陽のすぐ横の地平線の輝きで光る柱になる
+ */
+vec3 fogAirSkyDir(vec3 dir, float mu) {
+    vec3 sunDir = getSunDir();
+    float cosSun = dot(dir, sunDir);
+    float sinMu = sqrt(max(1.0 - mu * mu, 0.0));
+    float sunHorizontal = max(length(sunDir.xz), 1e-3);
+    // 地平線の上の点と太陽の角: cos = sinMu sunHorizontal cos(方位差) + mu sunDir.y
+    float cosAz = clamp((cosSun - mu * sunDir.y) / (sinMu * sunHorizontal), -1.0, 1.0);
+    vec2 sunXZ = sunDir.xz / sunHorizontal;
+    vec2 side = vec2(-sunXZ.y, sunXZ.x);
+    float sinAz = sqrt(max(1.0 - cosAz * cosAz, 0.0)) * (dot(dir.xz, side) < 0.0 ? -1.0 : 1.0);
+    return vec3((sunXZ * cosAz + side * sinAz) * sinMu, mu).xzy;
+}
+
+/*
+ * 景色の成分 (もや・空中遠近) の飽和した放射: 空の色 (地平線より下は fogAirSkyDir の地平線の色)
+ * sunPart: そのうち太陽の単散乱とみなす分 (影の中で引く。上限は空の色の FOG_HAZE_SUN_SHARE)
+ */
+vec3 fogAirRadiance(vec3 dir, out vec3 sunPart) {
+    float horizonMu = atmoHorizonMu(atmoViewerRadius());
+    vec3 sky = getSkyRadiance(dir.y > horizonMu ? dir : fogAirSkyDir(dir, horizonMu));
+    LightSample celestial = getCelestialLight();
+    vec3 sunScatter = celestial.irradiance * fogPhaseHaze(dot(dir, celestial.direction)) * (FOG_HAZE_TINT * FOG_ALBEDO);
+    sunPart = sunScatter * min(1.0, FOG_HAZE_SUN_SHARE * luminance(sky) / max(luminance(sunScatter), 1e-9));
+    return sky;
+}
+
+vec3 fogAirRadiance(vec3 dir) {
+    vec3 sunPart;
+    return fogAirRadiance(dir, sunPart);
+}
+#endif
+
 FogLighting fogLightingSetup(vec3 dir) {
     FogLighting f;
     LightSample celestial = getCelestialLight();
@@ -269,9 +387,7 @@ FogLighting fogLightingSetup(vec3 dir) {
      * もやと空中遠近は消散と内散乱を組にし、内散乱は同じ方位の空の色にする (遠い霞は地平線の空に収束する)。
      * 空の色は太陽の単散乱を含むので、影の中の点ではその分を引いて光芒にする。引く分は空の色の FOG_HAZE_SUN_SHARE までに留める
      */
-    f.air = getSkyRadiance(dir);
-    vec3 sunScatter = f.light * f.phaseHaze * FOG_HAZE_TINT * FOG_ALBEDO;
-    f.airSun = sunScatter * min(1.0, FOG_HAZE_SUN_SHARE * luminance(f.air) / max(luminance(sunScatter), 1e-9));
+    f.air = fogAirRadiance(dir, f.airSun);
 #elif defined WORLD_END
     f.ambient = END_FOG_COLOR * 0.05;
     f.air = vec3(0.0);
@@ -371,7 +487,7 @@ vec3 applyAerialPerspective(vec3 color, vec3 playerPos) {
     vec3 extinction = fogAerialExtinction(cameraPosition.y, cameraPosition.y + playerPos.y);
     float outdoor = 1.0 - getCaveFactor();
     vec3 transmittance = exp(-extinction * fogScenicDistance(dist, fogScenicInvD()) * mix(0.2, 1.0, outdoor));
-    return color * transmittance + getSkyRadiance(dir) * (1.0 - transmittance) * outdoor;
+    return color * transmittance + fogAirRadiance(dir) * (1.0 - transmittance) * outdoor;
 #else
     return color;
 #endif

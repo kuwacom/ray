@@ -381,7 +381,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | GI | LOW/MED: なし、HIGH: RSM (shadowcolor0/1)、ULTRA: SSGI、EXTREME: ボクセル RT (light の `traceVoxelRay` + floodfill でヒット点を照らす) + SVGF 系デノイズ | surface |
 | 空 / 大気 | Hillaire 2020 の 3 LUT (透過率・多重散乱・SkyView)。照度と空の SH を FrameData に書いて全パスで共有。ATMOSPHERE_MODE=0 は解析近似 | sky |
 | 雲 | 3D 体積雲: Kappa の天気マップ事前計算 + 指数ライトマーチ + Nostalgia の 1 マーチ多重散乱近似 (位相の OD 依存非対称性) + チェッカーボード時間アップスケール。2D 押し出し (CLOUDS=2) は Nostalgia 方式。既定は被覆 1.1・スケール 3.0 | sky |
-| フォグ / VL | Chocapic13 の指数分布ステップ + 影マップ空間マーチ + 区間解析積分。高さフォグは Kappa / Nostalgia の 2 成分密度。floodfill を VL マーチで読んで光源周りのフォグを照らす (FOG_BLOCKLIGHT)。洞窟の光漏れ防止。全面のブルーミーフォグは弱く | sky |
+| フォグ / VL | Chocapic13 の指数分布ステップ + 影マップ空間マーチ + 区間解析積分。景色の成分 (上端のある混合層のもや + 空中遠近) は内散乱を空の色から作り (遠景は同じ方位の地平線の空に収束、影の中は太陽の単散乱を引いて光芒)、描画距離 R の端で光学的深さが FOG_EDGE_DEPTH になる距離の写像 d (1 + d / D) で縮める。局所の成分 (霧の層・地表の霧) は縮めない。高さは FOG_HEIGHT_PRESET (`lib/sky/fog_template.glsl`)、日替わりは `lib/sky/climate.glsl` (雲と同じ種)。地平線の下の虚空は同じ式で仮想の地面まで積み、太陽から 30 度以上の方位では地平線の空の 1.05 倍まで。DH 対応時は `fogRenderDistance()` を DH の描画距離にし、縮めずに景色の成分の濃さを FOG_EDGE_DEPTH / R まで下げる (下限は晴天 1.5e-4)、虚空は DH の描画距離の外だけ、VL の解析区間と画面空間の光芒は DH の深度も見る。floodfill を VL マーチで読んで光源周りのフォグを照らす (FOG_BLOCKLIGHT)。洞窟の光漏れ防止。全面のブルーミーフォグは弱く | sky |
 | 水 | 前方シェーディング + 波 (Gerstner 系) + 視差、composite1 で屈折 (SS / レイトレース) と吸収 (Jerlov 風)、コースティクスは影マップ参照。水の上から見た内散乱は、深さで弱まる水面の照度を屈折した視線に沿って解析積分する。水中の VL は指数分布のステップで、floodfill の照度にライトビンの光源の向きから求めた前方散乱の位相関数を掛ける (光源の周りのにじみ) | surface |
 | 反射 | SSR (階層なし線形 + 二分探索) + ラフ反射 (時間蓄積)、SSR 失敗時はボクセル補完 (REFLECTIONS=3, light の `traceVoxelRay`)、最後は空 (`getSkyRadiance`) | surface |
 | TAA | Halton(2,3) 16 フレームのジッター (`lib/common/jitter.glsl`) + YCoCg 近傍クランプ + Catmull-Rom 履歴 + トーンマップ空間での混合 (HDR フリッカー対策) + 速度は colortex15 か深度再投影 | post |
@@ -544,7 +544,10 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | CLOUD_CIRRUS_COVERAGE | 0.1 | 0.1 | 0.1 | 0.1 | 0.1 | 0.1 |
 | CLOUD_SHADOWS | ON | **OFF** | **OFF** | ON | ON | ON |
 | FOG_DENSITY | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
-| FOG_MIST | OFF | OFF | OFF | OFF | **ON** | **ON** |
+| FOG_HEIGHT_PRESET | 4 (雲に合わせる) | 4 | 4 | 4 | 4 | 4 |
+| FOG_C_SEA_LEVEL / FOG_C_HAZE_TOP / FOG_C_LAYER_BASE / FOG_C_LAYER_THICKNESS | 63 / 0 / 70 / 35 | 同 | 同 | 同 | 同 | 同 |
+| FOG_LAYER | ON | **OFF** | ON | ON | ON | ON |
+| FOG_MIST | ON | **OFF** | **OFF** | ON | ON | ON |
 | FOG_MIST_ALTITUDE | 72 | 72 | 72 | 72 | 72 | 72 |
 | VL | ON | **OFF** | ON | ON | ON | ON |
 | VL_SAMPLES | 8 | **4** | **6** | 8 | **12** | **16** |
