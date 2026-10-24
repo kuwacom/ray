@@ -23,6 +23,7 @@
 | 大気散乱 LUT (透過率・多重散乱・SkyView) | Hillaire, "A Scalable and Production Ready Sky and Atmosphere Rendering Technique", EGSR 2020 | lib/sky/atmosphere.glsl, program/setup1-2, prepare1 |
 | 大気の物理モデル | Bruneton, "A Qualitative and Quantitative Evaluation of 8 Clear Sky Models", TVCG 2017 | lib/sky/atmosphere.glsl |
 | 体積雲の散乱 (多重散乱近似) | Wrenninge et al., "Oz: The Great and Volumetric", SIGGRAPH 2013 Talks | lib/sky/cloud_volume.glsl |
+| 積雲のこぶの陰影 (不透明な芯・光源方向の近くの光学的深さで多重散乱も落とす・塊の中は削らず境目だけ深く削る浸食) | Bliss Shaders (X0nk) の雲の見え方と考え方を参考に独自実装 (コードは不使用) | lib/sky/cloud_volume.glsl |
 | 体積雲のレイマーチと天気マップ | Schneider, "The Real-time Volumetric Cloudscapes of Horizon Zero Dawn", SIGGRAPH 2015 | lib/sky/cloud_volume.glsl, program/prepare2, deferred20-21 |
 | 大気の高さ分布 | Kasten & Young, "Revised optical air mass tables and approximation formula", Applied Optics 1989 | lib/sky/atmosphere.glsl |
 | 月面の反射 | Lommel-Seeliger の法則 | lib/sky/celestial.glsl |

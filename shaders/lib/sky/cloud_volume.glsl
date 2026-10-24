@@ -211,7 +211,9 @@ const float CLOUD_DOME_GAIN = 2.0;
 // セルの縁での背の高さの割合 (中心で 1)。0.42 では背の高さが中心の 1 点へ向かって伸び、頂が尖った炎のような塔になった
 const float CLOUD_DOME_BASE = 0.7;
 // 倍率で外へ広がった輪郭を戻す量 (浸食の平均程度。0 では晴れの日の雲量が 1.5 倍になり、空がほぼ埋まった)
-const float CLOUD_DOME_OFFSET = 0.5;
+// 0.5 -> 0.7 (#69): 芯を濃くした (CLOUD_CORE_DENSITY) 分、同じ輪郭でも不透明に見える所が増え、雲の量が増えて見えた
+// (プレビューの不透明な画素 0.30 -> 0.46)。輪郭を少し内へ戻して塊の間の青空を残す
+const float CLOUD_DOME_OFFSET = 0.7;
 // 3D の塔の塊のノイズでセルの値を揺らす量。2D のセルの値だけで側面を決めると、ドームを濃くした時に縦に伸ばした
 // 平らな壁と縦の筋 (望遠で目立つ) になったので、高さごとに張り出しの違うこぶの側面にする
 const float CLOUD_LUMP_V = 0.2;
@@ -246,6 +248,11 @@ const float CLOUD_TURRET_SCALE = 0.4;
 const float CLOUD_TURRET_EROSION = 0.5;
 const float CLOUD_TURRET_BASE = 0.4;  // 雲底での削りの割合 (底の近くの側面も 3D の塊で区切り、2D の足跡の縦の壁にしない)
 const vec2 CLOUD_BILLOW_PROFILE = vec2(0.7, 1.5);  // こぶで削る量の雲底 / 雲頂での倍率
+// 塔の塊とこぶの削りの輪郭の鋭さ (#69)。削る量を (1 - Worley) の CLOUD_LOBE_SHARPNESS 乗にし、平均の削りが一次と同じになるよう
+// CLOUD_LOBE_SHARP_GAIN を掛ける (g の分布で E[1-g] / E[(1-g)^2] = 1.68)。一次ではこぶの真ん中まで薄く削れて、
+// こぶどうしの境目が浅い起伏にしか見えなかった。2 乗にするとこぶの中は丸く残り、境目の谷だけが深く切れて段がはっきりする
+const float CLOUD_LOBE_SHARPNESS = 2.0;
+const float CLOUD_LOBE_SHARP_GAIN = 1.68;
 const float CLOUD_DETAIL_EROSION = 0.55 * CLOUD_LOW_EROSION; // 高周波ノイズで削る量
 const float CLOUD_DETAIL_REACH = 0.9;     // 高周波ノイズが効く縁の深さ (形状ノイズで削った後の密度で測る)
 // m: curl ノイズで侵食ノイズを歪める量。雲底に集中させ (iterationT: 底 100 m / 頂 0)、底はちぎれて巻き上がり上面はなめらかにする
@@ -275,7 +282,9 @@ const float CLOUD_CORE_DEPTH = 0.9 * CLOUD_EDGE_SOFTNESS;
 // CLOUD_HAZE_SWELL: 粗い形状ノイズで外殻の厚みを場所ごとに変える量 (一様な厚みの殻だと輪郭をなぞった縁取りに見える)。
 // 晴天の積雲だけに付ける (雨天・層積雲・積乱雲は従来どおり)。幅を 1.4 / 指数 1 まで広げると、足跡の縁 (2D のセルを縦に
 // 伸ばした面) がもやの幕の垂直な切り口として見えた
-const float CLOUD_HAZE_REACH = 1.2 * CLOUD_EDGE_SOFTNESS;
+// 1.2 -> 0.8 (#69): 芯を濃くして塊の輪郭がはっきりした後は、1.2 では塊の間がもやで埋まり、普通のワールドの Bliss の
+// 塊の間の青空 (上空の 45-68%) から遠かった。輪郭の外のもや (#25) は狭めるだけで残す
+const float CLOUD_HAZE_REACH = 0.8 * CLOUD_EDGE_SOFTNESS;
 const float CLOUD_HAZE_DENSITY = 0.15 * CLOUD_EDGE_HAZE;
 const float CLOUD_HAZE_SWELL = 0.7;
 const float CLOUD_HAZE_FALLOFF = 1.75; // もやが外へ消える曲線の指数 (大きいほど輪郭の近くに寄る)
@@ -291,7 +300,14 @@ const float CLOUD_CU_EDGE_WIDTH = 0.25 * CLOUD_EDGE_SOFTNESS;
 const float CLOUD_CU_CORE_DEPTH = 0.5 * CLOUD_EDGE_SOFTNESS;
 // 積雲の芯の密度の上限と、芯の中のこぶ単位の濃淡 (芯まで 1 で飽和させると、中まで一様に白い塊になった)。
 // 層積雲・積乱雲は上限を 1 のまま (雨天・雷雨の暗く重い雲を保つ)
-const float CLOUD_CORE_DENSITY = min(0.35 * CLOUD_CORE_STRENGTH, 1.0);
+// 0.35 -> 0.7 (#69): 0.35 ではこぶ 1 つ (200-400 m) を抜ける光学的厚さが 1 前後で、視線が日の当たる表面で止まらず奥の陰と
+// 後ろの空まで透け、どのこぶも同じ灰色のもやに見えた。芯だけを濃くし、縁の立ち上がり・外殻のもや・CLOUD_LOW_DENSITY は変えない。
+// 設定は平方根で効かせる (一次では 1.5 以上が上限 1 に張り付いて同じ見た目になった。0.25 で以前の既定の芯 0.35)
+const float CLOUD_CORE_DENSITY = min(0.7 * sqrt(CLOUD_CORE_STRENGTH), 1.0);
+// 芯を濃くするのは浸食前の雲量 (ドーム) がこの範囲で十分ある塊の中だけ。浸食で切り離された小片・小さな雲・セルの縁は
+// 芯の半分の CLOUD_CORE_DENSITY_THIN (既定で以前の上限 0.35) のまま淡く残す (全部を濃くすると、夕方の順光で縁の小片が白い粒の群れになった)
+const float CLOUD_CORE_DENSITY_THIN = 0.5 * CLOUD_CORE_DENSITY;
+const vec2 CLOUD_CORE_BODY = vec2(0.3, 0.8);
 const float CLOUD_CORE_MOTTLE = 0.5;
 // 光源方向の光学的深さ (と地面の雲影) で使う芯の上限。視線の密度と同じだけ下げると、芯の陰が浅くなり
 // 下側の灰色が消えて平板に見えた (CLOUD_LIGHT_OD_SCALE と同じく、陰影は消散係数を下げる前に合わせる)
@@ -340,13 +356,22 @@ const float CLOUD_LIGHT_OD_SCALE = 3.0;
 // 塊の下側と奥が沈むようにする (1 では濃さ 0.25 の雲の陰の側が空の光で明るく均され、立体感が出なかった)
 const float CLOUD_SKY_OD_SCALE = 2.5;
 const float CLOUD_LIGHT_STEP0 = 24.0;     // m: 光方向マーチの最初の歩幅 (毎回 2 倍)
+// こぶの陰 (#69)。多重散乱のオクターブは光学的深さを 0.45 倍ずつ薄めて読むので、こぶ 1 つ分の自己遮蔽がほぼ消え、
+// 日の当たるこぶと陰のこぶが同じ灰色に均されていた。光源方向の先頭 CLOUD_LOBE_STEPS 歩 (24 + 48 + 96 + 192 m = こぶの大きさ)
+// の光学的深さ odNear で、多重散乱にも exp(-CLOUD_LOBE_SHADE x odNear) の陰を付ける。遠くの厚み (雲全体の陰) は従来どおり薄めて読む
+const int CLOUD_LOBE_STEPS = 4;
+// 0.5 -> 0.3: 普通のワールドの Bliss の雲は 3000 ブロックのワールドより陰が浅い (雲の暗い側 p10 が明るい側の 0.30-0.46)。
+// 0.5 では 0.18-0.35 と深すぎ、望遠で背の高いこぶの側面に縦の明暗の境も出やすかった
+const float CLOUD_LOBE_SHADE = 0.3;
 // 銀の縁: 太陽方向の光を後段で 1 + k HG(g) 倍する (iterationT の (hg*2+1))。位相関数の和だけでは
 // 光学的に薄い逆光の縁が際立たなかった。単散乱には全量、多重散乱には CLOUD_SILVER_MS の割合だけ掛ける
 const float CLOUD_SILVER_BOOST = 2.0 * CLOUD_SILVER_LINING;
 const float CLOUD_SILVER_G = 0.7;
 const float CLOUD_SILVER_MS = 0.4;
 // 密度キーの powder: 散乱体の少ない縁は内側からの多重散乱を受けないので、順光で見ると暗い縁取りになる
-const float CLOUD_POWDER_LENGTH = 100.0;  // m (消散係数を 1/3 にした時に 35 -> 100)
+// m (消散係数を 1/3 にした時に 35 -> 100)。100 -> 700 (#69): 100 では芯でも exp(-0.4) 程度で、縁だけでなく雲全体が一様に暗くなっていた。
+// 芯 (密度 0.7) で効きがほぼ 0、縁のもや (0.15) で半分残る長さにして、順光で日の当たるこぶは白く、こぶの縁だけ灰色に縁取る
+const float CLOUD_POWDER_LENGTH = 700.0;
 const float CLOUD_POWDER_STRENGTH = min(0.4 * CLOUD_POWDER, 1.0); // 順光 (太陽を背にした時) での効き
 // 暗く重い底: その雲の中の高さ (底 0 / 頂 1) で多重散乱と空の光を落とす。底の光は厚い雲を何度も散乱して
 // 横へ逃げながら届くので、光方向の光学的深さだけで見積もるより暗い (iterationT の底 0.15 + pow(h, 0.75) 相当)
@@ -651,6 +676,12 @@ float cloudCumulonimbusShape(float core, vec2 rel, float hc, vec4 cells, float s
 }
 #endif
 
+// Worley の塊のノイズ n から削る量 (塊の中ほど 0、境目ほど大きい)。body: 浸食前の雲量で見た塊の中らしさ [0,1]
+// 鋭くするのは大きな塊の中だけ。薄い小さな雲まで鋭く削ると、こぶが切り離された白い粒の群れ (ポップコーン) になった
+float cloudLobeErosion(float n, float body) {
+    return mix(1.0 - n, pow(1.0 - n, CLOUD_LOBE_SHARPNESS) * CLOUD_LOBE_SHARP_GAIN, body);
+}
+
 /*
  * 低層の密度 [0,1] (消散係数 = CLOUD_LOW_SIGMA x 密度)
  * rel: カメラ基準の水平位置 (参照 m), altitude: 参照高度 (m)
@@ -799,6 +830,7 @@ float cloudLowDensity(CloudContext ctx, CloudColumn col, vec2 rel, float altitud
     cloudHeight = saturate(x);
     // 底より下へはもやを出さない (持ち上げ凝結高度で一斉に雲になる平らな底は保つ)
     cloudiness = cloudiness > 0.0 ? cloudiness * bottom : cloudiness - (1.0 - bottom) * CLOUD_HAZE_REACH;
+    float coreBody = smoothstep(CLOUD_CORE_BODY.x, CLOUD_CORE_BODY.y, cloudiness);
     // 外殻のもやの幅 (層積雲・積乱雲は 0 = 従来どおり輪郭で打ち切る)
     // 被覆 0 の境界 (天気図の双一次補間の直線) でもやが切れないよう、被覆が小さいほど狭める。
     // 雨天・雷雨は従来の濃さのまま (嵐の穴の縁がもやで埋まり、照らされた縁が鈍った)
@@ -824,7 +856,7 @@ float cloudLowDensity(CloudContext ctx, CloudColumn col, vec2 rel, float altitud
     // 塔: 積雲の上半分を数百 m の丸い塊 (上昇気流の泡) の積み重なりにする。2D の足跡を縦に伸ばした側面は
     // 縦の幕の筋に見えるので、3D の Worley の塊で側面と頂を区切り、こぶごとに陰を作る (平らな底は残す)
     if (turret < 0.0) turret = texture(cloudShapeTex, p / (CLOUD_SHAPE_PERIOD * CLOUD_TURRET_SCALE) + vec3(0.13, 0.57, 0.31)).g;
-    d -= (1.0 - turret) * CLOUD_TURRET_EROSION * mix(CLOUD_TURRET_BASE, 1.0, smoothstep(0.0, 0.6, x)) * (1.0 - wStrat) * (1.0 - wCb);
+    d -= cloudLobeErosion(turret, coreBody) * CLOUD_TURRET_EROSION * mix(CLOUD_TURRET_BASE, 1.0, smoothstep(0.0, 0.6, x)) * (1.0 - wStrat) * (1.0 - wCb);
     if (d <= -hazeReach) { cloudHeight = fractusHeight; return fractus; }
     // 中間スケールのこぶ (200-400 m): 大きな塊の表面にカリフラワーの段を付ける。
     // 光のマーチにも効くので、こぶごとに陰ができて立体に見える
@@ -836,7 +868,7 @@ float cloudLowDensity(CloudContext ctx, CloudColumn col, vec2 rel, float altitud
 #endif
     // 底の近くもこぶは残す: 下から見上げた雲の輪郭は底の外周そのもので、底で弱めると 2D のセルのなめらかな輪郭が
     // 斜めに引き伸ばされ、刷毛で伸ばしたような帯に見えた
-    d -= (1.0 - billow) * billowAmount * (1.0 - smoothstep(0.0, 0.9, d)) * mix(0.8, 1.0, baseKeep) * mix(1.0, 0.5, wStrat);
+    d -= cloudLobeErosion(billow, coreBody) * billowAmount * (1.0 - smoothstep(0.0, 0.9, d)) * mix(0.8, 1.0, baseKeep) * mix(1.0, 0.5, wStrat);
     if (d <= -hazeReach) { cloudHeight = fractusHeight; return fractus; }
     if (detail > 0.0) {
         // 歪みは雲底に集中させ、底はちぎれて巻き上がり、上面はなめらかなこぶのまま残す
@@ -866,7 +898,8 @@ float cloudLowDensity(CloudContext ctx, CloudColumn col, vec2 rel, float altitud
         if (d <= 0.0) { cloudHeight = fractusHeight; return fractus; }
     } else {
         // 芯の上限と濃淡は積雲だけ
-        float coreMax = mix(1.0, (lightPath ? CLOUD_CORE_DENSITY_LIGHT : CLOUD_CORE_DENSITY) * (1.0 - CLOUD_CORE_MOTTLE * (1.0 - billow)), cumulusShare);
+        float coreView = mix(CLOUD_CORE_DENSITY_THIN, CLOUD_CORE_DENSITY, coreBody);
+        float coreMax = mix(1.0, (lightPath ? CLOUD_CORE_DENSITY_LIGHT : coreView) * (1.0 - CLOUD_CORE_MOTTLE * (1.0 - billow)), cumulusShare);
         float edgeWidth = mix(CLOUD_EDGE_WIDTH, CLOUD_CU_EDGE_WIDTH, cumulusShare);
         float coreDepth = mix(CLOUD_CORE_DEPTH, CLOUD_CU_CORE_DEPTH, cumulusShare);
         float ramp = (1.0 - sqr(1.0 - saturate(d / edgeWidth))) * mix(CLOUD_EDGE_DENSITY, 1.0, saturate(d / coreDepth));
@@ -1056,6 +1089,7 @@ struct CloudLighting {
     vec3 groundRadiance;   // 下からの地面の照り返し
     float cosTheta;        // 視線と光源の角度
     float overcastDiffuse; // 雨雲の拡散透過の重み
+    float lobeShade;       // こぶの陰の強さ (雨雲では弱める)
 };
 
 // rain: 雲の中の光の雨天度 (CloudClimate.rainLight)。rainStrength (数秒で切り替わる) より少し遅く、被覆より早い
@@ -1076,6 +1110,8 @@ CloudLighting cloudLightingSetup(vec3 viewDir, float rain) {
     l.groundRadiance = groundIrradiance * CLOUD_GROUND_ALBEDO * RCP_PI;
     l.cosTheta = dot(viewDir, l.lightDir);
     l.overcastDiffuse = CLOUD_OVERCAST_DIFFUSE * rain;
+    // 厚い雨雲の中の光は拡散しきっていて、こぶ単位の陰は見えない (雷雨の雲を従来の見た目に保つ)
+    l.lobeShade = CLOUD_LOBE_SHADE * (1.0 - rain);
     return l;
 }
 
@@ -1083,8 +1119,9 @@ CloudLighting cloudLightingSetup(vec3 viewDir, float rain) {
  * 1 サンプルの内散乱放射 (散乱係数 1 あたり)
  * extinction: その点の消散係数, odLight / odSky: 光源 / 真上への光学的深さ, groundVisibility: 地面の照り返しの届き具合
  * upperT: 上の層による光源の透過率, cloudHeight: その雲の中の高さ (底 0 / 頂 1)
+ * odNear: 光源方向の近く (こぶの大きさ) だけの光学的深さ (こぶの陰。使わない層は 0)
  */
-vec3 cloudInscatter(CloudLighting l, float extinction, float odLight, float odSky, float groundVisibility, float upperT, float cloudHeight) {
+vec3 cloudInscatter(CloudLighting l, float extinction, float odLight, float odNear, float odSky, float groundVisibility, float upperT, float cloudHeight) {
     // 周りに散乱体が少ない縁では多重散乱が育たない
     float growth = 1.0 - exp(-extinction * CLOUD_MS_LENGTH);
     float msGain = growth * CLOUD_MS_GAIN;
@@ -1104,7 +1141,7 @@ vec3 cloudInscatter(CloudLighting l, float extinction, float odLight, float odSk
     }
     // 暗く重い底: 底の近くほど多重散乱と空の光が届かない
     float bottom = mix(CLOUD_BOTTOM_LIGHT, 1.0, smoothstep(0.0, CLOUD_BOTTOM_REACH, cloudHeight));
-    sun += ms * msGain * bottom * (1.0 + silver * CLOUD_SILVER_MS);
+    sun += ms * msGain * bottom * exp(-l.lobeShade * odNear) * (1.0 + silver * CLOUD_SILVER_MS);
     // 下部の側面は上の塊に空と太陽の一部を遮られ、上から下へ明るさが落ちる (順光で雲全体が一様に白く、立体感の無い綿玉に見えた)
     sun *= mix(CLOUD_BOTTOM_SUN, 1.0, smoothstep(0.0, CLOUD_BOTTOM_REACH, cloudHeight));
     // powder: 順光ほど、散乱体の少ない縁が暗い縁取りになる (逆光では縁が銀に光るので効かせない)
@@ -1120,11 +1157,12 @@ vec3 cloudInscatter(CloudLighting l, float extinction, float odLight, float odSk
 }
 
 // 低層の光源方向の光学的深さ。歩幅を毎回 2 倍に伸ばす (近くは細かく、遠くは粗く)。先頭 2 歩だけ侵食ノイズを使う
-// lightDir: 参照空間の光源方向
-float cloudLowLightOD(CloudContext ctx, CloudColumn col, vec2 rel, float altitude, vec3 lightDir, float dither) {
+// lightDir: 参照空間の光源方向, odNear: 先頭 CLOUD_LOBE_STEPS 歩だけの光学的深さ (こぶの陰)
+float cloudLowLightOD(CloudContext ctx, CloudColumn col, vec2 rel, float altitude, vec3 lightDir, float dither, out float odNear) {
     float stepLength = CLOUD_LIGHT_STEP0;
     float t = 0.0;
     float od = 0.0;
+    odNear = -1.0;
     for (int i = 0; i < CLOUD_LIGHT_STEPS; i++) {
         float sampleT = t + stepLength * dither;
         float a = altitude + lightDir.y * sampleT;
@@ -1132,8 +1170,12 @@ float cloudLowLightOD(CloudContext ctx, CloudColumn col, vec2 rel, float altitud
         od += cloudLowDensity(ctx, col, rel + lightDir.xz * sampleT, a, i < 2, true) * stepLength;
         t += stepLength;
         stepLength *= 2.0;
+        if (i == CLOUD_LOBE_STEPS - 1) odNear = od;
     }
-    return od * (CLOUD_LOW_SHADE_SIGMA * CLOUD_LIGHT_OD_SCALE);
+    if (odNear < 0.0) odNear = od;
+    const float scale = CLOUD_LOW_SHADE_SIGMA * CLOUD_LIGHT_OD_SCALE;
+    odNear *= scale;
+    return od * scale;
 }
 
 // 低層の真上 (空の光) 方向の光学的深さ
@@ -1252,10 +1294,11 @@ CloudAccum cloudMarchLow(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, 
         float extinction = density * CLOUD_LOW_SIGMA;
         float h = saturate((altitude - CLOUD_R_BASE) / CLOUD_R_DEPTH);
         vec3 lightDir = cloudRefDir(l.lightDir, CLOUD_KH, slope);
-        float odLight = cloudLowLightOD(ctx, col, rel, altitude, lightDir, dither.y);
+        float odNear;
+        float odLight = cloudLowLightOD(ctx, col, rel, altitude, lightDir, dither.y, odNear);
         float odSky = cloudLowSkyOD(ctx, col, rel, altitude);
         float upperT = cloudUpperTransmittance(ctx, rel, altitude, lightDir);
-        vec3 inscatter = cloudInscatter(l, extinction, odLight, odSky, sqr(1.0 - h), upperT, cloudHeight);
+        vec3 inscatter = cloudInscatter(l, extinction, odLight, odNear, odSky, sqr(1.0 - h), upperT, cloudHeight);
 
         float stepT = exp(-extinction * dt * cloudRefStretch(dir, CLOUD_KH, slope));
         float weight = acc.transmittance * (1.0 - stepT);
@@ -1304,7 +1347,7 @@ CloudAccum cloudMarchMid(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, 
         float upperT = cloudUpperTransmittance(ctx, rel, altitude, lightDir);
         // 地面の照り返しは低層の雲にさえぎられるので弱める
         // 粒の下側を沈めて、粒ごとに陰影を付ける (層の中の高さだけで沈めていた時は、陰の無い白い粒が並んで見えた)
-        vec3 inscatter = cloudInscatter(l, extinction, odLight, odSky, 0.3 * (1.0 - h), upperT, CLOUD_MID_GRAIN_SHADE + (1.0 - CLOUD_MID_GRAIN_SHADE) * grainHeight);
+        vec3 inscatter = cloudInscatter(l, extinction, odLight, 0.0, odSky, 0.3 * (1.0 - h), upperT, CLOUD_MID_GRAIN_SHADE + (1.0 - CLOUD_MID_GRAIN_SHADE) * grainHeight);
 
         float stepT = exp(-extinction * dt * cloudRefStretch(dir, CLOUD_KH, slope));
         float weight = acc.transmittance * (1.0 - stepT);
