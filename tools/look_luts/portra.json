@@ -1,0 +1,21 @@
+{
+    "name": "Portra",
+    "comment": "LOOK_LUT 4: カラーネガ Kodak Portra 400 風。公開の技術資料の「自然な肌の色・広い寛容度」から: 低めのコントラストと柔らかい肩、少し浮いた黒、控えめで暖かい色。緑はオリーブ寄り、青は少しシアン寄りで淡い",
+    "contrast": 0.92,
+    "saturation": 0.95,
+    "sat_shadows": 0.85,
+    "sat_mids": 1.0,
+    "sat_highlights": 0.85,
+    "wb": [1.03, 1.0, 0.95],
+    "shadow_tint": [0.97, 1.0, 1.03],
+    "shadow_tint_amount": 0.15,
+    "highlight_tint": [1.05, 1.0, 0.92],
+    "highlight_tint_amount": 0.25,
+    "hue_bands": [
+        {"center": 55.0, "width": 25.0, "saturation": 1.08},
+        {"center": 135.0, "width": 25.0, "shift": -6.0, "saturation": 0.85},
+        {"center": 250.0, "width": 30.0, "shift": -6.0, "saturation": 0.9}
+    ],
+    "black": 0.018,
+    "white": 0.98
+}

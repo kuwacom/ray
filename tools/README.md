@@ -102,7 +102,7 @@ uv run tools/gen_look_lut.py check shaders/textures/look/*.dat           # 大�
 uv run tools/gen_look_lut.py test-swap-rb --out shaders/textures/look/user_lut.png  # 赤と青を入れ替える LUT (向きの確認用。終わったら all で戻す)
 ```
 
-- パラメーター (`tools/look_luts/*.json`) は、コントラスト (中間グレーを軸にした log2)、輝度帯ごとの彩度、Oklab の色相帯ごとの色相の回転と彩度、暗部と明部の色付けです。意味は `gen_look_lut.py` の `BakeParams`
+- パラメーター (`tools/look_luts/*.json`) は、色の混ざり (3x3)、色温度の転び、コントラスト (中間グレーを軸にした log2) とチャンネルごとのコントラスト、輝度帯ごとの彩度、Oklab の色相帯ごとの色相の回転・彩度・明るさ、暗部と明部の色付け、出力の黒と白の位置です。意味は `gen_look_lut.py` の `BakeParams`
 - 新しい同梱の LUT を足すときは、JSON を足して `BUNDLED` と shaders.properties の `#if LOOK_LUT` に後ろの番号で足し、settings.glsl と lang の LOOK_LUT の値もそろえます
 - `.dat` はリトルエンディアンの uint16 で、赤が最速・次に緑・青の順 (.cube と同じ)。PNG のストリップは上の行が緑 0 で、ゲームで恒等と赤青の入れ替えの LUT を使って向きを確かめてあります
 

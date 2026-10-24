@@ -1,0 +1,15 @@
+{
+    "name": "Ektar",
+    "comment": "LOOK_LUT 5: カラーネガ Kodak Ektar 100 風。公開資料の「非常に鮮やかな色・高い彩度」から: 締まったコントラスト、濃い赤と青、鮮やかな緑。黒は浮かせない",
+    "contrast": 1.1,
+    "saturation": 1.2,
+    "sat_shadows": 1.05,
+    "sat_mids": 1.1,
+    "sat_highlights": 0.95,
+    "wb": [1.02, 1.0, 0.98],
+    "hue_bands": [
+        {"center": 29.0, "width": 22.0, "saturation": 1.2},
+        {"center": 135.0, "width": 25.0, "shift": 3.0, "saturation": 1.1},
+        {"center": 255.0, "width": 30.0, "saturation": 1.2, "lightness": -0.25}
+    ]
+}

@@ -56,6 +56,8 @@
 | ASC CDL | American Society of Cinematographers, ASC Color Decision List | lib/post/tonemap.glsl, program/final.fsh |
 | Oklab | Björn Ottosson, "A perceptual color space for image processing" (2020) | lib/post/color_grade.glsl |
 | カラーグレーディングの段の分け方と順番 (オフセット・コントラストとピボット・HDR のゾーン・リフト / ガンマ / ゲイン) | Blackmagic Design, DaVinci Resolve Reference Manual の Color ページの説明 | lib/post/color_grade.glsl |
+| フィルム風の LUT の特性 (コントラスト・彩度・色の傾向・色温度) | Kodak の技術資料 E-4050 (Portra 400)・Ektar 100 の製品説明・VISION3 500T 5219/7219 の技術資料、富士フイルムの Fujichrome Velvia 50 / Provia 100F のデータシート・Motion Picture Film Manual (Eterna) の文章の説明から値を決めた近似。メーカーの LUT や測定データは使っていない | tools/look_luts/*.json |
+| ブリーチバイパス・クロスプロセスの見た目 | 現像の手法の一般的な説明 (Wikipedia の Bleach bypass / Cross processing の項) | lib/common/look_presets.glsl |
 | 単調な 3 次補間 (トーンカーブ) | Fritsch & Carlson, "Monotone Piecewise Cubic Interpolation", SIAM J. Numer. Anal. 1980 / Fritsch & Butland 1984 | lib/post/color_grade.glsl |
 
 ## レンズの処方の出典

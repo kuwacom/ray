@@ -1,0 +1,20 @@
+{
+    "name": "Vision3 500T",
+    "comment": "LOOK_LUT 6: 映画用カラーネガ Kodak Vision3 500T 風。タングステン光 (3200K) 用のフィルムを昼の光でフィルター無しで使ったような青み。公開資料の「明部に 2 段広い寛容度・暗部の細かい階調」から: 低いコントラストと浮いた黒、青緑の暗部、色は控えめ",
+    "contrast": 0.88,
+    "saturation": 0.88,
+    "sat_shadows": 0.85,
+    "sat_mids": 0.95,
+    "sat_highlights": 0.8,
+    "wb": [0.9, 0.99, 1.12],
+    "shadow_tint": [0.92, 1.02, 1.06],
+    "shadow_tint_amount": 0.3,
+    "highlight_tint": [1.03, 1.0, 0.97],
+    "highlight_tint_amount": 0.15,
+    "hue_bands": [
+        {"center": 135.0, "width": 25.0, "shift": 6.0, "saturation": 0.85},
+        {"center": 55.0, "width": 25.0, "saturation": 1.05}
+    ],
+    "black": 0.03,
+    "white": 0.97
+}

@@ -1,0 +1,15 @@
+{
+    "name": "Velvia",
+    "comment": "LOOK_LUT 7: リバーサル Fujichrome Velvia 50 風 (色とコントラストが強い)。公開資料の「最高水準の彩度・鮮やかな色」から: 高いコントラストと深い黒、濃い青空と紫、鮮やかな緑、赤は少しマゼンタ寄り",
+    "contrast": 1.2,
+    "saturation": 1.3,
+    "sat_shadows": 1.1,
+    "sat_mids": 1.15,
+    "sat_highlights": 1.0,
+    "hue_bands": [
+        {"center": 29.0, "width": 20.0, "shift": -4.0, "saturation": 1.15},
+        {"center": 135.0, "width": 25.0, "shift": 4.0, "saturation": 1.2},
+        {"center": 255.0, "width": 30.0, "shift": 4.0, "saturation": 1.25, "lightness": -0.35},
+        {"center": 300.0, "width": 25.0, "saturation": 1.2}
+    ]
+}

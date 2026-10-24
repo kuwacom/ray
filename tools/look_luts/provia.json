@@ -1,0 +1,13 @@
+{
+    "name": "Provia",
+    "comment": "LOOK_LUT 8: リバーサル Fujichrome Provia 100F 風。公開資料の「鮮やかで忠実な色・豊かな階調」から: 少し締まったコントラストと素直な彩度、少し冷たく澄んだ白",
+    "contrast": 1.06,
+    "saturation": 1.08,
+    "sat_shadows": 1.0,
+    "sat_mids": 1.05,
+    "sat_highlights": 1.0,
+    "wb": [0.99, 1.0, 1.02],
+    "hue_bands": [
+        {"center": 255.0, "width": 30.0, "saturation": 1.1, "lightness": -0.1}
+    ]
+}

@@ -37,7 +37,7 @@ PARAMS_DIR = Path(__file__).resolve().parent / "look_luts"
 DAT_SIZE = 33
 STRIP_SIZE = 32
 # 同梱の 3D LUT: shaders.properties の LOOK_LUT の番号と同じ並び (2 から)
-BUNDLED = ("split_tone", "film")
+BUNDLED = ("split_tone", "film", "portra", "ektar", "vision3_500t", "velvia", "provia", "eterna")
 MCMETA = {"texture": {"blur": True, "clamp": True}}
 
 
@@ -210,16 +210,22 @@ class HueBand:
     width: float             # 半値幅 (度)。この幅のガウスで効かせる
     shift: float = 0.0       # 色相を回す量 (度)
     saturation: float = 1.0  # 彩度の倍率
+    lightness: float = 0.0   # 明るさ (EV。線形の値に 2^x を掛ける)
 
 
 @dataclass
 class BakeParams:
     """
-    演算は表示値 -> 線形 -> (コントラスト -> 輝度帯の彩度 -> 色相帯 -> 影と明部の色付け -> 全体の彩度) -> 表示値
+    演算は表示値 -> 線形 -> (色の混ざり -> 色温度 -> コントラスト -> チャンネルごとの階調 -> 輝度帯の彩度 -> 色相帯 -> 影と明部の色付け -> 全体の彩度)
+    -> 表示値 -> 黒と白の位置
+    - mix: 線形 RGB の 3x3 (行 = 出力)。フィルムの色素の重なり (クロストーク) で色の分かれ方を変える。各行の和を 1 にすると灰色は変わらない
+    - wb: 線形 RGB に掛ける倍率 (白の輝度を保つように正規化する)。色温度の転び
     - contrast: 中間グレー (pivot, 線形) を軸に log2 で掛ける。黒と白の端は toe / shoulder で 0 と 1 へ戻す (LUT の外へ出さない)
+    - channel_contrast: チャンネルごとのコントラスト (log2, pivot が軸)。フィルムの特性曲線が色ごとに違う傾きを持つのを近似する
     - sat_shadows / sat_mids / sat_highlights: 輝度帯ごとの彩度 (Oklab の彩度に掛ける。帯は線形輝度の 0.03 / 0.18 / 0.6 中心)
     - shadow_tint / highlight_tint: 色 (線形 RGB) と量。暗部・明部に向かって輝度を保ったまま色を寄せる (split toning)
-    - hue_bands: 色相帯ごとの色相の回転と彩度
+    - hue_bands: 色相帯ごとの色相の回転・彩度・明るさ
+    - black / white: 出力の黒と白の表示値 (フィルムのベースの濃度で黒が浮く・プリントで白が落ちる)
     """
     contrast: float = 1.0
     pivot: float = 0.18
@@ -232,6 +238,12 @@ class BakeParams:
     highlight_tint: list[float] = field(default_factory=lambda: [1.0, 1.0, 1.0])
     highlight_tint_amount: float = 0.0
     hue_bands: list[HueBand] = field(default_factory=list)
+    mix: list[list[float]] | None = None
+    wb: list[float] = field(default_factory=lambda: [1.0, 1.0, 1.0])
+    channel_contrast: list[float] = field(default_factory=lambda: [1.0, 1.0, 1.0])
+    black: float = 0.0
+    white: float = 1.0
+    name: str = ""
     comment: str = ""
 
 
@@ -248,6 +260,11 @@ def smooth_band(x: np.ndarray, center: float, width: float) -> np.ndarray:
 def bake(p: BakeParams, size: int) -> np.ndarray:
     disp = identity_lut(size).reshape(-1, 3)
     lin = srgb_to_linear(disp)
+    if p.mix is not None:
+        lin = np.maximum(lin @ np.array(p.mix, dtype=np.float64).T, 0.0)
+    if p.wb != [1.0, 1.0, 1.0]:
+        g = np.array(p.wb, dtype=np.float64)
+        lin = lin * (g / (g @ LUMA))
     lum = lin @ LUMA
 
     # コントラスト: log2 で pivot を軸に。端 (黒 0 / 白 1) は変えない (sRGB の 0-1 を LUT の外に出さない)
@@ -259,6 +276,16 @@ def bake(p: BakeParams, size: int) -> np.ndarray:
         w = smooth_band(np.log2(safe / p.pivot), 0.0, 2.2)
         new_l = lum + (np.minimum(new_l, 1.0) - lum) * w
         lin = lin * (new_l / safe)[:, None]
+        lum = lin @ LUMA
+
+    # チャンネルごとのコントラスト (端は全体のコントラストと同じく元へ戻す)
+    if p.channel_contrast != [1.0, 1.0, 1.0]:
+        cc = np.array(p.channel_contrast, dtype=np.float64)
+        safe = np.maximum(lin, 1e-6)
+        rel = np.log2(safe / p.pivot)
+        w = smooth_band(rel, 0.0, 2.2)
+        new = p.pivot * np.exp2(rel * cc)
+        lin = lin + (np.minimum(new, 1.0) - lin) * w
         lum = lin @ LUMA
 
     lab = linear_to_oklab(np.maximum(lin, 0.0))
@@ -274,16 +301,20 @@ def bake(p: BakeParams, size: int) -> np.ndarray:
     chroma = chroma * sat * p.saturation
 
     # 色相帯 (色の薄い所ほど弱める: 灰色の色相は意味が無い)
+    light_ev = np.zeros_like(hue)
     for b in p.hue_bands:
         d = (hue - b.center + 180.0) % 360.0 - 180.0
         w = smooth_band(d, 0.0, b.width) * np.clip(chroma / 0.03, 0.0, 1.0)
         hue = hue + b.shift * w
         chroma = chroma * (1.0 + (b.saturation - 1.0) * w)
+        light_ev = light_ev + b.lightness * w
 
     h = np.radians(hue)
     lab[:, 1] = chroma * np.cos(h)
     lab[:, 2] = chroma * np.sin(h)
     lin = np.maximum(oklab_to_linear(lab), 0.0)
+    if np.any(light_ev != 0.0):
+        lin = lin * np.exp2(light_ev)[:, None]
 
     # 影と明部の色付け: 輝度を保ったまま色を寄せる
     def tint(c: np.ndarray, color: list[float], amount: np.ndarray) -> np.ndarray:
@@ -303,6 +334,8 @@ def bake(p: BakeParams, size: int) -> np.ndarray:
     # 白の近くは白へ戻す (明部の色付けで白が色付いて見える・1 を超えるのを防ぐ)
     white = np.clip((disp.min(axis=1) - 0.92) / 0.08, 0.0, 1.0)[:, None]
     out = out + (disp - out) * white
+    if p.black != 0.0 or p.white != 1.0:
+        out = p.black + (p.white - p.black) * np.clip(out, 0.0, 1.0)
     return np.clip(out, 0.0, 1.0).reshape(size, size, size, 3)
 
 

@@ -1,0 +1,19 @@
+{
+    "name": "Eterna",
+    "comment": "LOOK_LUT 9: 映画用カラーネガ Fujifilm Eterna 風。落ち着いた低い彩度と柔らかいコントラスト、青緑に寄った暗部と緑、浮いた黒",
+    "contrast": 0.85,
+    "saturation": 0.72,
+    "sat_shadows": 0.8,
+    "sat_mids": 1.0,
+    "sat_highlights": 0.85,
+    "shadow_tint": [0.92, 1.02, 1.04],
+    "shadow_tint_amount": 0.3,
+    "highlight_tint": [1.02, 1.0, 0.98],
+    "highlight_tint_amount": 0.1,
+    "hue_bands": [
+        {"center": 135.0, "width": 30.0, "shift": 10.0, "saturation": 0.85},
+        {"center": 29.0, "width": 25.0, "saturation": 0.9}
+    ],
+    "black": 0.03,
+    "white": 0.97
+}
