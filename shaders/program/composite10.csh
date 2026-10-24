@@ -54,7 +54,19 @@ void main() {
     vec4 raw = vec4(0.0, 0.0, 0.0, 1.0);
     if (inRange) {
         if (isEyeInWater == 1) raw = vec4(marchWaterFog(dir, dist, dither), 1.0);
-        else if (isEyeInWater == 0) raw = marchAirFog(dir, dist, dither);
+        else if (isEyeInWater == 0) {
+#ifdef VL_FAR
+    #ifdef HAS_SUN_SHADOWS
+            float farStart = min(dist, min(shadowDistance, fogRenderDistance()));
+    #else
+            float farStart = min(dist, fogRenderDistance());
+    #endif
+            float farVisibility = vlFarScreenVisibility(dir, farStart, dist, blueNoise(texel).b);
+#else
+            float farVisibility = 1.0;
+#endif
+            raw = marchAirFog(dir, dist, dither, farVisibility);
+        }
     }
 
     sharedFog[local.y][local.x] = raw;

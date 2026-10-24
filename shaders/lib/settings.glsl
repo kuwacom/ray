@@ -234,7 +234,8 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 //#define VL_COLORED_SHADOWS // 色付きガラス越しの光芒
 #define FOG_BLOCKLIGHT // ブロックライトがフォグを照らす
 #define FOG_BLOCKLIGHT_STRENGTH 0.5 // [0.0 0.1 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0]
-//#define FOG_CLOUD_SHADOWS // 雲影を光芒に反映
+#define FOG_CLOUD_SHADOWS // 雲影を光芒に反映
+#define VL_FAR // 影マップの範囲より遠い光芒 (画面空間)
 #define CAVE_LEAK_PREVENTION // 洞窟内への太陽光芒の漏れを防ぐ
 #define BORDER_FOG // 描画距離端のフォグ
 #define NETHER_FOG_DENSITY 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0]
@@ -495,6 +496,8 @@ const int noiseTextureResolution = 256;
 #ifdef FOG_BLOCKLIGHT
 #endif
 #ifdef FOG_CLOUD_SHADOWS
+#endif
+#ifdef VL_FAR
 #endif
 #ifdef CAVE_LEAK_PREVENTION
 #endif

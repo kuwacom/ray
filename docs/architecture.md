@@ -564,7 +564,8 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | VL_COLORED_SHADOWS | OFF | OFF | OFF | OFF | **ON** | **ON** |
 | FOG_BLOCKLIGHT | ON | **OFF** | **OFF** | ON | ON | ON |
 | FOG_BLOCKLIGHT_STRENGTH | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 |
-| FOG_CLOUD_SHADOWS | OFF | OFF | OFF | OFF | **ON** | **ON** |
+| FOG_CLOUD_SHADOWS | ON | **OFF** | **OFF** | ON | ON | ON |
+| VL_FAR | ON | **OFF** | **OFF** | ON | ON | ON |
 | CAVE_LEAK_PREVENTION | ON | ON | ON | ON | ON | ON |
 | BORDER_FOG | ON | ON | ON | ON | ON | ON |
 | NETHER_FOG_DENSITY | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |

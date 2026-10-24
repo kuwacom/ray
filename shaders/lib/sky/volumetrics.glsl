@@ -71,18 +71,54 @@ float vlStepDistance(float x, float maxDist) {
     return maxDist * (exp2(VL_DISTRIBUTION * x) - 1.0) / (exp2(VL_DISTRIBUTION) - 1.0);
 }
 
+#ifdef VL_FAR
+// 遠方区間の画面空間の光芒: 光の方向へ進める点の数と最大の距離 (ブロック)、深度の比較の余裕 (距離に対する割合)
+const int VL_FAR_SAMPLES = 10;
+const float VL_FAR_MAX_DIST = 256.0;
+const float VL_FAR_DEPTH_BIAS = 0.02;
+// 太陽が画面から外れていく視線では判定を弱める (cos: 100 度で使わない、60 度より近いと全部使う)
+const float VL_FAR_FADE_COS_OFF = -0.17;
+const float VL_FAR_FADE_COS_ON = 0.5;
+
+/*
+ * 影マップの範囲より遠い区間の太陽の見え方を画面空間で近似する (Mitchell 2007 の考え方を遠方区間だけに使う)
+ * 遠方区間の中ほどの点から光の方向へ進み、画面に写した点より手前に地形があれば影とする。山・木・建物のシルエットから長い光芒が伸び、
+ * 高い太陽の下の地形の上の空気 (光の方向へ進むと地形より手前を通る) は影にならない
+ * dir: 視線 (player 空間), nearDist/farDist: 遠方区間, dither: 進める距離の揺らし (時間方向の積みで平均される)
+ */
+float vlFarScreenVisibility(vec3 dir, float nearDist, float farDist, float dither) {
+    if (farDist <= nearDist) return 1.0;
+    float weight = smoothstep(VL_FAR_FADE_COS_OFF, VL_FAR_FADE_COS_ON, dot(dir, getShadowLightDir()));
+    if (weight <= 0.0) return 1.0;
+    vec3 lightView = normalize(shadowLightPosition);
+    vec3 origin = (mat3(gbufferModelView) * dir) * mix(nearDist, farDist, 0.5);
+    for (int i = 0; i < VL_FAR_SAMPLES; i++) {
+        float s = VL_FAR_MAX_DIST * sqr((float(i) + dither) / float(VL_FAR_SAMPLES));
+        vec3 q = origin + lightView * s;
+        if (q.z >= -0.05) break;
+        vec2 p = projectAndDivide(gbufferProjection, q).xy * 0.5 + 0.5;
+        // 画面の外は遮るものが分からないので見えるとする
+        if (any(lessThan(p, vec2(0.0))) || any(greaterThan(p, vec2(1.0)))) break;
+        float depth = texelFetch(depthtex0, ivec2(p * viewSize()), 0).r;
+        if (depth < 1.0 && linearizeDepth(depth) < -q.z * (1.0 - VL_FAR_DEPTH_BIAS)) return 1.0 - weight;
+    }
+    return 1.0;
+}
+#endif
+
 /*
  * 空気中のフォグ (全ディメンション)。endDist: 地形 (空なら描画距離) までの距離
+ * farVisibility: 影マップの範囲より遠い区間の太陽の見え方 (画面空間の光芒。無ければ 1)
  * 戻り値: rgb = 内散乱, a = 透過率 (灰色)
  */
-vec4 marchAirFog(vec3 dir, float endDist, float dither) {
+vec4 marchAirFog(vec3 dir, float endDist, float dither, float farVisibility) {
     FogLighting fl = fogLightingSetup(dir);
     float outdoor = 1.0 - getCaveFactor();
 #ifdef CAVE_LEAK_PREVENTION
     // 影マップの外では遮蔽が分からないので、目の位置の空の見え方で光芒を抑える
-    float farSunVisibility = outdoor;
+    float farSunVisibility = outdoor * farVisibility;
 #else
-    float farSunVisibility = 1.0;
+    float farSunVisibility = farVisibility;
 #endif
 
 #if defined HAS_SKY
