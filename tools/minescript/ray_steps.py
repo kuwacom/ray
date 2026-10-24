@@ -265,6 +265,27 @@ def run_step(step: dict):
         time.sleep(float(step.get("delay", 0)))
         m.screenshot(step["screenshot"])
         return None
+    if "burst" in step:
+        # 例: {"burst": "name", "count": 24, "turn": 10, "walk": false}
+        # name_00 .. name_NN を続けて撮る (turn 度/秒で視線を回し、walk=true なら前進しながら)。ちらつき (連続フレームの差) の計測用
+        name = step["burst"]
+        count = int(step.get("count", 24))
+        speed = float(step.get("turn", 0.0))
+        walk = bool(step.get("walk", False))
+        yaw, pitch = m.player_orientation()
+        if walk:
+            m.player_press_forward(True)
+        t0 = time.time()
+        times = []
+        try:
+            for i in range(count):
+                m.player_set_orientation(yaw + speed * (time.time() - t0), pitch)
+                m.screenshot(f"{name}_{i:02d}")
+                times.append(round(time.time() - t0, 3))
+        finally:
+            if walk:
+                m.player_press_forward(False)
+        return {"times": times}
     if "turn" in step:
         # 例: {"turn": 30, "sec": 2.0, "shot": "name", "walk": false}
         # 毎秒 30 度で視線を回し (walk=true なら前進もし)、途中 (sec の 3/4) で撮影する。動いている時のブラー・TAA の確認用
