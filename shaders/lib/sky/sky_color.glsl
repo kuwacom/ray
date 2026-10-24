@@ -20,7 +20,7 @@ const vec3 SKY_NIGHT_FLOOR = vec3(0.55, 0.75, 1.0) * 3e-5;
  * そのままだと AgX を通した昼の天頂が灰青、夕方の太陽まわりが白っぽい桃色に寄った
  * iterationT も大気の色を錐体空間の行列で盛っている。環境光 (SH) 側は prepare.csh で別に彩度を落とす
  */
-const float SKY_COLOR_SATURATION = 1.25;
+const float SKY_COLOR_SATURATION = 1.25 * LK_SKY_SAT;
 // 描画距離の外の地面 (skyBelowHorizon)
 const vec3 SKY_DISTANT_GROUND_ALBEDO = vec3(0.16, 0.18, 0.14); // 草地・森・岩の平均
 // 雪原・砂漠では外の地面も明るい。草地の色のままだと、高所から見た夕方の雪原の描画距離の外が暗い灰色の壁に見えた
@@ -99,6 +99,16 @@ const float END_AMBIENT_DOWN = 0.2; // 下向きの面 (虚空側)
 // 大気上端での太陽照度
 vec3 getSunIlluminanceTOA() { return vec3(SUN_ILLUMINANCE * SUN_BRIGHTNESS); }
 
+/*
+ * ルックの日向の色 (LK_SUN_WARMTH)。地表に届く太陽の直達光だけを暖色に寄せる (輝度は保つ)
+ * 日陰の空の光の青との色の割れを出す見た目の値 (写真で白の基準を日向より高い色温度に置いた時の写り方)。空・雲・太陽の円盤の色は変えない
+ */
+const float LOOK_SUN_WARM_KELVIN = 5000.0;
+vec3 lookSunTint() {
+    vec3 t = mix(vec3(1.0), blackbody(LOOK_SUN_WARM_KELVIN) / blackbody(6500.0), LK_SUN_WARMTH);
+    return t / luminance(t);
+}
+
 // 球状のランバート体の位相関数 (満月 = 1)。月の照り返しが位相でどれだけ減るか
 float moonPhaseFactor() {
     float a = moonPhaseAngle();
@@ -134,8 +144,15 @@ vec3 getSkyIrradiance(vec3 n) { return shEvalIrradiance(n); }
  */
 const float SH_GROUND_ALBEDO = 0.2;
 // 輝度を保ったまま SH の彩度を落とす割合と、SH 全体の強さ (理由は prepare.csh)
-const float SH_SKY_SATURATION = SKY_AMBIENT_SATURATION;
-const float SH_SKY_GAIN = 1.7;
+const float SH_SKY_SATURATION = LOOK_SKY_AMBIENT_SATURATION;
+const float SH_SKY_GAIN_BASE = 1.7;
+/*
+ * ルックの空の環境光の強さ (LK_SKY_AMBIENT) は SH 全体に掛ける (日陰・GI のレイが運ぶ空の光・水・半透明が揃って変わる)
+ * 空そのものの描画は変えないので、SH を空の明るさとして使う所 (霧の内散乱・粗い反射の空・フレアの可視判定) は
+ * SH_LOOK_UNDO を掛けて戻す。雲の陰の空の光は prepare が SH_SKY_GAIN_BASE で別に作る
+ */
+const float SH_SKY_GAIN = SH_SKY_GAIN_BASE * LK_SKY_AMBIENT;
+const float SH_LOOK_UNDO = 1.0 / LK_SKY_AMBIENT;
 
 vec3 shSkyGrade(vec3 c) {
     c *= SH_SKY_GAIN;
@@ -225,7 +242,7 @@ vec3 skyBelowHorizon(vec3 dir, vec3 sky) {
     float height = max(cameraPosition.y - SKY_SEA_LEVEL, SKY_DISTANT_GROUND_MIN_HEIGHT);
     float dist = height / max(below, 1e-4);
     vec3 extinction = ATMO_RAYLEIGH_SCATTER + ATMO_MIE_EXTINCT * (1.0 + SKY_DISTANT_GROUND_RAIN * rainStrength);
-    vec3 transmittance = exp(-extinction * (1e-3 * SKY_DISTANT_GROUND_HAZE * FOG_DENSITY) * dist);
+    vec3 transmittance = exp(-extinction * (1e-3 * SKY_DISTANT_GROUND_HAZE * LOOK_FOG_DENSITY) * dist);
     vec3 irradiance = getSunIrradiance() * max(getSunDir().y, 0.0) * (1.0 - SKY_DISTANT_GROUND_OVERCAST * rainStrength)
                     + getMoonIrradiance() * max(getMoonDir().y, 0.0) + getSkyIrradiance(vec3(0.0, 1.0, 0.0));
     vec3 albedo = mix(SKY_DISTANT_GROUND_ALBEDO, SKY_DISTANT_SNOW_ALBEDO, saturate(distantSnow));

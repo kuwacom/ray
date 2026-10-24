@@ -27,6 +27,41 @@ screen.POST=ポストプロセス
 screen.CDL=カラーグレーディング (CDL)
 screen.DEBUG=デバッグ
 
+# ルック
+option.LOOK_PRESET=ルック
+option.LOOK_PRESET.comment=光と色の作り方をまとめて選ぶ。ナチュラル: 素朴なマイクラらしさを残した、目の疲れない見た目 (以前の既定)。ビビッド: SEUS Renewed / PTGI のように、日向と日陰の明るさの差、日向の暖色と日陰の青緑、草の照り返しの緑、白近くまで伸びる明部で見せる (彩度とブルームは控えめ)。彩度・コントラスト・露出補正・ブルーム・ブルーミーフォグ・空の光の遮蔽・空の環境光の彩度・フォグの濃さの設定は、プリセットの値に掛ける (露出補正は足す) 微調整として効く。カスタム: プリセットにしか無い値をポストプロセスの「カスタムルック」で決める
+value.LOOK_PRESET.0=カスタム
+value.LOOK_PRESET.1=ナチュラル
+value.LOOK_PRESET.2=ビビッド
+option.LOOK_LUT=LUT
+option.LOOK_LUT.comment=最後に掛ける色の LUT (トーンマップ後の表示値の 3D LUT)。ルックのプリセットとは別に重ねられる。ユーザーの LUT: shaders/textures/look/user_lut.png を自分の LUT に置き換える (恒等の画像に画像編集ソフトで色調補正を掛けたもの、または tools/gen_look_lut.py で .cube から変換したもの。README の「ルック」)。日向と日陰の色の割れ: 日向を暖色・日陰を青緑に寄せ、明るい緑を黄緑へ。フィルム: コントラストを少し下げ、明部を暖色に寄せて彩度を落とす
+value.LOOK_LUT.0=なし
+value.LOOK_LUT.1=ユーザーの LUT
+value.LOOK_LUT.2=日向と日陰の色の割れ
+value.LOOK_LUT.3=フィルム
+option.LOOK_LUT_STRENGTH=LUT の強さ
+option.LOOK_LUT_STRENGTH.comment=LUT を掛ける割合 (元の色と混ぜる)
+screen.LOOK_CUSTOM=カスタムルック
+screen.LOOK_CUSTOM.comment=ルックを「カスタム」にした時だけ有効。プリセットにしか無い値を決める。ほかの値は既存の設定 (彩度・コントラストなど) がそのまま効く
+option.LOOK_C_SKY_AMBIENT=空の環境光の強さ
+option.LOOK_C_SKY_AMBIENT.comment=日陰を照らす空の光の強さ。下げると日向と日陰の差が大きくなる (空そのものの明るさは変わらない)。ナチュラル 1、ビビッド 0.8
+option.LOOK_C_SKY_SATURATION=空の色の彩度
+option.LOOK_C_SKY_SATURATION.comment=空の青の濃さ (空の描画と空の環境光の両方)。ナチュラル 1、ビビッド 1.08
+option.LOOK_C_SUN_WARMTH=日向の暖かさ
+option.LOOK_C_SUN_WARMTH.comment=太陽の直達光を暖色に寄せる割合 (明るさは保つ)。日陰の空の光の青との色の割れが出る。空・雲・太陽の色は変わらない。1 で 6500K に対して 5000K の色。ナチュラル 0、ビビッド 0.85
+option.LOOK_C_BOUNCE=照り返しの強さ
+option.LOOK_C_BOUNCE.comment=照り返し (GI のレイが当たった面からの光) の強さ。空の光は変えないので、日陰の明るさを保ったまま草・壁の照り返しだけが強まる。GI の強さはこれにさらに掛かる。ナチュラル 1、ビビッド 1.6
+option.LOOK_C_BOUNCE_SATURATION=照り返しの色の濃さ
+option.LOOK_C_BOUNCE_SATURATION.comment=照り返し (GI のレイが当たった面からの光) の彩度。上げると草の照り返しで日陰・白樺の幹・洞窟の入り口が緑がかる。明るさは変わらない。ナチュラル 1、ビビッド 1.5
+option.LOOK_C_HIGHLIGHT=明部の伸び
+option.LOOK_C_HIGHLIGHT.comment=中間グレーより明るい所の明るさの差を広げる倍率 (暗い側は変えない)。上げると白い雲や日の当たる面が白近くまで伸びる。ナチュラル 1、ビビッド 1.6
+option.LOOK_C_DARK_LIFT=暗部の持ち上げ
+option.LOOK_C_DARK_LIFT.comment=トーンマップ後の暗部の明るさ。AgX は 2.2 乗で表示するモニターを前提にしているが、そのままでは sRGB の曲線でエンコードし直すので、2.2 乗のモニターでは暗い所が 1-3 EV 沈んで黒くつぶれる。1 でその分を戻す (中間調・明部はほぼ変わらない)。ナチュラル 0、ビビッド 0.5
+option.LOOK_C_BLOOM_SPREAD=ブルームの広がり
+option.LOOK_C_BLOOM_SPREAD.comment=光の周りの滲みの広がり。下げるほど光の近くに締まり、日陰が滲みで持ち上がらない。ナチュラル 0.82、ビビッド 0.75
+option.LOOK_C_BLOOM_FOG_CLEAR=晴れのブルーミーフォグ
+option.LOOK_C_BLOOM_FOG_CLEAR.comment=晴れの日に遠景に掛かる広い滲みの割合 (雨では 1)。ナチュラル 0.35、ビビッド 0.35
+
 # ブロックライト
 option.VOXEL_VOLUME=ボクセル範囲
 option.VOXEL_VOLUME.comment=色付き光と光源シャドウに使うプレイヤー周辺のボクセル範囲。大きいほど VRAM を使う
@@ -141,7 +176,7 @@ option.GI_STRENGTH.comment=照り返し (と SSGI / ボクセルレイトレー�
 option.GI_MULTI_BOUNCE=多重反射
 option.GI_MULTI_BOUNCE.comment=GI のレイが当たった面に前のフレームの GI を返し、フレームを重ねて照り返しを何回も跳ね返らせる量。洞窟の入り口や室内の奥まで光が回る。重さはほぼ変わらない。0 = 1 回だけ、1 = 物理的に正しい (SSGI / ボクセルレイトレースのみ)
 option.GI_SKY_OCCLUSION=空の光の遮蔽
-option.GI_SKY_OCCLUSION.comment=空の光を GI のレイで遮る割合。1 = 空の見える向きだけから光が入る (軒下・洞窟の入り口・室内の奥が暗くなり、入り口の向きが分かる)。0 = 以前と同じスカイライトだけの遮蔽 (向きが無く、照り返しと二重に数える)。既定の 0.5 は、多重反射を考えても暗くなりすぎる室内・洞窟の入り口を以前に近い明るさに保つため。スクリーンスペース / ボクセルレイトレースのみ
+option.GI_SKY_OCCLUSION.comment=空の光を GI のレイで遮る割合。1 = 空の見える向きだけから光が入る (軒下・洞窟の入り口・室内の奥が暗くなり、入り口の向きが分かる)。0 = 以前と同じスカイライトだけの遮蔽 (向きが無く、照り返しと二重に数える)。既定の 0.5 は、多重反射を考えても暗くなりすぎる室内・洞窟の入り口を以前に近い明るさに保つため。スクリーンスペース / ボクセルレイトレースのみ。ルックのプリセットの値に掛ける (ナチュラルでは今までと同じ値)
 option.GI_GROUND_REPLACE=地面の照り返しの置き換え
 option.GI_GROUND_REPLACE.comment=空の環境光に含まれる灰色の地面の照り返しを、GI が拾う実際の地面の色 (草地なら緑) に置き換える割合。1 = 物理的に正しい (日陰・下向きの面が地面の色に染まり暗くなる)。0 = 以前の明るく灰色の日陰 (照り返しを二重に数える)
 option.GI_RES=GI の解像度
@@ -236,7 +271,7 @@ option.SUN_BRIGHTNESS=太陽の明るさ
 option.MOON_BRIGHTNESS=月の明るさ
 option.SKY_BRIGHTNESS=空の明るさ
 option.SKY_AMBIENT_SATURATION=空の環境光の彩度
-option.SKY_AMBIENT_SATURATION.comment=日陰を照らす空の光の色の濃さ。上げると日陰が青み、日向の暖色との差が出る。0.3 = 以前の控えめな色、1 = 空の色のまま (日陰の雪がかなり青くなる)
+option.SKY_AMBIENT_SATURATION.comment=日陰を照らす空の光の色の濃さ。上げると日陰が青み、日向の暖色との差が出る。0.3 = 以前の控えめな色、1 = 空の色のまま (日陰の雪がかなり青くなる)。ルックのプリセットの値に掛ける (ナチュラルでは今までと同じ値)
 option.SUN_MOON_STYLE=太陽と月
 value.SUN_MOON_STYLE.0=バニラ
 value.SUN_MOON_STYLE.1=丸
@@ -352,7 +387,7 @@ option.CLOUD_EDGE_SOFTNESS.comment=低層の雲の淡い縁の幅。大きいほ
 option.CLOUD_EDGE_HAZE=縁のもや
 option.CLOUD_EDGE_HAZE.comment=晴天の積雲の縁から外へ広がる薄いもやの濃さ。0 で輪郭のはっきりした雲
 option.CLOUD_CORE_STRENGTH=芯の濃さ
-option.CLOUD_CORE_STRENGTH.comment=晴天の積雲の中心部の濃さ。大きいほど詰まった塊、3.0 でほぼ一様に濃い
+option.CLOUD_CORE_STRENGTH.comment=晴天の積雲の塊の中心部の濃さ (縁の小片と小さな雲はその半分)。大きいほど詰まった不透明な塊でこぶの陰影が深い。0.25 で以前の既定の淡い芯、2.0 以上はほぼ一様に濃い
 option.CLOUD_SILVER_LINING=銀の縁
 option.CLOUD_SILVER_LINING.comment=太陽・月の逆光で雲の縁が光る強さ
 option.CLOUD_POWDER=縁の暗さ
@@ -368,6 +403,7 @@ option.CLOUD_C_HIGH.comment=気候がカスタムの時だけ。巻雲の量の�
 
 # フォグ
 option.FOG_DENSITY=フォグの濃さ
+option.FOG_DENSITY.comment=ルックのプリセットの値に掛ける (ナチュラルでは今までと同じ値)
 option.FOG_MIST=地表の霧
 option.FOG_MIST_ALTITUDE=霧の高度
 option.VL=ボリューメトリックライト
@@ -577,12 +613,15 @@ option.TAA=TAA (時間的アンチエイリアス)
 option.CAS_STRENGTH=シャープネス
 option.BLOOM=ブルーム
 option.BLOOM_STRENGTH=ブルームの強さ
+option.BLOOM_STRENGTH.comment=ルックのプリセットの値に掛ける (ナチュラルでは今までと同じ値)
 option.BLOOM_FOG=ブルーミーフォグ
+option.BLOOM_FOG.comment=ルックのプリセットの値に掛ける (ナチュラルでは今までと同じ値)
 option.EXPOSURE_MODE=露出
 value.EXPOSURE_MODE.0=マニュアル
 value.EXPOSURE_MODE.1=オート (平均)
 value.EXPOSURE_MODE.2=オート (ヒストグラム)
 option.EXPOSURE_BIAS=露出補正
+option.EXPOSURE_BIAS.comment=ルックのプリセットの露出に足す (ナチュラルでは 0)
 suffix.EXPOSURE_BIAS= EV
 option.EXPOSURE_MANUAL_EV=マニュアル露出
 suffix.EXPOSURE_MANUAL_EV= EV
@@ -600,7 +639,9 @@ value.TONEMAP.3=Reinhard-Jodie
 value.TONEMAP.4=AgX (ゴールデン)
 value.TONEMAP.5=PBR Neutral
 option.SATURATION=彩度
+option.SATURATION.comment=ルックのプリセットの値に掛ける (ナチュラルでは今までと同じ値)
 option.CONTRAST=コントラスト
+option.CONTRAST.comment=ルックのプリセットの値に掛ける (ナチュラルでは今までと同じ値)
 option.WHITE_BALANCE=ホワイトバランス
 suffix.WHITE_BALANCE= K
 option.WHITE_BALANCE.comment=想定する照明の色温度。値が低いほど暖色の照明を打ち消すので画面は青くなる

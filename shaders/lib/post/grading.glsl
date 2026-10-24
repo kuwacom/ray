@@ -45,6 +45,18 @@ vec3 applyContrast(vec3 c, float contrast) {
     return EXPOSURE_KEY * pow(max(c, 0.0) / EXPOSURE_KEY, vec3(contrast));
 }
 
+/*
+ * 明部の伸び (ルックの LK_HIGHLIGHT): 中間グレーより明るい所だけ、log2 の明るさの差を range 倍にする (暗い側は変えない)
+ * AgX は対数で圧縮するので、白い雲や日の当たる明るい面を白近くまで伸ばすには肩の位置より明部の EV の差を広げる方が効く。
+ * 中間グレーの付近は滑らかな max (幅 HIGHLIGHT_KNEE EV) で折れ目を作らない。色の比は保つ
+ */
+const float HIGHLIGHT_KNEE = 0.5;
+vec3 applyHighlightRange(vec3 c, float range) {
+    float e = log2(max(luminance(c), 1e-8) / EXPOSURE_KEY);
+    float above = 0.5 * (e + sqrt(e * e + HIGHLIGHT_KNEE * HIGHLIGHT_KNEE));
+    return c * exp2((range - 1.0) * above);
+}
+
 vec3 applySaturation(vec3 c, float saturation) {
     float l = luminance(c);
     return max(l + saturation * (c - l), 0.0);

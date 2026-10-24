@@ -1,6 +1,6 @@
 /*
  * final: 歪曲と魚眼の再投影・色収差・シャープ (CAS)・ブルーム合成・球面収差・ベーリンググレア・レンズフレア・口径食・ハレーション・Purkinje・ビネット・露出・
- *        ホワイトバランス・コントラスト・彩度・トーンマップ・グレイン・ディザ・デバッグ表示
+ *        ホワイトバランス・コントラスト・彩度・トーンマップ・ルックの LUT・グレイン・ディザ・デバッグ表示
  * 色に掛ける処理は物理的な順 (レンズ -> センサー -> 現像) に並べる
  * post モジュール
  */
@@ -54,6 +54,36 @@ vec3 debugView(ivec2 texel, vec3 color) {
     return color;
 #endif
 }
+
+/*
+ * ルックの LUT (表示値 -> 表示値)。トーンマップと sRGB エンコードの後、CDL の前に掛ける
+ * 表示空間にすると、Resolve・Photoshop の .cube や、恒等の画像に画像編集ソフトで色調補正を掛けたものがそのまま使える。
+ * AgX の出力は 0-1 に収まるので定義域の外も出ない。グレインとディザより前なのでノイズを LUT が歪めない
+ * 1 = ユーザーの PNG ストリップ (32^3。青を 32 枚横に並べ、各枚は x = 赤、y = 緑で上の行が緑 0)、2 以降 = 同梱の 33^3 の 3D LUT
+ * ファイルは tools/gen_look_lut.py で作る
+ */
+#if LOOK_LUT == 1
+uniform sampler2D lookLutStripTex;
+const float LOOK_STRIP_SIZE = 32.0;
+// 2D のストリップには青の軸の補間が無いので、隣り合う 2 枚を双線形で読んで混ぜる
+vec3 applyLookLut(vec3 c) {
+    c = saturate(c) * (LOOK_STRIP_SIZE - 1.0);
+    float b0 = floor(c.b);
+    float b1 = min(b0 + 1.0, LOOK_STRIP_SIZE - 1.0);
+    vec2 uv = vec2((c.r + 0.5) / (LOOK_STRIP_SIZE * LOOK_STRIP_SIZE), (c.g + 0.5) / LOOK_STRIP_SIZE);
+    vec3 s0 = textureLod(lookLutStripTex, uv + vec2(b0 / LOOK_STRIP_SIZE, 0.0), 0.0).rgb;
+    vec3 s1 = textureLod(lookLutStripTex, uv + vec2(b1 / LOOK_STRIP_SIZE, 0.0), 0.0).rgb;
+    return mix(s0, s1, c.b - b0);
+}
+#elif LOOK_LUT >= 2
+uniform sampler3D lookLutTex;
+const float LOOK_LUT_SIZE = 33.0;
+// 格子点の中心に合わせてハードウェアの三重線形で読む (33^3 の誤差は表示値で 1/255 未満)
+vec3 applyLookLut(vec3 c) {
+    vec3 uvw = saturate(c) * ((LOOK_LUT_SIZE - 1.0) / LOOK_LUT_SIZE) + 0.5 / LOOK_LUT_SIZE;
+    return textureLod(lookLutTex, uvw, 0.0).rgb;
+}
+#endif
 
 vec3 fetchScene(ivec2 p) {
     return sanitizeColor(texelFetch(colortex0, clamp(p, ivec2(0), ivec2(viewSize()) - 1), 0).rgb);
@@ -186,17 +216,17 @@ void main() {
      * 溶岩の上は自分のブルーム (LAVA_BLOOM_GAIN 倍) が一様に乗って暗い殻が持ち上がり、模様が平らになる
      * 溶岩の画素だけ混合率を下げ、滲みは周りに出す
      */
-    float bloomMix = saturate(BLOOM_STRENGTH * BLOOM_AMOUNT) * (1.0 - LAVA_SELF_BLOOM_CUT * lava);
+    float bloomMix = saturate(LOOK_BLOOM_STRENGTH * BLOOM_AMOUNT) * (1.0 - LAVA_SELF_BLOOM_CUT * lava);
     hdr = mix(hdr, bloom, bloomMix);
     lavaGlowShare = saturate(bloomMix * bands.lava / max(luminance(hdr), 1e-6));
 
     // ブルーミーフォグ: 遠くと雨・水中ほど広いブルームで霞ませる (全面の滲みは弱く)
     float depth = texelFetch(depthtex0, texelG, 0).r;
     float dist = depth >= 1.0 ? far : linearizeDepth(fixHandDepth(depth));
-    float fogFactor = (1.0 - exp(-dist / BLOOM_FOG_DISTANCE)) * (0.35 + 0.65 * rainStrength);
+    float fogFactor = (1.0 - exp(-dist / BLOOM_FOG_DISTANCE)) * mix(LK_BLOOM_FOG_CLEAR, 1.0, rainStrength);
     float water = isEyeInWater == 1 ? 1.0 : 0.0;
-    float wideAmount = BLOOM_FOG * mix(fogFactor, 1.0, water)
-                     + BLOOM_STRENGTH * BLOOM_AMOUNT * (rainStrength * BLOOM_RAIN_BOOST + water * BLOOM_WATER_BOOST);
+    float wideAmount = LOOK_BLOOM_FOG * mix(fogFactor, 1.0, water)
+                     + LOOK_BLOOM_STRENGTH * BLOOM_AMOUNT * (rainStrength * BLOOM_RAIN_BOOST + water * BLOOM_WATER_BOOST);
     hdr = mix(hdr, bands.wide, saturate(wideAmount));
 
     #ifdef LENS_VEILING_GLARE
@@ -268,8 +298,9 @@ void main() {
 #if WHITE_BALANCE != 6500
     color = applyWhiteBalance(color, float(WHITE_BALANCE));
 #endif
-    color = applyContrast(color, CONTRAST);
-    color = applySaturation(color, SATURATION);
+    color = applyContrast(color, LOOK_CONTRAST);
+    if (LK_HIGHLIGHT != 1.0) color = applyHighlightRange(color, LK_HIGHLIGHT);
+    color = applySaturation(color, LOOK_SATURATION);
     /*
      * 溶岩の見た目の明るさ。表示の段でだけ上げ、露出の測光・ブルーム・反射・周りへの光は変えない
      * 赤はほぼ上限なので、明るさは tonemapEmissive で緑 (と少し青) が持ち上がる形で出る (暗い殻 -> 橙 -> 黄の割れ目)
@@ -278,6 +309,9 @@ void main() {
     lava = max(lava, lavaGlowShare);
     color = lava > 0.0 ? mix(tonemap(color), tonemapEmissive(color), lava) : tonemap(color);
     color = linearToSrgb(color);
+#if LOOK_LUT > 0
+    color = mix(color, applyLookLut(color), LOOK_LUT_STRENGTH);
+#endif
     // CDL はグレーディング用の表示値 (sRGB エンコード後) に掛ける。ASC の想定する扱いに近く、効き方が直感的
     // 既定値では恒等変換 (プリプロセッサで浮動小数の比較ができないので常に掛ける)
     color = saturate(applyCdl(color, vec3(CDL_SLOPE), vec3(CDL_OFFSET), vec3(CDL_POWER), CDL_SATURATION));

@@ -181,7 +181,7 @@ void main() {
         #endif
         if (giSky) {
             vec3 groundE = getSkyGroundIrradiance(g.normal);
-            skyE = max(skyE - groundE, 0.0) * (1.0 - GI_SKY_OCCLUSION) + groundE * (1.0 - GI_GROUND_REPLACE);
+            skyE = max(skyE - groundE, 0.0) * (1.0 - LOOK_GI_SKY_OCCLUSION) + groundE * (1.0 - GI_GROUND_REPLACE);
         }
     #else
         if (!hand) skyE = max(skyE - getSkyGroundIrradiance(g.normal) * GI_GROUND_REPLACE, 0.0);

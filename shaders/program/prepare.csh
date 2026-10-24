@@ -54,6 +54,7 @@ void main() {
     float weather = 1.0 - RAIN_DIRECT_DIMMING * rainStrength;
 
     vec3 sun = getSunIlluminanceTOA() * atmoTransmittanceToLight(r, sunDir.y) * weather;
+    if (LK_SUN_WARMTH > 0.0) sun *= lookSunTint();
     vec3 moon = getMoonIlluminanceTOA() * atmoTransmittanceToLight(r, moonDir.y) * weather;
 
     frameData.sunIrradiance = vec4(sun, sunDir.y);
@@ -94,7 +95,7 @@ void main() {
         // 輝度を保ったまま彩度だけ落とす (SH は線形なので係数ごとに掛けてよい)
         vec3 c = sh[k] * (4.0 * PI / float(SH_SAMPLES));
         frameData.skySH[k] = vec4(shSkyGrade(c), 0.0);
-        sh[k] = c * SH_SKY_GAIN;
+        sh[k] = c * SH_SKY_GAIN_BASE;
     }
     // 雲が受ける真上からの空の照度は彩度を落とさない。灰色にすると夕方の雲の陰が
     // 空の青紫にならず、残った橙の太陽光で茶色く濁る

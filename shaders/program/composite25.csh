@@ -46,8 +46,8 @@ uint flareVisibilityTap(uint index) {
     if (texelFetch(depthtex0, ivec2(clamped * viewSize()), 0).r < 1.0) return 0u;
     float vis = 1.0 - smoothstep(0.0, LENS_VIS_OFFSCREEN, outside);
     if (outside <= 0.0) {
-        // SH の DC 項 x Y00 = 空の平均放射
-        float skyLum = luminance(frameData.skySH[0].rgb) * 0.282095;
+        // SH の DC 項 x Y00 = 空の平均放射 (ルックの空の環境光の強さは空の明るさではないので外す)
+        float skyLum = luminance(frameData.skySH[0].rgb) * (0.282095 / LK_SKY_AMBIENT);
         if (skyLum > 1e-6) {
             // 歪曲・魚眼を TAA で組み立てた時は colortex0 が出力の座標なので、光源の出力の位置で読む
             vec2 colorUv = LENS_WARP_TAA ? lensForwardUv(clamped) : clamped;
@@ -245,7 +245,7 @@ void main() {
     float targetEv = applyEnvironmentExposure(clamp(exposureCurve(measuredEv), EXPOSURE_MIN_EV, EXPOSURE_MAX_EV), measuredEv);
 #endif
 
-    float bias = exp2(EXPOSURE_BIAS);
+    float bias = exp2(LOOK_EXPOSURE_BIAS);
     frameData.exposure = ev100ToExposure(appliedEv) * bias;
     frameData.exposureTarget = ev100ToExposure(targetEv) * bias;
     frameData.averageLuminance = ev100ToLuminance(adaptedEv);

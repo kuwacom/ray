@@ -32,6 +32,24 @@ vec4 getIndirectLight(ivec2 texel) {
 const float GI_EFFECTIVE_STRENGTH = GI_STRENGTH * GI_MODE_GAIN;
 
 /*
+ * ルックの照り返し (LK_GI_BOUNCE / LK_GI_BOUNCE_SAT)。レイが当たった面からの照り返しだけを強め、輝度を保ったまま彩度を上げる
+ * 空へ抜けたレイ (空の光) は変えないので、日陰の空の光の強さは方式によらず LK_SKY_AMBIENT だけで決まる
+ * 照り返しの光は空の光と同じくらいの明るさで混ざるので、そのままでは日の当たる草の照り返しが空の青と打ち消し合い、
+ * 洞窟の入り口・白樺の幹が青緑の灰色にしかならなかった
+ * 多重反射の履歴は強さで割ってから返すので (giHistoryAtPlayer)、強さは 1 回だけ掛かり発散しない
+ * RSM は影マップの色 (shadowcolor0) が G バッファより緑が濃い (照り返しの G/R が草の 1.75 に対して 1.97) ので、彩度は半分だけ上げる
+ */
+#if GI_MODE == 1
+    const float GI_BOUNCE_SAT = mix(1.0, LK_GI_BOUNCE_SAT, 0.5);
+#else
+    const float GI_BOUNCE_SAT = LK_GI_BOUNCE_SAT;
+#endif
+vec3 giBounceGrade(vec3 c) {
+    if (LK_GI_BOUNCE == 1.0 && GI_BOUNCE_SAT == 1.0) return c;
+    return max(mix(vec3(luminance(c)), c, GI_BOUNCE_SAT), 0.0) * LK_GI_BOUNCE;
+}
+
+/*
  * GI のレイが空の光も運ぶ (SSGI / ボクセル RT, 空のあるディメンション)
  * 空へ抜けたレイが方向ごとの空の色を返し、deferred30 は空の環境光 (方向の無いスカイライト x AO の遮蔽) をこれで置き換える。
  * 以前は抜けたレイが 0 で、当たったレイの照り返しを空の光に足していたので、軒下・洞窟の入り口・森の中で空の光の向きが無く、

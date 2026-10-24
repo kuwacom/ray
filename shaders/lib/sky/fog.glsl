@@ -68,7 +68,7 @@ float fogRainFactor() { return max(rainStrength, wetness * 0.4); }
 // もやの海面での消散係数 (時間帯・天気・バイオームの湿度で変わる)
 float fogHazeAmount() {
     float night = smoothstep(0.02, -0.1, getSunDir().y);
-    float amount = FOG_HAZE_DENSITY * FOG_DENSITY;
+    float amount = FOG_HAZE_DENSITY * LOOK_FOG_DENSITY;
     amount *= mix(1.0, FOG_HAZE_MORNING, fogMorningFactor());
     amount *= mix(1.0, FOG_HAZE_NIGHT, night);
     amount *= mix(1.0, FOG_HAZE_RAIN, fogRainFactor());
@@ -78,7 +78,7 @@ float fogHazeAmount() {
 
 float fogMistAmount() {
 #ifdef FOG_MIST
-    return FOG_MIST_DENSITY * FOG_DENSITY * saturate(fogMorningFactor() + fogRainFactor() * 1.5 + 0.12 * saturate(rainfall));
+    return FOG_MIST_DENSITY * LOOK_FOG_DENSITY * saturate(fogMorningFactor() + fogRainFactor() * 1.5 + 0.12 * saturate(rainfall));
 #else
     return 0.0;
 #endif
@@ -167,7 +167,7 @@ FogLighting fogLightingSetup(vec3 dir) {
     // 上半球 (空) と下半球 (地面の照り返し) から等方に入る光: (E_up + E_down) / 2pi
     vec3 skyUp = shEvalIrradiance(vec3(0.0, 1.0, 0.0));
     vec3 skyDown = shEvalIrradiance(vec3(0.0, -1.0, 0.0));
-    f.ambient = (skyUp + skyDown) / TAU;
+    f.ambient = (skyUp + skyDown) * (SH_LOOK_UNDO / TAU);
 #elif defined WORLD_END
     f.ambient = END_FOG_COLOR * 0.05;
 #else
@@ -217,7 +217,7 @@ vec3 applyAerialPerspective(vec3 color, vec3 playerPos) {
     vec3 extinction = ATMO_RAYLEIGH_SCATTER * exp(-hKm / ATMO_RAYLEIGH_HEIGHT)
                     + ATMO_MIE_EXTINCT * exp(-hKm / ATMO_MIE_HEIGHT) * (1.0 + AERIAL_PERSPECTIVE_RAIN * fogRainFactor());
     float outdoor = 1.0 - getCaveFactor();
-    vec3 transmittance = exp(-extinction * (1e-3 * AERIAL_PERSPECTIVE_SCALE * FOG_DENSITY) * dist * mix(0.2, 1.0, outdoor));
+    vec3 transmittance = exp(-extinction * (1e-3 * AERIAL_PERSPECTIVE_SCALE * LOOK_FOG_DENSITY) * dist * mix(0.2, 1.0, outdoor));
     return color * transmittance + getSkyRadiance(dir) * (1.0 - transmittance) * outdoor;
 #else
     return color;

@@ -188,7 +188,8 @@ const float DOF_BLADE_ROTATION = 0.2;
 const int BLOOM_LEVELS = 7;          // 1/2 .. 1/128
 const int BLOOM_PADDING = 4;         // タイル間の隙間 (ピクセル)。ぼかしの滲み込みを防ぐ
 // 合成時のレベル間の減衰 (幾何級数)。小さいほど狭くタイトな光
-const float BLOOM_LEVEL_DECAY = 0.82;
+// ルックのプリセットの値 (ナチュラルは 0.82)
+const float BLOOM_LEVEL_DECAY = LK_BLOOM_SPREAD;
 /*
  * シーンとの混合率 (BLOOM_STRENGTH = 1 の時)
  * 加算ではなく mix なので総エネルギーは保存される (PSF の畳み込みとして扱う)

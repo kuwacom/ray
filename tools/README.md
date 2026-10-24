@@ -34,6 +34,7 @@ uv sync
 | `gen_water_waves.py` | `shaders/textures/water_waves.dat` |
 | `gen_lens_textures.py` | `shaders/textures/lens_starburst.dat`, `lens_dirt.png` |
 | `gen_lens_ghosts.py` | `shaders/lib/post/lens_ghosts.glsl` (レンズゴーストの定数表) |
+| `gen_look_lut.py` | `shaders/textures/look/` のルックの LUT。`all` で恒等の `user_lut.png` と、`tools/look_luts/*.json` のパラメーターから焼いた同梱の 3D LUT (`split_tone.dat`, `film.dat`) を作り直します。ほかのサブコマンドは下の「ルックの LUT」 |
 
 ### 検証
 
@@ -85,6 +86,25 @@ uv run tools/gl_compile_check.py --full --limits --report
 | `--report` | プログラムごとの使用数を表示します |
 | `--warnings` | ドライバの警告も表示します |
 | `--all-programs` | `program.*.enabled` で無効になるプログラムも検証します (既定では Iris と同じく飛ばします) |
+
+## ルックの LUT
+
+LUT は表示の色 (トーンマップと sRGB エンコードの後) から表示の色への写像で、final が CDL の前に掛けます。形式と設定の番号は [README の「ルック」](../README.md#lut)
+
+```powershell
+uv run tools/gen_look_lut.py all                                         # 同梱の LUT を作り直す
+uv run tools/gen_look_lut.py bake tools/look_luts/split_tone.json --out x.dat   # パラメーターから焼く (.dat = 33^3 RGBA16, .png = 32^3 ストリップ)
+uv run tools/gen_look_lut.py from-cube my.cube --out shaders/textures/look/user_lut.png
+uv run tools/gen_look_lut.py from-strip graded.png --out x.cube          # 加工したストリップ PNG を .cube / .dat に
+uv run tools/gen_look_lut.py to-cube shaders/textures/look/film.dat --out film.cube
+uv run tools/gen_look_lut.py preview --lut x.dat --in shot.png --out out.png    # 撮影した画面に CPU で掛けて比べる
+uv run tools/gen_look_lut.py check shaders/textures/look/*.dat           # 大きさ・恒等からのずれ・隅の色
+uv run tools/gen_look_lut.py test-swap-rb --out shaders/textures/look/user_lut.png  # 赤と青を入れ替える LUT (向きの確認用。終わったら all で戻す)
+```
+
+- パラメーター (`tools/look_luts/*.json`) は、コントラスト (中間グレーを軸にした log2)、輝度帯ごとの彩度、Oklab の色相帯ごとの色相の回転と彩度、暗部と明部の色付けです。意味は `gen_look_lut.py` の `BakeParams`
+- 新しい同梱の LUT を足すときは、JSON を足して `BUNDLED` と shaders.properties の `#if LOOK_LUT` に後ろの番号で足し、settings.glsl と lang の LOOK_LUT の値もそろえます
+- `.dat` はリトルエンディアンの uint16 で、赤が最速・次に緑・青の順 (.cube と同じ)。PNG のストリップは上の行が緑 0 で、ゲームで恒等と赤青の入れ替えの LUT を使って向きを確かめてあります
 
 ## ゲーム内で撮影する
 

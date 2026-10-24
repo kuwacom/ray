@@ -1,0 +1,15 @@
+{
+    "comment": "LOOK_LUT 2: 日向の暖色と日陰の青緑の割れを少し強め、明るい緑を黄緑へ、空の青を少し深くする。明部と暗部の彩度は控えめに",
+    "contrast": 1.04,
+    "sat_shadows": 0.95,
+    "sat_mids": 1.08,
+    "sat_highlights": 0.92,
+    "shadow_tint": [0.85, 1.0, 1.08],
+    "shadow_tint_amount": 0.25,
+    "highlight_tint": [1.08, 1.0, 0.88],
+    "highlight_tint_amount": 0.25,
+    "hue_bands": [
+        {"center": 135.0, "width": 25.0, "shift": -5.0, "saturation": 1.04},
+        {"center": 255.0, "width": 25.0, "shift": 0.0, "saturation": 1.06}
+    ]
+}

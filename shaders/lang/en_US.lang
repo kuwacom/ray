@@ -27,6 +27,41 @@ screen.POST=Post Processing
 screen.CDL=Color Grading (CDL)
 screen.DEBUG=Debug
 
+# Look
+option.LOOK_PRESET=Look
+option.LOOK_PRESET.comment=Picks how light and color are rendered. Natural: a plain Minecraft-like look that is easy on the eyes (the previous default). Vivid: like SEUS Renewed / PTGI, beauty comes from the contrast between sun and shade, warm sunlight against blue-green shade, green bounce light from the grass, and highlights that reach near white (saturation and bloom stay modest). The Saturation, Contrast, Exposure Compensation, Bloom, Bloomy Fog, Sky Light Occlusion, Sky Ambient Saturation and Fog Density options multiply the preset values (exposure is added). Custom: set the preset-only values under Post Processing > Custom Look
+value.LOOK_PRESET.0=Custom
+value.LOOK_PRESET.1=Natural
+value.LOOK_PRESET.2=Vivid
+option.LOOK_LUT=LUT
+option.LOOK_LUT.comment=A color LUT applied last (3D LUT on the display values after the tone map). Stacks on top of the look preset. User LUT: replace shaders/textures/look/user_lut.png with your own (the identity image graded in an image editor, or a .cube converted with tools/gen_look_lut.py; see Look in the README). Sun and Shade Split: warmer sun, bluer-green shade, bright greens toward yellow-green. Film: slightly lower contrast, warm and less saturated highlights
+value.LOOK_LUT.0=None
+value.LOOK_LUT.1=User LUT
+value.LOOK_LUT.2=Sun and Shade Split
+value.LOOK_LUT.3=Film
+option.LOOK_LUT_STRENGTH=LUT Strength
+option.LOOK_LUT_STRENGTH.comment=How much of the LUT is applied (mixed with the original color)
+screen.LOOK_CUSTOM=Custom Look
+screen.LOOK_CUSTOM.comment=Only used when Look is Custom. Sets the values that only the presets have. Everything else uses the regular options (Saturation, Contrast, ...)
+option.LOOK_C_SKY_AMBIENT=Sky Ambient Strength
+option.LOOK_C_SKY_AMBIENT.comment=Strength of the sky light that fills the shade. Lower values increase the difference between sun and shade (the sky itself keeps its brightness). Natural 1, Vivid 0.8
+option.LOOK_C_SKY_SATURATION=Sky Color Saturation
+option.LOOK_C_SKY_SATURATION.comment=How deep the sky blue is (both the sky and the sky ambient light). Natural 1, Vivid 1.08
+option.LOOK_C_SUN_WARMTH=Sunlight Warmth
+option.LOOK_C_SUN_WARMTH.comment=How much the direct sunlight is shifted toward warm colors (brightness is kept). Splits the warm sun from the blue sky light in the shade. The sky, clouds and sun disc keep their colors. 1 = a 5000K color against 6500K. Natural 0, Vivid 0.85
+option.LOOK_C_BOUNCE=Bounce Light Strength
+option.LOOK_C_BOUNCE.comment=Strength of the bounce light (light from surfaces hit by GI rays). The sky light is unchanged, so only the bounce from grass and walls gets stronger. GI Strength multiplies this. Natural 1, Vivid 1.6
+option.LOOK_C_BOUNCE_SATURATION=Bounce Light Saturation
+option.LOOK_C_BOUNCE_SATURATION.comment=Saturation of the bounce light (light from surfaces hit by GI rays). Higher values tint shade, birch trunks and cave entrances green from the grass. Brightness is unchanged. Natural 1, Vivid 1.5
+option.LOOK_C_HIGHLIGHT=Highlight Range
+option.LOOK_C_HIGHLIGHT.comment=Widens the brightness differences above middle gray (the dark side is unchanged). Higher values let white clouds and sunlit surfaces reach near white. Natural 1, Vivid 1.6
+option.LOOK_C_DARK_LIFT=Shadow Lift
+option.LOOK_C_DARK_LIFT.comment=Brightness of the darkest tones after the tone map. AgX expects a display with a 2.2 power curve, but the output is re-encoded with the piecewise sRGB curve, so on 2.2 displays dark areas sink by 1-3 EV and crush to black. 1 restores them (midtones and highlights barely change). Natural 0, Vivid 0.5
+option.LOOK_C_BLOOM_SPREAD=Bloom Spread
+option.LOOK_C_BLOOM_SPREAD.comment=How far the glow around lights spreads. Lower values keep it close to the light so shade is not lifted by the glow. Natural 0.82, Vivid 0.75
+option.LOOK_C_BLOOM_FOG_CLEAR=Clear-Weather Bloomy Fog
+option.LOOK_C_BLOOM_FOG_CLEAR.comment=How much wide glow is applied to distant terrain in clear weather (1 in rain). Natural 0.35, Vivid 0.35
+
 # Block lighting
 option.VOXEL_VOLUME=Voxel Volume
 option.VOXEL_VOLUME.comment=Size of the voxel area around the player used for colored light and light shadows. Larger costs more VRAM.
@@ -141,7 +176,7 @@ option.GI_STRENGTH.comment=Strength of the bounce light (and, with screen-space 
 option.GI_MULTI_BOUNCE=Multiple Bounces
 option.GI_MULTI_BOUNCE.comment=How much of the previous frame's GI is fed back into the surfaces GI rays hit, so light bounces again with every frame. Lets light reach deeper into cave entrances and rooms at almost no cost. 0 = single bounce, 1 = physically correct (screen-space and voxel ray tracing only).
 option.GI_SKY_OCCLUSION=Sky Light Occlusion
-option.GI_SKY_OCCLUSION.comment=How much of the sky light is occluded by the GI rays. 1 = light only comes from directions that see the sky (eaves, cave entrances and the back of rooms get darker, and openings show their direction). 0 = the old skylight-only occlusion (no direction, counted twice with the bounce). The default 0.5 keeps rooms and cave entrances close to their old brightness, which full occlusion makes too dark even with multiple bounces. Screen-space and voxel ray tracing only.
+option.GI_SKY_OCCLUSION.comment=How much of the sky light is occluded by the GI rays. 1 = light only comes from directions that see the sky (eaves, cave entrances and the back of rooms get darker, and openings show their direction). 0 = the old skylight-only occlusion (no direction, counted twice with the bounce). The default 0.5 keeps rooms and cave entrances close to their old brightness, which full occlusion makes too dark even with multiple bounces. Screen-space and voxel ray tracing only. Multiplies the look preset value (unchanged with Natural)
 option.GI_GROUND_REPLACE=Ground Bounce Replacement
 option.GI_GROUND_REPLACE.comment=How much of the gray ground bounce built into the sky ambient is replaced by the real ground color picked up by GI (green on grass). 1 = physically correct (shade and downward faces take the ground color and get darker). 0 = the old brighter gray shade (bounce counted twice).
 option.GI_RES=GI Resolution
@@ -236,7 +271,7 @@ option.SUN_BRIGHTNESS=Sun Brightness
 option.MOON_BRIGHTNESS=Moon Brightness
 option.SKY_BRIGHTNESS=Sky Brightness
 option.SKY_AMBIENT_SATURATION=Sky Ambient Saturation
-option.SKY_AMBIENT_SATURATION.comment=How colorful the sky light that fills the shade is. Higher values make shade bluer against the warm sunlight. 0.3 = the old subtle color, 1 = the full sky color (shaded snow turns quite blue).
+option.SKY_AMBIENT_SATURATION.comment=How colorful the sky light that fills the shade is. Higher values make shade bluer against the warm sunlight. 0.3 = the old subtle color, 1 = the full sky color (shaded snow turns quite blue). Multiplies the look preset value (unchanged with Natural)
 option.SUN_MOON_STYLE=Sun & Moon
 value.SUN_MOON_STYLE.0=Vanilla
 value.SUN_MOON_STYLE.1=Round
@@ -352,7 +387,7 @@ option.CLOUD_EDGE_SOFTNESS.comment=Width of the thin, soft margin of low clouds.
 option.CLOUD_EDGE_HAZE=Edge Haze
 option.CLOUD_EDGE_HAZE.comment=Thin haze spreading out from the edges of fair-weather cumulus. 0 gives crisp outlines
 option.CLOUD_CORE_STRENGTH=Core Density
-option.CLOUD_CORE_STRENGTH.comment=Density of the centres of fair-weather cumulus. Higher looks more solid, 3.0 is almost uniformly dense
+option.CLOUD_CORE_STRENGTH.comment=Density of the centres of fair-weather cumulus bodies (small fragments and small clouds get half). Higher looks more solid with deeper shading between the lobes. 0.25 matches the old thin cores, 2.0 and above is almost uniformly dense
 option.CLOUD_SILVER_LINING=Silver Lining
 option.CLOUD_SILVER_LINING.comment=Glow of cloud edges backlit by the sun or moon
 option.CLOUD_POWDER=Dark Edges
@@ -368,6 +403,7 @@ option.CLOUD_C_HIGH.comment=Custom climate only. Average amount of cirrus (varie
 
 # Fog
 option.FOG_DENSITY=Fog Density
+option.FOG_DENSITY.comment=Multiplies the look preset value (unchanged with Natural)
 option.FOG_MIST=Ground Mist
 option.FOG_MIST_ALTITUDE=Mist Altitude
 option.VL=Volumetric Light
@@ -577,12 +613,15 @@ option.TAA=Temporal Anti-Aliasing
 option.CAS_STRENGTH=Sharpening
 option.BLOOM=Bloom
 option.BLOOM_STRENGTH=Bloom Strength
+option.BLOOM_STRENGTH.comment=Multiplies the look preset value (unchanged with Natural)
 option.BLOOM_FOG=Bloomy Fog
+option.BLOOM_FOG.comment=Multiplies the look preset value (unchanged with Natural)
 option.EXPOSURE_MODE=Exposure
 value.EXPOSURE_MODE.0=Manual
 value.EXPOSURE_MODE.1=Auto (Average)
 value.EXPOSURE_MODE.2=Auto (Histogram)
 option.EXPOSURE_BIAS=Exposure Compensation
+option.EXPOSURE_BIAS.comment=Added to the look preset exposure (0 with Natural)
 suffix.EXPOSURE_BIAS= EV
 option.EXPOSURE_MANUAL_EV=Manual Exposure
 suffix.EXPOSURE_MANUAL_EV= EV
@@ -600,7 +639,9 @@ value.TONEMAP.3=Reinhard-Jodie
 value.TONEMAP.4=AgX Golden
 value.TONEMAP.5=PBR Neutral
 option.SATURATION=Saturation
+option.SATURATION.comment=Multiplies the look preset value (unchanged with Natural)
 option.CONTRAST=Contrast
+option.CONTRAST.comment=Multiplies the look preset value (unchanged with Natural)
 option.WHITE_BALANCE=White Balance
 suffix.WHITE_BALANCE= K
 option.WHITE_BALANCE.comment=Color temperature of the assumed light. Lower values cancel warmer light, so the image gets bluer

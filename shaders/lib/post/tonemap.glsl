@@ -59,7 +59,14 @@ vec3 tonemapAgx(vec3 x, int look) {
     }
     v = AGX_OUTSET * v;
     // AgX の出力は 2.2 乗のディスプレイを前提にエンコードされているので線形へ戻す
-    return pow(saturate(v), vec3(2.2));
+    v = saturate(v);
+    /*
+     * final はこれを sRGB の区分曲線でエンコードし直すので、2.2 乗で表示するモニターでは暗部が AgX の想定より 1-3 EV 沈む
+     * (区分曲線で表示するモニターでは AgX の想定どおり)。どちらのモニターを前提にするかは見た目の選択なので、
+     * ルックのプリセットで sRGB の区分曲線の復号 (2.2 乗のモニターで AgX の想定どおり、暗部が持ち上がる) へ寄せる割合を決める
+     */
+    if (LK_DARK_LIFT > 0.0) return mix(pow(v, vec3(2.2)), srgbToLinear(v), LK_DARK_LIFT);
+    return pow(v, vec3(2.2));
 }
 
 /*

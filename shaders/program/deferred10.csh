@@ -162,7 +162,7 @@ vec3 rsmIndirect(vec3 playerPos, vec3 normal, float rotation) {
      */
     float area = PI * RSM_RADIUS * RSM_RADIUS / float(count);
     vec3 skyUp = getSkyIrradiance(vec3(0.0, 1.0, 0.0));
-    return (sum * sun.irradiance * getCloudShadow(playerPos) + sumSky * (skyUp * GI_GROUND_REPLACE)) * area * RCP_PI;
+    return giBounceGrade((sum * sun.irradiance * getCloudShadow(playerPos) + sumSky * (skyUp * GI_GROUND_REPLACE)) * area * RCP_PI);
 }
 #endif
 
@@ -182,7 +182,7 @@ vec3 giMissRadiance(vec3 dir, vec3 groundRadiance, float gate) {
     float toGround = smoothstep(0.0, 0.1, -dir.y);
     vec3 r = groundRadiance * toGround;
 #ifdef GI_TRACES_SKY
-    r += shSkyGrade(getSkyRadiance(dir)) * ((1.0 - toGround) * gate * GI_SKY_OCCLUSION);
+    r += shSkyGrade(getSkyRadiance(dir)) * ((1.0 - toGround) * gate * LOOK_GI_SKY_OCCLUSION);
 #endif
     return r;
 }
@@ -207,9 +207,9 @@ vec3 ssgiIndirect(vec3 viewPos, vec3 normal, float skyLm, vec4 noise) {
         if (dot(h.normal, dir) >= 0.0) continue;
         vec3 hitPlayer = screenToPlayer(hit.xyz);
         vec3 prev = GI_MULTI_BOUNCE > 0.0 ? giHistoryAtPlayer(hitPlayer) : vec3(-1.0);
-        sum += shadeSecondaryHitGi(hitPlayer, h.normal, h.albedo, h.lightmap.y, prev)
+        sum += giBounceGrade(shadeSecondaryHitGi(hitPlayer, h.normal, h.albedo, h.lightmap.y, prev)
             + h.albedo * RCP_PI * secondaryHitBlockLight(hitPlayer, h.normal, ht, handLightIndirectScale()) * SECONDARY_BLOCKLIGHT_GAIN
-            + h.albedo * h.emission * EMISSION_LUMINANCE * EMISSION_STRENGTH;
+            + h.albedo * h.emission * EMISSION_LUMINANCE * EMISSION_STRENGTH);
     }
     // 余弦重みサンプルの照度の推定量 E = pi / N * sum(L)
     return sum * PI / float(GI_SAMPLES);
@@ -233,7 +233,7 @@ vec3 voxelIndirect(vec3 playerPos, vec3 normal, vec3 geoNormal, float skyLm, vec
         vec3 dir = basis * cosineHemisphere(fract(noise.xy + r2Sequence(i)));
         if (dot(dir, geoNormal) <= 0.0) continue;
         vec4 hit = traceVoxelRadiance(origin, dir, VOXEL_GI_DISTANCE, skyLm, false);
-        sum += hit.a > 0.5 ? hit.rgb : giMissRadiance(dir, ground, gate);
+        sum += hit.a > 0.5 ? giBounceGrade(hit.rgb) : giMissRadiance(dir, ground, gate);
     }
     return sum * PI / float(GI_SAMPLES);
 }

@@ -7,6 +7,7 @@
 #define COMMON_COMMON_GLSL
 
 #include "/lib/settings.glsl"
+#include "/lib/common/look_presets.glsl"
 #include "/lib/common/dimension.glsl"
 #include "/lib/common/constants.glsl"
 #include "/lib/common/uniforms.glsl"

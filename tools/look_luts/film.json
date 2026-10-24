@@ -1,0 +1,15 @@
+{
+    "comment": "LOOK_LUT 3: フィルム風。コントラストを少し下げ、明部を暖色に寄せて彩度を落とし、緑を少し黄へ。黒は持ち上げない",
+    "contrast": 0.92,
+    "saturation": 0.95,
+    "sat_shadows": 0.9,
+    "sat_mids": 1.0,
+    "sat_highlights": 0.85,
+    "shadow_tint": [0.95, 1.0, 1.05],
+    "shadow_tint_amount": 0.15,
+    "highlight_tint": [1.06, 1.0, 0.9],
+    "highlight_tint_amount": 0.3,
+    "hue_bands": [
+        {"center": 135.0, "width": 25.0, "shift": -6.0, "saturation": 0.95}
+    ]
+}

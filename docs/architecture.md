@@ -49,6 +49,7 @@ tools/
   gen_blue_noise.py / gen_cloud_noise.py / gen_water_waves.py / gen_lens_textures.py
                                             shaders/textures/ のテクスチャの生成
   gen_lens_ghosts.py                        lib/post/lens_ghosts.glsl (レンズゴーストの定数表) の生成
+  gen_look_lut.py, look_luts/*.json         ルックの LUT (textures/look/) の生成・.cube や PNG ストリップとの変換・確認
   validate_shaders.py                       Iris 前処理の簡易再現 + glslangValidator 検証 + 静的チェック
   gl_compile_check.py                       同じ前処理結果を実機の GL ドライバで compile + link、上限値との比較
   mc.py / run_scene.py / shader_options.py  ゲーム内デバッグのクライアント・定点シーン撮影・Iris の設定の読み書き
@@ -58,6 +59,7 @@ shaders/
   shaders.properties  block.properties  item.properties  entity.properties  dimension.properties
   lang/en_US.lang  lang/ja_JP.lang
   textures/                                 blue_noise.png, lens_dirt.png, cloud_*.dat, lens_starburst.dat, water_waves.dat (+ .mcmeta)
+  textures/look/                            user_lut.png (ユーザーの LUT、恒等), split_tone.dat, film.dat (同梱の LUT) (+ .mcmeta)
   lib/settings.glsl                         全設定の唯一の定義
   lib/common/*   lib/buffers/*   lib/ids/*  共通基盤
   lib/light/*                               light モジュール
@@ -389,6 +391,8 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | トーンマップ | AgX (多項式近似, 公知) を既定、AgX Punchy / ACES / Reinhard-Jodie / AgX Golden / PBR Neutral を選択式 (TONEMAP 0-5)。後段で彩度・コントラスト・ホワイトバランス・CAS・ビネット・8bit ディザ | post |
 | レンズフレア | 太陽・月のレンズフレア。既定 ON (全プロファイルで ON) | post |
 | レンズプリセット | LENS_PRESET 0 はカスタム (LENS_C_*)、1 は現代の単焦点 (既定)、2-6 は推定値の味付け、7-18 は特許の処方から計算した値 (ゴースト表 `tools/gen_lens_ghosts.py`、歪曲 K1-K3、魚眼の写像、周辺光量と像面の焦点ずれの 9 点の表、STF のアポダイゼーション `LENS_APODIZATION_BETA` (composite22 のボケのサンプルに瞳の透過率を掛ける)、FA 28 Soft と Canon 50/0.95 の球面収差のハロー `LENS_SOFT_HALO_TABLE` (final で F 値ごとの半径に合うブルームのタイルを混ぜる))。新しいレンズは後ろに足し、既存の番号は変えない。歪曲と魚眼は TAA・DoF・ブルームの後、final の最初で出力 -> 元画像へ再投影し (`lensProjectUv`)、魚眼と歪曲の強い時 (LENS_WARP_IN_TAA の自動) は TAA (composite20) の中で出力の画面を組み立ててジッターで中央の細かさを戻す (以降の colortex0・colortex13・ブルームは出力の座標になり、深度・G バッファ・速度だけ `postSourceUv` で元画像の位置を読む)。太陽・月のフレアは光源を出力側へ写して (`lensForwardUv`) 出力の座標で描く。直線写像で歪曲 0 のプリセットでは再投影は定数畳み込みで消える | post |
+| ルックのプリセット | LOOK_PRESET 0 はカスタム (LOOK_C_*)、1 はナチュラル (既定。入れる前の見た目と同じ)、2 はビビッド。`lib/common/look_presets.glsl` の `#if` で基準値 LK_* を差し替え (Iris の profile は品質のプロファイルの 1 組しか持てないため)、既存の設定 (SATURATION, CONTRAST, EXPOSURE_BIAS, BLOOM_STRENGTH, BLOOM_FOG, GI_SKY_OCCLUSION, SKY_AMBIENT_SATURATION, FOG_DENSITY) は LK_* に掛ける (露出は足す)。効く所: 空の環境光の強さ (SH 全体。霧・粗い反射・フレアの判定では戻す)、日向の暖かさ (prepare の太陽の直達光だけ)、照り返しの強さと彩度 (GI のレイが当たった面だけ、`giBounceGrade`。多重反射の履歴は強さで割る)、明部の伸び (final、中間グレーより上の log2 の傾き)、暗部の持ち上げ (AgX の出力の復号を 2.2 乗から sRGB の曲線へ)、ブルームの広がりと晴れのブルーミーフォグ | 全モジュール |
+| ルックの LUT | LOOK_LUT 1 はユーザーの PNG ストリップ (`textures/look/user_lut.png`, 32^3, 1024x32, 上の行が緑 0)、2 以降は同梱の 3D LUT (`.dat`, 33^3 RGBA16)。shaders.properties の `#if LOOK_LUT` で `customTexture` を切り替え、final がトーンマップと sRGB エンコードの後、CDL の前に掛ける (sampler は final で 1 個)。作成・変換は `tools/gen_look_lut.py` | post |
 
 ---
 
@@ -408,6 +412,15 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | 設定 | 既定 | LOW | MEDIUM | HIGH | ULTRA | EXTREME |
 |---|---|---|---|---|---|---|
 | RAY_VERSION | 1 (v0.1.0-alpha) | 1 | 1 | 1 | 1 | 1 |
+
+#### ルック (プロファイルに含めない)
+
+| 設定 | 既定 | 内容 |
+|---|---|---|
+| LOOK_PRESET | 1 | 0 = カスタム、1 = ナチュラル、2 = ビビッド (値は README の「ルック」と `lib/common/look_presets.glsl`) |
+| LOOK_LUT | 0 | 0 = なし、1 = ユーザーの LUT、2 = 日向と日陰の色の割れ、3 = フィルム |
+| LOOK_LUT_STRENGTH | 1.0 | LUT と元の色の混ぜ具合 |
+| LOOK_C_* | ナチュラルの値 | カスタムの時だけ使う (空の環境光の強さ・空の色の彩度・日向の暖かさ・照り返しの強さと彩度・明部の伸び・暗部の持ち上げ・ブルームの広がり・晴れのブルーミーフォグ) |
 
 #### ブロックライト / ボクセル (light)
 

@@ -44,7 +44,7 @@ vec3 shadeSecondaryHitGi(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm, 
     vec3 E = secondaryHitDirect(playerPos, normal);
     if (prevIndirect.x >= 0.0) {
 #ifdef GI_TRACES_SKY
-        E += mix(sky, prevIndirect + sky * (1.0 - GI_SKY_OCCLUSION), GI_MULTI_BOUNCE);
+        E += mix(sky, prevIndirect + sky * (1.0 - LOOK_GI_SKY_OCCLUSION), GI_MULTI_BOUNCE);
 #else
         E += sky + prevIndirect * GI_MULTI_BOUNCE;
 #endif
@@ -59,7 +59,7 @@ const float GI_HISTORY_EDGE = 0.002;
 vec3 giHistoryAtPlayer(vec3 playerPos) {
     vec2 uv = playerToPrevScreen(playerPos).xy;
     if (any(lessThan(uv, vec2(GI_HISTORY_EDGE))) || any(greaterThan(uv, vec2(1.0 - GI_HISTORY_EDGE)))) return vec3(-1.0);
-    return textureLod(colortex9, uv, 0.0).rgb / max(GI_EFFECTIVE_STRENGTH, 1e-3);
+    return textureLod(colortex9, uv, 0.0).rgb / max(GI_EFFECTIVE_STRENGTH * LK_GI_BOUNCE, 1e-3);
 }
 
 /*
@@ -136,7 +136,7 @@ vec3 skyReflectionFallback(vec3 dir, float skyLm, float perceptualRoughness) {
 #ifdef HAS_SKY
     float horizon = exp(-max(-dir.y, 0.0) * 1.77);
     vec3 sharp = getSkyRadiance(dir);
-    vec3 blurry = getSkyIrradiance(dir) * RCP_PI;
+    vec3 blurry = getSkyIrradiance(dir) * (RCP_PI * SH_LOOK_UNDO);
     vec3 sky = mix(sharp, blurry, saturate(perceptualRoughness * 1.5));
     return sky * horizon * skylightCurve(skyLm);
 #else
