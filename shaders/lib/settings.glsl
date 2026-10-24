@@ -151,6 +151,7 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define SKY_AMBIENT_SATURATION 0.5 // [0.2 0.3 0.4 0.5 0.6 0.7 0.8 1.0] 空の環境光 (日陰を照らす空の光) の彩度。1 = 空の色のまま
 #define SUN_MOON_STYLE 1 // [0 1] 0=バニラテクスチャ 1=物理的な円盤
 #define STARS
+#define TWILIGHT_STRETCH 1.0 // [1.0 1.5 2.0 3.0] 薄明を長く見せる倍率 (空の色と空の光の太陽の高さを地平線より下だけ縮める。1 = 実際の長さ)
 #define CLOUDS 3 // [0 1 2 3] 0=なし 1=バニラ 2=2D 押し出し体積雲 3=3D 体積雲
 #define CLOUD_STYLE 1 // [0 1 2 3 4 5 6 7 8] 雲の形のプリセット 0=カスタム 1=Ray 2=Bliss 風 3=Nostalgia 風 4=現実に忠実 5=綿あめ 6=入道雲 7=まばらな晴天積雲 8=層積雲の曇り
 #define CLOUD_S_SHAPE 0 // [0 1] カスタム: 0=積雲 1=角の丸い平らな板

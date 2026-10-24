@@ -64,7 +64,7 @@ float skyFbm3(vec3 p, int octaves) {
 }
 
 // 夜の度合い (星・天の川・大気光を出す強さ)
-float skyNightFactor() { return smoothstep(0.05, -0.12, getSunDir().y); }
+float skyNightFactor() { return smoothstep(0.05, -0.12, atmoSkySunMu(getSunDir().y)); }
 
 /*
  * 太陽円盤。照度 E を円盤の立体角で割った放射に周縁減光を掛ける (円盤の積分 = E)

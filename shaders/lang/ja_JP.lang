@@ -293,6 +293,8 @@ option.SUN_MOON_STYLE=太陽と月
 value.SUN_MOON_STYLE.0=バニラ
 value.SUN_MOON_STYLE.1=丸
 option.STARS=星
+option.TWILIGHT_STRETCH=薄明の長さ
+option.TWILIGHT_STRETCH.comment=日の出前と日没後の空の色を長く見せる。空の色にだけ、太陽が地平線の下へ沈む深さを縮めて使う。Minecraft の市民薄明は 20 秒ほどしかない。1 = 実際の長さ。太陽の円盤・日光・影は変わらない
 
 # 雲
 option.CLOUDS=雲

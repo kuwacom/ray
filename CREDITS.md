@@ -21,6 +21,7 @@
 | 黒体放射の近似色 | Tanner Helland の近似式 | lib/common/color.glsl |
 | Light Propagation Volumes | Kaplanyan & Dachsbacher, I3D 2010 | lib/light/floodfill.glsl, program/deferred.csh |
 | 大気散乱 LUT (透過率・多重散乱・SkyView) | Hillaire, "A Scalable and Production Ready Sky and Atmosphere Rendering Technique", EGSR 2020 | lib/sky/atmosphere.glsl, program/setup1-2, prepare1 |
+| 薄明の空 (オゾンの Chappuis 吸収による天頂の青、成層圏のエアロゾルによる紫の光) | Hulburt, "Explanation of the Brightness and Color of the Sky, Particularly the Twilight Sky", JOSA 1953 / Lange, Rozanov, von Savigny, "Revisiting the question 'Why is the sky blue?'", ACP 2023 / Lee & Hernández-Andrés, "Measuring and modeling twilight's purple light", Applied Optics 2003 | lib/sky/atmosphere.glsl, program/prepare1.csh |
 | 大気の物理モデル | Bruneton, "A Qualitative and Quantitative Evaluation of 8 Clear Sky Models", TVCG 2017 | lib/sky/atmosphere.glsl |
 | 体積雲の散乱 (多重散乱近似) | Wrenninge et al., "Oz: The Great and Volumetric", SIGGRAPH 2013 Talks | lib/sky/cloud_volume.glsl |
 | 積雲のこぶの陰影 (不透明な芯・光源方向の近くの光学的深さで多重散乱も落とす・塊の中は削らず境目だけ深く削る浸食) | Bliss Shaders (X0nk) の雲の見え方と考え方を参考に独自実装 (コードは不使用) | lib/sky/cloud_volume.glsl |

@@ -293,6 +293,8 @@ option.SUN_MOON_STYLE=Sun & Moon
 value.SUN_MOON_STYLE.0=Vanilla
 value.SUN_MOON_STYLE.1=Round
 option.STARS=Stars
+option.TWILIGHT_STRETCH=Twilight Length
+option.TWILIGHT_STRETCH.comment=Makes the colors of dawn and dusk last longer by compressing how far the sun sinks below the horizon, for the sky only. Civil twilight lasts about 20 seconds in Minecraft. 1 = real length. The sun disk, sunlight and shadows are unchanged
 
 # Clouds
 option.CLOUDS=Clouds

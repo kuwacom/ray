@@ -12,6 +12,9 @@ layout(local_size_x = 8, local_size_y = 4) in;
 const ivec3 workGroups = ivec3(24, 27, 1);
 
 const int SKYVIEW_STEPS = 32;
+// 太陽が地平線の近く (この sin より低い) の間は歩数を増やす。地平線の近くの視線は 1000 km 以上あり、地球の影の境目に段差が出るため
+const int SKYVIEW_STEPS_TWILIGHT = 48;
+const float SKYVIEW_TWILIGHT_MU = 0.17;
 
 void main() {
     ivec2 texel = ivec2(gl_GlobalInvocationID.xy);
@@ -24,12 +27,13 @@ void main() {
     viewMu = max(viewMu, 1e-3);
 
     // 太陽を方位角 0 に置いた局所座標で積分する
-    float sunMu = getSunDir().y;
+    float sunMu = atmoSkySunMu(getSunDir().y);
+    int steps = abs(sunMu) < SKYVIEW_TWILIGHT_MU ? SKYVIEW_STEPS_TWILIGHT : SKYVIEW_STEPS;
     vec3 sunDir = vec3(sqrt(max(1.0 - sunMu * sunMu, 0.0)), sunMu, 0.0);
     float sinView = sqrt(max(1.0 - viewMu * viewMu, 0.0));
     vec3 dir = vec3(sinView * cos(azimuth), viewMu, sinView * sin(azimuth));
 
     vec3 transmittance;
-    vec3 radiance = atmoIntegrateScattering(vec3(0.0, r, 0.0), dir, sunDir, getSunIlluminanceTOA(), -sunDir, getMoonIlluminanceTOA(), SKYVIEW_STEPS, transmittance);
+    vec3 radiance = atmoIntegrateScattering(vec3(0.0, r, 0.0), dir, sunDir, getSunIlluminanceTOA(), -sunDir, getMoonIlluminanceTOA(), steps, transmittance);
     imageStore(skyViewImg, texel, vec4(radiance, 1.0));
 }
