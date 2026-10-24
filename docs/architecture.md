@@ -233,7 +233,7 @@ struct LightInstance {
 | 200-299 | 半透明 (透過色 index = id - 200) | 200 水, 201 氷, 202 ガラス, 203 ガラス板, 204 スライム, 205 ハチミツ, 206 遮光ガラス, 210-225 色付きガラス, 230-245 色付きガラス板 |
 | 300-399 | 部分形状 (形状 index = id - 300) | 300/301 ハーフ下/上, 302/303 階段下/上, 304 フェンス, 305 塀, 306 鉄格子, 307 背の低いブロック, 308 雪の層, 309 閉じたドア・トラップドア |
 | 1001-1255 | 光源 (光源インデックス = id - 1000) | 1001 たいまつ … 1062 トライアルスポナー |
-| 2000-4095 | 色の付いた固体 (遮蔽・マテリアルは未登録の固体と同じ)。上の帯に無いブロックを平均の色ごとにまとめたもの | 羊毛・コンクリート・石・板材 (今は 2000-2351) |
+| 2000-4095 | 色の付いた固体 (遮蔽・マテリアルは未登録の固体と同じ)。上の帯に無いブロックを平均の色ごとにまとめたもの | 羊毛・コンクリート・石・板材 (使用中は 2000-2351) |
 
 - ボクセルには下位 12bit しか入らないので 4095 を超える ID は作らない
 - ブロックの平均の色は `tools/gen_block_colors.py` がクライアント jar のテクスチャから `tools/block_colors.json` に書き (面積と不透明度で重み付けした線形の平均。草・葉・水は平原の色で代表)、`gen_block_properties.py` が 2000 番台の ID と `lib/ids/block_albedo.glsl` (ID ごとの色の定数表) を作る。setup.csh が SSBO1 `blockData.albedo[4096]` に展開し、実行時は `getBlockAlbedo(voxelId)` で引く (floodfill の照り返し、ボクセル RT の画面外の当たり)。上面の色が全体の平均と違うブロック (草ブロック・原木など) は json の `top` に上面だけの平均を持ち、`blockData.albedoUp[4096]` に展開してレイの当たりで `getBlockAlbedo(voxelId, faceNormal)` が上向きの面に使う (草ブロックの全面の平均は側面の土で茶色)。2000 番台以外の ID はその ID に載せたブロックの平均、未登録 (1) は線形 0.3 の灰色
@@ -265,7 +265,7 @@ getLightDef(index) -> lightEmission(d, level), lightRange(d, level), lightFallof
 
 - 色・明るさ・到達半径・光源サイズ・発光中心・フリッカー・フラグを 1 行で定義 (`makeLight(...)`)
 - 実際の光源レベルは `at_midBlock.w` (Iris 1.7+, 状態込みの発光レベル: ロウソク本数・シーピクルス数・リスポーンアンカーの充填等) を優先し、0 ならテーブルの既定レベル
-- 炎系の色は `BLOCKLIGHT_WARMTH` で中性 (sRGB 1.0, 0.86, 0.72) からバニラ寄りの暖色まで動かす。既定 0.6 (黒体で約 3100K。AgX が明るい面の彩度を落とすので見た目は 3500-4000K。0.5 では洞窟の R/B が iterationT の 4.0 に対し 2.9 で中性すぎた)
+- 炎系の色は `BLOCKLIGHT_WARMTH` で中性 (sRGB 1.0, 0.86, 0.72) からバニラ寄りの暖色まで動かす。既定 0.6 (黒体で約 3100K。AgX が明るい面の彩度を落とすので見た目は 3500-4000K。0.5 以下ではたいまつの洞窟が中性すぎて炎の色に見えない)
 - 新しい光源の追加 = light_ids.glsl に index、light_table.glsl に 1 行、gen_block_properties.py に ID 行
 
 ### item.properties (`heldItemId` / `heldItemId2` / `currentRenderedItemId`)
@@ -344,7 +344,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 ### 光源シャドウ (直接光)
 
 - 光源の選別: ワールド空間ライトビン (Shrimple の bin) + ピクセルごとの重み (影なし照度の輝度) による選択。RV のタイル別リスト + ビットニックソートより単純で、GI・VL・反射からも同じビンを引ける
-- 上限を超えた時 (LIGHT_CULL_MODE 1/2, deferred_a.csh / deferred.csh): ビンの枠を「atomicMax で大きい方を残し小さい方を次の枠へ運ぶ」鎖にして、到着順に関係なく重要度 (2 = 揺らぎ前の放射 x ビンの箱までの距離減衰、1 = 近さ) の上位 LIGHT_BIN_LIGHTS 個を残す。最後の 1 枠に外れたうち最大のキーを持ち、重要度がその 1.15 倍までの光源を弱める。ビンはワールドの 8 ブロック格子にそろえる。総数 LIGHT_MAX_COUNT は前フレームの距離の分布から間引き距離を決め (2 = 光の届く球の縁までの距離)、1 フレームに 0.5 ブロック広げ / 2 ブロック縮める速さで動かし、手前 8 ブロックで弱める。0 は以前の到着順 (atomicAdd の先着。毎フレーム入れ替わってちらつく)
+- 上限を超えた時 (LIGHT_CULL_MODE 1/2, deferred_a.csh / deferred.csh): ビンの枠を「atomicMax で大きい方を残し小さい方を次の枠へ運ぶ」鎖にして、到着順に関係なく重要度 (2 = 揺らぎ前の放射 x ビンの箱までの距離減衰、1 = 近さ) の上位 LIGHT_BIN_LIGHTS 個を残す。最後の 1 枠に外れたうち最大のキーを持ち、重要度がその 1.15 倍までの光源を弱める。ビンはワールドの 8 ブロック格子にそろえる。総数 LIGHT_MAX_COUNT は前フレームの距離の分布から間引き距離を決め (2 = 光の届く球の縁までの距離)、1 フレームに 0.5 ブロック広げ / 2 ブロック縮める速さで動かし、手前 8 ブロックで弱める。0 は到着順 (atomicAdd の先着。毎フレーム入れ替わってちらつく)
 - 選び方 (N = LIGHT_TRACE_COUNT, deferred1.csh): 上位 N-1 個は確定でトレースし、残り全部からリザーバサンプリングで 1 個を重みに比例して選び、1/確率 倍してトレースする。選ばれなかった光源も影付きで不偏に寄与する。N = 1 の時は上位 1 個だけをトレースし、残りの光源の照度にはその可視率 (輝度) を掛けて近似する
 - 比の推定 (Heitz et al. 2018, `lib/light/light_select.glsl`): deferred1 が同じ光源選択で影あり S と影なし U を低解像度で求め、deferred2 が可視率 S/U だけを時空間フィルタして、フル解像度で求めたビン内全光源の影なし照度に掛ける。減衰・法線の細部はフル解像度のまま残り、ノイズのある可視率だけがぼける
 - 遮蔽判定: Amanatides & Woo DDA (自前実装) で voxelBlock を辿り、部分形状は AABB テスト (LIGHT_SHAPE_TRACE)、半透明は透過色を乗算 (LIGHT_TRANSLUCENT_TINT)、エンティティはサブセルのビット (LIGHT_ENTITY_OCCLUSION / LIGHT_PLAYER_OCCLUSION)。光源側・着色点側のセルは判定しない
@@ -392,7 +392,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | トーンマップ | AgX (多項式近似, 公知) を既定、AgX Punchy / ACES / Reinhard-Jodie / AgX Golden / PBR Neutral を選択式 (TONEMAP 0-5)。後段で彩度・コントラスト・ホワイトバランス・CAS・ビネット・8bit ディザ | post |
 | レンズフレア | 太陽・月のレンズフレア。既定 ON (全プロファイルで ON) | post |
 | レンズプリセット | LENS_PRESET 0 はカスタム (LENS_C_*)、1 は現代の単焦点 (既定)、2-6 は推定値の味付け、7-18 は特許の処方から計算した値 (ゴースト表 `tools/gen_lens_ghosts.py`、歪曲 K1-K3、魚眼の写像、周辺光量と像面の焦点ずれの 9 点の表、STF のアポダイゼーション `LENS_APODIZATION_BETA` (composite22 のボケのサンプルに瞳の透過率を掛ける)、FA 28 Soft と Canon 50/0.95 の球面収差のハロー `LENS_SOFT_HALO_TABLE` (final で F 値ごとの半径に合うブルームのタイルを混ぜる))。新しいレンズは後ろに足し、既存の番号は変えない。歪曲と魚眼は TAA・DoF・ブルームの後、final の最初で出力 -> 元画像へ再投影し (`lensProjectUv`)、魚眼と歪曲の強い時 (LENS_WARP_IN_TAA の自動) は TAA (composite20) の中で出力の画面を組み立ててジッターで中央の細かさを戻す (以降の colortex0・colortex13・ブルームは出力の座標になり、深度・G バッファ・速度だけ `postSourceUv` で元画像の位置を読む)。太陽・月のフレアは光源を出力側へ写して (`lensForwardUv`) 出力の座標で描く。直線写像で歪曲 0 のプリセットでは再投影は定数畳み込みで消える | post |
-| ルックのプリセット | LOOK_PRESET 0 はカスタム (LOOK_C_*)、1 はナチュラル (既定。入れる前の見た目と同じ)、2 はビビッド。`lib/common/look_presets.glsl` の `#if` で基準値 LK_* を差し替え (Iris の profile は品質のプロファイルの 1 組しか持てないため)、既存の設定 (SATURATION, CONTRAST, EXPOSURE_BIAS, BLOOM_STRENGTH, BLOOM_FOG, GI_SKY_OCCLUSION, SKY_AMBIENT_SATURATION, FOG_DENSITY) は LK_* に掛ける (露出は足す)。効く所: 空の環境光の強さ (SH 全体。霧・粗い反射・フレアの判定では戻す)、日向の暖かさ (prepare の太陽の直達光だけ)、照り返しの強さと彩度 (GI のレイが当たった面だけ、`giBounceGrade`。多重反射の履歴は強さで割る)、明部の伸び (final、中間グレーより上の log2 の傾き)、暗部の持ち上げ (AgX の出力の復号を 2.2 乗から sRGB の曲線へ)、ブルームの広がりと晴れのブルーミーフォグ | 全モジュール |
+| ルックのプリセット | LOOK_PRESET 0 はカスタム (LOOK_C_*)、1 はナチュラル (既定。既存の設定に掛ける基準値は 1)、2 はビビッド。`lib/common/look_presets.glsl` の `#if` で基準値 LK_* を差し替え (Iris の profile は品質のプロファイルの 1 組しか持てないため)、既存の設定 (SATURATION, CONTRAST, EXPOSURE_BIAS, BLOOM_STRENGTH, BLOOM_FOG, GI_SKY_OCCLUSION, SKY_AMBIENT_SATURATION, FOG_DENSITY) は LK_* に掛ける (露出は足す)。効く所: 空の環境光の強さ (SH 全体。霧・粗い反射・フレアの判定では戻す)、日向の暖かさ (prepare の太陽の直達光だけ)、照り返しの強さと彩度 (GI のレイが当たった面だけ、`giBounceGrade`。多重反射の履歴は強さで割る)、明部の伸び (final、中間グレーより上の log2 の傾き)、暗部の持ち上げ (AgX の出力の復号を 2.2 乗から sRGB の曲線へ)、ブルームの広がりと晴れのブルーミーフォグ | 全モジュール |
 | ルックの LUT | LOOK_LUT 1 はユーザーの PNG ストリップ (`textures/look/user_lut.png`, 32^3, 1024x32, 上の行が緑 0)、2 以降は同梱の 3D LUT (`.dat`, 33^3 RGBA16)。shaders.properties の `#if LOOK_LUT` で `customTexture` を切り替え、final がトーンマップと sRGB エンコードの後、CDL の前に掛ける (sampler は final で 1 個)。作成・変換は `tools/gen_look_lut.py` | post |
 
 ---

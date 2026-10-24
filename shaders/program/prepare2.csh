@@ -23,7 +23,7 @@ const ivec3 workGroups = ivec3(32, 32, 1);
 const float CLOUD_REGION_SIZE = 26000.0;
 const float CLOUD_REGION_VARIATION = 0.75;
 // 雷雨の時の嵐のセルの間の低層の雲種と被覆
-// 0.3 / 0.78 では実機で嵐の間が青空の見える晴れ間ばかりになり、雨なのに晴れの日の綿雲に見えた。ほぼ覆って所々だけ切らす
+// 0.3 / 0.78 では嵐の間が青空の見える晴れ間ばかりになり、雨なのに晴れの日の綿雲に見える。ほぼ覆って所々だけ切らす
 const float CLOUD_THUNDER_GAP_TYPE = 0.25;
 const float CLOUD_THUNDER_GAP_COVER = 0.88;
 // 雲影の半影の半径 (m) と時間方向の混合率。雲の縁の密度の勾配と多重散乱で、実際の雲影の縁は数十 m かけてぼける

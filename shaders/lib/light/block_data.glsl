@@ -38,7 +38,7 @@ float lightRange(LightDef d, float level) { return d.params.x * level / 15.0; }
  */
 const float LIGHT_FALLOFF_LINEAR = 0.3;
 const float LIGHT_FALLOFF_QUADRATIC = 0.035;
-// 1 ブロックの距離で旧来の逆二乗 (0.5) と同じ照度になるように掛ける正規化 (1 + a + b) / 2
+// 1 ブロックの距離で素の逆二乗 (0.5) と同じ照度になるように掛ける正規化 (1 + a + b) / 2
 const float LIGHT_FALLOFF_NORM = (1.0 + LIGHT_FALLOFF_LINEAR + LIGHT_FALLOFF_QUADRATIC) * 0.5;
 
 /*

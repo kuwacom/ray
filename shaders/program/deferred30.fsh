@@ -35,15 +35,15 @@ const float SSS_DENSITY = 2.5;
 // 溶岩の面が受けるブロックライト・GI の割合
 const float LAVA_RECEIVED_LIGHT = 0.15;
 /*
- * 溶岩の見た目の輝度。以前は他の発光と同じ g.emission (0.12-0.3) x 露出の -0.45 乗で、暗い洞窟では
- * 溶岩に照らされた壁と同じ明るさになり、光って見えなかった。周りへの光 (光源・floodfill・GI の g.emission) は変えず、見た目の輝度だけ別に持つ
+ * 溶岩の見た目の輝度。他の発光と同じ g.emission (0.12-0.3) x 露出の -0.45 乗では、暗い洞窟で
+ * 溶岩に照らされた壁と同じ明るさになり、光って見えない。周りへの光 (光源・floodfill・GI の g.emission) は変えず、見た目の輝度だけ別に持つ
  *   橙の地 (テクスチャの線形輝度 LAVA_BODY_ALBEDO) を LAVA_LUMINANCE にし、黄色い筋は輝度の比の LAVA_PATTERN_CONTRAST 乗で明るくする
  *   画面に溶岩が多いと露出が下がって橙の地が露出後 0.3-0.5 に収まる。溶岩が小さく露出が高い時は、露出後の地の明るさを
  *   LAVA_EXPOSED_MAX で頭打ちにする (白く飛ばさない)。色は final の溶岩専用のトーンマップで橙のまま残す
- * -> 頭打ちのままではブルームの滲みが出ず光って見えなかった。滲みはブルームの元でだけ溶岩を明るくして出す
- *    (composite23 の LAVA_BLOOM_GAIN)。上限は 0.7 -> 1.2 (トーンマップの白へ抜け始めを上げたので橙の地は淡くならない)
- * -> ここ (シーンの HDR) を上げると露出の測光が下がって周りの壁が暗くなり、ブルームも一緒に変わるので、
- *    見た目の明るさは final で表示の段だけ上げる (設定 LAVA_BRIGHTNESS)。上限 1.2 はそのまま
+ * 頭打ちのままではブルームの滲みが出ず光って見えないので、滲みはブルームの元でだけ溶岩を明るくして出す
+ * (composite23 の LAVA_BLOOM_GAIN)。上限 1.2 (溶岩のトーンマップは白へ抜け始めが高いので、橙の地は淡くならない)
+ * ここ (シーンの HDR) を上げると露出の測光が下がって周りの壁が暗くなり、ブルームも一緒に変わるので、
+ * 見た目の明るさは final で表示の段だけ上げる (設定 LAVA_BRIGHTNESS)
  */
 const float LAVA_LUMINANCE = 0.8;
 const float LAVA_BODY_ALBEDO = 0.175;
@@ -173,7 +173,7 @@ void main() {
 #if GI_MODE == 2 || GI_MODE == 3
     #ifdef GI_TRACES_SKY
         // GI のレイが空の光を向きと遮蔽込みで運ぶので、空の環境光は置き換えない分 (GI_SKY_OCCLUSION, GI_GROUND_REPLACE) だけ残す
-        // (lib/surface/gi.glsl)。ボクセル体積の外は GI が 0 なので従来どおり
+        // (lib/surface/gi.glsl)。ボクセル体積の外は GI が 0 なので空の環境光をそのまま使う
         #if GI_MODE == 3
             giSky = !hand && isInVoxelVolume(playerToVoxel(playerPos + g.geoNormal * GI_VOLUME_TEST_OFFSET));
         #else

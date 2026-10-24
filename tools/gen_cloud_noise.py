@@ -173,7 +173,7 @@ def gen_noise2d(rng: np.random.Generator) -> None:
     grains = 0.7 * np.clip(1.0 - worley(c, 32, rng), 0.0, 1.0) + 0.3 * np.clip(1.0 - worley(c, 64, rng), 0.0, 1.0)
 
     # b: 中くらいの積雲のセル (r の 8 と a の 32 の間の 18)。r / b / a を 1 回のフェッチで読み、積雲の大きさをべき乗則の分布にする。
-    # 以前の巻雲の筋 (fibers) は巻雲を体積にしたので使わない。乱数の消費順を保つため fibers は計算したまま、別の乱数列で作る
+    # 巻雲の筋 (fibers) は巻雲を体積で描くので使わないが、乱数の消費順を保つため計算したままにし、b は別の乱数列で作る
     del fibers
     rng_mid = np.random.default_rng(SEED + 1)
     mids = 0.75 * np.clip(1.0 - worley(c, 18, rng_mid), 0.0, 1.0) + 0.25 * np.clip(1.0 - worley(c, 36, rng_mid), 0.0, 1.0)

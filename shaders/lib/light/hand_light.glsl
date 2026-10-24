@@ -122,8 +122,7 @@ LightSample evalHandLight(bool mainHand, vec3 playerPos, vec3 geoNormal, float d
     #ifdef ENTITY_TRI_OCCLUSION
         /*
          * 三角形方式: 三人称は自分の体の三角形で遮り、光源を持つ手・腕の先だけを無視する
-         * 一人称では自分の体で手の光を遮らない。以前は体のモデルの手から別に判定して体の影を落としていたが、
-         * 見えない体の影が足元や視界に出るのは不自然なため。設置光源・太陽による自分の影は一人称でも残る
+         * 一人称では自分の体で手の光を遮らない (見えない体の影が足元や視界に出るのは不自然なため)。設置光源・太陽による自分の影は一人称でも残る
          */
         vec3 target = playerToVoxel(lightPos) + jitter;
         skipEnd = HAND_TRI_SELF_SKIP;
@@ -162,9 +161,9 @@ LightSample evalHandLight(bool mainHand, vec3 playerPos, vec3 geoNormal, float d
 const float HAND_LIGHT_FILL = 0.18;
 
 /*
- * 手持ち光の照り返し (陰の中に回り込む分) の倍率。HAND_LIGHT_SHADOW_STRENGTH = 0.5 で以前と同じ、1 で照り返しなし
+ * 手持ち光の照り返し (陰の中に回り込む分) の倍率。HAND_LIGHT_SHADOW_STRENGTH = 0.5 で 1 倍、1 で照り返しなし
  * 陰の中の明るさは、GI_MODE 0/1 ではほぼこの getHandLightFill だけ、GI_MODE 2/3 では GI のヒット点の手持ち光
- * (lib/surface/lighting.glsl の secondaryHitBlockLight) と半分ずつ (実機 hand_shadow53 で計測)。両方に同じ倍率を掛ける
+ * (lib/surface/lighting.glsl の secondaryHitBlockLight) と半分ずつ (ゲーム内で計測)。両方に同じ倍率を掛ける
  */
 float handLightIndirectScale() { return 2.0 * (1.0 - HAND_LIGHT_SHADOW_STRENGTH); }
 

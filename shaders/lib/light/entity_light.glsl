@@ -8,7 +8,7 @@
  *      グローバル光源リストへ 1 個だけ登録する (大きいエンティティが複数セルにまたがっても 1 光源になる)
  *
  * 蓄積表は SSBO3 lightBins.entityAcc (begin でクリア -> shadow / gbuffers で蓄積 -> deferred で読む)。大きさは lib/buffers/ssbo.glsl
- * 以前は binLights の先頭を借りていたが、ビンを重要度順に詰める方式 (LIGHT_CULL_MODE 1/2) は枠が 0 で始まる必要があるので分けた
+ * binLights とは分ける (ビンを重要度順に詰める方式 (LIGHT_CULL_MODE 1/2) は枠が 0 で始まる必要があり、先頭を借りられない)
  */
 #ifndef LIGHT_ENTITY_LIGHT_GLSL
 #define LIGHT_ENTITY_LIGHT_GLSL

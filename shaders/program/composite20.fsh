@@ -102,7 +102,7 @@ void taaWarped() {
     vec2 pos = (src + jitter) * viewSize();
     ivec2 nearest = clamp(ivec2(floor(pos)), ivec2(0), maxTexel);
     vec2 nearestUv = (vec2(nearest) + 0.5) * texelSize();
-    // 拡大している所だけ超解像を効かせる (縮小している周辺は今までどおりの補間)
+    // 拡大している所だけ超解像を効かせる (縮小している周辺は 1 フレームの補間のまま)
     float magnify = 1.0 / max(footprint, 1e-3);
     float superRes = saturate((magnify - 1.0) * LENS_WARP_TAA_SR_RAMP);
     // 一番近い元の画素の中心と出力の画素の中心の距離 (出力の画素)
@@ -113,7 +113,7 @@ void taaWarped() {
     vec3 nearColor = sanitizeColor(nearRaw.rgb) * (1.0 - glintShare(nearRaw.a));
     float centerDepth = texelFetch(depthtex0, nearest, 0).r;
 
-    // 1 フレームの補間 (今までの final と同じ Catmull-Rom)。輝点は双線形で別に取り出す
+    // 1 フレームの補間 (final で引き伸ばす方式と同じ Catmull-Rom)。輝点は双線形で別に取り出す
     vec2 posUv = pos * texelSize();
     vec2 b = pos - 0.5;
     ivec2 b0 = ivec2(floor(b));
@@ -127,7 +127,7 @@ void taaWarped() {
     }
     vec3 smoothColor = max(sanitizeColor(sampleCatmullRom(colortex0, posUv, viewSize())) - glint, 0.0);
 
-    // 一番近い元の画素の周り 3x3 の統計と、最も手前の深度 (元画像の座標。今までの TAA と同じ)
+    // 一番近い元の画素の周り 3x3 の統計と、最も手前の深度 (元画像の座標。歪曲なしの TAA と同じ)
     vec3 m1 = vec3(0.0);
     vec3 m2 = vec3(0.0);
     vec3 boxMin = vec3(1e9);
@@ -197,7 +197,7 @@ void taaWarped() {
         alpha = max(alpha * mix(1.0, nearWeight, superResEff), LENS_WARP_TAA_MIN_BLEND);
         resultYcc = mix(historyYcc, currentYcc, alpha);
     } else {
-        // 履歴が無い所は 1 フレームの補間 (今までの final の再投影と同じぼけ方)
+        // 履歴が無い所は 1 フレームの補間 (final で引き伸ばす方式と同じぼけ方)
         resultYcc = mix(rgbToYCoCg(taaCompress(smoothColor, exposure)), mean, 0.3 * (1.0 - superRes));
     }
 

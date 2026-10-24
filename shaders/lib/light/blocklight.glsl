@@ -71,14 +71,14 @@ vec3 getBlockLightForward(vec3 playerPos, vec3 normal, float lm) {
 /*
  * 前方シェーディングする不透明物 (三人称の自分・半透明ブロックエンティティ) のブロックライト
  * Iris 26.1 は自分を deferred の後に描くので、deferred1 の直接光 (トレース) も GI も届かず、floodfill だけでは
- * 光源に向いた面も暗く、背中は真っ黒だった。ビンの光源を直接トレースし、
+ * 光源に向いた面も暗く、背中は真っ黒になる。ビンの光源を直接トレースし、
  * GI の代わりに、光源から見通せる位置の向きなしの照度の一定割合を周りの壁・床からの照り返しとして足す
- * (floodfill は光源から 2-3 ブロックで急に弱まり、照り返しの代わりにならなかった)
+ * (floodfill は光源から 2-3 ブロックで急に弱まり、照り返しの代わりにならない)
  * 自分の体で自分を遮らないよう、エンティティの遮蔽は使わない (裏側は NdotL で暗くなる)
  */
 const int FORWARD_TRACED_LIGHTS = 8;
-// 照り返しの割合。物理的には周りの反射率 0.3 前後 x 光が周囲に当たる割合だが、0.3 では服の色が読めなかった (実機 dk2)
-// iterationT の三人称 (背中も床の照り返しで服の色が見える) に寄せて多めにする
+// 照り返しの割合。物理的には周りの反射率 0.3 前後 x 光が周囲に当たる割合だが、0.3 では服の色が読めない
+// 三人称で背中も床の照り返しで服の色が見えるよう多めにする (iterationT の三人称の見え方)
 const float FORWARD_ENTITY_BOUNCE = 0.5;
 
 vec3 getBlockLightForwardEntity(vec3 playerPos, vec3 geoNormal, vec3 normal, float lm) {

@@ -158,7 +158,7 @@ vec3 rsmIndirect(vec3 playerPos, vec3 normal, float rotation) {
      * 影マップ上の 1 サンプルが受け持つ面積 (光源方向への投影面積なので太陽の照度をそのまま掛けられる)
      * VPL (太陽から見える面) は空からも照らされている。deferred30 は空の SH の地面の分を丸ごと引くので、空に照らされた分もここで足す
      * (空の照度は真上向きの面の値で代表する。面積は投影面積を太陽との角度の余弦で割って実面積に戻す)
-     * 足さないと雲の影の中で照り返しがほぼ消えて、草地の照り返しが SH の灰色のままだった (FB #55)
+     * 足さないと雲の影の中で照り返しがほぼ消えて、草地の照り返しが SH の灰色のままになる
      */
     float area = PI * RSM_RADIUS * RSM_RADIUS / float(count);
     vec3 skyUp = getSkyIrradiance(vec3(0.0, 1.0, 0.0));
@@ -172,7 +172,7 @@ vec3 rsmIndirect(vec3 playerPos, vec3 normal, float rotation) {
  * 下向きは遠くの地面 (deferred30 が空の SH から引いた灰色の地面) を見たとみなす。画面の外へ出た SSGI のレイや、
  * 崖の上・空中の足場から届かないボクセルのレイで、地面の照り返しが丸ごと消えないように
  * 上向きは方向ごとの空の色 (GI_TRACES_SKY。SH と同じ強さ・彩度の調整)。混ぜ方は prepare の SH と同じ (地平線から 0.1 で地面に切り替わる)
- * gate: 空の光に掛ける絞り (ボクセルは giVoxelSkyGate、SSGI は画面外の遮蔽が分からないので従来のスカイライトの曲線)
+ * gate: 空の光に掛ける絞り (ボクセルは giVoxelSkyGate、SSGI は画面外の遮蔽が分からないのでスカイライトの曲線のまま)
  */
 vec3 giGroundRadiance(float gate) {
     return shSkyGrade(skyGroundIrradianceRaw()) * (GI_GROUND_REPLACE * RCP_PI * gate);
@@ -220,7 +220,7 @@ vec3 ssgiIndirect(vec3 viewPos, vec3 normal, float skyLm, vec4 noise) {
 vec3 voxelIndirect(vec3 playerPos, vec3 normal, vec3 geoNormal, float skyLm, vec4 noise) {
     mat3 basis = tbnFromNormal(normal);
     vec3 origin = voxelRayOrigin(playerPos, geoNormal);
-    // ボクセル体積の外はレイを追えないので 0 (deferred30 が従来の空の環境光に戻す)
+    // ボクセル体積の外はレイを追えないので 0 (deferred30 が空の SH の環境光を使う)
     if (!isInVoxelVolume(playerToVoxel(origin))) return vec3(0.0);
     vec3 sum = vec3(0.0);
 #ifdef GI_TRACES_SKY

@@ -30,7 +30,7 @@ screen.DEBUG=デバッグ
 
 # ルック
 option.LOOK_PRESET=ルック
-option.LOOK_PRESET.comment=光と色の作り方をまとめて選ぶ。ナチュラル: 素朴なマイクラらしさを残した、目の疲れない見た目 (以前の既定)。ビビッド: SEUS Renewed / PTGI のように、日向と日陰の明るさの差、日向の暖色と日陰の青緑、草の照り返しの緑、白近くまで伸びる明部で見せる (彩度とブルームは控えめ)。彩度・コントラスト・露出補正・ブルーム・ブルーミーフォグ・空の光の遮蔽・空の環境光の彩度・フォグの濃さの設定は、プリセットの値に掛ける (露出補正は足す) 微調整として効く。カスタム: プリセットにしか無い値をポストプロセスの「カスタムルック」で決める
+option.LOOK_PRESET.comment=光と色の作り方をまとめて選ぶ。ナチュラル: 素朴なマイクラらしさを残した、目の疲れない見た目。ビビッド: SEUS Renewed / PTGI のように、日向と日陰の明るさの差、日向の暖色と日陰の青緑、草の照り返しの緑、白近くまで伸びる明部で見せる (彩度とブルームは控えめ)。彩度・コントラスト・露出補正・ブルーム・ブルーミーフォグ・空の光の遮蔽・空の環境光の彩度・フォグの濃さは、プリセットの値に掛かる (露出補正は足す)。カスタム: プリセットにしか無い値をポストプロセスの「カスタムルック」で決める
 value.LOOK_PRESET.0=カスタム
 value.LOOK_PRESET.1=ナチュラル
 value.LOOK_PRESET.2=ビビッド
@@ -43,7 +43,7 @@ value.LOOK_LUT.3=フィルム
 option.LOOK_LUT_STRENGTH=LUT の強さ
 option.LOOK_LUT_STRENGTH.comment=LUT を掛ける割合 (元の色と混ぜる)
 screen.LOOK_CUSTOM=カスタムルック
-screen.LOOK_CUSTOM.comment=ルックを「カスタム」にした時だけ有効。プリセットにしか無い値を決める。ほかの値は既存の設定 (彩度・コントラストなど) がそのまま効く
+screen.LOOK_CUSTOM.comment=ルックを「カスタム」にした時だけ有効。プリセットにしか無い値を決める。ほかの値は通常の設定 (彩度・コントラストなど) がそのまま効く
 option.LOOK_C_SKY_AMBIENT=空の環境光の強さ
 option.LOOK_C_SKY_AMBIENT.comment=日陰を照らす空の光の強さ。下げると日向と日陰の差が大きくなる (空そのものの明るさは変わらない)。ナチュラル 1、ビビッド 0.8
 option.LOOK_C_SKY_SATURATION=空の色の彩度
@@ -118,7 +118,7 @@ option.LIGHT_ENTITY_TRIANGLES.comment=三角形方式で保持する三角形の
 option.LIGHT_CONTACT_SHADOWS=光源の接触影
 option.LIGHT_CONTACT_SHADOWS.comment=ボクセルでは表せない細部をスクリーンスペースの影で補う
 option.LIGHT_CULL_MODE=上限を超えた時の光源の選び方
-option.LIGHT_CULL_MODE.comment=光源の数がビンや総数の上限を超えた時に、どの光源を残すか。到着順: 以前の方式。毎フレーム違う光源が外れてちらつく。近い順: 近い光源から残す。明るさ x 近さ: 届く光の強さの目安で残す (既定)。どちらも外れる境界の光源は数フレームかけて弱め、ビンをワールドの格子にそろえて歩いても入れ替わらないようにする。上限を超えない場面では見た目も重さも変わらない
+option.LIGHT_CULL_MODE.comment=光源の数がビンや総数の上限を超えた時に、どの光源を残すか。到着順: 先に登録された光源を残す。毎フレーム違う光源が外れてちらつく。近い順: 近い光源から残す。明るさ x 近さ: 届く光の強さの目安で残す (既定)。近い順と明るさ x 近さでは、外れる境界の光源は数フレームかけて弱め、ビンをワールドの格子にそろえて歩いても入れ替わらないようにする。上限を超えない場面では見た目も重さも変わらない
 value.LIGHT_CULL_MODE.0=到着順
 value.LIGHT_CULL_MODE.1=近い順
 value.LIGHT_CULL_MODE.2=明るさ x 近さ
@@ -188,13 +188,13 @@ value.GI_MODE.2=スクリーンスペース
 value.GI_MODE.3=ボクセルレイトレース
 option.GI_SAMPLES=GI のサンプル数
 option.GI_STRENGTH=GI の強さ
-option.GI_STRENGTH.comment=照り返し (と SSGI / ボクセルレイトレースでは空の光) の強さ。上げると日陰・地面を向く面・室内が明るくなり、日向との差が小さくなる。2 で以前に近い日陰の明るさ。同じ値でどの方式も近い明るさになるよう、内部で方式ごとに効きを変えている (ボクセル 1 倍、RSM 0.75 倍、スクリーンスペース 0.5 倍)
+option.GI_STRENGTH.comment=照り返し (と SSGI / ボクセルレイトレースでは空の光) の強さ。上げると日陰・地面を向く面・室内が明るくなり、日向との差が小さくなる。同じ値でどの方式も近い明るさになるよう、内部で方式ごとに効きを変えている (ボクセル 1 倍、RSM 0.75 倍、スクリーンスペース 0.5 倍)
 option.GI_MULTI_BOUNCE=多重反射
 option.GI_MULTI_BOUNCE.comment=GI のレイが当たった面に前のフレームの GI を返し、フレームを重ねて照り返しを何回も跳ね返らせる量。洞窟の入り口や室内の奥まで光が回る。重さはほぼ変わらない。0 = 1 回だけ、1 = 物理的に正しい (SSGI / ボクセルレイトレースのみ)
 option.GI_SKY_OCCLUSION=空の光の遮蔽
-option.GI_SKY_OCCLUSION.comment=空の光を GI のレイで遮る割合。1 = 空の見える向きだけから光が入る (軒下・洞窟の入り口・室内の奥が暗くなり、入り口の向きが分かる)。0 = 以前と同じスカイライトだけの遮蔽 (向きが無く、照り返しと二重に数える)。既定の 0.5 は、多重反射を考えても暗くなりすぎる室内・洞窟の入り口を以前に近い明るさに保つため。スクリーンスペース / ボクセルレイトレースのみ。ルックのプリセットの値に掛ける (ナチュラルでは今までと同じ値)
+option.GI_SKY_OCCLUSION.comment=空の光を GI のレイで遮る割合。1 = 空の見える向きだけから光が入る (軒下・洞窟の入り口・室内の奥が暗くなり、入り口の向きが分かる)。0 = スカイライトだけの遮蔽 (向きが無く、照り返しと二重に数える)。既定の 0.5 は室内・洞窟の入り口を暗くしすぎないため (1 では多重反射があっても暗すぎる)。スクリーンスペース / ボクセルレイトレースのみ。ルックのプリセットの値 (ナチュラルでは 1) に掛ける
 option.GI_GROUND_REPLACE=地面の照り返しの置き換え
-option.GI_GROUND_REPLACE.comment=空の環境光に含まれる灰色の地面の照り返しを、GI が拾う実際の地面の色 (草地なら緑) に置き換える割合。1 = 物理的に正しい (日陰・下向きの面が地面の色に染まり暗くなる)。0 = 以前の明るく灰色の日陰 (照り返しを二重に数える)
+option.GI_GROUND_REPLACE.comment=空の環境光に含まれる灰色の地面の照り返しを、GI が拾う実際の地面の色 (草地なら緑) に置き換える割合。1 = 物理的に正しい (日陰・下向きの面が地面の色に染まり暗くなる)。0 = 灰色の地面の照り返しのまま (日陰が明るく灰色になり、照り返しを二重に数える)
 option.GI_RES=GI の解像度
 value.GI_RES.1=フル
 value.GI_RES.2=1/2
@@ -229,7 +229,7 @@ option.PUDDLE_RIPPLES=水たまりの波紋
 option.PUDDLE_RIPPLES.comment=水たまりに落ちる雨の波紋の強さ
 option.EMISSION_STRENGTH=発光の強さ
 option.LAVA_BRIGHTNESS=溶岩の明るさ
-option.LAVA_BRIGHTNESS.comment=画面に見える溶岩そのものの明るさ。上げるほど橙から黄色へ寄る。周りを照らす光は変わらない。0 で以前の暗めの見た目
+option.LAVA_BRIGHTNESS.comment=画面に見える溶岩そのものの明るさ。上げるほど橙から黄色へ寄る。周りを照らす光は変わらない。0 で持ち上げなし (暗めの橙)
 option.LAVA_BLOOM=溶岩のブルーム
 option.LAVA_BLOOM.comment=溶岩の周りの光の滲みの強さ。0 で他の物と同じブルーム
 
@@ -287,7 +287,7 @@ option.SUN_BRIGHTNESS=太陽の明るさ
 option.MOON_BRIGHTNESS=月の明るさ
 option.SKY_BRIGHTNESS=空の明るさ
 option.SKY_AMBIENT_SATURATION=空の環境光の彩度
-option.SKY_AMBIENT_SATURATION.comment=日陰を照らす空の光の色の濃さ。上げると日陰が青み、日向の暖色との差が出る。0.3 = 以前の控えめな色、1 = 空の色のまま (日陰の雪がかなり青くなる)。ルックのプリセットの値に掛ける (ナチュラルでは今までと同じ値)
+option.SKY_AMBIENT_SATURATION.comment=日陰を照らす空の光の色の濃さ。上げると日陰が青み、日向の暖色との差が出る。0.3 = 控えめな色、1 = 空の色のまま (日陰の雪がかなり青くなる)。ルックのプリセットの値 (ナチュラルでは 1) に掛ける
 option.SUN_MOON_STYLE=太陽と月
 value.SUN_MOON_STYLE.0=バニラ
 value.SUN_MOON_STYLE.1=丸
@@ -353,7 +353,7 @@ option.CLOUD_SHADOWS=雲の影
 option.CLOUD_LOW_COVERAGE=低層の雲量
 option.CLOUD_LOW_COVERAGE.comment=積雲・層積雲・雨雲の量の倍率。雲量と気候に掛かる
 option.CLOUD_LOW_DENSITY=低層の濃さ
-option.CLOUD_LOW_DENSITY.comment=低層の雲の光学的な濃さ。既定 0.25 で縁が淡く透けるふわっとした雲、1.0 で以前の既定、3.0 でさらに前の濃い雲。雨雲・雷雨の雲もこの比率で変わる。小さくしても陰影 (光源側の明るさと底の暗さ) は残す
+option.CLOUD_LOW_DENSITY.comment=低層の雲の光学的な濃さ。既定 0.25 で縁が淡く透けるふわっとした雲、上げるほど詰まった濃い雲になる。雨雲・雷雨の雲もこの比率で変わる。小さくしても陰影 (光源側の明るさと底の暗さ) は残す
 option.CLOUD_LOW_SCALE=低層の大きさ
 option.CLOUD_LOW_SCALE.comment=低層の雲だけの水平の大きさの倍率 (雲の大きさに掛かる)
 option.CLOUD_LOW_EROSION=低層の浸食
@@ -403,7 +403,7 @@ option.CLOUD_EDGE_SOFTNESS.comment=低層の雲の淡い縁の幅。大きいほ
 option.CLOUD_EDGE_HAZE=縁のもや
 option.CLOUD_EDGE_HAZE.comment=晴天の積雲の縁から外へ広がる薄いもやの濃さ。0 で輪郭のはっきりした雲
 option.CLOUD_CORE_STRENGTH=芯の濃さ
-option.CLOUD_CORE_STRENGTH.comment=晴天の積雲の塊の中心部の濃さ (縁の小片と小さな雲はその半分)。大きいほど詰まった不透明な塊でこぶの陰影が深い。0.25 で以前の既定の淡い芯、2.0 以上はほぼ一様に濃い
+option.CLOUD_CORE_STRENGTH.comment=晴天の積雲の塊の中心部の濃さ (縁の小片と小さな雲はその半分)。大きいほど詰まった不透明な塊でこぶの陰影が深い。0.25 で淡い芯、2.0 以上はほぼ一様に濃い
 option.CLOUD_SILVER_LINING=銀の縁
 option.CLOUD_SILVER_LINING.comment=太陽・月の逆光で雲の縁が光る強さ
 option.CLOUD_POWDER=縁の暗さ
@@ -419,7 +419,7 @@ option.CLOUD_C_HIGH.comment=気候がカスタムの時だけ。巻雲の量の�
 
 # フォグ
 option.FOG_DENSITY=フォグの濃さ
-option.FOG_DENSITY.comment=ルックのプリセットの値に掛ける (ナチュラルでは今までと同じ値)
+option.FOG_DENSITY.comment=ルックのプリセットの値 (ナチュラルでは 1) に掛ける
 option.FOG_MIST=地表の霧
 option.FOG_MIST_ALTITUDE=霧の高度
 option.VL=ボリューメトリックライト
@@ -493,7 +493,7 @@ option.LENS_FLARE.comment=太陽・月のフレア (ゴースト・光条・ハ�
 option.LENS_FLARE_STRENGTH=フレア全体の倍率
 option.LENS_FLARE_STRENGTH.comment=どのプリセットでも効く。1 = プリセットどおり (ゴーストは反射率から計算した物理量)
 option.LENS_PRESET=レンズ
-option.LENS_PRESET.comment=レンズの個性 (フレアの色と形・光条の本数・収差) をまとめて選ぶ。個別の強さは「カスタム」の時だけ下の「カスタムレンズ」で変えられる。ON/OFF はどのレンズでも効く。Sonnar から魚眼までは実在のレンズの特許の処方から計算した値を使う。Sonnar: 高コントラストでゴーストが少なく、わずかに糸巻き型。Summilux 35: 開放で光がにじみ、周辺の玉ボケは猫目、四隅が暗い。Canon 50/1.2: 開放は柔らかく低コントラスト、周辺で背景が流れ、四隅が大きく落ちる。Hologon: 110 度でも直線がまっすぐ、四隅が大きく暗い、F8 固定 (FOV 68)。Flektogon: 中ほどで樽型・隅で糸巻き型の陣笠歪曲 (FOV 54)。魚眼: 魚眼の写り方で直線が曲がる (FOV 110。魚眼の合わせ方を「横幅を合わせる」にすると実物の画角)。FOV の目安は、35mm 判の横幅 36mm を画面の横幅に合わせた時の実物の画角 (16:9 なので 3:2 の上下が切れる): 縦の FOV = 2 atan(18 / f x 9 / 16)。ぎょぎょっと: 正射影寄りの魚眼で周辺が Rokkor より強く縮む、F8 固定。Ultra Wide-Heliar 12: 121 度、単純な樽型、絞っても四隅がとても暗い。New FD 14: 114 度、四隅で弱まる樽型、開放の四隅が暗く絞ると戻る。STF 135: アポダイゼーションフィルターでボケの縁が溶けて輪郭が出ない。FA 28 Soft: 開放でピントの合った所にもハローが付き、F5.6 までに消える (絞りは被写界深度の設定で)。Canon 50/0.95: 四隅が最も暗く、開放だけ光がにじむ。35mm = 32、20mm = 54、15mm = 68。50mm 以上はゲームの下限 30 より狭いので 30 (実物より少し広い)
+option.LENS_PRESET.comment=レンズの個性 (フレアの色と形・光条の本数・収差) をまとめて選ぶ。個別の強さは「カスタム」の時だけ下の「カスタムレンズ」で変えられる。ON/OFF はどのレンズでも効く。Sonnar 以降は実在のレンズの特許の処方から計算した値を使う。Sonnar: 高コントラストでゴーストが少なく、わずかに糸巻き型。Summilux 35: 開放で光がにじみ、周辺の玉ボケは猫目、四隅が暗い。Canon 50/1.2: 開放は柔らかく低コントラスト、周辺で背景が流れ、四隅が大きく落ちる。Hologon: 110 度でも直線がまっすぐ、四隅が大きく暗い、F8 固定 (FOV 68)。Flektogon: 中ほどで樽型・隅で糸巻き型の陣笠歪曲 (FOV 54)。魚眼: 魚眼の写り方で直線が曲がる (FOV 110。魚眼の合わせ方を「横幅を合わせる」にすると実物の画角)。ぎょぎょっと: 正射影寄りの魚眼で周辺が Rokkor より強く縮む、F8 固定。Ultra Wide-Heliar 12: 121 度、単純な樽型、絞っても四隅がとても暗い。New FD 14: 114 度、四隅で弱まる樽型、開放の四隅が暗く絞ると戻る。STF 135: アポダイゼーションフィルターでボケの縁が溶けて輪郭が出ない。FA 28 Soft: 開放でピントの合った所にもハローが付き、F5.6 までに消える (絞りは被写界深度の設定で)。Canon 50/0.95: 四隅が最も暗く、開放だけ光がにじむ。名前の FOV は、35mm 判の横幅 36mm を画面の横幅に合わせた時の実物の画角: 縦の FOV = 2 atan(18 / f x 9 / 16) (35mm = 32、20mm = 54、15mm = 68)。50mm 以上はゲームの下限より狭くなるので 30 (実物より少し広い)
 value.LENS_PRESET.0=カスタム
 value.LENS_PRESET.1=現代の単焦点 (控えめ)
 value.LENS_PRESET.2=Helios 44-2
@@ -540,7 +540,7 @@ option.LENS_FISHEYE_FIT.comment=魚眼を画面にどう合わせるか。隅ま
 value.LENS_FISHEYE_FIT.0=隅まで埋める
 value.LENS_FISHEYE_FIT.1=横幅を合わせる
 option.LENS_WARP_IN_TAA=歪曲を TAA で組み立てる
-option.LENS_WARP_IN_TAA.comment=魚眼・歪曲の画面をどこで作るか。final: できた画面を引き伸ばすので、魚眼の中央 (FOV 110 で約 2.5 倍に拡大) が柔らかくなる。TAA: ジッターで毎フレームずれた画面から組み立てるので、止まっている時やゆっくり回る時に中央の細かさが戻る (速く動く時は final と同じくらい)。重さは final とほぼ同じ (1038x938 の計測で 1 ms 前後の差)。自動は魚眼と歪曲の強い時に TAA。TAA が必要
+option.LENS_WARP_IN_TAA.comment=魚眼・歪曲の画面をどこで作るか。final: できた画面を引き伸ばすので、魚眼の中央 (FOV 110 で約 2.5 倍に拡大) が柔らかくなる。TAA: ジッターで毎フレームずれた画面から組み立てるので、止まっている時やゆっくり回る時に中央の細かさが戻る (速く動く時は final と同じくらい)。重さは final とほぼ同じ。自動は魚眼と歪曲の強い時に TAA。TAA が必要
 value.LENS_WARP_IN_TAA.0=自動
 value.LENS_WARP_IN_TAA.1=final (引き伸ばし)
 value.LENS_WARP_IN_TAA.2=TAA
@@ -629,9 +629,9 @@ option.TAA=TAA (時間的アンチエイリアス)
 option.CAS_STRENGTH=シャープネス
 option.BLOOM=ブルーム
 option.BLOOM_STRENGTH=ブルームの強さ
-option.BLOOM_STRENGTH.comment=ルックのプリセットの値に掛ける (ナチュラルでは今までと同じ値)
+option.BLOOM_STRENGTH.comment=ルックのプリセットの値 (ナチュラルでは 1) に掛ける
 option.BLOOM_FOG=ブルーミーフォグ
-option.BLOOM_FOG.comment=ルックのプリセットの値に掛ける (ナチュラルでは今までと同じ値)
+option.BLOOM_FOG.comment=ルックのプリセットの値 (ナチュラルでは 1) に掛ける
 option.EXPOSURE_MODE=露出
 value.EXPOSURE_MODE.0=マニュアル
 value.EXPOSURE_MODE.1=オート (平均)
@@ -655,9 +655,9 @@ value.TONEMAP.3=Reinhard-Jodie
 value.TONEMAP.4=AgX (ゴールデン)
 value.TONEMAP.5=PBR Neutral
 option.SATURATION=彩度
-option.SATURATION.comment=ルックのプリセットの値に掛ける (ナチュラルでは今までと同じ値)
+option.SATURATION.comment=ルックのプリセットの値 (ナチュラルでは 1) に掛ける
 option.CONTRAST=コントラスト
-option.CONTRAST.comment=ルックのプリセットの値に掛ける (ナチュラルでは今までと同じ値)
+option.CONTRAST.comment=ルックのプリセットの値 (ナチュラルでは 1) に掛ける
 option.WHITE_BALANCE=ホワイトバランス
 suffix.WHITE_BALANCE= K
 option.WHITE_BALANCE.comment=想定する照明の色温度。値が低いほど暖色の照明を打ち消すので画面は青くなる

@@ -14,7 +14,7 @@
 #ifndef SURFACE_WATER_GLSL
 #define SURFACE_WATER_GLSL
 
-// プレビュー用の旧版 (テクスチャ波) と見分けるための印
+// FFT の波テクスチャを使う水であることの印 (方式を見分けて分岐する側のため)
 #define WATER_FFT_WAVES
 
 uniform sampler3D waterWaveTex;
@@ -23,8 +23,7 @@ uniform float waterRiver;
 
 const float WATER_IOR = 1.333;
 const float WATER_GRAVITY = 9.81;
-// 横向きの面 (滝・流れの側面) は波を弱める
-// -> 海のスペクトルを弱めて貼るのをやめ、側面専用の落ちる水の乱れ (waterFallNormal) にした
+// 横向きの面 (滝・流れの側面) には海のスペクトルを貼らず、側面専用の落ちる水の乱れ (waterFallNormal) を使う
 
 // ---- 波テクスチャ (gen_water_waves.py と揃える) ----
 const int WATER_LAYERS = 5;
@@ -82,13 +81,11 @@ const float WATER_FLOW_CYCLE = 1.6;            // 流れの 2 相の切り替え
     const vec3 WATER_ABSORPTION_COEFF = vec3(0.33, 0.05, 0.014);
     const vec3 WATER_SCATTERING_COEFF = vec3(0.010, 0.013, 0.018);
 #else
-    // 散乱は外洋の粒子散乱の下限寄り (0.03-0.05 では浅瀬が底まで透けて浅いプールに見えた)
-    // 緑と青の吸収 0.09 / 0.03 では手前の水が底の砂の照り返しで明るいターコイズに浮いた (iterationT の約 4 倍の明るさ)。
-    // 緑を青より強く吸わせて紺に寄せる
-    // -> (0.45, 0.20, 0.09) / (0.09, 0.11, 0.13) は消散が緑 0.31 / 青 0.22 で、水中の見通しが 10 ブロックほどしかなく、光源も
-    //    すぐ水の色に埋もれた。深い所の暗さは内散乱の光源を深さで弱める式 (composite1 の waterInscatter) で出すようにしたので、
-    //    吸収を純水 (Pope & Fry 1997) + 少量のクロロフィルに戻す。消散は緑 0.21 / 青 0.15 で 15-25 ブロック先まで見える
-    //    (緑の吸収 0.10 では上から見た浅瀬が明るいターコイズに寄りすぎたので、緑を少し多めに吸わせる)
+    // 散乱は外洋の粒子散乱の下限寄り (0.03-0.05 では浅瀬が底まで透けて浅いプールに見える)
+    // 吸収は純水 (Pope & Fry 1997) + 少量のクロロフィル。消散は緑 0.21 / 青 0.15 で 15-25 ブロック先まで見える
+    // (緑 0.31 / 青 0.22 まで上げると水中の見通しが 10 ブロックほどしかなく、光源もすぐ水の色に埋もれる)。
+    // 深い所の暗さは内散乱の光源を深さで弱める式 (composite1 の waterInscatter) で出す
+    // 緑は青より強く吸わせて紺に寄せる (緑 0.09-0.10 では手前の水が底の砂の照り返しで明るいターコイズに浮く)
     const vec3 WATER_ABSORPTION_COEFF = vec3(0.38, 0.12, 0.05);
     const vec3 WATER_SCATTERING_COEFF = vec3(0.070, 0.085, 0.100);
 #endif

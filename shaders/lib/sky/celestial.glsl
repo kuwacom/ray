@@ -13,7 +13,7 @@ const float MOON_EARTHSHINE = 0.004;
 const float MOON_DISK_SCALE = 2.5;
 /*
  * 夜の月の円盤の明るさの倍率 (見た目の調整)。物理的な放射のままだと、夜の露出では円盤が白飛びして強いブルームと光条の
- * 光る玉になり、海もクレーターも見えなかった。昼の月は青空と同じくらいの明るさで淡く見えるのが正しいので 1 にする
+ * 光る玉になる。昼の月は青空と同じくらいの明るさで淡く見えるのが正しいので 1 にする
  */
 const float MOON_NIGHT_BRIGHTNESS = 0.004;
 
@@ -108,7 +108,7 @@ vec3 skyMoonDisk(vec3 dir, vec3 moonDir, vec3 illuminanceFull, vec3 viewT) {
     float mu0 = max(dot(n, l), 0.0);
     float lommel = 2.0 * mu0 / (mu0 + n.z + 1e-3);
 
-    // 月面の模様 (海・クレーター) は廃止し、一様な白い円盤にした。満ち欠けの陰影だけ残す
+    // 月面の模様 (海・クレーター) は描かず、一様な白い円盤にする。満ち欠けの陰影だけ残す
     vec3 radiance = illuminanceFull / (PI * radius * radius);
     radiance *= mix(MOON_NIGHT_BRIGHTNESS, 1.0, smoothstep(-0.1, 0.1, getSunDir().y));
     return radiance * (lommel + MOON_EARTHSHINE) * viewT * coverage;

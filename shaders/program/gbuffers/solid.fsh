@@ -42,8 +42,8 @@ const float GENERATED_NORMAL_MAX_LOD = 0.25; // テクセルが画素とほぼ�
 const float FRONT_FACING_MIN_NOV = 0.05;     // テクスチャ法線と視線の内積の下限
 const float VANILLA_AO_SOFTEN = 0.6;     // GTAO 併用時はバニラ AO を弱めて二重に暗くならないように
 /*
- * 水たまりの模様。以前は Iris 既定の noisetex (白色ノイズ) を 0.05/ブロックで読んでいて、
- * 1 ブロックに 13 テクセルの砂目になり、小さな水たまりがまばらに散っていた
+ * 水たまりの模様。Iris 既定の noisetex (白色ノイズ) を 0.05/ブロックで読むと、
+ * 1 ブロックに 13 テクセルの砂目になり、小さな水たまりがまばらに散る
  * 勾配ノイズの fbm を基本の大きさ PUDDLE_SCALE x PUDDLE_SIZE で敷き、上位 PUDDLE_AMOUNT の割合を水たまりにする
  * 3.5 ブロック・割合 0.3 で、1 つが中央値 3 ブロック^2・100 ブロック^2 あたり 3 個 (Nostalgia の再現では 2.4 ブロック^2・3.4 個、割合 0.37)
  */
@@ -363,8 +363,8 @@ void main() {
     // ---- 鏡面のちらつき対策 ----
     // テクスチャ法線が視線の裏を向くと NoV が 0 に張り付き、かすめ角の照り返しがテクセル単位で明滅する
     if (!isPlant && dot(geoNormal, -viewDirPlayer) > 0.0) normal = frontFacingNormal(normal, -viewDirPlayer, FRONT_FACING_MIN_NOV);
-    // 鏡面 AA (法線の画面微分で alpha^2 を広げる) は実機で逆効果だったので入れていない。自動法線はテクセル内で一定のため
-    // 微分がテクセルの境目の 2x2 だけ大きくなり、ジッターでその画素の粗さが毎フレーム変わってちらつきが増えた (ice_dusk p99 3.7 -> 3.9)
+    // 鏡面 AA (法線の画面微分で alpha^2 を広げる) は逆効果なので入れない。自動法線はテクセル内で一定のため
+    // 微分がテクセルの境目の 2x2 だけ大きくなり、ジッターでその画素の粗さが毎フレーム変わってちらつきが増える
 
     GBufferData g = gbufferDefault();
     g.albedo = srgbToLinear(albedo.rgb);
