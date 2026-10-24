@@ -1,6 +1,6 @@
 /*
  * final: 歪曲と魚眼の再投影・色収差・シャープ (CAS)・ブルーム合成・球面収差・ベーリンググレア・レンズフレア・口径食・ハレーション・Purkinje・ビネット・露出・
- *        ホワイトバランス・コントラスト・彩度・トーンマップ・ルックの LUT・グレイン・ディザ・デバッグ表示
+ *        ホワイトバランス・カラーグレーディング・トーンマップ・ルックの LUT・グレイン・ディザ・デバッグ表示
  * 色に掛ける処理は物理的な順 (レンズ -> センサー -> 現像) に並べる
  * post モジュール
  */
@@ -56,7 +56,7 @@ vec3 debugView(ivec2 texel, vec3 color) {
 }
 
 /*
- * ルックの LUT (表示値 -> 表示値)。トーンマップと sRGB エンコードの後、CDL の前に掛ける
+ * ルックの LUT (表示値 -> 表示値)。トーンマップと sRGB エンコード・表示値のグレードの後、CDL の前に掛ける
  * 表示空間にすると、Resolve・Photoshop の .cube や、恒等の画像に画像編集ソフトで色調補正を掛けたものがそのまま使える。
  * AgX の出力は 0-1 に収まるので定義域の外も出ない。グレインとディザより前なのでノイズを LUT が歪めない
  * 1 = ユーザーの PNG ストリップ (32^3。青を 32 枚横に並べ、各枚は x = 赤、y = 緑で上の行が緑 0)、2 以降 = 同梱の 33^3 の 3D LUT
@@ -294,13 +294,27 @@ void main() {
     hdr = applyPurkinje(hdr, frameData.averageLuminance, exposure);
     vec3 color = hdr * exposure;
 
-    // ---- 現像: ホワイトバランス -> コントラスト -> 彩度 -> トーンマップ ----
+    /*
+     * ---- 現像: ホワイトバランス -> ティント・オフセット -> コントラスト -> 明部の伸び -> ゾーン・圧縮・持ち上げ -> 彩度 ->
+     *      バイブランス・色相ごと -> トーンマップ (グレーディングの順番は lib/post/color_grade.glsl) ----
+     */
 #if WHITE_BALANCE != 6500
     color = applyWhiteBalance(color, float(WHITE_BALANCE));
 #endif
-    color = applyContrast(color, LOOK_CONTRAST);
+#ifdef GRADING
+    color = gradeBalance(color);
+    color = applyContrast(color, LOOK_CONTRAST, G_PIVOT_LEVEL);
+#else
+    color = applyContrast(color, LOOK_CONTRAST, EXPOSURE_KEY);
+#endif
     if (LK_HIGHLIGHT != 1.0) color = applyHighlightRange(color, LK_HIGHLIGHT);
+#ifdef GRADING
+    color = gradeZones(color);
+#endif
     color = applySaturation(color, LOOK_SATURATION);
+#ifdef GRADING
+    color = gradeChroma(color);
+#endif
     /*
      * 溶岩の見た目の明るさ。表示の段でだけ上げ、露出の測光・ブルーム・反射・周りへの光は変えない
      * 赤はほぼ上限なので、明るさは tonemapEmissive で緑 (と少し青) が持ち上がる形で出る (暗い殻 -> 橙 -> 黄の割れ目)
@@ -309,6 +323,10 @@ void main() {
     lava = max(lava, lavaGlowShare);
     color = lava > 0.0 ? mix(tonemap(color), tonemapEmissive(color), lava) : tonemap(color);
     color = linearToSrgb(color);
+    // 表示値のグレード (リフト・ガンマ・ゲイン -> カーブ -> スプリットトーン) は、フィルムの LUT の下 (前) に置く
+#ifdef GRADING
+    color = gradeDisplay(color);
+#endif
 #if LOOK_LUT > 0
     color = mix(color, applyLookLut(color), LOOK_LUT_STRENGTH);
 #endif

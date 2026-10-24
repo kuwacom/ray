@@ -395,6 +395,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | ルックのプリセット | LOOK_PRESET 0 はカスタム (LOOK_C_*)、1 はナチュラル (既定。既存の設定に掛ける基準値は 1)、2 はビビッド。`lib/common/look_presets.glsl` の `#if` で基準値 LK_* を差し替え (Iris の profile は品質のプロファイルの 1 組しか持てないため)、既存の設定 (SATURATION, CONTRAST, EXPOSURE_BIAS, BLOOM_STRENGTH, BLOOM_FOG, GI_SKY_OCCLUSION, SKY_AMBIENT_SATURATION, FOG_DENSITY) は LK_* に掛ける (露出は足す)。効く所: 空の環境光の強さ (SH 全体。霧・粗い反射・フレアの判定では戻す)、日向の暖かさ (prepare の太陽の直達光だけ)、照り返しの強さと彩度 (GI のレイが当たった面だけ、`giBounceGrade`。多重反射の履歴は強さで割る)、明部の伸び (final、中間グレーより上の log2 の傾き)、暗部の持ち上げ (AgX の出力の復号を 2.2 乗から sRGB の曲線へ)、ブルームの広がりと晴れのブルーミーフォグ | 全モジュール |
 | 雲の形のプリセット | CLOUD_STYLE 0 はカスタム (CLOUD_S_*)、1 は Ray (既定)、2 Bliss 風、3 Nostalgia 風、4 現実に忠実、5 綿あめ、6 入道雲、7 まばらな晴天積雲、8 層積雲の曇り。`lib/sky/cloud_styles.glsl` の `#if` で基準値 CS_* (晴天の層ごとの雲量、低層の大きさ・背丈・対流・雲種・晴れ間・こぶ・浸食・雲底・断片雲・もや・縁・濃さ・芯、こぶの陰・銀の縁・powder・日光・多重散乱・空の光・雲底の暗さ) を差し替え、既存の CLOUD_* の設定は CS_* に掛ける。雲量・濃さ・光の値は雨天度で Ray の値へ戻す (雨雲・雷雨はどのスタイルもほぼ同じ。大きさ・こぶなど形の定数は雨雲にも効く)。視線の濃さを上げたスタイルは、光源・真上方向の光学的深さを芯の実測の消散係数で頭打ちにする (CLOUD_STYLE_LIGHT_SIGMA_RATIO)。CS_SLAB=1 (Nostalgia 風) は格子のマスを被覆で塗り、境目の近くだけなめらかに補間して切る角の丸い平らな板 (cloudSlabDensity)。晴天はマーチを板の厚みに限り、光源方向の陰は 100 m まで | sky |
 | ルックの LUT | LOOK_LUT 1 はユーザーの PNG ストリップ (`textures/look/user_lut.png`, 32^3, 1024x32, 上の行が緑 0)、2 以降は同梱の 3D LUT (`.dat`, 33^3 RGBA16)。shaders.properties の `#if LOOK_LUT` で `customTexture` を切り替え、final がトーンマップと sRGB エンコードの後、CDL の前に掛ける (sampler は final で 1 個)。作成・変換は `tools/gen_look_lut.py` | post |
+| カラーグレーディング | `lib/post/color_grade.glsl` (final だけ)。Resolve のノードの考え方で、シーンの値 (露出後・トーンマップ前, EV) の段と表示値 (sRGB エンコード後) の段に分ける。シーン: WHITE_BALANCE -> ティント -> オフセット (チャンネルごとの EV) -> CONTRAST とピボット -> 明部の伸び (LK_HIGHLIGHT) -> ゾーン (中間グレーからの EV の境目と柔らかさで分けたシャドー・ミッド・ハイライトの RGB・輝度・コントラスト) -> ハイライトの圧縮・シャドーの持ち上げ (境目の外の EV の差 a を a / sqrt(1 + k a)) -> SATURATION -> ゾーンの彩度・バイブランス・色相ごと 8 色 (Oklab の色相で隣の中心の間を smoothstep で補間、a,b / L で色の薄い所を外す) -> トーンマップ。表示: リフト・ガンマ・ゲイン -> 7 点のトーンカーブ (Fritsch-Butland の単調 3 次エルミート) -> スプリットトーン (Oklab の a,b に L に比例して足す) -> LOOK_LUT -> CDL。設定 GRADE_* とルックのプリセットの基準 LKG_* は和 / 積で重ねる。段ごとの const bool で既定値の段を定数畳み込みで消すので、既定値では前の式と同じ画素 (GPU の格子で全一致を確認)。追加の sampler・パスなし | post |
 
 ---
 
@@ -423,6 +424,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | LOOK_LUT | 0 | 0 = なし、1 = ユーザーの LUT、2 = 日向と日陰の色の割れ、3 = フィルム |
 | LOOK_LUT_STRENGTH | 1.0 | LUT と元の色の混ぜ具合 |
 | LOOK_C_* | ナチュラルの値 | カスタムの時だけ使う (空の環境光の強さ・空の色の彩度・日向の暖かさ・照り返しの強さと彩度・明部の伸び・暗部の持ち上げ・ブルームの広がり・晴れのブルーミーフォグ) |
+| GRADING / GRADE_* | 有効 / 恒等 | カラーグレーディング (`lib/post/color_grade.glsl`)。既定値ではどの段も何もしない。画面は「ポストプロセス」の「カラーグレーディング」の下の入れ子 (基本・シャドー・ミッド・ハイライト・リフト・ガンマ・ゲイン・色相ごと・トーンカーブ・スプリットトーン・CDL) |
 
 #### 雲の形 (プロファイルに含めない)
 

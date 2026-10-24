@@ -40,9 +40,9 @@ vec3 applyWhiteBalance(vec3 c, float kelvin) {
     return max(XYZ_TO_RGB * (LMS_TO_XYZ * lms), 0.0);
 }
 
-// コントラストは log2 ドメインで中間グレーを軸に掛ける (露出を変えても効き方が同じ)
-vec3 applyContrast(vec3 c, float contrast) {
-    return EXPOSURE_KEY * pow(max(c, 0.0) / EXPOSURE_KEY, vec3(contrast));
+// コントラストは log2 ドメインで軸 (既定は中間グレー, グレーディングのピボット) を中心に掛ける (露出を変えても効き方が同じ)
+vec3 applyContrast(vec3 c, float contrast, float pivot) {
+    return pivot * pow(max(c, 0.0) / pivot, vec3(contrast));
 }
 
 /*

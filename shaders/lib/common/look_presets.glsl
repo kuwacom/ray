@@ -79,6 +79,88 @@ const float LK_BLOOM_FOG_CLEAR = LOOK_C_BLOOM_FOG_CLEAR;
 const float LK_FOG = 1.0;
 #endif
 
+/*
+ * プリセットのグレーディングの基準 (LKG_*, lib/post/color_grade.glsl)。プリセットは変えたいものだけを上の #if の中で #define し、
+ * 残りはここで恒等の値になる。設定 (GRADE_*) は足す値なら和、掛ける値なら積で重なる
+ */
+#ifndef LKG_TINT
+#define LKG_TINT 0.0                 // ティント (+ でマゼンタ)
+#endif
+#ifndef LKG_OFFSET
+#define LKG_OFFSET vec3(0.0)         // チャンネルごとの露出 (EV)
+#endif
+#ifndef LKG_PIVOT
+#define LKG_PIVOT 0.0                // コントラストの軸 (中間グレーからの EV)
+#endif
+#ifndef LKG_SHADOW
+#define LKG_SHADOW vec4(0.0)         // シャドーの色 (rgb) と明るさ (a) (EV)
+#endif
+#ifndef LKG_MID
+#define LKG_MID vec4(0.0)
+#endif
+#ifndef LKG_HIGHLIGHT
+#define LKG_HIGHLIGHT vec4(0.0)
+#endif
+#ifndef LKG_ZONE_SAT
+#define LKG_ZONE_SAT vec3(1.0)       // シャドー・ミッド・ハイライトの彩度
+#endif
+#ifndef LKG_ZONE_CONTRAST
+#define LKG_ZONE_CONTRAST vec3(1.0)  // シャドー・ミッド・ハイライトのコントラスト
+#endif
+#ifndef LKG_HIGHLIGHT_COMPRESS
+#define LKG_HIGHLIGHT_COMPRESS 0.0
+#endif
+#ifndef LKG_SHADOW_LIFT
+#define LKG_SHADOW_LIFT 0.0
+#endif
+#ifndef LKG_VIBRANCE
+#define LKG_VIBRANCE 0.0
+#endif
+// 色相ごと (赤, 橙, 黄, 緑, 水色, 青, 紫, マゼンタ) の色相の回転 (度)・彩度の倍率・明るさ (EV)
+#ifndef LKG_HUE_SHIFT_INIT
+#define LKG_HUE_SHIFT_INIT float[8](0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+#endif
+#ifndef LKG_HUE_SAT_INIT
+#define LKG_HUE_SAT_INIT float[8](1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0)
+#endif
+#ifndef LKG_HUE_LUM_INIT
+#define LKG_HUE_LUM_INIT float[8](0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+#endif
+const float LKG_HUE_SHIFT[8] = LKG_HUE_SHIFT_INIT;
+const float LKG_HUE_SAT[8] = LKG_HUE_SAT_INIT;
+const float LKG_HUE_LUM[8] = LKG_HUE_LUM_INIT;
+// リフト・ガンマ・ゲイン (rgb = 色, a = 輝度。トーンマップ後の表示値)
+#ifndef LKG_LIFT
+#define LKG_LIFT vec4(0.0)
+#endif
+#ifndef LKG_GAMMA
+#define LKG_GAMMA vec4(0.0)
+#endif
+#ifndef LKG_GAIN
+#define LKG_GAIN vec4(1.0)
+#endif
+// トーンカーブの 7 点 (0, 10, 25, 50, 75, 90, 100 %) の出力のずらし
+#ifndef LKG_CURVE_INIT
+#define LKG_CURVE_INIT float[7](0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+#endif
+const float LKG_CURVE[7] = LKG_CURVE_INIT;
+// スプリットトーン (色相は HSV の度)
+#ifndef LKG_SPLIT_SHADOW_HUE
+#define LKG_SPLIT_SHADOW_HUE 210.0
+#endif
+#ifndef LKG_SPLIT_SHADOW_AMOUNT
+#define LKG_SPLIT_SHADOW_AMOUNT 0.0
+#endif
+#ifndef LKG_SPLIT_HIGHLIGHT_HUE
+#define LKG_SPLIT_HIGHLIGHT_HUE 30.0
+#endif
+#ifndef LKG_SPLIT_HIGHLIGHT_AMOUNT
+#define LKG_SPLIT_HIGHLIGHT_AMOUNT 0.0
+#endif
+#ifndef LKG_SPLIT_BALANCE
+#define LKG_SPLIT_BALANCE 0.0
+#endif
+
 // 各モジュールが使う実効値 (既存の設定 x プリセットの基準値)
 const float LOOK_SATURATION = SATURATION * LK_SATURATION;
 const float LOOK_CONTRAST = CONTRAST * LK_CONTRAST;

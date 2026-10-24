@@ -54,6 +54,9 @@
 | CAS | AMD FidelityFX Contrast Adaptive Sharpening (アルゴリズムを参照して自前実装) | program/final.fsh |
 | Purkinje 効果の桿体輝度 | Larson et al., "A Visibility Matching Tone Reproduction Operator for High Dynamic Range Scenes", TVCG 1997 | lib/post/grading.glsl |
 | ASC CDL | American Society of Cinematographers, ASC Color Decision List | lib/post/tonemap.glsl, program/final.fsh |
+| Oklab | Björn Ottosson, "A perceptual color space for image processing" (2020) | lib/post/color_grade.glsl |
+| カラーグレーディングの段の分け方と順番 (オフセット・コントラストとピボット・HDR のゾーン・リフト / ガンマ / ゲイン) | Blackmagic Design, DaVinci Resolve Reference Manual の Color ページの説明 | lib/post/color_grade.glsl |
+| 単調な 3 次補間 (トーンカーブ) | Fritsch & Carlson, "Monotone Piecewise Cubic Interpolation", SIAM J. Numer. Anal. 1980 / Fritsch & Butland 1984 | lib/post/color_grade.glsl |
 
 ## レンズの処方の出典
 
