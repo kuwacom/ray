@@ -1,9 +1,8 @@
 # Credits
 
-## 流用したコード
+## 流用コード
 
-なし  
-他のシェーダーパックのコードは含まない
+なし
 
 ## 手法の出典 (独自実装したもの)
 
@@ -62,7 +61,7 @@
 
 ## レンズの処方の出典
 
-レンズプリセット 7-18 (lib/post/lens_presets.glsl, tools/gen_lens_ghosts.py) の処方は、次の特許の実施例の数値 (曲率半径・面間隔・屈折率・アッベ数) を公称焦点距離に拡大して使った。有効半径は特許に無いので、surfaceandstop.com (https://surfaceandstop.com/lenses/) の推定値を使った。13-18 は Bill Claff の PhotonsToPhotos Optical Bench (https://www.photonstophotos.net/GeneralTopics/Lenses/OpticalBench/OpticalBench.htm) の転記とも照合した (Canon 50mm f/0.95 はこの転記だけ)。ゴーストの光路は Lee & Eisemann, "Practical Real-Time Lens-Flare Rendering", EGSR 2013 の近軸行列近似で解いた
+レンズプリセット 7-18 (lib/post/lens_presets.glsl, tools/gen_lens_ghosts.py) の処方は、次の特許の実施例の数値 (曲率半径・面間隔・屈折率・アッベ数) を公称焦点距離に拡大して使っています。有効半径は特許に無いため、surfaceandstop.com (https://surfaceandstop.com/lenses/) の推定値を使っています。13-18 は Bill Claff の PhotonsToPhotos Optical Bench (https://www.photonstophotos.net/GeneralTopics/Lenses/OpticalBench/OpticalBench.htm) の転記とも照合しています (Canon 50mm f/0.95 はこの転記だけです)。ゴーストの光路は Lee & Eisemann, "Practical Real-Time Lens-Flare Rendering", EGSR 2013 の近軸行列近似で解いています
 
 | プリセット | 特許 |
 |---|---|
@@ -79,9 +78,11 @@
 | Pentax SMC FA 28mm f/2.8 Soft | US 5,822,132 (J. Hirakawa, 1998) Example 1 |
 | Canon 50mm f/0.95 | JP S39-10178 (キヤノン, 1964) 実施例 1 (原本は未確認) |
 
-## 参考にしたシェーダー (コードは不使用)
+## 参考にしたシェーダー (コード不使用)
+すべて大変大好きなシェーダーです！  
+尊敬しています
 
-Rethinking Voxels (gri573), Shrimple (Null-MC), Photon (sixthsurge), iterationT (Tahnass), Nostalgia / Kappa (RRe36), Chocapic13, Bliss (X0nk), BSL (capt tatsu), Complementary (EminGT), Solas / Revelation (HaringPro) ほか。
+Rethinking Voxels (gri573), Shrimple (Null-MC), Photon (sixthsurge), iterationT (Tahnass), Nostalgia / Kappa (RRe36), Chocapic13, Bliss (X0nk), BSL (capt tatsu), Complementary (EminGT), Solas / Revelation (HaringPro) 等
 
 ## ツール
 
