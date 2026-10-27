@@ -29,6 +29,7 @@
 #include "/lib/light/voxel.glsl"
 #include "/lib/surface/gi.glsl"
 #include "/lib/surface/sun_shadow.glsl"
+#include "/lib/surface/surface_lights.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/sky/sky_color.glsl"
 
@@ -42,17 +43,23 @@
  * 太陽 (1 タップの色付き影 + 雲影) + floodfill + 空 (スカイライト)
  */
 vec3 secondaryHitDirect(vec3 playerPos, vec3 normal) {
-    LightSample sun = getCelestialLight();
-    float NoL = saturate(dot(normal, sun.direction));
-    vec3 E = vec3(0.0);
-    if (NoL > 0.0) {
-        E += sun.irradiance * NoL * sampleShadowVolume(playerPos + normal * 0.08) * getCloudShadow(playerPos);
-    }
-    return E + sampleFloodfill(playerPos, normal);
+    // 省く項: 手持ち光源と直接光 (secondaryHitBlockLight が別に返す)、GI と AO と鏡面 (拡散の放射輝度だけ)
+    SurfaceLights L = gatherSurfaceLights(surfacePoint(playerPos, normal), SL_SUN_VOLUME, SL_BLOCK_HIT_FLOOD, 0u);
+    return L.sun.irradiance + L.block;
+}
+
+// ヒット点の空の拡散照度 (スカイライトの絞り込み)
+vec3 secondaryHitSky(vec3 playerPos, vec3 normal, float skyLm) {
+    SurfacePoint p = surfacePoint(playerPos, normal);
+    p.lightmap.y = skyLm;
+    return gatherSurfaceLights(p, SL_SUN_NONE, SL_BLOCK_NONE, SL_SKY).sky;
 }
 
 vec3 shadeSecondaryHit(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm) {
-    return albedo * RCP_PI * (secondaryHitDirect(playerPos, normal) + getSkyIrradiance(normal) * skylightCurve(skyLm));
+    SurfacePoint p = surfacePoint(playerPos, normal);
+    p.lightmap.y = skyLm;
+    SurfaceLights L = gatherSurfaceLights(p, SL_SUN_VOLUME, SL_BLOCK_HIT_FLOOD, SL_SKY);
+    return albedo * RCP_PI * (L.sun.irradiance + L.block + L.sky);
 }
 
 /*
@@ -66,7 +73,7 @@ vec3 shadeSecondaryHit(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm) {
  * 履歴の無い点 (画面外・前フレームの画面外) は prevIndirect.x < 0 で、空の SH のまま
  */
 vec3 shadeSecondaryHitGi(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm, vec3 prevIndirect) {
-    vec3 sky = getSkyIrradiance(normal) * skylightCurve(skyLm);
+    vec3 sky = secondaryHitSky(playerPos, normal, skyLm);
     vec3 E = secondaryHitDirect(playerPos, normal);
     if (prevIndirect.x >= 0.0) {
 #ifdef GI_TRACES_SKY

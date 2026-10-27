@@ -9,22 +9,15 @@
 #define SURFACE_SURFACE_LIGHTS_GLSL
 
 #include "/lib/settings.glsl"
-#include "/lib/common/constants.glsl"
 #include "/lib/common/look_presets.glsl"
 #include "/lib/common/math.glsl"
 #include "/lib/common/shading_types.glsl"
 #include "/lib/common/shadow_volume.glsl"
 #include "/lib/common/transforms.glsl"
-#include "/lib/common/uniforms.glsl"
 #include "/lib/common/voxel_space.glsl"
-#include "/lib/buffers/global_lights.glsl"
-#include "/lib/light/block_data.glsl"
 #include "/lib/light/blocklight.glsl"
 #include "/lib/light/floodfill.glsl"
 #include "/lib/light/hand_light.glsl"
-#include "/lib/light/light_select.glsl"
-#include "/lib/light/trace.glsl"
-#include "/lib/light/voxel.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/sky/sky_color.glsl"
 #include "/lib/surface/gi.glsl"
@@ -42,7 +35,6 @@ const int SL_BLOCK_OPAQUE = 1;            // colortex6 の直接光 + floodfill 
 const int SL_BLOCK_FORWARD = 2;           // floodfill だけ
 const int SL_BLOCK_FORWARD_ENTITY = 3;    // ビンの光源を直接トレース
 const int SL_BLOCK_HIT_FLOOD = 4;         // 2 次ヒットの floodfill だけ
-const int SL_BLOCK_HIT = 5;               // 2 次ヒットの floodfill (block) + 直接光と手持ち光源 (blockDirect)
 
 // 足す項 (組み合わせ)
 const uint SL_SUN_CONTACT = 1u << 0;
@@ -59,67 +51,6 @@ const vec2 SHADOW_FALLBACK_SKYLIGHT = vec2(0.8, 0.97);
 // GI が空の光を運ぶ時 (GI_TRACES_SKY): ボクセル体積の判定で面から浮かせる量
 const float GI_VOLUME_TEST_OFFSET = 0.1;
 
-/*
- * 二次ヒット点の設置光源・手持ち光の直接光の照度 (GI・反射の照り返し用)。光源シャドウ ON の時だけ
- * ヒット点の照明が floodfill だけだと、floodfill は光源から 2-3 ブロックで急に落ちるので、たいまつ 1 本の洞窟で
- * 照らされた壁からの照り返しがほとんど無く、光源の見えない側 (壁・天井・三人称の自分の背中) が真っ黒だった
- * - 画面に映っているヒット点 (screenTexel.x >= 0): deferred2 のデノイズ済みの直接光 (colortex6, 影込み) をそのまま使う
- * - 画面外: ビンで一番強い光源を 1 本だけボクセルでトレースし、その可視率をビンの全光源の影なし照度に掛ける
- *   (光源ごとに追うと GI のレイ数 x 光源数のトレースになる。壁越しの光源を影なしで足すと光が漏れる)
- * 手持ち光は影を追わず、幾何法線で光源の裏を向く面だけ除く (光源は自分の手元なので、遮られるのは大抵自分の体)
- * 1 回の照り返しだけでは洞窟の壁の反射率 (0.2 前後) で光の当たる面の数 % にしかならず、影の側はまだ真っ黒だった。
- * 閉じた洞窟・部屋の多重反射 (反射率 rho で 1 / (1 - rho) 倍) と、ヒット点の floodfill (近距離しか届かない) の不足を
- * まとめて SECONDARY_BLOCKLIGHT_GAIN (lib/surface/lighting.glsl) で補う
- *
- * handScale: 手持ち光の分に掛ける倍率。GI では handLightIndirectScale() (HAND_LIGHT_SHADOW_STRENGTH) を渡す
- * GI_MODE 2/3 では手持ち光の陰の中の明るさの半分ほどがこの GI の照り返しで、残りが getHandLightFill なので、両方に同じ倍率を掛ける
- * 反射に映る面は照り返しではなく直接見える面なので 1 を渡す
- */
-vec3 hitBlockDirect(vec3 playerPos, vec3 normal, ivec2 screenTexel, float handScale) {
-#ifdef LIGHT_SHADOWS
-    vec3 E = vec3(0.0);
-    if (screenTexel.x >= 0) {
-        E = texelFetch(colortex6, screenTexel, 0).rgb;
-    } else {
-        vec3 fromVoxel = playerToVoxel(playerPos + normal * TRACE_NORMAL_OFFSET);
-        if (isInVoxelVolume(fromVoxel)) {
-            int bin = lightBinIndex(ivec3(fromVoxel));
-            uint n = lightBinCount(bin);
-            int strongest = -1;
-            float strongestW = 0.0;
-            for (uint k = 0u; k < n; k++) {
-                int ci = lightBinEntry(bin, k);
-                vec3 e = evalLightIrradiance(globalLights.lights[ci], fromVoxel, normal, normal);
-                E += e;
-                float w = luminance(e);
-                if (w > strongestW) { strongestW = w; strongest = ci; }
-            }
-            if (strongest >= 0) {
-                uint flags = blockLightTraceFlags() & ~(TRACE_ENTITIES | TRACE_PLAYER);
-                E *= luminance(traceVisibilityEx(fromVoxel, globalLights.lights[strongest].posRadius.xyz, flags, 0.5, 0.0, 0.0));
-            }
-        }
-    }
-    #ifdef HAND_LIGHT
-    for (int i = 0; i < 2; i++) {
-        bool mainHand = i == 0;
-        int level = mainHand ? heldBlockLightValue : heldBlockLightValue2;
-        if (level <= 0) continue;
-        LightDef d = getHandLightDef(mainHand ? heldItemId : heldItemId2);
-        vec3 toLight = getHandLightPositionSafe(mainHand) - playerPos;
-        float dist = length(toLight);
-        float range = lightRange(d, float(level));
-        if (dist >= range) continue;
-        float ndl = sphereLightNdotL(normal, toLight / max(dist, EPS), dist, d.shape.w);
-        E += lightEmission(d, float(level)) * lightFalloff(dist, range) * (ndl * HAND_LIGHT_BRIGHTNESS * handScale);
-    }
-    #endif
-    return E;
-#else
-    return vec3(0.0);
-#endif
-}
-
 struct SurfacePoint {
     vec3 playerPos;
     vec3 viewPos;     // SL_SUN_CONTACT だけが使う
@@ -130,7 +61,6 @@ struct SurfacePoint {
     float dither;
     float pomShadow;  // SL_POM の時の太陽の可視率の倍率
     float sss;        // 太陽の影のブロッカー探索の SSS の強さ
-    float handScale;  // SL_BLOCK_HIT の手持ち光源の倍率 (GI は handLightIndirectScale、反射は 1)
     bool hand;        // 一人称の手
 };
 
@@ -146,7 +76,6 @@ SurfacePoint surfacePoint(vec3 playerPos, vec3 normal) {
     p.dither = 0.0;
     p.pomShadow = 1.0;
     p.sss = 0.0;
-    p.handScale = 1.0;
     p.hand = false;
     return p;
 }
@@ -164,7 +93,6 @@ struct SurfaceLights {
     LightSample handOff;
     vec3 sky;               // 空の SH x スカイライト。GI が運ぶ分を引いた後、AO の前
     vec3 block;             // ブロックライトの拡散照度 (AO の前)
-    vec3 blockDirect;       // SL_BLOCK_HIT の直接光と手持ち光源
     vec3 handFill;          // 手持ち光源の照り返し (AO の前)
     vec4 indirect;          // colortex8 (rgb = GI, a = GTAO)
     bool giSky;             // GI が空の光を運んでいる
@@ -174,7 +102,7 @@ struct SurfaceLights {
 
 SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, uint terms) {
     SurfaceLights L;
-    L.celestial = getCelestialLight();
+    L.celestial = noLight();
     L.sun = noLight();
     L.sunVis = vec3(0.0);
     L.sunVisAll = vec3(0.0);
@@ -187,7 +115,6 @@ SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, ui
     L.cloudShadow = 1.0;
     L.sky = vec3(0.0);
     L.block = vec3(0.0);
-    L.blockDirect = vec3(0.0);
     L.handFill = vec3(0.0);
     L.indirect = vec4(0.0, 0.0, 0.0, 1.0);
     L.giSky = false;
@@ -196,6 +123,7 @@ SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, ui
     if ((terms & SL_GI) != 0u) L.indirect = getIndirectLight(p.texel);
 
     if (sunMode == SL_SUN_SHADOW_MAP) {
+        L.celestial = getCelestialLight();
         if ((terms & SL_SUN_LEAF) != 0u) {
             float cloud = getCloudShadow(p.playerPos);
             vec3 specular;
@@ -208,6 +136,7 @@ SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, ui
         L.sun = L.celestial;
         L.sun.irradiance *= L.sunVis;
     } else if (sunMode == SL_SUN_SHADOW_MAP_FALLBACK) {
+        L.celestial = getCelestialLight();
         SunShadow ss = evalSunShadow(p.playerPos, p.geoNormal, p.sss, p.dither);
         L.sunShadow = ss;
         float fallback = smoothstep(SHADOW_FALLBACK_SKYLIGHT.x, SHADOW_FALLBACK_SKYLIGHT.y, p.lightmap.y);
@@ -241,13 +170,13 @@ SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, ui
         L.sun = L.celestial;
         L.sun.irradiance *= L.sunVis;
     } else if (sunMode == SL_SUN_VOLUME) {
+        L.celestial = getCelestialLight();
         float NoL = saturate(dot(p.normal, L.celestial.direction));
-        vec3 E = vec3(0.0);
-        if (NoL > 0.0) {
-            E += L.celestial.irradiance * NoL * sampleShadowVolume(p.playerPos + p.normal * 0.08) * getCloudShadow(p.playerPos);
-        }
         L.sun = L.celestial;
-        L.sun.irradiance = E;
+        L.sun.irradiance = vec3(0.0);
+        if (NoL > 0.0) {
+            L.sun.irradiance += L.celestial.irradiance * NoL * sampleShadowVolume(p.playerPos + p.normal * 0.08) * getCloudShadow(p.playerPos);
+        }
     }
 
     if ((terms & SL_HAND) != 0u) {
@@ -264,9 +193,8 @@ SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, ui
         L.block = getBlockLightForward(p.playerPos, p.normal, p.lightmap.x);
     } else if (blockMode == SL_BLOCK_FORWARD_ENTITY) {
         L.block = getBlockLightForwardEntity(p.playerPos, p.geoNormal, p.normal, p.lightmap.x);
-    } else if (blockMode == SL_BLOCK_HIT_FLOOD || blockMode == SL_BLOCK_HIT) {
+    } else if (blockMode == SL_BLOCK_HIT_FLOOD) {
         L.block = sampleFloodfill(p.playerPos, p.normal);
-        if (blockMode == SL_BLOCK_HIT) L.blockDirect = hitBlockDirect(p.playerPos, p.normal, p.texel, p.handScale);
     }
 
     if ((terms & SL_SKY) != 0u) {
