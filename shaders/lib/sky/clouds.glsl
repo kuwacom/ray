@@ -245,9 +245,7 @@ ivec2 cloudSampleOffset(int frame) {
     #if CLOUD_RES == 2
         return bayerOffset2(frame % (CLOUD_RES * CLOUD_RES));
     #else
-        const ivec2 BAYER2[4] = BAYER2_ORDER;
-        int i = frame % (CLOUD_RES * CLOUD_RES);
-        return BAYER2[i & 3] * 2 + BAYER2[(i >> 2) & 3];
+        return bayerOffset4(frame % (CLOUD_RES * CLOUD_RES));
     #endif
 #else
     return ivec2(CLOUD_RES / 2);

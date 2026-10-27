@@ -163,7 +163,7 @@ LightSample evalHandLight(bool mainHand, vec3 playerPos, vec3 geoNormal, float d
     if (maxOf(s.irradiance) > 0.0) {
         // 光源の直前 (手・たいまつ自身の形) までで止める
         float len = min(dist - 0.4, HAND_SS_LENGTH);
-        s.irradiance *= screenSpaceShadow(playerPos, geoNormal, s.direction, len, HAND_SS_STEPS, dither);
+        s.irradiance *= lightContactShadow(playerPos, geoNormal, s.direction, len, HAND_SS_STEPS, dither);
     }
 #endif
     return s;

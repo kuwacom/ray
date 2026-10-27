@@ -325,26 +325,26 @@ vec3 getSunShadow(vec3 playerPos, vec3 geoNormal, float dither, out vec3 specula
  * 影マップのテクセルより細かい接地影 (草の根元・柵・エンティティの足元) を深度バッファで補う
  * viewPos: 着色点 (view 空間), geoNormalView: 幾何法線 (view 空間), lightView: 光源方向 (view 空間)
  */
-const int CONTACT_SHADOW_STEPS = 12;
-const float CONTACT_SHADOW_LENGTH = 0.35;      // 近距離のマーチ長 (ブロック)
-const float CONTACT_SHADOW_LENGTH_SCALE = 0.012; // 距離に比例して伸ばす (遠景の小物の影を拾う)
-const float CONTACT_SHADOW_THICKNESS = 0.15;   // 遮蔽物として扱う厚み (ブロック)
-const float CONTACT_SHADOW_MIN_NOV = 0.1;      // 押し出しの 1/NoV の上限 (真横から見た面で押し出しすぎない)
+const int SUN_CONTACT_STEPS = 12;
+const float SUN_CONTACT_LENGTH = 0.35;      // 近距離のマーチ長 (ブロック)
+const float SUN_CONTACT_LENGTH_SCALE = 0.012; // 距離に比例して伸ばす (遠景の小物の影を拾う)
+const float SUN_CONTACT_THICKNESS = 0.15;   // 遮蔽物として扱う厚み (ブロック)
+const float SUN_CONTACT_MIN_NOV = 0.1;      // 押し出しの 1/NoV の上限 (真横から見た面で押し出しすぎない)
 
-float screenSpaceShadow(vec3 viewPos, vec3 geoNormalView, vec3 lightView, float dither) {
+float sunContactShadow(vec3 viewPos, vec3 geoNormalView, vec3 lightView, float dither) {
     float dist = -viewPos.z;
-    float len = CONTACT_SHADOW_LENGTH + dist * CONTACT_SHADOW_LENGTH_SCALE;
-    vec3 stepVec = lightView * (len / float(CONTACT_SHADOW_STEPS));
+    float len = SUN_CONTACT_LENGTH + dist * SUN_CONTACT_LENGTH_SCALE;
+    vec3 stepVec = lightView * (len / float(SUN_CONTACT_STEPS));
     /*
      * 始点を幾何法線の方向へ 1 画素の奥行きぶん浮かせる。かすめ角の面では 1 画素の中で深度が大きく変わり、
      * 面から少し上がっただけのレイが隣の画素の自分の面より奥と判定されて、遠くの雪・氷の床の日向が
      * 一面に影になっていた (段差の縁だけ判定を逃れて明るく残り、ブロックごとのマス目に見えた)
      */
     float pixelSize = dist * 2.0 / (gbufferProjection[1][1] * viewSize().y);
-    float NoV = max(dot(geoNormalView, -viewPos / max(dist, 1e-4)), CONTACT_SHADOW_MIN_NOV);
+    float NoV = max(dot(geoNormalView, -viewPos / max(dist, 1e-4)), SUN_CONTACT_MIN_NOV);
     vec3 p = viewPos + geoNormalView * (0.01 + pixelSize / NoV) + stepVec * dither;
-    float thickness = CONTACT_SHADOW_THICKNESS + dist * 0.01;
-    for (int i = 0; i < CONTACT_SHADOW_STEPS; i++) {
+    float thickness = SUN_CONTACT_THICKNESS + dist * 0.01;
+    for (int i = 0; i < SUN_CONTACT_STEPS; i++) {
         p += stepVec;
         if (p.z > -near) break;
         vec3 s = viewToScreen(p);

@@ -111,6 +111,45 @@ float taaBlendAlpha(float motionPx, float centerDepth) {
     return alpha;
 }
 
+// center の周り 3x3 の統計 (露出込みの YCoCg の平均・標準偏差・min/max) と、最も手前の深度とその位置
+struct TaaNeighborhood {
+    vec3 mean;
+    vec3 sigma;
+    vec3 boxMin;
+    vec3 boxMax;
+    float closestDepth;
+    ivec2 closestOffset;
+};
+
+TaaNeighborhood taaNeighborhood(ivec2 center, ivec2 maxTexel, float exposure, float centerDepth) {
+    vec3 m1 = vec3(0.0);
+    vec3 m2 = vec3(0.0);
+    TaaNeighborhood nb;
+    nb.boxMin = vec3(1e9);
+    nb.boxMax = vec3(-1e9);
+    nb.closestDepth = centerDepth;
+    nb.closestOffset = ivec2(0);
+    for (int y = -1; y <= 1; y++) {
+        for (int x = -1; x <= 1; x++) {
+            ivec2 p = clamp(center + ivec2(x, y), ivec2(0), maxTexel);
+            vec4 s = texelFetch(colortex0, p, 0);
+            vec3 c = rgbToYCoCg(taaCompress(sanitizeColor(s.rgb) * (1.0 - glintShare(s.a)), exposure));
+            m1 += c;
+            m2 += c * c;
+            nb.boxMin = min(nb.boxMin, c);
+            nb.boxMax = max(nb.boxMax, c);
+            float d = texelFetch(depthtex0, p, 0).r;
+            if (d < nb.closestDepth) {
+                nb.closestDepth = d;
+                nb.closestOffset = ivec2(x, y);
+            }
+        }
+    }
+    nb.mean = m1 / 9.0;
+    nb.sigma = momentSigma(m2, nb.mean, 9.0);
+    return nb;
+}
+
 /*
  * 歪曲・魚眼を TAA の中で組み立てる (LENS_WARP_TAA, lib/post/lens.glsl)
  * 出力 (再投影後) の画素ごとに、写っている元画像の点を今フレーム (ジッター込み) から読み、出力の座標の履歴に積む
@@ -165,34 +204,16 @@ void taaWarped() {
     }
     vec3 smoothColor = max(sanitizeColor(sampleCatmullRom(colortex0, posUv, viewSize())) - glint, 0.0);
 
-    // 一番近い元の画素の周り 3x3 の統計と、最も手前の深度 (元画像の座標。歪曲なしの TAA と同じ)
-    vec3 m1 = vec3(0.0);
-    vec3 m2 = vec3(0.0);
-    vec3 boxMin = vec3(1e9);
-    vec3 boxMax = vec3(-1e9);
-    float closestDepth = centerDepth;
-    ivec2 closestOffset = ivec2(0);
-    for (int y = -1; y <= 1; y++) {
-        for (int x = -1; x <= 1; x++) {
-            ivec2 p = clamp(nearest + ivec2(x, y), ivec2(0), maxTexel);
-            vec4 s = texelFetch(colortex0, p, 0);
-            vec3 c = rgbToYCoCg(taaCompress(sanitizeColor(s.rgb) * (1.0 - glintShare(s.a)), exposure));
-            m1 += c;
-            m2 += c * c;
-            boxMin = min(boxMin, c);
-            boxMax = max(boxMax, c);
-            float d = texelFetch(depthtex0, p, 0).r;
-            if (d < closestDepth) {
-                closestDepth = d;
-                closestOffset = ivec2(x, y);
-            }
-        }
-    }
-    vec3 mean = m1 / 9.0;
-    vec3 sigma = momentSigma(m2, mean, 9.0);
+    // 一番近い元の画素の周りの統計と、最も手前の深度 (元画像の座標。歪曲なしの TAA と同じ)
+    TaaNeighborhood nb = taaNeighborhood(nearest, maxTexel, exposure, centerDepth);
+    vec3 mean = nb.mean;
+    vec3 sigma = nb.sigma;
+    vec3 boxMin = nb.boxMin;
+    vec3 boxMax = nb.boxMax;
+    float closestDepth = nb.closestDepth;
 
     // 前フレームの出力の位置
-    vec2 closestUv = nearestUv + vec2(closestOffset) * texelSize();
+    vec2 closestUv = nearestUv + vec2(nb.closestOffset) * texelSize();
     vec2 prevSrc = src + (getPreviousUv(closestUv, closestDepth) - closestUv);
     vec2 prevUv = lensForwardUv(prevSrc);
     float motionPx = length((prevUv - uv) * viewSize());
@@ -246,33 +267,15 @@ void main() {
     float centerDepth = texelFetch(depthtex0, texel, 0).r;
 
     // 3x3 近傍の統計と、最も手前の深度 (エッジでは手前の物体の速度を使うと輪郭のゴーストが減る)
-    vec3 m1 = vec3(0.0);
-    vec3 m2 = vec3(0.0);
-    vec3 boxMin = vec3(1e9);
-    vec3 boxMax = vec3(-1e9);
-    float closestDepth = centerDepth;
-    ivec2 closestOffset = ivec2(0);
-    for (int y = -1; y <= 1; y++) {
-        for (int x = -1; x <= 1; x++) {
-            ivec2 p = clamp(texel + ivec2(x, y), ivec2(0), maxTexel);
-            vec4 s = texelFetch(colortex0, p, 0);
-            vec3 c = rgbToYCoCg(taaCompress(sanitizeColor(s.rgb) * (1.0 - glintShare(s.a)), exposure));
-            m1 += c;
-            m2 += c * c;
-            boxMin = min(boxMin, c);
-            boxMax = max(boxMax, c);
-            float d = texelFetch(depthtex0, p, 0).r;
-            if (d < closestDepth) {
-                closestDepth = d;
-                closestOffset = ivec2(x, y);
-            }
-        }
-    }
-    vec3 mean = m1 / 9.0;
-    vec3 sigma = momentSigma(m2, mean, 9.0);
+    TaaNeighborhood nb = taaNeighborhood(texel, maxTexel, exposure, centerDepth);
+    vec3 mean = nb.mean;
+    vec3 sigma = nb.sigma;
+    vec3 boxMin = nb.boxMin;
+    vec3 boxMax = nb.boxMax;
+    float closestDepth = nb.closestDepth;
     vec3 currentYcc = rgbToYCoCg(taaCompress(centerColor, exposure));
 
-    vec2 closestUv = uv + vec2(closestOffset) * texelSize();
+    vec2 closestUv = uv + vec2(nb.closestOffset) * texelSize();
     vec2 prevUv = uv + (getPreviousUv(closestUv, closestDepth) - closestUv);
     float motionPx = length((prevUv - uv) * viewSize());
 

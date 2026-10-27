@@ -2,7 +2,7 @@
  * ボクセル空間のレイトレース (light モジュール)
  * Amanatides & Woo 1987 の DDA を自前実装する。ブロック形状 (LIGHT_SHAPE_TRACE)、
  * 半透明の色 (LIGHT_TRANSLUCENT_TINT)、エンティティのサブセル占有 (三角形方式では三角形, lib/light/entity_tri.glsl) を判定に使う
- * 画面空間の接触影 (screenSpaceShadow) もここに置く (ボクセルに入らない細部の補完)
+ * 画面空間の接触影 (lightContactShadow) もここに置く (ボクセルに入らない細部の補完)
  */
 #ifndef LIGHT_TRACE_GLSL
 #define LIGHT_TRACE_GLSL
@@ -311,7 +311,7 @@ bool traceVoxelRay(vec3 originVoxel, vec3 dir, float maxDist, out vec3 hitVoxel,
 const float SS_SHADOW_THICKNESS = 0.35;     // 遮蔽物の厚みの想定 (ブロック, 距離に比例して増やす)
 const float SS_SHADOW_THICKNESS_DIST = 0.02;
 
-float screenSpaceShadow(vec3 playerPos, vec3 geoNormal, vec3 toLight, float maxDist, int steps, float dither) {
+float lightContactShadow(vec3 playerPos, vec3 geoNormal, vec3 toLight, float maxDist, int steps, float dither) {
     if (maxDist <= 0.05) return 1.0;
     vec3 startView = playerToView(playerPos);
     float startDist = -startView.z;
@@ -331,7 +331,7 @@ float screenSpaceShadow(vec3 playerPos, vec3 geoNormal, vec3 toLight, float maxD
         vec3 sp = viewToScreen(p);
         if (any(lessThan(sp.xy, vec2(0.0))) || any(greaterThanEqual(sp.xy, vec2(1.0)))) break;
         float d = texelFetch(depthtex1, ivec2(sp.xy * screenSize), 0).r;
-        if (d < HAND_DEPTH_THRESHOLD || d >= 1.0) continue;
+        if (isHandDepth(d) || d >= 1.0) continue;
         float sceneDist = -screenToView(vec3(sp.xy, d)).z;
         float rayDist = -p.z;
         float diff = rayDist - sceneDist;

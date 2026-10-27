@@ -61,7 +61,7 @@ vec3 traceBlockLight(int li, vec3 fromVoxel, vec3 playerPos, vec3 geoNormal, uin
     if (contact && maxOf(vis) > 0.0) {
         // 光源自身の形 (たいまつの棒・ランタンの枠) で遮らないよう手前で止める
         float len = min(LIGHT_CONTACT_LENGTH, dist - 0.5);
-        vis *= screenSpaceShadow(playerPos, geoNormal, normalize(target - fromVoxel), len, LIGHT_CONTACT_STEPS, dither);
+        vis *= lightContactShadow(playerPos, geoNormal, normalize(target - fromVoxel), len, LIGHT_CONTACT_STEPS, dither);
     }
 #endif
     return vis;

@@ -15,4 +15,9 @@ ivec2 bayerOffset2(int i) {
     return o[i];
 }
 
+// 4x4 ブロックの巡回順。bayerOffset2 を 2 段重ねた並びで、16 フレームで全ピクセルを巡回する
+ivec2 bayerOffset4(int i) {
+    return bayerOffset2(i & 3) * 2 + bayerOffset2((i >> 2) & 3);
+}
+
 #endif

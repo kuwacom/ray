@@ -85,7 +85,7 @@ void main() {
 
 #if GI_DENOISE >= 1
     vec2 prevUv = getPreviousUv(texcoord, depth);
-    if (all(greaterThan(prevUv, vec2(0.0))) && all(lessThan(prevUv, vec2(1.0)))) {
+    if (reprojectionInside(prevUv)) {
         vec4 sigma = momentSigma(sum2, mean, max(wsum, 1e-5));
         vec4 history = texture(colortex9, prevUv);
         history = clamp(history, mean - sigma * GI_HISTORY_CLIP - 1e-3, mean + sigma * GI_HISTORY_CLIP + 1e-3);

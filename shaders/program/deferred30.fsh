@@ -152,7 +152,7 @@ void main() {
     }
 #ifdef SCREEN_SPACE_SHADOWS
     if (!hand && maxOf(sunVis) > 0.0) {
-        float contact = screenSpaceShadow(viewPos, playerToViewDir(g.geoNormal), playerToViewDir(sun.direction), dither);
+        float contact = sunContactShadow(viewPos, playerToViewDir(g.geoNormal), playerToViewDir(sun.direction), dither);
         sunVis *= contact;
         leafVis *= contact;
     }

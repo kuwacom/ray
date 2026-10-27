@@ -12,6 +12,7 @@
 // このプログラムで書く image (lib/buffers/images.glsl。宣言は 8 個まで)
 #define IMG_REFLECTION
 #include "/lib/common/common.glsl"
+#include "/lib/common/temporal.glsl"
 #include "/lib/surface/surface.glsl"
 #include "/lib/sky/sky.glsl"
 #include "/lib/light/light.glsl"
@@ -137,7 +138,7 @@ void main() {
         float alpha = mix(0.5, REFLECTION_ALPHA_MIN, saturate((s.perceptualRoughness - MIRROR_ROUGHNESS) / 0.4));
         vec2 uv = (vec2(texel) + 0.5) / viewSize();
         vec2 prevUv = getPreviousUv(uv, s.depth);
-        if (all(greaterThan(prevUv, vec2(0.0))) && all(lessThan(prevUv, vec2(1.0)))) {
+        if (reprojectionInside(prevUv)) {
             ivec2 pl = clamp(ivec2(prevUv * vec2(lowSize)), ivec2(0), lowSize - 1);
             vec4 h = imageLoad(reflectionImg, pl + prevRegion);
             float expected = length(playerPos + cameraPosition - previousCameraPosition);

@@ -133,7 +133,7 @@ void main() {
 
     // 時間: 再投影 + 遮蔽判定 + 分散クリップ
     vec2 prevUv = getPreviousUv(texcoord, hd);
-    if (all(greaterThanEqual(prevUv, vec2(0.0))) && all(lessThan(prevUv, vec2(1.0)))) {
+    if (reprojectionInside(prevUv)) {
         // 動くもの (速度ベクトルあり) は距離がほぼ変わらないとみなし、静止物は前フレームのカメラで距離を求める
         float expected = viewDist;
         if (texture(colortex15, texcoord).a < 0.5) {
