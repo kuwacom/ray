@@ -118,7 +118,7 @@ vec3 evalLightIrradiance(LightInstance L, vec3 voxelPos, vec3 n, vec3 gateNormal
     // かすめ角ではテクスチャ法線の NdotL が幾何法線の何倍にも振れ、テクセルごとの明暗が強くなりすぎる
     // TAA のジッターでピクセルがテクセルの境界をまたぐたびに値が飛び、床が細かくちらついた。幾何法線の NdotL に寄せる
     float ndl = mix(gate, sphereLightNdotL(n, dir, dist, radius), smoothstep(0.0, LIGHT_NORMAL_GRAZING, gate));
-    return L.colorSize.rgb * lightFalloff(dist, L.posRadius.w) * ndl;
+    return L.colorSize.rgb * (lightFalloff(dist, L.posRadius.w) + lightNearField(dist, radius)) * ndl;
 }
 
 // 着色点のビンの全光源の影なし照度の和 (deferred2 がフル解像度で使う)

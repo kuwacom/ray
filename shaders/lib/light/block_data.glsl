@@ -59,6 +59,22 @@ float lightFalloff(float dist, float range) {
 }
 
 /*
+ * 光源の面からの近距離の放射 (lightFalloff に足す係数)
+ * lightFalloff は遠くを持ち上げた分だけ光源のすぐそばで逆二乗より緩く、光源を付けた壁や発光ブロックの足元が
+ * 周りとあまり変わらない明るさになる。光源を見かけの半径 x LIGHT_NEAR_RADIUS_SCALE の発光面とみなし、
+ * 球の面光源の形態係数 r^2 / (d^2 + r^2) で光源の周りだけを明るくする
+ */
+const float LIGHT_NEAR_CONTACT = 4.5;       // 光源に接した面の係数 (1 ブロック先の lightFalloff は 0.5)
+const float LIGHT_NEAR_RADIUS_SCALE = 2.5;  // 発光面の半径 / 光源の見かけの半径 (炎や発光の照り返しで光る範囲は光源より広い)
+const float LIGHT_NEAR_REACH = 6.0;         // この距離で 0 へ落とす (ブロック)
+
+float lightNearField(float dist, float radius) {
+    float r2 = radius * radius * (LIGHT_NEAR_RADIUS_SCALE * LIGHT_NEAR_RADIUS_SCALE);
+    float w = saturate(1.0 - dist / LIGHT_NEAR_REACH);
+    return LIGHT_NEAR_CONTACT * r2 / (dist * dist + r2) * (w * w);
+}
+
+/*
  * 球光源の NdotL。光源の見かけの半径ぶん地平線の下まで回り込ませる (wrap 近似)
  * 点光源の NdotL のままだと大きな光源 (グロウストーン等) の横の面が不自然に真っ暗になる
  */
