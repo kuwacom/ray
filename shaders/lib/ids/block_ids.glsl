@@ -1,5 +1,6 @@
 /*
- * ブロック ID (block.properties と 1 対 1 で対応。変更は両方を同時に)
+ * ブロック ID (block.properties と同じ表から生成する)
+ * tools/gen_block_properties.py が生成する (光源以外は同スクリプトの BLOCKS、光源は tools/id_tables.py)。手で編集しない
  *
  * 番号帯
  *   1        : 未登録の固体 (mc_Entity.x = -1 をボクセルではこれに置き換える)

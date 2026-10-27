@@ -1,5 +1,6 @@
 /*
  * 光源インデックス (0-255)。光源テーブル (lib/light/light_table.glsl) の添字
+ * tools/gen_block_properties.py が tools/id_tables.py から生成する。手で編集しない
  *   1-127  : ブロック光源 (block.properties / item.properties の 1000 + index)
  *   128-191: アイテム専用光源 (item.properties の 1000 + index)
  *   192-255: エンティティ光源 (entity.properties の 5100 + (index - 192))

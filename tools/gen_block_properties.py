@@ -1,25 +1,37 @@
 """
-shaders/block.properties と shaders/item.properties、ブロックの平均の色の表 shaders/lib/ids/block_albedo.glsl を生成する (正本はこのスクリプト)
+ID と光源の表から、シェーダー側の ID の定数・properties・光源のデータを生成する
 
-ID の番号帯は shaders/lib/ids/*.glsl と一致させること
+    shaders/block.properties, item.properties, entity.properties
+    shaders/lib/ids/block_ids.glsl, light_ids.glsl, entity_ids.glsl, block_albedo.glsl
+    shaders/lib/light/light_table_data.glsl
+
+正本は、光源・エンティティ・ID の定数が tools/id_tables.py、光源でないブロックの表 (BLOCKS) がこのスクリプト、
+ブロックの色が tools/block_colors.json (tools/gen_block_colors.py が作る)
 未登録のブロックはボクセルで「完全な固体」として扱われるので、光を通す形のブロックは必ずどこかに載せる。
 下の表に載っていないブロックのうち tools/block_colors.json に色のあるものは、色ごとに 2000 番台の ID (色の付いた固体) を振る
 
-使い方: uv run tools/gen_block_properties.py
+使い方
+    uv run tools/gen_block_properties.py            # 生成物を書く
+    uv run tools/gen_block_properties.py --check    # 生成物が最新か確認する (ずれていれば終了コード 1)
 """
 
 from __future__ import annotations
 
+import argparse
 import json
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from id_tables import (  # noqa: E402
+    BLOCK_CONSTS, COLOR_BAND_FIRST, COLOR_BAND_LAST, COLORS, COPPER_PREFIX, ENTITIES, ENTITY_LIGHT_ID_BASE, LIGHT_BLOCK_LAST,
+    LIGHT_ENTITY_FIRST, LIGHT_ENTITY_LAST, LIGHT_ID_BASE, LIGHT_ITEM_FIRST, LIGHT_ITEM_LAST, LIGHTS, Light, with_state,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 SHADERS = ROOT / "shaders"
 BLOCK_COLORS = ROOT / "tools" / "block_colors.json"
 
-# 色の付いた固体の ID 帯 (lib/ids/block_ids.glsl の BLOCK_COLOR_FIRST)。ボクセルには 12bit しか入らない
-COLOR_BAND_FIRST = 2000
-COLOR_BAND_LAST = 4095
 # この刻み (sRGB 8bit) で同じになる色は 1 つの ID にまとめる。照り返しの色にはこれで十分
 COLOR_QUANT = 4
 # 色の分からない ID (未登録の固体・MOD のブロック) の色。線形 0.3 の灰色
@@ -27,12 +39,9 @@ DEFAULT_ALBEDO_SRGB = (149, 149, 149)
 # 番号帯ごとに表を分ける (ID がまばらなので 1 本の表にすると無駄が多い)。光源帯は 1000 + 光源インデックス
 ALBEDO_BANDS = [(0, 100), (100, 200), (200, 300), (300, 400), (1000, 1256)]
 
-COLORS = ["white", "orange", "magenta", "light_blue", "yellow", "lime", "pink", "gray",
-          "light_gray", "cyan", "purple", "blue", "brown", "green", "red", "black"]
 WOODS = ["oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "mangrove", "cherry", "pale_oak", "bamboo", "crimson", "warped"]
 # 酸化していない銅ブロックの ID は copper_block (ワックス付きは waxed_copper_block)。"copper" というブロックは無い
 COPPER = ["copper_block", "exposed_copper", "weathered_copper", "oxidized_copper"]
-COPPER_PREFIX = ["", "exposed_", "weathered_", "oxidized_"]
 
 SLAB_STAIR_BASES = [
     *WOODS, "bamboo_mosaic", "stone", "cobblestone", "mossy_cobblestone", "stone_brick", "mossy_stone_brick",
@@ -59,16 +68,7 @@ def colored(suffix: str) -> list[str]:
     return [f"{c}_{suffix}" for c in COLORS]
 
 
-def with_state(blocks: list[str], state: str) -> list[str]:
-    return [f"{b}:{state}" for b in blocks]
-
-
-# Iris の状態フィルタは 1 プロパティ 1 値の完全一致 (BlockMaterialMapping.checkState)。
-# "prop=a,b" のカンマ区切りは何にも一致しないので、値ごとに別エントリへ展開する
-def state_values(block: str, prop: str, values: list[str]) -> list[str]:
-    return [f"{block}:{prop}={v}" for v in values]
-
-
+# 光源でないブロックの表。光源 (ID 1001-1255) は id_tables.py の LIGHTS
 # (ID, コメント, ブロック一覧) の順に並べる
 # コメントは .properties にそのまま出るので ASCII で書く (Iris は ISO-8859-1 で読み、UTF-8 の日本語は前処理を壊す)
 BLOCKS: list[tuple[int, str, list[str]]] = [
@@ -151,98 +151,8 @@ BLOCKS: list[tuple[int, str, list[str]]] = [
     (309, "closed doors / trapdoors", [*with_state([f"{w}_door" for w in DOOR_TRAPDOOR], "open=false"),
                                  *with_state([f"{w}_trapdoor" for w in DOOR_TRAPDOOR], "open=false")]),
     *[(308 + k, f"snow layers ({k})", [f"snow:layers={k}"]) for k in range(2, 9)],
-
-    # 光源 (1000 + 光源インデックス, lib/ids/light_ids.glsl)
-    (1001, "torch", ["torch", "wall_torch"]),
-    (1002, "soul torch", ["soul_torch", "soul_wall_torch"]),
-    (1003, "redstone torch", ["redstone_torch:lit=true", "redstone_wall_torch:lit=true"]),
-    (1004, "copper torch", ["copper_torch", "copper_wall_torch"]),
-    (1005, "lantern", ["lantern"]),
-    (1006, "soul lantern", ["soul_lantern"]),
-    (1007, "copper lantern", [f"{p}copper_lantern" for p in COPPER_PREFIX] + [f"waxed_{p}copper_lantern" for p in COPPER_PREFIX]),
-    (1008, "glowstone", ["glowstone"]),
-    (1009, "sea lantern", ["sea_lantern"]),
-    (1010, "shroomlight", ["shroomlight"]),
-    (1011, "jack o'lantern", ["jack_o_lantern"]),
-    (1012, "lava", ["lava", "lava_cauldron"]),
-    (1013, "fire", ["fire"]),
-    (1014, "soul fire", ["soul_fire"]),
-    (1015, "campfire", ["campfire:lit=true"]),
-    (1016, "soul campfire", ["soul_campfire:lit=true"]),
-    (1017, "magma block", ["magma_block"]),
-    (1018, "end rod", ["end_rod"]),
-    (1019, "beacon", ["beacon"]),
-    (1020, "conduit", ["conduit"]),
-    (1021, "sea pickle", ["sea_pickle:waterlogged=true"]),
-    (1022, "glow lichen", ["glow_lichen"]),
-    (1023, "amethyst", ["amethyst_cluster", "large_amethyst_bud", "medium_amethyst_bud", "small_amethyst_bud"]),
-    (1024, "crying obsidian", ["crying_obsidian"]),
-    (1025, "respawn anchor", state_values("respawn_anchor", "charges", ["1", "2", "3", "4"])),
-    (1026, "redstone lamp", ["redstone_lamp:lit=true"]),
-    (1027, "ochre froglight", ["ochre_froglight"]),
-    (1028, "verdant froglight", ["verdant_froglight"]),
-    (1029, "pearlescent froglight", ["pearlescent_froglight"]),
-    (1030, "candle", ["candle:lit=true", "candle_cake:lit=true"]),
-    *[(1031 + i, f"{c} candle", [f"{c}_candle:lit=true", f"{c}_candle_cake:lit=true"]) for i, c in enumerate(COLORS)],
-    (1047, "copper bulb", with_state([f"{p}copper_bulb" for p in COPPER_PREFIX] + [f"waxed_{p}copper_bulb" for p in COPPER_PREFIX], "lit=true")),
-    (1048, "lit redstone ore", ["redstone_ore:lit=true", "deepslate_redstone_ore:lit=true"]),
-    (1049, "lit furnaces", ["furnace:lit=true", "smoker:lit=true", "blast_furnace:lit=true"]),
-    (1050, "brewing stand", ["brewing_stand"]),
-    (1051, "enchanting table", ["enchanting_table"]),
-    (1052, "end portal frame (with eye)", ["end_portal_frame:eye=true"]),
-    (1053, "end portal", ["end_portal", "end_gateway"]),
-    (1054, "nether portal", ["nether_portal"]),
-    (1055, "light block", ["light"]),
-    (1056, "sculk catalyst", ["sculk_catalyst"]),
-    (1057, "sculk sensor", ["sculk_sensor", "calibrated_sculk_sensor"]),
-    (1058, "glowing cave vines", ["cave_vines:berries=true", "cave_vines_plant:berries=true"]),
-    (1059, "dragon egg", ["dragon_egg"]),
-    (1060, "ender chest", ["ender_chest"]),
-    (1061, "firefly bush", ["firefly_bush"]),
-    (1062, "trial spawner / vault (active)", [*state_values("trial_spawner", "trial_spawner_state", ["active", "waiting_for_reward_ejection", "ejecting_reward"]),
-                                          *state_values("vault", "vault_state", ["active", "unlocking", "ejecting"])]),
 ]
 
-# 光るアイテム (heldItemId / currentRenderedItemId)。ブロックアイテムは同じ光源 ID を使う
-ITEMS: list[tuple[int, str, list[str]]] = [
-    (1001, "torch", ["torch"]),
-    (1002, "soul torch", ["soul_torch"]),
-    (1003, "redstone torch", ["redstone_torch"]),
-    (1004, "copper torch", ["copper_torch"]),
-    (1005, "lantern", ["lantern"]),
-    (1006, "soul lantern", ["soul_lantern"]),
-    (1007, "copper lantern", [f"{p}copper_lantern" for p in COPPER_PREFIX] + [f"waxed_{p}copper_lantern" for p in COPPER_PREFIX]),
-    (1008, "glowstone", ["glowstone"]),
-    (1009, "sea lantern", ["sea_lantern"]),
-    (1010, "shroomlight", ["shroomlight"]),
-    (1011, "jack o'lantern", ["jack_o_lantern"]),
-    (1015, "campfire", ["campfire"]),
-    (1016, "soul campfire", ["soul_campfire"]),
-    (1017, "magma block", ["magma_block"]),
-    (1018, "end rod", ["end_rod"]),
-    (1019, "beacon", ["beacon"]),
-    (1020, "conduit", ["conduit"]),
-    (1021, "sea pickle", ["sea_pickle"]),
-    (1022, "glow lichen", ["glow_lichen"]),
-    (1023, "amethyst", ["amethyst_cluster", "large_amethyst_bud", "medium_amethyst_bud", "small_amethyst_bud"]),
-    (1024, "crying obsidian", ["crying_obsidian"]),
-    (1027, "ochre froglight", ["ochre_froglight"]),
-    (1028, "verdant froglight", ["verdant_froglight"]),
-    (1029, "pearlescent froglight", ["pearlescent_froglight"]),
-    (1055, "light block", ["light"]),
-    (1056, "sculk catalyst", ["sculk_catalyst"]),
-    (1061, "firefly bush", ["firefly_bush"]),
-    (1128, "lava bucket", ["lava_bucket"]),
-    (1129, "glowstone dust", ["glowstone_dust"]),
-    (1130, "blaze rod / powder", ["blaze_rod", "blaze_powder"]),
-    (1131, "magma cream", ["magma_cream"]),
-    (1132, "glow ink sac / glow berries", ["glow_ink_sac", "glow_berries"]),
-    (1133, "nether star", ["nether_star"]),
-    (1134, "spectral arrow", ["spectral_arrow"]),
-    (1135, "fire charge", ["fire_charge"]),
-    (1136, "bottle o' enchanting", ["experience_bottle"]),
-    (1137, "end crystal", ["end_crystal"]),
-]
 
 HEADER = """#
 # Ray {kind}.properties
@@ -291,7 +201,7 @@ def color_blocks(colors: dict[str, list[int]], tops: dict[str, list[int]]) -> tu
     """表に無いブロックを色 (全体と上面) でまとめて 2000 番台の ID を振る。戻り値は (BLOCKS と同じ形の項目, ID 順の色, ID 順の上面の色)"""
     # 状態付きで一部だけ載っているブロック (点灯したかまど等) は名前ごと外す。
     # 名前だけの項目を足すと Iris の状態の対応がどちらになるか定まらないため (残りの状態は今どおり未登録の固体)
-    registered = {n.split(":")[0] for _, _, names in BLOCKS for n in names}
+    registered = {n.split(":")[0] for _, _, names in all_blocks() for n in names}
     groups: dict[tuple[int, ...], list[str]] = {}
     for name, c in colors.items():
         if name in registered:
@@ -321,7 +231,7 @@ def pack_srgb(rgb: tuple[int, int, int]) -> str:
 def render_albedo_glsl(colors: dict[str, list[int]], tops: dict[str, list[int]], palette: list[Rgb], palette_top: list[Rgb]) -> str:
     by_id: dict[int, Rgb] = {1: DEFAULT_ALBEDO_SRGB}
     top_by_id: dict[int, Rgb] = {}
-    for bid, _, names in BLOCKS:
+    for bid, _, names in all_blocks():
         known = [n.split(":")[0] for n in names if n.split(":")[0] in colors]
         if known:
             by_id[bid] = mean_srgb([colors[n] for n in known])
@@ -351,6 +261,8 @@ def render_albedo_glsl(colors: dict[str, list[int]], tops: dict[str, list[int]],
         " */",
         "#ifndef IDS_BLOCK_ALBEDO_GLSL",
         "#define IDS_BLOCK_ALBEDO_GLSL",
+        "",
+        '#include "/lib/ids/block_ids.glsl"',
         "",
         f"const uint BLOCK_ALBEDO_DEFAULT = {default};",
         "",
@@ -391,16 +303,313 @@ def render_albedo_glsl(colors: dict[str, list[int]], tops: dict[str, list[int]],
     return "\n".join(lines)
 
 
-def main() -> None:
+Entry = tuple[int, str, list[str]]
+
+
+def light_block_entries() -> list[Entry]:
+    out: list[Entry] = []
+    for light in LIGHTS:
+        if light.blocks:
+            out.append((LIGHT_ID_BASE + light.index, light.title, list(light.blocks)))
+        for k, (title, names) in enumerate(light.variants):
+            out.append((LIGHT_ID_BASE + light.index + k, title, list(names)))
+    return out
+
+
+def light_item_entries() -> list[Entry]:
+    return [(LIGHT_ID_BASE + light.index, light.title, list(light.items)) for light in LIGHTS if light.items]
+
+
+def all_blocks() -> list[Entry]:
+    return BLOCKS + light_block_entries()
+
+
+def check_tables() -> None:
+    """光源の番号帯・ID の重複・定数と properties の対応を確かめる。ずれていれば生成を止める"""
+    names: set[str] = set()
+    prev_end = 0
+    for light in LIGHTS:
+        span = max(light.count, len(light.variants), 1)
+        if light.index < prev_end or light.index + span - 1 > LIGHT_ENTITY_LAST:
+            raise SystemExit(f"光源 {light.index} ({light.title}) の index が昇順でないか範囲外")
+        prev_end = light.index + span
+        if light.name:
+            if light.name in names:
+                raise SystemExit(f"光源の定数名 {light.name} が重複")
+            names.add(light.name)
+        in_block = light.index + span - 1 <= LIGHT_BLOCK_LAST
+        if (light.blocks or light.variants) and not in_block:
+            raise SystemExit(f"光源 {light.index} ({light.title}): ブロック光源の帯 (1-{LIGHT_BLOCK_LAST}) の外にブロックがある")
+        if light.items and light.index > LIGHT_ITEM_LAST:
+            raise SystemExit(f"光源 {light.index} ({light.title}): アイテムはエンティティ光源の帯に置けない")
+        if LIGHT_ITEM_FIRST <= light.index <= LIGHT_ITEM_LAST and not light.items:
+            raise SystemExit(f"光源 {light.index} ({light.title}): アイテム専用光源の帯なのにアイテムが無い")
+        if light.entities and light.index < LIGHT_ENTITY_FIRST:
+            raise SystemExit(f"光源 {light.index} ({light.title}): エンティティはエンティティ光源の帯 ({LIGHT_ENTITY_FIRST}-) に置く")
+        if light.index >= LIGHT_ENTITY_FIRST and not light.entities:
+            raise SystemExit(f"光源 {light.index} ({light.title}): エンティティ光源の帯なのにエンティティが無い")
+    ids: dict[int, str] = {}
+    for bid, comment, _ in all_blocks():
+        if bid in ids:
+            raise SystemExit(f"ブロック ID {bid} が重複: {ids[bid]} / {comment}")
+        ids[bid] = comment
+    for _kind, _width, name, value, _c, in_table in (r for r in BLOCK_CONSTS if r[0] == "const"):
+        if in_table and value not in ids:
+            raise SystemExit(f"{name} = {value} に対応する block.properties の行が無い")
+    entity_ids = [e[0] for e in ENTITIES]
+    if len(set(entity_ids)) != len(entity_ids) or max(entity_ids) >= ENTITY_LIGHT_ID_BASE:
+        raise SystemExit("エンティティ ID が重複しているか、光源の帯 (5100-) に入っている")
+
+
+def trailing(line: str, width: int, comment: str) -> str:
+    if not comment:
+        return line
+    return line + " " * max(width - len(line), 1) + "// " + comment
+
+
+GENERATED_NOTE = "tools/gen_block_properties.py が tools/id_tables.py から生成する。手で編集しない"
+
+
+def render_light_ids() -> str:
+    def consts(lo: int, hi: int) -> list[str]:
+        return [trailing(f"const int {l.name} = {l.index};", 0, l.comment) for l in LIGHTS if l.name and lo <= l.index <= hi]
+
+    lines = [
+        "/*",
+        " * 光源インデックス (0-255)。光源テーブル (lib/light/light_table.glsl) の添字",
+        f" * {GENERATED_NOTE}",
+        f" *   1-{LIGHT_BLOCK_LAST}  : ブロック光源 (block.properties / item.properties の {LIGHT_ID_BASE} + index)",
+        f" *   {LIGHT_ITEM_FIRST}-{LIGHT_ITEM_LAST}: アイテム専用光源 (item.properties の {LIGHT_ID_BASE} + index)",
+        f" *   {LIGHT_ENTITY_FIRST}-{LIGHT_ENTITY_LAST}: エンティティ光源 (entity.properties の {ENTITY_LIGHT_ID_BASE} + (index - {LIGHT_ENTITY_FIRST}))",
+        " */",
+        "#ifndef IDS_LIGHT_IDS_GLSL",
+        "#define IDS_LIGHT_IDS_GLSL",
+        "",
+        "const int LIGHT_NONE = 0;",
+        "",
+        "// ブロック光源",
+        *consts(1, LIGHT_BLOCK_LAST),
+        f"const int LIGHT_BLOCK_LAST = {LIGHT_BLOCK_LAST};",
+        "",
+        "// アイテム専用光源 (ドロップ・手持ち)",
+        *consts(LIGHT_ITEM_FIRST, LIGHT_ITEM_LAST),
+        f"const int LIGHT_ITEM_LAST = {LIGHT_ITEM_LAST};",
+        "",
+        "// エンティティ光源",
+        *consts(LIGHT_ENTITY_FIRST, LIGHT_ENTITY_LAST),
+        "",
+        "// 光源フラグ (LightDef.info.x)",
+        "const uint LIGHT_FLAG_OCCLUDES = 1u;        // 光源ブロック自体が完全遮蔽物 (グロウストーン等)",
+        "const uint LIGHT_FLAG_FLUID = 2u;           // 液体 (溶岩)",
+        "const uint LIGHT_FLAG_CAT_ITEM = 4u;        // ITEM_LIGHTS の対象",
+        "const uint LIGHT_FLAG_CAT_PROJECTILE = 8u;  // PROJECTILE_LIGHTS の対象",
+        "const uint LIGHT_FLAG_CAT_BURNING = 16u;    // BURNING_ENTITY_LIGHTS の対象",
+        "const uint LIGHT_FLAG_CAT_GLOWING = 32u;    // GLOWING_ENTITY_LIGHTS の対象",
+        "const uint LIGHT_FLAG_ENTITY_FLASH = 64u;   // entityColor.a (点滅) が強い時だけ光る (TNT・クリーパー)",
+        "",
+        "#endif",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def render_block_ids() -> str:
+    lines = [
+        "/*",
+        " * ブロック ID (block.properties と同じ表から生成する)",
+        " * tools/gen_block_properties.py が生成する (光源以外は同スクリプトの BLOCKS、光源は tools/id_tables.py)。手で編集しない",
+        " *",
+        " * 番号帯",
+        " *   1        : 未登録の固体 (mc_Entity.x = -1 をボクセルではこれに置き換える)",
+        " *   10-19    : マテリアルのヒント付き固体 (完全遮蔽)",
+        " *   100-129  : 遮蔽しない植物・小物",
+        " *   200-299  : 半透明 (透過色テーブル index = id - 200)",
+        " *   300-399  : 部分形状 (形状テーブル index = id - 300)",
+        f" *   {LIGHT_ID_BASE + 1}-{LIGHT_ID_BASE + LIGHT_ENTITY_LAST}: 光源 (光源インデックス = id - {LIGHT_ID_BASE}, lib/ids/light_ids.glsl)",
+        f" *   {COLOR_BAND_FIRST}-{COLOR_BAND_LAST}: 色の付いた固体 (完全遮蔽。上の帯に無いブロックを平均の色ごとにまとめたもの。色は lib/ids/block_albedo.glsl)",
+        f" * ボクセルには下位 12bit しか入らないので {COLOR_BAND_LAST} を超える ID は作らない",
+        " */",
+        "#ifndef IDS_BLOCK_IDS_GLSL",
+        "#define IDS_BLOCK_IDS_GLSL",
+        "",
+    ]
+    for row in BLOCK_CONSTS:
+        if row[0] == "raw":
+            lines.append(row[1])
+        else:
+            _, width, name, value, comment, _in_table = row
+            lines.append(trailing(f"const int {name} = {value};", width, comment))
+    lines += ["", "#endif", ""]
+    return "\n".join(lines)
+
+
+def render_entity_ids() -> str:
+    last = ENTITY_LIGHT_ID_BASE + LIGHT_ENTITY_LAST - LIGHT_ENTITY_FIRST
+    rows = [(f"const int {name} = {eid};", comment) for eid, name, comment, _n, _c in ENTITIES]
+    rows.append((f"const int ENTITY_LIGHT_BASE = {ENTITY_LIGHT_ID_BASE};",
+                 f"{ENTITY_LIGHT_ID_BASE}-{last} は光源エンティティ (光源インデックス {LIGHT_ENTITY_FIRST} + (id - {ENTITY_LIGHT_ID_BASE}))"))
+    rows.append((f"const int ENTITY_LIGHT_LAST = {last};", ""))
+    lines = [
+        "/*",
+        " * エンティティ ID (entity.properties と対応) とアイテム ID (item.properties と対応)",
+        f" * {GENERATED_NOTE}",
+        " * 未登録のエンティティは 65535、未登録 / 素手のアイテムは -1 (heldItemId) または 0",
+        " */",
+        "#ifndef IDS_ENTITY_IDS_GLSL",
+        "#define IDS_ENTITY_IDS_GLSL",
+        "",
+        *[trailing(line, 40, comment) for line, comment in rows],
+        "",
+        f"// アイテム: 光るアイテムは {LIGHT_ID_BASE} + 光源インデックス。それ以外の特別扱い",
+        f"const int ITEM_LIGHT_BASE = {LIGHT_ID_BASE};",
+        f"const int ITEM_LIGHT_LAST = {LIGHT_ID_BASE + LIGHT_ENTITY_LAST};",
+        "",
+        "#endif",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def render_entity_properties() -> str:
+    lines = [
+        "#",
+        "# Ray entity.properties",
+        "# Generated by tools/gen_block_properties.py. Do not edit by hand (ID ranges: shaders/lib/ids/entity_ids.glsl)",
+        f"# {ENTITY_LIGHT_ID_BASE}-{ENTITY_LIGHT_ID_BASE + LIGHT_ENTITY_LAST - LIGHT_ENTITY_FIRST} are light-emitting entities "
+        f"(light index = {LIGHT_ENTITY_FIRST} + (ID - {ENTITY_LIGHT_ID_BASE}))",
+        "# Keep this file ASCII only: Iris reads .properties as ISO-8859-1 and non-ASCII bytes break its preprocessor",
+        "#",
+        "",
+    ]
+    seen: dict[str, int] = {}
+
+    def row(eid: int, names: tuple[str, ...], note: str) -> None:
+        for n in names:
+            if n in seen:
+                raise SystemExit(f"entity: {n} が ID {seen[n]} と {eid} に重複")
+            seen[n] = eid
+        if note:
+            lines.append(f"# {note}")
+        lines.append(f"entity.{eid} = " + " ".join(names))
+
+    for eid, _name, _c, names, note in ENTITIES:
+        row(eid, names, note)
+    lines += ["", "# Light-emitting entities"]
+    for light in LIGHTS:
+        if light.entities:
+            row(ENTITY_LIGHT_ID_BASE + light.index - LIGHT_ENTITY_FIRST, light.entities, light.entity_note)
+    lines.append("")
+    text = "\n".join(lines)
+    if not text.isascii():
+        raise SystemExit("entity.properties に ASCII 以外の文字がある (コメントは ASCII で書く)")
+    return text
+
+
+def render_light_table_data() -> str:
+    headers = {
+        1: (False, "// ブロック光源: (sRGB 色, 明るさ, 既定レベル, 光源半径, 発光中心, フリッカー, フラグ)"),
+        63: (False, "// 鉱物ブロック (DECORATIVE_BLOCK_LIGHTS 2 の時だけ光源)。本物の光源より暗く狭い、鉱物の色のほのかな灯り"),
+        LIGHT_ITEM_FIRST: (True, "// アイテム専用光源 (ドロップ / 手持ち)"),
+        LIGHT_ENTITY_FIRST: (True, "// エンティティ光源"),
+    }
+    lines = [
+        "/*",
+        " * 光源のデータ表。makeLight の式は lib/light/light_def.glsl",
+        f" * {GENERATED_NOTE}",
+        " */",
+        "#ifndef LIGHT_LIGHT_TABLE_DATA_GLSL",
+        "#define LIGHT_LIGHT_TABLE_DATA_GLSL",
+        "",
+        '#include "/lib/light/light_def.glsl"',
+        '#include "/lib/ids/light_ids.glsl"',
+        "",
+        "LightDef lightDefStatic(int i) {",
+        "    vec3 fire = fireSrgb();",
+    ]
+    for light in LIGHTS:
+        if light.count > 1:
+            lines += [f"    {n}" for n in light.note]
+            lines += [f"    if (i >= {light.name} && i < {light.name} + {light.count}) {{",
+                      f"        return makeLight({light.make});", "    }"]
+    lines.append("    switch (i) {")
+    for light in LIGHTS:
+        if light.index in headers:
+            blank, text = headers[light.index]
+            if blank:
+                lines.append("")
+            lines.append(f"        {text}")
+        if light.count > 1:
+            continue
+        lines += [f"        {n}" for n in light.note]
+        label = f"case {light.label or light.name}:"
+        width = 29 if light.index <= LIGHT_BLOCK_LAST else 34
+        label = label.ljust(width) if len(label) <= width else label + " "
+        lines.append(f"        {label}return makeLight({light.make});")
+    lines += [
+        "    }",
+        "    LightDef none;",
+        "    none.color = vec4(0.0);",
+        "    none.shape = vec4(LT_CENTER, 0.0);",
+        "    none.params = vec4(0.0);",
+        "    none.info = uvec4(0u);",
+        "    return none;",
+        "}",
+        "",
+        "#endif",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def generated(shaders: Path = SHADERS) -> dict[Path, str]:
+    check_tables()
     data = json.loads(BLOCK_COLORS.read_text(encoding="utf-8"))
     colors: dict[str, list[int]] = data["colors"]
     tops: dict[str, list[int]] = data.get("top", {})
     colored, palette, palette_top = color_blocks(colors, tops)
-    (SHADERS / "block.properties").write_text(render("block", BLOCKS + colored), encoding="utf-8", newline="\n")
-    (SHADERS / "item.properties").write_text(render("item", ITEMS), encoding="utf-8", newline="\n")
-    (SHADERS / "lib" / "ids" / "block_albedo.glsl").write_text(render_albedo_glsl(colors, tops, palette, palette_top), encoding="utf-8", newline="\n")
-    print(f"block.properties / item.properties / lib/ids/block_albedo.glsl を生成した (色の付いた固体 {len(palette)} 色)")
+    ids = shaders / "lib" / "ids"
+    return {
+        shaders / "block.properties": render("block", all_blocks() + colored),
+        shaders / "item.properties": render("item", light_item_entries()),
+        shaders / "entity.properties": render_entity_properties(),
+        ids / "block_albedo.glsl": render_albedo_glsl(colors, tops, palette, palette_top),
+        ids / "block_ids.glsl": render_block_ids(),
+        ids / "light_ids.glsl": render_light_ids(),
+        ids / "entity_ids.glsl": render_entity_ids(),
+        shaders / "lib" / "light" / "light_table_data.glsl": render_light_table_data(),
+    }
+
+
+def read_normalized(path: Path) -> str | None:
+    return path.read_bytes().decode("utf-8").replace("\r\n", "\n") if path.exists() else None
+
+
+def check(shaders: Path = SHADERS) -> list[str]:
+    problems = []
+    for path, text in generated(shaders).items():
+        if read_normalized(path) != text:
+            problems.append(f"生成物が古い: {path.relative_to(shaders.parent).as_posix()} (uv run tools/gen_block_properties.py で再生成する)")
+    return problems
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--check", action="store_true", help="書かずに、生成物が最新か確認する")
+    ap.add_argument("--shaders", type=Path, default=SHADERS, help="対象のシェーダーのフォルダ")
+    args = ap.parse_args()
+    shaders = args.shaders.resolve()
+    if args.check:
+        problems = check(shaders)
+        for p in problems:
+            print(p)
+        return 1 if problems else 0
+    for path, text in generated(shaders).items():
+        if read_normalized(path) != text:
+            nl = "\r\n" if path.exists() and b"\r\n" in path.read_bytes() else "\n"
+            path.write_bytes(text.replace("\n", nl).encode("utf-8"))
+            print(f"書き込み: {path.relative_to(shaders.parent).as_posix()}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

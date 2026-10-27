@@ -45,7 +45,7 @@ pyproject.toml / uv.lock / .python-version     tools 用の Python 環境 (uv)
 docs/architecture.md
 tools/
   gen_wrappers.py                           ディメンション別ラッパーの生成 (プログラム一覧と、プログラムごとの本体・マクロの正本)
-  gen_block_properties.py                   block.properties / item.properties の生成 (正本)
+  gen_block_properties.py, id_tables.py     ID の定数・block / item / entity.properties・光源の表のデータの生成 (正本)
   gen_blue_noise.py / gen_cloud_noise.py / gen_water_waves.py / gen_lens_textures.py
                                             shaders/textures/ のテクスチャの生成
   gen_lens_ghosts.py                        lib/post/lens_ghosts.glsl (レンズゴーストの定数表) の生成
@@ -84,7 +84,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 
 | # | プログラム | モジュール | 役割 | 主な入力 | 主な出力 | dispatch / 解像度 | 有効条件 |
 |---|---|---|---|---|---|---|---|
-| 1 | setup.csh | light | 光源・形状・透過色・ブロックの平均の色の表を SSBO に構築、FrameData 初期化 | `lib/light/light_table.glsl` | SSBO1 BlockData, SSBO0 | local 256, groups (1,1,1) | 常時 |
+| 1 | setup.csh | light | 光源・形状・透過色・ブロックの平均の色の表を SSBO に構築、FrameData 初期化 | `lib/light/light_table.glsl`, `light_table_data.glsl` | SSBO1 BlockData, SSBO0 | local 256, groups (1,1,1) | 常時 |
 | 2 | setup1.csh | sky | 大気の透過率 LUT (Hillaire 2020) | - | skyTransmittanceImg 256x64 | local 8x8, (32,8,1) | ATMOSPHERE_MODE=1, world0 |
 | 3 | setup2.csh | sky | 多重散乱 LUT | skyTransmittance | skyMultiScatterImg 32x32 | local 8x8, (4,4,1) | 同上 |
 | 4 | begin.csh | light | 光源リストとライトビン (前フレームに使った枠) とエンティティ光源の蓄積表のクリア | - | SSBO2 カウンタ, SSBO3 binCount/binLights/entityAcc | local 256, (160,1,1) | 常時 |
@@ -249,7 +249,7 @@ struct LightInstance {
 - ボクセルには下位 12bit しか入らないので 4095 を超える ID は作らない
 - ブロックの平均の色は `tools/gen_block_colors.py` がクライアント jar のテクスチャから `tools/block_colors.json` に書き (面積と不透明度で重み付けした線形の平均。草・葉・水は平原の色で代表)、`gen_block_properties.py` が 2000 番台の ID と `lib/ids/block_albedo.glsl` (ID ごとの色の定数表) を作る。setup.csh が SSBO1 `blockData.albedo[4096]` に展開し、実行時は `getBlockAlbedo(voxelId)` で引く (floodfill の照り返し、ボクセル RT の画面外の当たり)。上面の色が全体の平均と違うブロック (草ブロック・原木など) は json の `top` に上面だけの平均を持ち、`blockData.albedoUp[4096]` に展開してレイの当たりで `getBlockAlbedo(voxelId, faceNormal)` が上向きの面に使う (草ブロックの全面の平均は側面の土で茶色)。2000 番台以外の ID はその ID に載せたブロックの平均、未登録 (1) は線形 0.3 の灰色
 - ブロックの状態 (`lit=true`, `berries=true`, `waterlogged=true` 等) で光る状態だけを光源 ID に入れる。光らない状態は 106 等へ
-- 正本は `tools/gen_block_properties.py` (block.properties と item.properties を生成)。GLSL 側の定数は `lib/ids/block_ids.glsl`, `lib/ids/light_ids.glsl`
+- 正本は `tools/id_tables.py` (光源・エンティティ・ID の定数) と `tools/gen_block_properties.py` (光源でないブロックの表)。block / item / entity.properties と、GLSL 側の定数 `lib/ids/{block,light,entity}_ids.glsl` を同じ表から生成する
 - 状態フィルタは 1 プロパティ 1 値の完全一致 (Iris `BlockMaterialMapping.checkState`)。`charges=1,2,3,4` のようなカンマ区切りは何にも一致しないので、値ごとに別エントリに展開する (`state_values()`)
 - `*.properties` は ASCII だけで書く。Iris は ISO-8859-1 で読み、Java の `\R` (U+0085 を含む) で行分割してから C プリプロセッサに通すため、UTF-8 の日本語はコメント行でも途中で割れて `Bad token` になり、そのファイルの前処理全体が失敗する (shaders.properties なら設定・イメージ・SSBO がすべて無視される)
 
@@ -265,7 +265,8 @@ struct LightInstance {
 データの流れ:
 
 ```
-lib/light/light_table.glsl  lightDefStatic(index) / shapeStatic(i) / tintStatic(i)   (正本, sRGB で記述)
+lib/light/light_table_data.glsl  lightDefStatic(index)   (tools/id_tables.py から生成, sRGB で記述)
+lib/light/light_table.glsl       shapeStatic(i) / tintStatic(i)   (正本)
         | setup.csh が起動時に評価
         v
 SSBO1 blockData.lightDefs[256] / shapes[128] / tints[128] / albedo[4096] / albedoUp[4096] (lib/ids/block_albedo.glsl から)
@@ -274,10 +275,10 @@ SSBO1 blockData.lightDefs[256] / shapes[128] / tints[128] / albedo[4096] / albed
 getLightDef(index) -> lightEmission(d, level), lightRange(d, level), lightFalloff(dist, range)
 ```
 
-- 色・明るさ・到達半径・光源サイズ・発光中心・フリッカー・フラグを 1 行で定義 (`makeLight(...)`)
+- 色・明るさ・到達半径・光源サイズ・発光中心・フリッカー・フラグを 1 行で定義 (`tools/id_tables.py` の `LIGHTS`。`makeLight(...)` は `lib/light/light_def.glsl`)
 - 実際の光源レベルは `at_midBlock.w` (Iris 1.7+, 状態込みの発光レベル: ロウソク本数・シーピクルス数・リスポーンアンカーの充填等) を優先し、0 ならテーブルの既定レベル
 - 炎系の色は `BLOCKLIGHT_WARMTH` で中性 (sRGB 1.0, 0.86, 0.72) からバニラ寄りの暖色まで動かす。既定 0.6 (黒体で約 3100K。AgX が明るい面の彩度を落とすので見た目は 3500-4000K。0.5 以下ではたいまつの洞窟が中性すぎて炎の色に見えない)
-- 新しい光源の追加 = light_ids.glsl に index、light_table.glsl に 1 行、gen_block_properties.py に ID 行
+- 新しい光源の追加 = `tools/id_tables.py` の `LIGHTS` に 1 行足して `uv run tools/gen_block_properties.py` (index の定数、ID、光源の表が生成される)
 
 ### item.properties (`heldItemId` / `heldItemId2` / `currentRenderedItemId`)
 

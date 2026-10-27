@@ -27,7 +27,7 @@ uv sync
 | スクリプト | 生成するもの |
 |---|---|
 | `gen_wrappers.py` | `shaders/world0`, `world-1`, `world1` のラッパー (ディメンションと本体のマクロを定義して、本体を直接 include するだけ)。プログラムと本体の対応は `gen_wrappers.py` の表にあり、追加・削除・変更したときに実行します。`--check` で過不足と本文の一致の確認だけもできます |
-| `gen_block_properties.py` | `shaders/block.properties` と `shaders/item.properties`、ブロックの平均の色の表 `shaders/lib/ids/block_albedo.glsl`。ブロック・アイテム ID の表はこのスクリプトの中にあります。表に無いブロックは `block_colors.json` の色ごとに 2000 番台の ID にまとめます |
+| `gen_block_properties.py` | `shaders/block.properties`、`item.properties`、`entity.properties`、ID の定数 `shaders/lib/ids/{block,light,entity}_ids.glsl`、ブロックの平均の色の表 `block_albedo.glsl`、光源の表のデータ `shaders/lib/light/light_table_data.glsl`。光源・エンティティ・ID の定数の表は `id_tables.py`、光源でないブロックの表はこのスクリプトの中にあります。光源の追加は `id_tables.py` の `LIGHTS` に 1 行足すだけです。表に無いブロックは `block_colors.json` の色ごとに 2000 番台の ID にまとめます。`--check` で生成物が最新かの確認だけもできます (`validate_shaders.py` も確認します) |
 | `gen_settings.py` | `shaders/lib/settings/bool_refs.glsl` (Iris がブールの設定を認識するための参照) と、`shaders/shaders.properties` の `sliders` (`BEGIN GENERATED sliders` と `END GENERATED sliders` の間。値がすべて数値で 4 個以上の設定がスライダーになり、例外は `gen_settings.py` の `NOT_SLIDER` / `FORCE_SLIDER`)、プロファイルで値の変わる設定の表 (`docs/architecture.md` の `BEGIN GENERATED settings` と `END GENERATED settings` の間)、全設定の一覧 `docs/settings.md`。設定の解析は `validate_shaders.py` と `shader_options.py` もここを使います。設定を追加・削除したときに実行します。`--check` で生成物が最新かの確認だけもできます |
 | `gen_block_colors.py <client.jar>` | `tools/block_colors.json` (ブロックごとの平均の色)。Minecraft のクライアント jar のブロックモデルとテクスチャを読むだけで、jar は変更しません。バージョンを上げたときに実行し、続けて `gen_block_properties.py` を実行します |
 | `gen_blue_noise.py` | `shaders/textures/blue_noise.png` |

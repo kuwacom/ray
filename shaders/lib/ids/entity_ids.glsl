@@ -1,5 +1,6 @@
 /*
  * エンティティ ID (entity.properties と対応) とアイテム ID (item.properties と対応)
+ * tools/gen_block_properties.py が tools/id_tables.py から生成する。手で編集しない
  * 未登録のエンティティは 65535、未登録 / 素手のアイテムは -1 (heldItemId) または 0
  */
 #ifndef IDS_ENTITY_IDS_GLSL
