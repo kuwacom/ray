@@ -18,6 +18,7 @@ Iris の前処理を簡易再現して glslangValidator で全プログラムを
     uv run tools/validate_shaders.py --profile HIGH     # 指定プロファイルのみ
     uv run tools/validate_shaders.py --filter deferred  # ファイル名に文字列を含むものだけ
     uv run tools/validate_shaders.py --no-cache         # キャッシュを使わず全部コンパイルし直す
+    uv run tools/validate_shaders.py --shaders <dir>    # 別のフォルダのシェーダーを検証する
 
 キャッシュ (tools/.cache/validate.json): include を展開し設定を差し替えた後の本文のハッシュを、成功したものだけ記録する
 本文には依存ファイルと設定値がすべて入っているので、どのファイルを変えても影響するプログラムだけが再コンパイルされる
@@ -50,6 +51,21 @@ LANG_FILES = [SHADERS / "lang" / "en_US.lang", SHADERS / "lang" / "ja_JP.lang"]
 WORLDS = ["world0", "world-1", "world1"]
 
 STAGE_OF_EXT = {".vsh": "vert", ".fsh": "frag", ".gsh": "geom", ".csh": "comp", ".tcs": "tesc", ".tes": "tese"}
+
+
+def set_shaders_dir(path: Path) -> None:
+    """
+    ### set_shaders_dir
+    検証するシェーダーのフォルダを差し替える (別のコミットを展開したツリーなどを、このリポジトリのツールで検証するため)
+    include の展開のキャッシュは絶対パスがキーなので、ツリーを行き来しても混ざらない。キャッシュ (tools/.cache) の場所は変えない
+
+    @param path - shaders.properties を含むフォルダ
+    """
+    global SHADERS, SETTINGS, PROPERTIES, LANG_FILES
+    SHADERS = Path(path).resolve()
+    SETTINGS = SHADERS / "lib" / "settings.glsl"
+    PROPERTIES = SHADERS / "shaders.properties"
+    LANG_FILES = [SHADERS / "lang" / "en_US.lang", SHADERS / "lang" / "ja_JP.lang"]
 
 # Iris が定義するレンダーステージのマクロ (値は検証用の仮の連番)
 RENDER_STAGES = [
@@ -464,7 +480,10 @@ def main() -> int:
     ap.add_argument("--quick", action="store_true", help="既定値 x world0 のみ (既定の動作。互換のため残す)")
     ap.add_argument("--no-cache", action="store_true", help="前回成功したものも含めて全部コンパイルする")
     ap.add_argument("--jobs", type=int, default=os.cpu_count() or 4)
+    ap.add_argument("--shaders", type=Path, help="検証するシェーダーのフォルダ (既定: このリポジトリの shaders/)")
     args = ap.parse_args()
+    if args.shaders:
+        set_shaders_dir(args.shaders)
     cache = SuccessCache("validate", enabled=not args.no_cache)
 
     options = parse_settings()

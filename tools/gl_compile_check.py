@@ -22,6 +22,8 @@ glslangValidator は仕様の文法しか見ないので、ドライバ固有の
     uv run tools/gl_compile_check.py --limits           # 上限値の一覧も表示
     uv run tools/gl_compile_check.py --report           # プログラムごとの使用数の表も表示
     uv run tools/gl_compile_check.py --all-programs     # program.*.enabled で無効なプログラムも検査する
+    uv run tools/gl_compile_check.py --time --gpu 1070  # 検査の代わりにコールドのコンパイル時間を測る
+    uv run tools/gl_compile_check.py --shaders <dir>    # 別のフォルダのシェーダーを検査する
 
 必要なもの: glfw, PyOpenGL (uv sync で入る)
 """
@@ -39,6 +41,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -219,6 +223,19 @@ def create_context() -> object:
         glfw.terminate()
         sys.exit("OpenGL 4.6 compatibility コンテキストを作れない")
     glfw.make_context_current(win)
+    return win
+
+
+def open_context(gpu: str = "") -> object:
+    """create_context を、--gpu で選んだ GPU で開く (選んだ GPU にならなければ終了する)"""
+    gpu_name = ""
+    if gpu:
+        # ICD はコンテキスト作成時に読み込まれるので、それより前に環境変数を置けば効く
+        os.environ["OGL_DEFAULT_RENDERING_GPU"], gpu_name = nv_rendering_gpu(gpu)
+    win = create_context()
+    if gpu_name and not gl_string(GL.GL_RENDERER).startswith(gpu_name):
+        glfw.terminate()
+        sys.exit(f"--gpu {gpu}: {gpu_name} を指定したがドライバが別の GPU でコンテキストを作った")
     return win
 
 
@@ -580,11 +597,12 @@ class PendingLink:
     msgs: list[str]
 
 
-def start_link(stages: list[StageSource], level: str, started: list[int] | None = None) -> PendingLink:
+def start_link(stages: list[StageSource], level: str, started: list[int] | None = None, retrievable: bool = False) -> PendingLink:
     """
     コンパイル結果を読んでリンクを発行だけする (結果は finish_link が読む)
     NVIDIA は最適化とコード生成をリンク時に行うので、ここが重い。並列コンパイル拡張があれば
     glLinkProgram はすぐ返るので、全部発行してから結果を読むとリンクも並列に進む
+    retrievable: リンク後に program_binary でバイナリを取れるようにする (ヒントはリンクの前に立てる必要がある)
     """
     by_stage = {s.stage: s for s in stages}
     shaders: list[int] = []
@@ -604,8 +622,53 @@ def start_link(stages: list[StageSource], level: str, started: list[int] | None 
         prog = GL.glCreateProgram()
         for sh in shaders:
             GL.glAttachShader(prog, sh)
+        if retrievable:
+            GL.glProgramParameteri(prog, GL.GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL.GL_TRUE)
         GL.glLinkProgram(prog)
     return PendingLink(stages, shaders, prog, msgs)
+
+
+def program_binary(prog: int) -> bytes:
+    """リンク済みプログラムのドライバのバイナリ (start_link の retrievable で立てたものだけ取れる)"""
+    n = int(GL.glGetProgramiv(prog, GL.GL_PROGRAM_BINARY_LENGTH))
+    if n <= 0:
+        return b""
+    buf = (GL.GLubyte * n)()
+    length = GL.GLsizei(0)
+    fmt = GL.GLenum(0)
+    GL.glGetProgramBinary(prog, n, length, fmt, buf)
+    return bytes(buf)[: length.value]
+
+
+def _resource_name(prog: int, interface: int, index: int) -> str:
+    buf = ctypes.create_string_buffer(512)
+    length = ctypes.c_int()
+    GL.glGetProgramResourceName(prog, interface, index, len(buf), ctypes.byref(length), buf)
+    return buf.value.decode(errors="replace")
+
+
+def ssbo_layout(prog: int) -> dict[str, list[tuple[str, int, int, int, int]]]:
+    """
+    ### ssbo_layout
+    SSBO ごとのメンバーの配置 (リンク後のイントロスペクション)。構造体を並べ替えた・型を変えた時に、オフセットがずれていないかを比べるため
+
+    @param prog - リンク済みのプログラム
+    @returns "binding <N> <ブロック名>" -> [(メンバー名, 型, オフセット, 配列の間隔, 最上位の配列の間隔)] をメンバー名順に。アクティブなメンバーだけが出る
+    """
+    blocks: dict[int, str] = {}
+    for i in range(_active_count(prog, GL.GL_SHADER_STORAGE_BLOCK)):
+        binding = _resource_props(prog, GL.GL_SHADER_STORAGE_BLOCK, i, [GL.GL_BUFFER_BINDING])[0]
+        blocks[i] = f"binding {binding} {_resource_name(prog, GL.GL_SHADER_STORAGE_BLOCK, i)}"
+    out: dict[str, list[tuple[str, int, int, int, int]]] = {b: [] for b in blocks.values()}
+    for i in range(_active_count(prog, GL.GL_BUFFER_VARIABLE)):
+        block, typ, offset, arr_stride, top_stride = _resource_props(
+            prog, GL.GL_BUFFER_VARIABLE, i,
+            [GL.GL_BLOCK_INDEX, GL.GL_TYPE, GL.GL_OFFSET, GL.GL_ARRAY_STRIDE, GL.GL_TOP_LEVEL_ARRAY_STRIDE])
+        if block in blocks:
+            out[blocks[block]].append((_resource_name(prog, GL.GL_BUFFER_VARIABLE, i), typ, offset, arr_stride, top_stride))
+    for rows in out.values():
+        rows.sort()
+    return out
 
 
 def finish_link(p: PendingLink, level: str) -> ProgramResult:
@@ -792,6 +855,71 @@ def collect_programs(world: str, flt: str, sections: list[str] | None = None) ->
     return progs
 
 
+def cold_build_time(stages: list[StageSource], nonce: str) -> tuple[float, float, bool]:
+    """
+    ### cold_build_time
+    1 プログラムを Iris と同じく逐次に compile -> link し、かかった時間を測る
+
+    @param stages - プログラムのステージ
+    @param nonce - #version の直後に足す #define の名前の一部。ドライバのディスクキャッシュは本文がキーなので、実行ごとに変えるとキャッシュに当たらない
+    @returns (全ステージの compile の秒, link の秒, 成功したか)
+    """
+    shaders = []
+    ok = True
+    t0 = time.perf_counter()
+    for s in stages:
+        head, rest = s.source.split("\n", 1)
+        sh = GL.glCreateShader(GL_STAGE[s.stage])
+        GL.glShaderSource(sh, f"{head}\n#define RAY_COLD_{nonce}\n{rest}")
+        GL.glCompileShader(sh)
+        ok &= bool(GL.glGetShaderiv(sh, GL.GL_COMPILE_STATUS))
+        shaders.append(sh)
+    t1 = time.perf_counter()
+    prog = GL.glCreateProgram()
+    for sh in shaders:
+        GL.glAttachShader(prog, sh)
+    GL.glLinkProgram(prog)
+    ok &= bool(GL.glGetProgramiv(prog, GL.GL_LINK_STATUS))
+    t2 = time.perf_counter()
+    GL.glDeleteProgram(prog)
+    for sh in shaders:
+        GL.glDeleteShader(sh)
+    return t1 - t0, t2 - t1, ok
+
+
+def time_programs(configs: list[tuple[str, dict, list[str]]], options: dict[str, vs.Option], features: list[str],
+                  flt: str, sections: list[str], all_programs: bool) -> int:
+    """--time: 有効なプログラムのコールドのコンパイル時間を表示する。同じ本文は 1 回の実行の中で 1 回だけ測る"""
+    nonce = uuid.uuid4().hex[:12]
+    seen: set[str] = set()
+    total = 0.0
+    count = failed = 0
+    t_all = time.perf_counter()
+    for cfg_name, ov, worlds in configs:
+        disabled = disabled_programs(preprocess_properties(effective_macros(ov, options)))
+        for world in worlds:
+            for pname, files in collect_programs(world, flt, sections).items():
+                prog_key = f"{world}/{pname.removesuffix('.csh')}"
+                if prog_key in disabled and not all_programs:
+                    continue
+                stages = []
+                for f in files:
+                    src, lm = vs.build_source(f, ov, options, features)
+                    stages.append(StageSource(f, vs.STAGE_OF_EXT[f.suffix], src, lm))
+                key = run_key(stages)
+                if key in seen:
+                    continue
+                seen.add(key)
+                comp, link, ok = cold_build_time(stages, nonce)
+                total += comp + link
+                count += 1
+                failed += not ok
+                print(f"[{cfg_name}] {prog_key:36s} {comp + link:7.2f}s (compile {comp:6.2f} link {link:6.2f})" + ("" if ok else "  FAIL"),
+                      flush=True)
+    print(f"\n{count} programs, cold sum {total:.1f}s, wall {time.perf_counter() - t_all:.1f}s, {failed} failed")
+    return 1 if failed else 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--profile", help="このプロファイルだけ (DEFAULT で既定値。カンマ区切りで複数)")
@@ -807,8 +935,12 @@ def main() -> int:
     ap.add_argument("--report", action="store_true", help="プログラムごとの使用数を表示")
     ap.add_argument("--warnings", action="store_true", help="ドライバの警告も表示")
     ap.add_argument("--all-programs", action="store_true", help="program.*.enabled で無効なプログラムも検査")
+    ap.add_argument("--time", action="store_true", help="検査の代わりに、ドライバのキャッシュを外したコンパイル時間をプログラムごとに測る")
+    ap.add_argument("--shaders", type=Path, help="検査するシェーダーのフォルダ (既定: このリポジトリの shaders/)")
     args = ap.parse_args()
     level = "warning" if args.warnings else "error"
+    if args.shaders:
+        vs.set_shaders_dir(args.shaders)
 
     options = vs.parse_settings()
     profiles = vs.parse_profiles()
@@ -820,17 +952,11 @@ def main() -> int:
         glslang = None
         print("[warn] glslangValidator が無いので宣言数のチェックを省略する")
 
-    gpu_name = ""
-    if args.gpu:
-        # ICD はコンテキスト作成時に読み込まれるので、それより前に環境変数を置けば効く
-        os.environ["OGL_DEFAULT_RENDERING_GPU"], gpu_name = nv_rendering_gpu(args.gpu)
-    win = create_context()
+    win = open_context(args.gpu)
     limits = query_limits()
-    parallel = enable_parallel_compile(args.jobs)
+    # 時間を測る時は Iris と同じく逐次にする
+    parallel = False if args.time else enable_parallel_compile(args.jobs)
     print(f"GL: {gl_string(GL.GL_VENDOR)} / {gl_string(GL.GL_RENDERER)} / {gl_string(GL.GL_VERSION)}")
-    if gpu_name and not gl_string(GL.GL_RENDERER).startswith(gpu_name):
-        glfw.terminate()
-        sys.exit(f"--gpu {args.gpu}: {gpu_name} を指定したがドライバが別の GPU でコンテキストを作った")
     if args.limits:
         for k, v in limits.items():
             print(f"  {k:52s} {v}")
@@ -850,6 +976,13 @@ def main() -> int:
             configs.append((p, vs.resolve_profile(p, profiles), ["world0"]))
     else:
         configs.append(("DEFAULT", {}, worlds_opt or ["world0"]))
+
+    if args.time:
+        try:
+            return time_programs(configs, options, features, args.filter, sections, args.all_programs)
+        finally:
+            glfw.destroy_window(win)
+            glfw.terminate()
 
     tmpdir = Path(tempfile.mkdtemp(prefix="ray_glcheck_"))
     cache: dict[str, ProgramResult] = {}

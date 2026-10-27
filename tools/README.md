@@ -42,6 +42,8 @@ uv sync
 |---|---|
 | `validate_shaders.py` | Iris の前処理 (include の展開、設定値の差し替え、Iris が注入するマクロ) を再現して glslang でコンパイルし、エラーを元ファイルの行番号で表示します。プロファイルの値、「高」プロファイルと既定値の一致、設定画面と lang の過不足、`*.properties` が ASCII だけか、も確認します |
 | `gl_compile_check.py` | 同じ前処理の結果を、見えないウィンドウの OpenGL 4.6 compatibility コンテキストで手元の GPU ドライバに compile + link させます。glslang では出ないドライバ固有のエラーと、image / sampler / SSBO / shared メモリの使用数が上限を超えていないかを調べます |
+| `equiv_check.py` | 2 つのコミット (または作業ツリー) のシェーダーをドライバにリンクさせ、バイナリが同じかを比べます。リファクタで計算が変わっていないかを、ゲームを使わずに確かめます |
+| `pixdiff.py` | 2 枚の撮影の画素の差 (平均・p99・最大・4/255 を超える画素の割合・平均色の差) を出します |
 
 ### ゲーム内デバッグ
 
@@ -74,6 +76,7 @@ uv run tools/gl_compile_check.py --full --limits --report
 | `--filter TEXT` | 名前に TEXT を含むものだけ検証します |
 | `--no-cache` | キャッシュを使わずに全部検証します |
 | `--jobs N` | 並列数 (既定は CPU 数) |
+| `--shaders DIR` | このリポジトリの `shaders/` の代わりに DIR を検証します |
 
 `gl_compile_check.py` だけにあるオプション
 
@@ -86,6 +89,24 @@ uv run tools/gl_compile_check.py --full --limits --report
 | `--report` | プログラムごとの使用数を表示します |
 | `--warnings` | ドライバの警告も表示します |
 | `--all-programs` | `program.*.enabled` で無効になるプログラムも検証します (既定では Iris と同じく飛ばします) |
+| `--time` | 検証の代わりに、プログラムごとのコンパイル時間を Iris と同じく 1 つずつ測ります。ドライバのキャッシュに当たらないよう、毎回違う `#define` を足します |
+
+## リファクタの前後を比べる
+
+`equiv_check.py` は、基準のコミット (`--base`、既定 HEAD) を `git archive` で `tools/.cache/equiv/` に展開し、作業ツリー (または `--new` のコミット) と同じ前処理・同じ GL コンテキストでリンクして比べます。前処理後の本文が同じプログラムはリンクせずに SAME とします
+
+```powershell
+uv run tools/equiv_check.py --gpu 1070                # 既定値・オーバーワールド
+uv run tools/equiv_check.py --gpu 1070 --full         # 3 ディメンションと全プロファイル
+uv run tools/equiv_check.py --text                    # glslang -E 後の本文 (コメント・空行・#line を除く) を比べる
+uv run tools/equiv_check.py --gpu 1070 --layout       # SSBO のメンバーのオフセットと間隔を比べる
+uv run tools/equiv_check.py --base HEAD~1 --new HEAD -v
+```
+
+- 結果はプログラムごとに `SAME` / `DIFF` / `ERROR` / `ONLY_BASE` / `ONLY_NEW` で、DIFF か ERROR があると終了コードが 1 になります。`-v` で SAME も表示します
+- バイナリには本文のハッシュなど、意味が同じでも変わるバイトがあります。基準の本文に違うコメントを足してリンクし直し、変わった位置を比べる対象から外します。コメント・関数名・未使用の関数や定数だけの変更は SAME、式や定数の値の変更は DIFF になります
+- 並べ替えなどで意味が同じでもバイナリが変わることがあります。DIFF になったら、撮影して `pixdiff.py` で比べます
+- 比べるのは同じ GPU とドライバの中だけです。`--filter`、`--profile`、`--world` で絞れます
 
 ## ルックの LUT
 
