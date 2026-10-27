@@ -109,7 +109,7 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define POM_DEPTH 0.25 // [0.05 0.1 0.15 0.2 0.25 0.3 0.4 0.5 0.75 1.0]
 #define POM_SAMPLES 32 // [16 32 48 64]
 #define POM_SHADOW // POM の自己影
-#define SSS // 表面下散乱 (葉・草)
+#define SSS // 表面下散乱 (葉・草・雪・プレイヤーの肌を裏から透ける光)
 #define SSS_STRENGTH 1.0 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0 4.0]
 #define WAVING_PLANTS
 #define WAVING_LEAVES

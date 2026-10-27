@@ -11,7 +11,7 @@
  * 環境光の鏡面 (反射バッファ・空) はここでは足さず composite1 で足す (反射パスが colortex0 のこの結果を映すため)
  * 合成の考え方
  *   太陽: PCSS の影 (色付き・水底のコースティクス込み) x POM の自己影 x 接触影 x 雲影。影マップの外はスカイライトで近似
- *   SSS: 影のブロッカー探索で得た厚みで減衰させた太陽光を裏面透過として足す
+ *   SSS: 影のブロッカー探索で得た厚みで減衰させた太陽光を裏面透過として足す。手持ち光源の透過も含め、設定 SSS が無ければ外す
  *   AO: 空の照度には多重バウンス AO を全部、ブロックライトには半分 (光源シャドウで既に遮蔽されているため)、GI はバニラ AO だけ
  */
 #include "/lib/common/common.glsl"
@@ -134,7 +134,12 @@ void main() {
 
     // ---- 太陽 / 月 ----
     LightSample sun = getCelestialLight();
+#ifdef SSS
     SunShadow ss = evalSunShadow(playerPos, g.geoNormal, m.sss, dither);
+#else
+    // 透過を足さないので、裏向きの面の厚みの探索と影のにじみも要らない
+    SunShadow ss = evalSunShadow(playerPos, g.geoNormal, 0.0, dither);
+#endif
     float fallback = smoothstep(SHADOW_FALLBACK_SKYLIGHT.x, SHADOW_FALLBACK_SKYLIGHT.y, g.lightmap.y);
     vec3 sunVis = mix(vec3(fallback), ss.visibility, ss.fade) * pomShadow;
     // 葉を透過した分 (拡散だけに使う。鏡面の太陽は葉の隙間を抜けた光だけで照り返す)
@@ -161,6 +166,7 @@ void main() {
         color += max(evalDirectLight(m, g.normal, V, leafLit) - evalDirectSpecular(m, g.normal, V, leafLit), 0.0);
     }
 
+#ifdef SSS
     if (m.sss > 0.0) {
         // 厚みに応じた減衰。アルベドの色ほど通りやすい (葉は緑に透ける)
         float thickness = mix(1.0 - fallback, ss.thickness, ss.fade);
@@ -169,12 +175,18 @@ void main() {
         through.irradiance *= transmit * cloudShadow * pomShadow;
         color += evalTranslucency(m, g.normal, V, through) * SSS_STRENGTH;
     }
+#endif
 
     // ---- 手持ち光源・ブロックライトの鏡面 ----
     LightSample handMain, handOff;
     getHandLights(playerPos, g.geoNormal, dither, handMain, handOff);
+#ifdef SSS
     color += directLight(m, g.normal, V, handMain, playerPos, g.geoNormal, glintVar, glintShare, glintLum) + evalTranslucency(m, g.normal, V, handMain);
     color += directLight(m, g.normal, V, handOff, playerPos, g.geoNormal, glintVar, glintShare, glintLum) + evalTranslucency(m, g.normal, V, handOff);
+#else
+    color += directLight(m, g.normal, V, handMain, playerPos, g.geoNormal, glintVar, glintShare, glintLum);
+    color += directLight(m, g.normal, V, handOff, playerPos, g.geoNormal, glintVar, glintShare, glintLum);
+#endif
     LightSample blockSpec[BLOCKLIGHT_SPECULAR_LIGHTS];
     int blockSpecCount = getBlockLightSpecular(texel, playerPos, g.geoNormal, blockSpec);
     for (int j = 0; j < blockSpecCount; j++) color += directSpecular(m, g.normal, V, blockSpec[j], playerPos, g.geoNormal, glintVar, glintShare, glintLum);
