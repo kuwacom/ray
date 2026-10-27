@@ -8,37 +8,24 @@ Iris のシェーダー設定ファイル (<game>/shaderpacks/Ray.txt) を外部
 - uv run tools/shader_options.py set GI_MODE=0 LIGHT_SHADOWS=false
 - uv run tools/shader_options.py unset GI_MODE           既定値に戻す (行を消す)
 - 反映はシェーダー再読み込み時 (run_scene.py --reload か mc.py の reload_shaders)
-- 既定値と選択肢は shaders/lib/settings.glsl から読む。未知のキーや選択肢外の値は警告だけ出して書き込む
+- 既定値と選択肢は shaders/lib/settings/ から読む。未知のキーや選択肢外の値は警告だけ出して書き込む
 """
 
 import argparse
 import os
-import re
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-SETTINGS = ROOT / "shaders" / "lib" / "settings.glsl"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import gen_settings  # noqa: E402
 
 
 def load_defaults() -> dict:
     # キー -> (既定値, 選択肢) 。bool は #define の有無、値付きは // [a b c] の選択肢を拾う
-    defaults = {}
-    for line in SETTINGS.read_text(encoding="utf-8").splitlines():
-        s = line.strip()
-        mt = re.match(r"^(//\s*)?#define\s+(\w+)(?:\s+([^\s/]+))?\s*(?://\s*(?:\[([^\]]*)\])?.*)?$", s)
-        if mt:
-            commented, key, value, choices = mt.groups()
-            if value is None:
-                defaults[key] = ("false" if commented else "true", ["true", "false"])
-            elif not commented:
-                defaults[key] = (value, choices.split() if choices else [])
-            continue
-        mt = re.match(r"^const\s+\w+\s+(\w+)\s*=\s*([^;]+);\s*(?://\s*\[([^\]]*)\])?", s)
-        if mt:
-            key, value, choices = mt.groups()
-            defaults[key] = (value.strip(), choices.split() if choices else [])
-    return defaults
+    return {
+        o.name: (("true" if o.default else "false"), ["true", "false"]) if o.kind == "bool" else (o.default, o.values)
+        for o in gen_settings.parse_settings().values()
+    }
 
 
 def read_options(path: Path) -> tuple[list[str], dict]:
@@ -94,7 +81,7 @@ def main() -> None:
                 raise SystemExit(f"KEY=VALUE で指定する: {item}")
             k, v = (s.strip() for s in item.split("=", 1))
             if k not in defaults:
-                print(f"警告: {k} は settings.glsl に見つからない", file=sys.stderr)
+                print(f"警告: {k} は lib/settings/ に見つからない", file=sys.stderr)
             elif defaults[k][1] and v not in defaults[k][1]:
                 print(f"警告: {k}={v} は選択肢 {defaults[k][1]} に無い", file=sys.stderr)
             values[k] = v

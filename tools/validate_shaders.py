@@ -9,7 +9,7 @@ Iris の前処理を簡易再現して glslangValidator で全プログラムを
 
 あわせて静的チェックも行う
 - #include の漏れ (使う記号の定義元を include しているか)、include の循環、lib のガード名 (tools/include_deps.py)
-- プロファイル・program.enabled が参照する設定が settings.glsl に存在するか
+- プロファイル・program.enabled が参照する設定が lib/settings/ に存在するか
 - lang (en_US / ja_JP) に全設定・全画面のラベルがあるか
 - shaders.properties の screen に全設定が載っているか
 
@@ -41,15 +41,15 @@ import subprocess
 import sys
 import tempfile
 import threading
-from dataclasses import dataclass, field
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import gen_settings  # noqa: E402
 import include_deps  # noqa: E402
+from gen_settings import CONST_RE, DEFINE_RE, Option  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 SHADERS = ROOT / "shaders"
-SETTINGS = SHADERS / "lib" / "settings.glsl"
 PROPERTIES = SHADERS / "shaders.properties"
 LANG_FILES = [SHADERS / "lang" / "en_US.lang", SHADERS / "lang" / "ja_JP.lang"]
 WORLDS = ["world0", "world-1", "world1"]
@@ -65,9 +65,8 @@ def set_shaders_dir(path: Path) -> None:
 
     @param path - shaders.properties を含むフォルダ
     """
-    global SHADERS, SETTINGS, PROPERTIES, LANG_FILES
+    global SHADERS, PROPERTIES, LANG_FILES
     SHADERS = Path(path).resolve()
-    SETTINGS = SHADERS / "lib" / "settings.glsl"
     PROPERTIES = SHADERS / "shaders.properties"
     LANG_FILES = [SHADERS / "lang" / "en_US.lang", SHADERS / "lang" / "ja_JP.lang"]
 
@@ -96,39 +95,12 @@ IRIS_MACROS = {
 }
 
 INCLUDE_RE = re.compile(r'^\s*#\s*include\s+"([^"]+)"')
-DEFINE_RE = re.compile(r"^(\s*)(//\s*)?#define\s+([A-Za-z_]\w*)(?:\s+([^\s/]+))?\s*(//.*)?$")
-CONST_RE = re.compile(r"^(\s*)const\s+(int|float|bool)\s+(\w+)\s*=\s*([^;]+);\s*(//.*)?$")
 ERROR_RE = re.compile(r"^(ERROR|WARNING): 0:(\d+): (.*)$")
 
 
-@dataclass
-class Option:
-    name: str
-    kind: str  # "bool" | "value" | "const"
-    default: str | bool
-    values: list[str] = field(default_factory=list)
-
-
 def parse_settings() -> dict[str, Option]:
-    """settings.glsl から設定項目を拾う (値リスト付きの数値 define, ブール define, 値リスト付き const)"""
-    opts: dict[str, Option] = {}
-    for line in SETTINGS.read_text(encoding="utf-8").splitlines():
-        m = DEFINE_RE.match(line)
-        if m:
-            commented, name, value, comment = m.group(2), m.group(3), m.group(4), m.group(5) or ""
-            if value is None:
-                # 値なし define がブール設定 (インクルードガードは除く)
-                if name not in opts and not name.endswith("_GLSL"):
-                    opts[name] = Option(name, "bool", commented is None)
-            elif commented is None and comment.startswith("//") and "[" in comment:
-                vals = re.search(r"\[([^\]]*)\]", comment)
-                opts[name] = Option(name, "value", value, vals.group(1).split() if vals else [])
-            continue
-        m = CONST_RE.match(line)
-        if m and m.group(5) and "[" in m.group(5):
-            vals = re.search(r"\[([^\]]*)\]", m.group(5))
-            opts[m.group(3)] = Option(m.group(3), "const", m.group(4).strip(), vals.group(1).split() if vals else [])
-    return opts
+    """lib/settings/ から設定項目を拾う (解析は gen_settings.py)"""
+    return gen_settings.parse_settings(SHADERS)
 
 
 def read_properties_logical_lines(path: Path) -> list[str]:

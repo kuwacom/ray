@@ -1,6 +1,6 @@
 /*
  * post モジュールの内部定数 (ユーザー設定ではない調整値)
- * ユーザーに見せる設定は lib/settings.glsl にしかない。ここは「なぜその値か」を残すための置き場
+ * ユーザーに見せる設定は lib/settings/ にしかない。ここは「なぜその値か」を残すための置き場
  */
 #ifndef POST_POST_CONSTANTS_GLSL
 #define POST_POST_CONSTANTS_GLSL

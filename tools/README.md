@@ -28,6 +28,7 @@ uv sync
 |---|---|
 | `gen_wrappers.py` | `shaders/world0`, `world-1`, `world1` のラッパー (ディメンションと本体のマクロを定義して、本体を直接 include するだけ)。プログラムと本体の対応は `gen_wrappers.py` の表にあり、追加・削除・変更したときに実行します。`--check` で過不足と本文の一致の確認だけもできます |
 | `gen_block_properties.py` | `shaders/block.properties` と `shaders/item.properties`、ブロックの平均の色の表 `shaders/lib/ids/block_albedo.glsl`。ブロック・アイテム ID の表はこのスクリプトの中にあります。表に無いブロックは `block_colors.json` の色ごとに 2000 番台の ID にまとめます |
+| `gen_settings.py` | `shaders/lib/settings/bool_refs.glsl` (Iris がブールの設定を認識するための参照)。設定の解析は `validate_shaders.py` と `shader_options.py` もここを使います。ブールの設定を追加・削除したときに実行します。`--check` で生成物が最新かの確認だけもできます |
 | `gen_block_colors.py <client.jar>` | `tools/block_colors.json` (ブロックごとの平均の色)。Minecraft のクライアント jar のブロックモデルとテクスチャを読むだけで、jar は変更しません。バージョンを上げたときに実行し、続けて `gen_block_properties.py` を実行します |
 | `gen_blue_noise.py` | `shaders/textures/blue_noise.png` |
 | `gen_cloud_noise.py` | `shaders/textures/cloud_*.dat` |
@@ -125,7 +126,7 @@ uv run tools/gen_look_lut.py test-swap-rb --out shaders/textures/look/user_lut.p
 ```
 
 - パラメーター (`tools/look_luts/*.json`) は、色の混ざり (3x3)、色温度の転び、コントラスト (中間グレーを軸にした log2) とチャンネルごとのコントラスト、輝度帯ごとの彩度、Oklab の色相帯ごとの色相の回転・彩度・明るさ、暗部と明部の色付け、出力の黒と白の位置です。意味は `gen_look_lut.py` の `BakeParams`
-- 新しい同梱の LUT を足すときは、JSON を足して `BUNDLED` と shaders.properties の `#if LOOK_LUT` に後ろの番号で足し、settings.glsl と lang の LOOK_LUT の値もそろえます
+- 新しい同梱の LUT を足すときは、JSON を足して `BUNDLED` と shaders.properties の `#if LOOK_LUT` に後ろの番号で足し、lib/settings/look.glsl と lang の LOOK_LUT の値もそろえます
 - `.dat` はリトルエンディアンの uint16 で、赤が最速・次に緑・青の順 (.cube と同じ)。PNG のストリップは上の行が緑 0 で、ゲームで恒等と赤青の入れ替えの LUT を使って向きを確かめてあります
 
 ## ゲーム内で撮影する

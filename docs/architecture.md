@@ -60,7 +60,8 @@ shaders/
   lang/en_US.lang  lang/ja_JP.lang
   textures/                                 blue_noise.png, lens_dirt.png, cloud_*.dat, lens_starburst.dat, water_waves.dat (+ .mcmeta)
   textures/look/                            user_lut.png (ユーザーの LUT、恒等), split_tone.dat, film.dat, portra.dat, ektar.dat, vision3_500t.dat, velvia.dat, provia.dat, eterna.dat (同梱の LUT) (+ .mcmeta)
-  lib/settings.glsl                         全設定の唯一の定義
+  lib/settings.glsl                         設定の入口 (lib/settings/ のファイルを include する)
+  lib/settings/*                            全設定の定義 (look / light / surface / sky / post のモジュールごと)、導出値 (internal)、ブールの参照 (bool_refs、gen_settings.py が生成)
   lib/common/*   lib/buffers/*   lib/ids/*  共通基盤
   lib/light/*                               light モジュール
   lib/sky/*                                 sky モジュール
@@ -72,7 +73,7 @@ shaders/
   world0/  world-1/  world1/                gen_wrappers.py が生成するラッパー (WORLD_* と本体のマクロを定義して本体を include)
 ```
 
-`lib/settings.glsl` と共通基盤 (`lib/common`, `lib/buffers`, `lib/ids`) はパイプライン全体から参照される。変更すると全プログラムに影響するので、関数シグネチャを変えるときは呼び出し側もすべて直し、docs/architecture.md の表も更新する。
+`lib/settings.glsl` (`lib/settings/`) と共通基盤 (`lib/common`, `lib/buffers`, `lib/ids`) はパイプライン全体から参照される。変更すると全プログラムに影響するので、関数シグネチャを変えるときは呼び出し側もすべて直し、docs/architecture.md の表も更新する。
 
 ---
 
@@ -411,9 +412,9 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 
 ## 設定とプリセット
 
-以下の表は主な設定だけを載せる。全項目は `lib/settings.glsl` と shaders.properties (設定画面と `profile.*`) にある。
+以下の表は主な設定だけを載せる。全項目は `lib/settings/` と shaders.properties (設定画面と `profile.*`) にある。
 
-- 全設定は `lib/settings.glsl` の `#define` / `const`。プロファイルは shaders.properties の `profile.*` (ULTRA = HIGH + 差分、EXTREME = ULTRA + 差分、HIGH_FAST = HIGH + 差分、HIGH_FASTEST = HIGH_FAST + 差分、EXTREME_LITE / EXTREME_BALANCED = EXTREME + 差分の継承)。Iris は設定の数でプロファイルを並べ替えてから巡回するので、宣言順 (軽い順) で巡回させるために全プロファイルが同じ設定の組を持つ (新しいプロファイルは全部入りのプロファイルを継承して値だけ上書きする)
+- 全設定は `lib/settings/` の `#define` / `const`。プロファイルは shaders.properties の `profile.*` (ULTRA = HIGH + 差分、EXTREME = ULTRA + 差分、HIGH_FAST = HIGH + 差分、HIGH_FASTEST = HIGH_FAST + 差分、EXTREME_LITE / EXTREME_BALANCED = EXTREME + 差分の継承)。Iris は設定の数でプロファイルを並べ替えてから巡回するので、宣言順 (軽い順) で巡回させるために全プロファイルが同じ設定の組を持つ (新しいプロファイルは全部入りのプロファイルを継承して値だけ上書きする)
 - HIGH_FASTEST / HIGH_FAST: HIGH と同じ手法・見た目のまま、内部の解像度 (光源トレース・VL・雲) とサンプル数 (PCSS・RSM・SSR・光源) を下げ、時間方向の積み重ねとデノイズで補う
 - EXTREME_LITE / EXTREME_BALANCED: EXTREME と同じ手法 (ボクセル RT の GI・ボクセル補完の反射・レイトレースの屈折・コースティクス・POM・色付き光芒) のまま。EXTREME_LITE は範囲 (ボクセルの体積・影の距離と解像度・光源の上限) と解像度・サンプル数を ULTRA にそろえ、EXTREME_BALANCED は範囲を EXTREME のまま光源トレース・GI・雲・VL を半解像度にする
 - 素の既定値 = HIGH (iterationT 方式。`tools/validate_shaders.py` が不一致を検出する)
@@ -754,7 +755,7 @@ post モジュールが提供 (`#include "/lib/post/post.glsl"`):
 ### コーディング規約
 
 - マジックナンバーは定数化
-- 設定は `lib/settings.glsl` にしかない
+- 設定は `lib/settings/` にしかない
 - 重い機能は `#ifdef` で丸ごと外す。プログラム単位は shaders.properties の `program.enabled`
 - compute の `workGroups` / `workGroupsRender` はリテラルで書く (式・マクロは不可。`#if` で分岐)。validate_shaders.py が検査する
 - 他のシェーダーパックのコードは持ち込まない。手法を参考にした場合は CREDITS.md に出典を書く

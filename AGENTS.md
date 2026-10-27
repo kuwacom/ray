@@ -6,7 +6,7 @@ Iris 向け Minecraft シェーダーパック Ray のリポジトリ。人間�
   - `lib/`: 共有コード。`light` (ブロックライト) / `sky` (大気・雲・フォグ) / `surface` (マテリアル・影・GI・反射・水) / `post` (カメラ・ポストプロセス) と、共通部の `common` / `buffers` / `ids`
   - `program/`: 各パスの本体
   - `world0/`, `world-1/`, `world1/`: ディメンションと本体のマクロを定義して本体を include するだけのラッパー。手で編集せず `uv run tools/gen_wrappers.py` で生成する
-  - `lib/settings.glsl`: 全設定の定義。素の既定値は「高」(HIGH) プロファイルと一致させる
+  - `lib/settings.glsl`: 設定の入口。設定の定義は `lib/settings/` に lib のモジュールごとのファイルで書く。素の既定値は「高」(HIGH) プロファイルと一致させる。`lib/settings/bool_refs.glsl` は `uv run tools/gen_settings.py` で生成する
 - `tools/`: 生成・検証・ゲーム内デバッグのスクリプト ([tools/README.md](tools/README.md))
 - `docs/`: 設計資料
 
@@ -29,7 +29,7 @@ glslang は `RAY_GLSLANG`、PATH、`tools/glslang/bin/glslang.exe` の順に探�
 - `lib/` と `program/` のファイルは、使う記号の定義元を自分で `#include` する (読む順番に頼らない)。ガード名はパスから決める (`lib/sky/fog.glsl` は `SKY_FOG_GLSL`)。漏れは `tools/include_deps.py` と validate_shaders.py が検出する
 - compute の `workGroups` / `workGroupsRender` はリテラルで書く (式・マクロ不可)
 - `block.properties` / `item.properties` は `tools/gen_block_properties.py` から生成する。ID の番号帯は `lib/ids/*.glsl` と合わせる
-- 設定を足したら `lib/settings.glsl`、`shaders.properties` (画面と `profile.*`)、`lang/en_US.lang`、`lang/ja_JP.lang` をそろえる。漏れは validate_shaders.py が検出する
+- 設定を足したら `lib/settings/` の該当モジュールのファイル (ブールなら `gen_settings.py` も実行)、`shaders.properties` (画面と `profile.*`)、`lang/en_US.lang`、`lang/ja_JP.lang` をそろえる。漏れは validate_shaders.py が検出する
 - バッファ・ID・設定の割り当てを変えたら docs/architecture.md の表も直す
 
 ## コードの書き方

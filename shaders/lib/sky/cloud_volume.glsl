@@ -5,7 +5,7 @@
  *   低層: 積雲 (扁平雲 -> 並雲 -> 雄大雲。大中小のセルをべき乗則の割合で重ねる) / 層積雲 / 雨天の乱層雲
  *         / 積乱雲 (CLOUD_CUMULONIMBUS。雷雨と熱帯の午後。塔・かなとこ・オーバーシュート・乳房雲・降水の柱)
  *         / 断片雲 (CLOUD_FRACTUS。濃い雲の周りに群れで散らばる薄いちぎれ雲)
- *   層ごとの量・濃さ・大きさ・浸食・風は settings.glsl の CLOUD_LOW_* / CLOUD_MID_* / CLOUD_HIGH_* / CLOUD_CB_*
+ *   層ごとの量・濃さ・大きさ・浸食・風は lib/settings/sky.glsl の CLOUD_LOW_* / CLOUD_MID_* / CLOUD_HIGH_* / CLOUD_CB_*
  *   中層: 高積雲 (うろこ状の小塊) / 高層雲 (一様なベール)。CLOUDS=3 かつ CLOUD_QUALITY>=1 (CLOUD_MID_LAYER)
  *   上層: 巻雲 (薄い体積。房から落ちる氷晶の筋を風のシアで傾ける) / 巻積雲 / 巻層雲 (ベールと控えめな 22 度ハロ) (CLOUD_CIRRUS)
  *

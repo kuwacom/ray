@@ -259,7 +259,7 @@ LUT はトーンマップの後の表示の色 (sRGB) に掛かります。「LU
 
 主な設定項目とプリセットごとの値は [docs/architecture.md の「設定とプリセット」](docs/architecture.md#設定とプリセット) にまとめています
 
-既定値は [`shaders/lib/settings.glsl`](shaders/lib/settings.glsl) (「高」と同じ値) に、プリセットは [`shaders/shaders.properties`](shaders/shaders.properties) の `profile.*` に定義しています
+既定値は [`shaders/lib/settings/`](shaders/lib/settings) (「高」と同じ値) に、プリセットは [`shaders/shaders.properties`](shaders/shaders.properties) の `profile.*` に定義しています
 
 </details>
 
