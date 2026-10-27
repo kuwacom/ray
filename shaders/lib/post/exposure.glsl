@@ -7,6 +7,8 @@
 #ifndef POST_EXPOSURE_GLSL
 #define POST_EXPOSURE_GLSL
 
+#include "/lib/post/post_constants.glsl"
+
 const float EXPOSURE_INIT_MARKER = 271.828;
 
 float luminanceToEv100(float l) { return log2(max(l, 1e-10) * 100.0 / EXPOSURE_CALIBRATION); }

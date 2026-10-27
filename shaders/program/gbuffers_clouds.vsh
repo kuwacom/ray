@@ -3,6 +3,8 @@
  * sky モジュール (lib/sky)
  */
 #include "/lib/common/common.glsl"
+#include "/lib/common/jitter.glsl"
+#include "/lib/common/transforms.glsl"
 
 out vec2 texcoord;
 out vec4 glcolor;

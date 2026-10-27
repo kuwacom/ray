@@ -12,6 +12,12 @@
 #ifndef POST_COLOR_GRADE_GLSL
 #define POST_COLOR_GRADE_GLSL
 
+#include "/lib/settings.glsl"
+#include "/lib/common/color.glsl"
+#include "/lib/common/look_presets.glsl"
+#include "/lib/common/math.glsl"
+#include "/lib/post/post_constants.glsl"
+
 // 実効値
 const float G_TINT = GRADE_TINT + LKG_TINT;
 const vec3 G_OFFSET = vec3(GRADE_OFFSET_R, GRADE_OFFSET_G, GRADE_OFFSET_B) + LKG_OFFSET;

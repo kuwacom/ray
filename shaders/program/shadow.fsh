@@ -5,6 +5,11 @@
  * light モジュール (RSM で使う内容は surface モジュールと調整)
  */
 #include "/lib/common/common.glsl"
+#include "/lib/common/color.glsl"
+#include "/lib/common/encoding.glsl"
+#include "/lib/common/shadow_space.glsl"
+#include "/lib/ids/block_ids.glsl"
+#include "/lib/ids/id_decode.glsl"
 
 in vec2 texcoord;
 in vec4 glcolor;

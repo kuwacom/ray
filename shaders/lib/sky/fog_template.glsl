@@ -13,6 +13,10 @@
 #ifndef SKY_FOG_TEMPLATE_GLSL
 #define SKY_FOG_TEMPLATE_GLSL
 
+#include "/lib/settings.glsl"
+#include "/lib/sky/atmosphere.glsl"
+#include "/lib/sky/clouds.glsl"
+
 #if FOG_HEIGHT_PRESET == 4
     #if CLOUD_HEIGHT_PRESET == 3
         #define FOG_T_FROM_CLOUDS

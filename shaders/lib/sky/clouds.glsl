@@ -24,6 +24,14 @@
 #ifndef SKY_CLOUDS_GLSL
 #define SKY_CLOUDS_GLSL
 
+#include "/lib/settings.glsl"
+#include "/lib/common/dimension.glsl"
+#include "/lib/common/math.glsl"
+#include "/lib/common/samplers.glsl"
+#include "/lib/common/transforms.glsl"
+#include "/lib/common/uniforms.glsl"
+#include "/lib/buffers/images.glsl"
+
 // 参照空間の層の高さ (m)。調整はここが基準
 #if CLOUDS == 3
     const float CLOUD_R_BASE = 1500.0;

@@ -6,6 +6,9 @@
 #ifndef LIGHT_LIGHT_BINS_GLSL
 #define LIGHT_LIGHT_BINS_GLSL
 
+#include "/lib/settings.glsl"
+#include "/lib/buffers/ssbo.glsl"
+
 const int MAX_GLOBAL_LIGHTS = LIGHT_MAX_COUNT; // 1 フレームに登録できる光源インスタンス数
 
 const int LIGHT_BIN_CAPACITY = LIGHT_BIN_LIGHTS; // ビン 1 つに入る光源数

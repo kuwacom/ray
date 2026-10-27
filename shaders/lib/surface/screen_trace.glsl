@@ -6,6 +6,11 @@
 #ifndef SURFACE_SCREEN_TRACE_GLSL
 #define SURFACE_SCREEN_TRACE_GLSL
 
+#include "/lib/common/math.glsl"
+#include "/lib/common/samplers.glsl"
+#include "/lib/common/transforms.glsl"
+#include "/lib/common/uniforms.glsl"
+
 const int SCREEN_TRACE_REFINE = 5;
 // 遠くを粗く近くを細かく刻む (ステップの分布を t^k にする)
 const float SCREEN_TRACE_STEP_POWER = 1.6;

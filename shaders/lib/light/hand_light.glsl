@@ -12,6 +12,22 @@
 #ifndef LIGHT_HAND_LIGHT_GLSL
 #define LIGHT_HAND_LIGHT_GLSL
 
+#include "/lib/settings.glsl"
+#include "/lib/common/constants.glsl"
+#include "/lib/common/math.glsl"
+#include "/lib/common/shading_types.glsl"
+#include "/lib/common/transforms.glsl"
+#include "/lib/common/uniforms.glsl"
+#include "/lib/common/voxel_space.glsl"
+#include "/lib/buffers/images.glsl"
+#include "/lib/buffers/ssbo.glsl"
+#include "/lib/ids/id_decode.glsl"
+#include "/lib/ids/light_ids.glsl"
+#include "/lib/light/block_data.glsl"
+#include "/lib/light/light_select.glsl"
+#include "/lib/light/trace.glsl"
+#include "/lib/light/voxel.glsl"
+
 // 一人称のカメラから見た手の位置 (view 空間, ブロック)
 // 目から離すほど段差の縁の影 (黒い楔) と、両手持ちで片方の影にだけ乗る色の帯が太く見えるので画面の手より内側に置く
 const vec3 HAND_OFFSET_VIEW = vec3(0.2, -0.18, -0.3);

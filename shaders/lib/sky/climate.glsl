@@ -5,6 +5,10 @@
 #ifndef SKY_CLIMATE_GLSL
 #define SKY_CLIMATE_GLSL
 
+#include "/lib/settings.glsl"
+#include "/lib/common/noise.glsl"
+#include "/lib/common/uniforms.glsl"
+
 // 日替わりの種 (cloud_volume.glsl の cloudClimate と同じ値)
 const uint CLIMATE_SEED_HUMIDITY = 11u;
 const uint CLIMATE_SEED_CLEAR_DAY = 78u;

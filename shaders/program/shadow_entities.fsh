@@ -3,6 +3,7 @@
  * light モジュール (lib/light)
  */
 #include "/lib/common/common.glsl"
+#include "/lib/common/encoding.glsl"
 
 in vec2 texcoord;
 in vec4 glcolor;

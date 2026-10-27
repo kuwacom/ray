@@ -5,6 +5,8 @@
  * post モジュール
  */
 #include "/lib/common/common.glsl"
+#include "/lib/common/exposure.glsl"
+#include "/lib/common/gbuffer.glsl"
 #include "/lib/post/post_internal.glsl"
 #include "/lib/light/light.glsl"
 #include "/lib/buffers/formats.glsl"

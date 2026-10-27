@@ -8,6 +8,7 @@ Iris の前処理を簡易再現して glslangValidator で全プログラムを
 - エラー行を元のファイル名・行番号へ戻して表示
 
 あわせて静的チェックも行う
+- #include の漏れ (使う記号の定義元を include しているか)、include の循環、lib のガード名 (tools/include_deps.py)
 - プロファイル・program.enabled が参照する設定が settings.glsl に存在するか
 - lang (en_US / ja_JP) に全設定・全画面のラベルがあるか
 - shaders.properties の screen に全設定が載っているか
@@ -42,6 +43,9 @@ import tempfile
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import include_deps  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 SHADERS = ROOT / "shaders"
@@ -413,6 +417,7 @@ def properties_checks() -> list[str]:
 
 def static_checks(options: dict[str, Option], profiles: dict[str, list[str]]) -> list[str]:
     problems: list[str] = properties_checks()
+    problems += include_deps.Tree(SHADERS).problems()
     for pname in profiles:
         for k, v in resolve_profile(pname, profiles).items():
             opt = options.get(k)

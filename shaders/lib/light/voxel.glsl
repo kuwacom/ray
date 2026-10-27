@@ -5,6 +5,13 @@
 #ifndef LIGHT_VOXEL_GLSL
 #define LIGHT_VOXEL_GLSL
 
+#include "/lib/common/voxel_space.glsl"
+#include "/lib/buffers/images.glsl"
+#include "/lib/ids/block_ids.glsl"
+#include "/lib/ids/id_decode.glsl"
+#include "/lib/ids/light_ids.glsl"
+#include "/lib/light/block_data.glsl"
+
 const uint VOXEL_ENTITY_MASK = 0x00FFu; // 全エンティティ (自分を含む) の 2x2x2 サブセル占有
 const uint VOXEL_PLAYER_MASK = 0xFF00u; // 自分 (current_player) だけのサブセル占有
 

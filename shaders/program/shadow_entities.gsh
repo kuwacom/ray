@@ -7,6 +7,7 @@
 #define IMG_VOXEL_ENTITY
 #define IMG_VOXEL_EMIT
 #include "/lib/common/common.glsl"
+#include "/lib/common/shadow_space.glsl"
 #include "/lib/light/light.glsl"
 
 layout(triangles) in;

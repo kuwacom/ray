@@ -7,6 +7,7 @@
  * post モジュール (lib/post)
  */
 #include "/lib/common/common.glsl"
+#include "/lib/common/exposure.glsl"
 #include "/lib/post/post_internal.glsl"
 
 in vec2 texcoord;

@@ -17,6 +17,22 @@
 #ifndef SURFACE_SUN_SHADOW_GLSL
 #define SURFACE_SUN_SHADOW_GLSL
 
+#include "/lib/settings.glsl"
+#include "/lib/common/color.glsl"
+#include "/lib/common/constants.glsl"
+#include "/lib/common/dimension.glsl"
+#include "/lib/common/math.glsl"
+#include "/lib/common/samplers.glsl"
+#include "/lib/common/shadow_space.glsl"
+#include "/lib/common/transforms.glsl"
+#include "/lib/common/uniforms.glsl"
+#include "/lib/common/voxel_space.glsl"
+#include "/lib/buffers/images.glsl"
+#include "/lib/ids/block_ids.glsl"
+#include "/lib/ids/id_decode.glsl"
+#include "/lib/common/shadow_volume.glsl"
+#include "/lib/common/water.glsl"
+
 const float SHADOW_NORMAL_OFFSET_MIN = 0.6;   // 法線オフセット (テクセル)。正面向きの面
 const float SHADOW_NORMAL_OFFSET_SLOPE = 1.4; // 法線オフセット (テクセル)。傾いた面での追加分
 const float SHADOW_CONSTANT_BIAS = 0.75;      // 深度の量子化分 (テクセル)
@@ -43,7 +59,6 @@ struct SunShadow {
     float fade;      // 1 = 影マップの範囲内。0 に近いほど呼び出し側のフォールバックを使う
 };
 
-float shadowDepthPerBlock() { return abs(shadowProjection[2][2]) * SHADOW_DEPTH_SCALE * 0.5; }
 vec2 shadowClipPerBlock() { return vec2(shadowProjection[0][0], shadowProjection[1][1]); }
 
 vec2 shadowClipToUv(vec2 clipXY) { return clipXY / shadowDistortScale(clipXY) * 0.5 + 0.5; }
@@ -57,27 +72,6 @@ float shadowCompareBilinear(sampler2D tex, vec2 uv, float z) {
     vec4 d = textureGather(tex, (floor(px) + 1.0) / res, 0);
     vec4 v = step(vec4(z), d);
     return mix(mix(v.w, v.z, f.x), mix(v.x, v.y, f.x), f.y);
-}
-
-/*
- * 影マップの 1 点の透過色。半透明の透過色 (ガラス) か水の吸収 + コースティクス
- * receiverPlayer: 受け点, z: 受け点の影深度
- */
-vec3 shadowTranslucentTint(vec2 uv, float z, vec3 receiverPlayer) {
-#ifdef SHADOW_COLORED
-    vec4 kind = texture(shadowcolor1, uv);
-    if (kind.a > 0.75) {
-        float surfaceDepth = texture(shadowtex0, uv).r;
-        float depthBelow = max(z - surfaceDepth, 0.0) / shadowDepthPerBlock();
-        vec3 L = getShadowLightDir();
-        vec3 t = exp(-waterExtinction() * depthBelow);
-        return t * waterCaustics(receiverPlayer + cameraPosition, depthBelow, L);
-    }
-    vec4 c = texture(shadowcolor0, uv);
-    return mix(vec3(1.0), srgbToLinear(c.rgb), c.a);
-#else
-    return vec3(1.0);
-#endif
 }
 
 #ifdef SHADOW_LEAF_TINT
@@ -305,24 +299,6 @@ SunShadow evalSunShadow(vec3 playerPos, vec3 geoNormal, float sss, float dither)
     }
 #endif
     return r;
-}
-
-/*
- * VL 等の体積マーチ用の 1 タップ影 (sky モジュールが使う)。rgb = 色付き透過率
- */
-vec3 sampleShadowVolume(vec3 playerPos) {
-#ifdef HAS_SUN_SHADOWS
-    vec3 s = playerToShadowScreen(playerPos);
-    if (any(lessThan(s, vec3(0.0))) || any(greaterThan(s, vec3(1.0)))) return vec3(1.0);
-    float opaqueVis = step(s.z, texture(shadowtex1, s.xy).r);
-    #ifdef SHADOW_COLORED
-        float allVis = step(s.z, texture(shadowtex0, s.xy).r);
-        if (opaqueVis > 0.0 && allVis < 1.0) return shadowTranslucentTint(s.xy, s.z, playerPos);
-    #endif
-    return vec3(opaqueVis);
-#else
-    return vec3(1.0);
-#endif
 }
 
 /*

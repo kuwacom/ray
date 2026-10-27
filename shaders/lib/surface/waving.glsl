@@ -8,6 +8,10 @@
 #ifndef SURFACE_WAVING_GLSL
 #define SURFACE_WAVING_GLSL
 
+#include "/lib/settings.glsl"
+#include "/lib/common/uniforms.glsl"
+#include "/lib/ids/block_ids.glsl"
+
 const float WIND_SPEED = 1.0;
 const float WAVE_AMP_SHORT = 0.11;      // 草花の先端
 const float WAVE_AMP_TALL = 0.09;       // 2 ブロックの植物の継ぎ目 (上半分の先端はこの 2 倍)

@@ -10,6 +10,31 @@
 #ifndef SKY_VOLUMETRICS_GLSL
 #define SKY_VOLUMETRICS_GLSL
 
+#include "/lib/settings.glsl"
+#include "/lib/common/color.glsl"
+#include "/lib/common/constants.glsl"
+#include "/lib/common/dimension.glsl"
+#include "/lib/common/math.glsl"
+#include "/lib/common/noise.glsl"
+#include "/lib/common/samplers.glsl"
+#include "/lib/common/shading_types.glsl"
+#include "/lib/common/shadow_space.glsl"
+#include "/lib/common/transforms.glsl"
+#include "/lib/common/uniforms.glsl"
+#include "/lib/common/voxel_space.glsl"
+#include "/lib/buffers/ssbo.glsl"
+#include "/lib/light/block_data.glsl"
+#include "/lib/light/blocklight.glsl"
+#include "/lib/light/light_select.glsl"
+#include "/lib/common/shadow_volume.glsl"
+#include "/lib/common/water.glsl"
+#include "/lib/sky/atmosphere.glsl"
+#include "/lib/sky/clouds.glsl"
+#include "/lib/sky/fog.glsl"
+#include "/lib/sky/fog_styles.glsl"
+#include "/lib/sky/sh.glsl"
+#include "/lib/sky/sky_color.glsl"
+
 // 指数分布の強さ (大きいほど手前に集中)
 const float VL_DISTRIBUTION = 3.0;
 // 水中のマーチ範囲 (ブロック)。これより先は透過率がほぼ 0

@@ -13,6 +13,17 @@
 #ifndef LIGHT_ENTITY_LIGHT_GLSL
 #define LIGHT_ENTITY_LIGHT_GLSL
 
+#include "/lib/settings.glsl"
+#include "/lib/common/math.glsl"
+#include "/lib/common/noise.glsl"
+#include "/lib/common/voxel_space.glsl"
+#include "/lib/buffers/images.glsl"
+#include "/lib/buffers/ssbo.glsl"
+#include "/lib/ids/entity_ids.glsl"
+#include "/lib/ids/id_decode.glsl"
+#include "/lib/ids/light_ids.glsl"
+#include "/lib/light/block_data.glsl"
+
 const int ENTITY_ACC_PROBES = 8;       // 線形探索の上限
 const float ENTITY_ACC_SCALE = 256.0;  // セル内位置の固定小数点倍率
 

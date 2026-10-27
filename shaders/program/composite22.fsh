@@ -11,6 +11,7 @@
  * post モジュール (lib/post)
  */
 #include "/lib/common/common.glsl"
+#include "/lib/buffers/ssbo.glsl"
 #include "/lib/post/post_internal.glsl"
 
 const bool colortex0MipmapEnabled = true;

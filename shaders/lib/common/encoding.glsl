@@ -1,6 +1,8 @@
 #ifndef COMMON_ENCODING_GLSL
 #define COMMON_ENCODING_GLSL
 
+#include "/lib/common/math.glsl"
+
 // 八面体法線エンコード (Cigolle et al. 2014)。戻り値は [0,1]^2
 vec2 octEncode(vec3 n) {
     n /= abs(n.x) + abs(n.y) + abs(n.z);

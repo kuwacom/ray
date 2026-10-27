@@ -6,6 +6,21 @@
 #ifndef SKY_SKY_COLOR_GLSL
 #define SKY_SKY_COLOR_GLSL
 
+#include "/lib/settings.glsl"
+#include "/lib/common/color.glsl"
+#include "/lib/common/constants.glsl"
+#include "/lib/common/dimension.glsl"
+#include "/lib/common/look_presets.glsl"
+#include "/lib/common/math.glsl"
+#include "/lib/common/shading_types.glsl"
+#include "/lib/common/transforms.glsl"
+#include "/lib/common/uniforms.glsl"
+#include "/lib/buffers/images.glsl"
+#include "/lib/buffers/ssbo.glsl"
+#include "/lib/sky/atmosphere.glsl"
+#include "/lib/sky/celestial.glsl"
+#include "/lib/sky/sh.glsl"
+
 // 月光の色。物理的には太陽光とほぼ同じだが、夜の視覚 (プルキンエ効果) に寄せて青に振る
 const vec3 MOON_TINT = vec3(0.72, 0.84, 1.0);
 // 新月でも真っ暗にしない下限 (地球照・星明かり分)

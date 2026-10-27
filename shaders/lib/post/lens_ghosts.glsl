@@ -14,6 +14,8 @@
 #ifndef POST_LENS_GHOSTS_GLSL
 #define POST_LENS_GHOSTS_GLSL
 
+#include "/lib/post/lens_presets.glsl"
+
 const int GHOST_TABLE_SIZE = 24;
 #if LENS_GHOST_TABLE == 0 // dg6 / multi
 const float GHOST_KA_MAIN = 0.599187;

@@ -7,6 +7,12 @@
 #ifndef POST_VELOCITY_GLSL
 #define POST_VELOCITY_GLSL
 
+#include "/lib/settings.glsl"
+#include "/lib/common/jitter.glsl"
+#include "/lib/common/samplers.glsl"
+#include "/lib/common/transforms.glsl"
+#include "/lib/common/uniforms.glsl"
+
 /*
  * エンティティの gbuffers の fragment から呼ぶ。viewPos は今フレームの view 空間位置 (ジッターを含まない)
  * Iris 26.1 の ENTITY 頂点形式には at_velocity が無い (IrisVertexFormats)。宣言すると未割り当ての属性が

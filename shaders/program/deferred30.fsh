@@ -15,6 +15,7 @@
  *   AO: 空の照度には多重バウンス AO を全部、ブロックライトには半分 (光源シャドウで既に遮蔽されているため)、GI はバニラ AO だけ
  */
 #include "/lib/common/common.glsl"
+#include "/lib/common/exposure.glsl"
 #include "/lib/surface/surface.glsl"
 #include "/lib/sky/sky.glsl"
 #include "/lib/light/light.glsl"
@@ -64,7 +65,7 @@ const float PUDDLE_GLINT_MIN_VOH = 0.05;
 
 /*
  * 水たまりの光 L の鏡面。傾きの分散 slopeVar で広げた滑らかなローブを (1 - share) 残し、share を輝点にする
- * (lib/surface/water.glsl の waterSunGlint。composite1 の水面の sunGlint と同じ分け方)
+ * (lib/common/water.glsl の waterSunGlint。composite1 の水面の sunGlint と同じ分け方)
  * 戻り値 rgb = 鏡面の放射輝度, a = そのうち輝点の輝度 (composite20 の TAA を通さずに足す分)
  */
 vec4 puddleSpecular(Material m, vec3 N, vec3 V, LightSample L, vec3 playerPos, vec3 geoNormal, float slopeVar, float share) {

@@ -6,6 +6,13 @@
 #ifndef POST_BLOOM_GLSL
 #define POST_BLOOM_GLSL
 
+#include "/lib/common/color.glsl"
+#include "/lib/common/math.glsl"
+#include "/lib/common/samplers.glsl"
+#include "/lib/common/transforms.glsl"
+#include "/lib/post/post_constants.glsl"
+#include "/lib/post/sampling.glsl"
+
 // xy = タイルの左下 (ピクセル), zw = タイルの大きさ (ピクセル)
 ivec4 bloomTileRectPx(int level) {
     ivec2 screen = ivec2(viewSize());

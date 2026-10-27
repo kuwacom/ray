@@ -14,6 +14,20 @@
 #ifndef SKY_FOG_GLSL
 #define SKY_FOG_GLSL
 
+#include "/lib/settings.glsl"
+#include "/lib/common/color.glsl"
+#include "/lib/common/constants.glsl"
+#include "/lib/common/dimension.glsl"
+#include "/lib/common/look_presets.glsl"
+#include "/lib/common/math.glsl"
+#include "/lib/common/noise.glsl"
+#include "/lib/common/shading_types.glsl"
+#include "/lib/common/transforms.glsl"
+#include "/lib/common/uniforms.glsl"
+#include "/lib/sky/atmosphere.glsl"
+#include "/lib/sky/sh.glsl"
+#include "/lib/sky/sky_color.glsl"
+
 #include "/lib/sky/fog_template.glsl"
 #include "/lib/sky/climate.glsl"
 #include "/lib/sky/fog_styles.glsl"
@@ -125,8 +139,7 @@ const float NETHER_FOG_CLEAR_DIST = 32.0;
 const float END_FOG_EXTINCTION = 0.0025;
 const vec3 END_FOG_COLOR = vec3(0.30, 0.22, 0.45);
 
-// 水中の係数は水面側 (surface モジュール) の waterAbsorption / waterScattering を共有する (上から見た水と潜った時の色を揃える)
-#include "/lib/surface/water.glsl"
+// 水中の係数は水面側 (lib/common/water.glsl) の waterAbsorption / waterScattering を共有する (上から見た水と潜った時の色を揃える)
 const vec3 FOG_LAVA_EXTINCTION = vec3(1.6);
 const vec3 FOG_LAVA_RADIANCE = vec3(1.0, 0.30, 0.04) * 1.5;
 const vec3 FOG_POWDER_SNOW_EXTINCTION = vec3(1.2);

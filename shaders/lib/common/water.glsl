@@ -11,8 +11,16 @@
  * - 吸収 / 散乱: Jerlov の外洋タイプ IB 付近の係数 (1 ブロック = 1 m)
  * - コースティクス: 受け面側で水面の屈折光の面積比 (ヤコビアン) を有限差分で求める
  */
-#ifndef SURFACE_WATER_GLSL
-#define SURFACE_WATER_GLSL
+#ifndef COMMON_WATER_GLSL
+#define COMMON_WATER_GLSL
+
+#include "/lib/settings.glsl"
+#include "/lib/common/constants.glsl"
+#include "/lib/common/dimension.glsl"
+#include "/lib/common/math.glsl"
+#include "/lib/common/noise.glsl"
+#include "/lib/common/transforms.glsl"
+#include "/lib/common/uniforms.glsl"
 
 uniform sampler3D waterWaveTex;
 // カメラのバイオームが川 (shaders.properties の smooth)。海は distantOcean を使う

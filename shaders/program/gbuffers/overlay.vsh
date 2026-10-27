@@ -4,6 +4,7 @@
  * surface モジュール (lib/surface)
  */
 #include "/lib/common/common.glsl"
+#include "/lib/common/jitter.glsl"
 
 out vec2 texcoord;
 out vec4 glcolor;

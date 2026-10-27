@@ -9,6 +9,21 @@
 #ifndef POST_LENS_GLSL
 #define POST_LENS_GLSL
 
+#include "/lib/settings.glsl"
+#include "/lib/common/color.glsl"
+#include "/lib/common/constants.glsl"
+#include "/lib/common/jitter.glsl"
+#include "/lib/common/math.glsl"
+#include "/lib/common/noise.glsl"
+#include "/lib/common/transforms.glsl"
+#include "/lib/common/uniforms.glsl"
+#include "/lib/post/bloom.glsl"
+#include "/lib/post/camera.glsl"
+#include "/lib/post/lens_presets.glsl"
+#include "/lib/post/post_constants.glsl"
+#include "/lib/post/sampling.glsl"
+#include "/lib/post/velocity.glsl"
+
 #include "/lib/post/lens_ghosts.glsl"
 
 uniform sampler2D lensStarburstTex;

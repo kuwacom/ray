@@ -7,6 +7,21 @@
 #ifndef LIGHT_TRACE_GLSL
 #define LIGHT_TRACE_GLSL
 
+#include "/lib/settings.glsl"
+#include "/lib/common/constants.glsl"
+#include "/lib/common/math.glsl"
+#include "/lib/common/samplers.glsl"
+#include "/lib/common/transforms.glsl"
+#include "/lib/common/uniforms.glsl"
+#include "/lib/common/voxel_space.glsl"
+#include "/lib/buffers/images.glsl"
+#include "/lib/ids/block_ids.glsl"
+#include "/lib/ids/id_decode.glsl"
+#include "/lib/ids/light_ids.glsl"
+#include "/lib/light/block_data.glsl"
+#include "/lib/light/entity_tri.glsl"
+#include "/lib/light/voxel.glsl"
+
 // トレースのフラグ
 const uint TRACE_ENTITIES = 1u; // エンティティ占有で遮る (LIGHT_ENTITY_OCCLUSION)
 const uint TRACE_PLAYER = 2u;   // 自分 (current_player) で遮る。一人称の手持ち光源では外す

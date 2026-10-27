@@ -5,6 +5,12 @@
 #ifndef POST_CAMERA_GLSL
 #define POST_CAMERA_GLSL
 
+#include "/lib/settings.glsl"
+#include "/lib/common/constants.glsl"
+#include "/lib/common/uniforms.glsl"
+#include "/lib/post/lens_presets.glsl"
+#include "/lib/post/post_constants.glsl"
+
 // 焦点距離 (mm)。gbufferProjection[1][1] = 1 / tan(縦 FOV / 2)
 float cameraFocalLength() {
     return 0.5 * DOF_SENSOR_HEIGHT * gbufferProjection[1][1];

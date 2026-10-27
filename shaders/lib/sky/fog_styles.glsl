@@ -18,6 +18,8 @@
 #ifndef SKY_FOG_STYLES_GLSL
 #define SKY_FOG_STYLES_GLSL
 
+#include "/lib/settings.glsl"
+
 #if FOG_STYLE == 0
 // Ray (物理): 混合層のもや、朝に霧の層と谷霧、端は透過率 0.55
 const float FS_HAZE = 1.0;

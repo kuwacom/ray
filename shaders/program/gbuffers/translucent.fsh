@@ -12,6 +12,7 @@
  *     deferred の後 (renderTranslucentFeatures) に描くので G バッファに書いても照明されない。ここで前方シェーディングする
  */
 #include "/lib/common/common.glsl"
+#include "/lib/common/exposure.glsl"
 #include "/lib/surface/surface.glsl"
 #include "/lib/sky/sky.glsl"
 #include "/lib/light/light.glsl"

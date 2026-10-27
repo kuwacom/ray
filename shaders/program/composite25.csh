@@ -10,6 +10,9 @@
  * post モジュール (lib/post)
  */
 #include "/lib/common/common.glsl"
+#include "/lib/common/gbuffer.glsl"
+#include "/lib/buffers/ssbo.glsl"
+#include "/lib/ids/material_ids.glsl"
 #include "/lib/post/post_internal.glsl"
 
 layout(local_size_x = 16, local_size_y = 16) in;

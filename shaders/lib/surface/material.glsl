@@ -6,6 +6,13 @@
 #ifndef SURFACE_MATERIAL_GLSL
 #define SURFACE_MATERIAL_GLSL
 
+#include "/lib/common/color.glsl"
+#include "/lib/common/encoding.glsl"
+#include "/lib/common/gbuffer.glsl"
+#include "/lib/common/math.glsl"
+#include "/lib/common/samplers.glsl"
+#include "/lib/ids/material_ids.glsl"
+
 struct Material {
     vec3 albedo;      // 拡散反射色 (金属は 0 に近づける)
     vec3 f0;          // 垂直入射の反射率 (プリセット金属はアルベドの色付け込み)

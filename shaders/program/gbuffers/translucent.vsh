@@ -8,6 +8,7 @@
     #define IMG_VOXEL_EMIT
 #endif
 #include "/lib/common/common.glsl"
+#include "/lib/common/jitter.glsl"
 #include "/lib/surface/surface.glsl"
 #ifdef GBUF_ENTITIES_TRANSLUCENT
     #include "/lib/light/light.glsl"

@@ -4,6 +4,7 @@
  * フォールバック) だと発光しない不透明物として暗い柱になるので、半透明バッファへ発光だけを足す
  */
 #include "/lib/common/common.glsl"
+#include "/lib/common/jitter.glsl"
 
 out vec4 glcolor;
 

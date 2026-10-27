@@ -12,6 +12,20 @@
 #ifndef LIGHT_BLOCKLIGHT_GLSL
 #define LIGHT_BLOCKLIGHT_GLSL
 
+#include "/lib/settings.glsl"
+#include "/lib/common/color.glsl"
+#include "/lib/common/constants.glsl"
+#include "/lib/common/math.glsl"
+#include "/lib/common/samplers.glsl"
+#include "/lib/common/shading_types.glsl"
+#include "/lib/common/voxel_space.glsl"
+#include "/lib/buffers/ssbo.glsl"
+#include "/lib/light/block_data.glsl"
+#include "/lib/light/floodfill.glsl"
+#include "/lib/light/light_select.glsl"
+#include "/lib/light/light_table.glsl"
+#include "/lib/light/trace.glsl"
+
 // バニラのブロックライトマップ値 [0,1] からの照度 (体積外のフォールバック)
 vec3 blockLightmapFallback(float lm) {
     vec3 c = srgbToLinear(fireSrgb());

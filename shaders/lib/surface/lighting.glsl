@@ -6,6 +6,31 @@
 #ifndef SURFACE_LIGHTING_GLSL
 #define SURFACE_LIGHTING_GLSL
 
+#include "/lib/settings.glsl"
+#include "/lib/common/color.glsl"
+#include "/lib/common/constants.glsl"
+#include "/lib/common/dimension.glsl"
+#include "/lib/common/encoding.glsl"
+#include "/lib/common/look_presets.glsl"
+#include "/lib/common/math.glsl"
+#include "/lib/common/samplers.glsl"
+#include "/lib/common/shading_types.glsl"
+#include "/lib/common/transforms.glsl"
+#include "/lib/common/uniforms.glsl"
+#include "/lib/common/voxel_space.glsl"
+#include "/lib/buffers/images.glsl"
+#include "/lib/buffers/ssbo.glsl"
+#include "/lib/light/block_data.glsl"
+#include "/lib/light/floodfill.glsl"
+#include "/lib/light/hand_light.glsl"
+#include "/lib/light/light_select.glsl"
+#include "/lib/light/trace.glsl"
+#include "/lib/light/voxel.glsl"
+#include "/lib/surface/gi.glsl"
+#include "/lib/surface/sun_shadow.glsl"
+#include "/lib/sky/clouds.glsl"
+#include "/lib/sky/sky_color.glsl"
+
 /*
  * ボクセルのヒット面の色が画面に無い時は、ブロックの平均の色の表 (lib/ids/block_albedo.glsl) を使う
  * 一定の灰色 (線形 0.3) では、色の付いた壁の照り返しや反射の色が画面の外で抜ける。表に無いブロックはこの灰色になる

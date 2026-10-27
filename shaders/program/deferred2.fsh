@@ -11,6 +11,7 @@
  * light モジュール (lib/light)
  */
 #include "/lib/common/common.glsl"
+#include "/lib/common/encoding.glsl"
 #include "/lib/light/light.glsl"
 #include "/lib/post/post.glsl"
 

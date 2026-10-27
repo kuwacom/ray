@@ -9,6 +9,8 @@
 #ifndef POST_LENS_PRESETS_GLSL
 #define POST_LENS_PRESETS_GLSL
 
+#include "/lib/settings.glsl"
+
 #if LENS_PRESET == 1
 /*
  * 現代の大口径単焦点 (50mm F1.8 級, マルチコート, 丸い 9 枚羽根)

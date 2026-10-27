@@ -17,6 +17,8 @@
 #define IMG_BLOCKLIGHT_RAW
 #define IMG_BLOCKLIGHT_AUX
 #include "/lib/common/common.glsl"
+#include "/lib/common/encoding.glsl"
+#include "/lib/common/gbuffer.glsl"
 #include "/lib/light/light.glsl"
 
 layout(local_size_x = 8, local_size_y = 8) in;

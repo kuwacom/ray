@@ -9,6 +9,8 @@
 #ifndef COMMON_LOOK_PRESETS_GLSL
 #define COMMON_LOOK_PRESETS_GLSL
 
+#include "/lib/settings.glsl"
+
 #if LOOK_PRESET == 1
 /*
  * ナチュラル: 素朴なマイクラらしさを残した、目の疲れないルック (各設定がそのまま効く基準)

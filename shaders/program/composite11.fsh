@@ -5,6 +5,8 @@
  * sky モジュール (lib/sky)
  */
 #include "/lib/common/common.glsl"
+#include "/lib/common/gbuffer.glsl"
+#include "/lib/common/water.glsl"
 #include "/lib/sky/sky.glsl"
 #include "/lib/light/light.glsl"
 

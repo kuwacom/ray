@@ -9,6 +9,9 @@
 #ifndef COMMON_TRANSFORMS_GLSL
 #define COMMON_TRANSFORMS_GLSL
 
+#include "/lib/common/constants.glsl"
+#include "/lib/common/uniforms.glsl"
+
 vec2 viewSize() { return vec2(viewWidth, viewHeight); }
 vec2 texelSize() { return 1.0 / vec2(viewWidth, viewHeight); }
 

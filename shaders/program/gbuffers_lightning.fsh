@@ -1,4 +1,6 @@
 #include "/lib/common/common.glsl"
+#include "/lib/common/color.glsl"
+#include "/lib/common/exposure.glsl"
 
 in vec4 glcolor;
 

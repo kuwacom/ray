@@ -7,6 +7,10 @@
 #ifndef COMMON_VOXEL_SPACE_GLSL
 #define COMMON_VOXEL_SPACE_GLSL
 
+#include "/lib/settings.glsl"
+#include "/lib/common/math.glsl"
+#include "/lib/common/uniforms.glsl"
+
 const ivec3 VOXEL_SIZE = ivec3(VOXEL_SIZE_X, VOXEL_SIZE_Y, VOXEL_SIZE_Z);
 const ivec3 VOXEL_HALF = VOXEL_SIZE / 2;
 

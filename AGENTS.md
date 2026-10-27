@@ -26,6 +26,7 @@ glslang は `RAY_GLSLANG`、PATH、`tools/glslang/bin/glslang.exe` の順に探�
 
 - `*.properties` は ASCII のみ。Iris は ISO-8859-1 で読むので、日本語はコメントでも前処理を壊す
 - image uniform は 1 ステージ 8 個まで (NVIDIA)。`lib/buffers/images.glsl` は opt-in なので、使う `IMG_*` だけを `common.glsl` の include 前に `#define` する
+- `lib/` と `program/` のファイルは、使う記号の定義元を自分で `#include` する (読む順番に頼らない)。ガード名はパスから決める (`lib/sky/fog.glsl` は `SKY_FOG_GLSL`)。漏れは `tools/include_deps.py` と validate_shaders.py が検出する
 - compute の `workGroups` / `workGroupsRender` はリテラルで書く (式・マクロ不可)
 - `block.properties` / `item.properties` は `tools/gen_block_properties.py` から生成する。ID の番号帯は `lib/ids/*.glsl` と合わせる
 - 設定を足したら `lib/settings.glsl`、`shaders.properties` (画面と `profile.*`)、`lang/en_US.lang`、`lang/ja_JP.lang` をそろえる。漏れは validate_shaders.py が検出する

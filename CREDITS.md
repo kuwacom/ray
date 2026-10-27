@@ -41,7 +41,7 @@
 | 反射率の測定値・濡れた面 | Lagarde, "Water drop 2b - Dynamic rain and its effects", 2013 | program/gbuffers/solid.fsh |
 | RSM | Dachsbacher & Stamminger, "Reflective Shadow Maps", I3D 2005 | program/deferred10.csh |
 | 粗い誘電体の透過 | Walter et al., "Microfacet Models for Refraction through Rough Surfaces", EGSR 2007 | program/composite1.fsh |
-| 純水の吸収係数 | Pope & Fry, "Absorption spectrum (380-700 nm) of pure water", Applied Optics 1997 | lib/surface/water.glsl |
+| 純水の吸収係数 | Pope & Fry, "Absorption spectrum (380-700 nm) of pure water", Applied Optics 1997 | lib/common/water.glsl |
 | POM | Tatarchuk, "Dynamic Parallax Occlusion Mapping with Approximate Soft Shadows", I3D 2006 | program/gbuffers/solid.fsh |
 | AgX トーンマップ | Troy Sobotka の AgX (Blender 4.0 の実装と公開されている多項式近似) | lib/post/tonemap.glsl |
 | ACES fit | Stephen Hill, "ACES Filmic Tone Mapping Curve" (BakingLab, MIT) の近似式 | lib/post/tonemap.glsl |

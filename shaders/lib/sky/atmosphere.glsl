@@ -10,6 +10,14 @@
 #ifndef SKY_ATMOSPHERE_GLSL
 #define SKY_ATMOSPHERE_GLSL
 
+#include "/lib/settings.glsl"
+#include "/lib/common/color.glsl"
+#include "/lib/common/constants.glsl"
+#include "/lib/common/dimension.glsl"
+#include "/lib/common/math.glsl"
+#include "/lib/common/uniforms.glsl"
+#include "/lib/buffers/images.glsl"
+
 const float ATMO_GROUND_RADIUS = 6360.0;  // km
 const float ATMO_TOP_RADIUS = 6460.0;     // km
 const vec3 ATMO_RAYLEIGH_SCATTER = vec3(5.802, 13.558, 33.1) * 1e-3; // 1/km (海面)

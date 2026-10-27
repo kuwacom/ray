@@ -1,6 +1,9 @@
 #ifndef COMMON_NOISE_GLSL
 #define COMMON_NOISE_GLSL
 
+#include "/lib/common/samplers.glsl"
+#include "/lib/common/uniforms.glsl"
+
 // PCG ハッシュ (Jarzynski & Olano 2020, "Hash Functions for GPU Rendering")
 uint pcgHash(uint v) {
     uint state = v * 747796405u + 2891336453u;

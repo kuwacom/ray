@@ -149,7 +149,7 @@ vec3 sunSpecular(vec3 N, vec3 V, float f0, float roughness, vec3 sunVis) {
 }
 
 /*
- * 水面の太陽 (月) の照り返しのきらめき。滑らかなローブ x 輝点の倍率 (lib/surface/water.glsl の waterSunGlint)
+ * 水面の太陽 (月) の照り返しのきらめき。滑らかなローブ x 輝点の倍率 (lib/common/water.glsl の waterSunGlint)
  * slopeVar: 画素より細かい波の傾きの分散。戻り値 rgb = 足す放射輝度, a = そのうち輝点の輝度 (TAA を通さずに足す分)
  */
 vec4 sunGlint(vec3 surfPlayer, vec3 N, vec3 V, float slopeVar, vec3 sunVis, float dist, float NoVGeo) {
@@ -297,7 +297,7 @@ bool waterRefractVoxel(vec3 surfPlayer, vec3 dir, vec3 floorPlayer, float d1, fl
 #endif
 
 /*
- * 水の上から見た水中の内散乱 (水面の太陽 + 空)。水中フォグ (B) と同じ係数 (lib/surface/water.glsl) を使う
+ * 水の上から見た水中の内散乱 (水面の太陽 + 空)。水中フォグ (B) と同じ係数 (lib/common/water.glsl) を使う
  * 水面から入った光は深さ z で E0 exp(-Kd z) に弱まる (太陽は水中で屈折した向きに沿って Kd = c / mu_sun、空の光は Kd = c で、
  * 水中フォグの marchWaterFog と同じ)。屈折した視線に沿って s 進んだ点の深さは s mu_view で、そこから戻る光は exp(-c s) で弱まるので、
  * 経路 [0, S] の積分は E0 b (1 - exp(-(c + Kd mu_view) S)) / (c + Kd mu_view) で閉じる
@@ -489,7 +489,7 @@ void main() {
         bool below = isEyeInWater == 1;
         float eta = below ? 1.0 / WATER_IOR : WATER_IOR;
         WaterSea sea = waterSeaState(lmT.y);
-        // 側面 (滝・流れの段差・水槽): 幾何の向きは面の軸。波は側面専用の落ちる水の乱れ (lib/surface/water.glsl の waterFallNormal)
+        // 側面 (滝・流れの段差・水槽): 幾何の向きは面の軸。波は側面専用の落ちる水の乱れ (lib/common/water.glsl の waterFallNormal)
         bool side = abs(N.y) < 0.5;
         vec3 faceN = side ? waterSideFaceNormal(N) : vec3(0.0, 1.0, 0.0);
         float NoVGeo = abs(dot(V, faceN));

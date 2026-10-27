@@ -5,6 +5,9 @@
 #ifndef POST_POST_CONSTANTS_GLSL
 #define POST_POST_CONSTANTS_GLSL
 
+#include "/lib/settings.glsl"
+#include "/lib/common/look_presets.glsl"
+
 // 露出
 // 自動露出が平均輝度を写す先の中間グレー (AgX は 0.18 を表示値 0.5 付近に置く)
 const float EXPOSURE_KEY = 0.18;

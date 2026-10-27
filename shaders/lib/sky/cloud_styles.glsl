@@ -19,6 +19,8 @@
 #ifndef SKY_CLOUD_STYLES_GLSL
 #define SKY_CLOUD_STYLES_GLSL
 
+#include "/lib/settings.glsl"
+
 #if CLOUD_STYLE == 1
 // Ray: 雲量のほかは各設定がそのまま効く基準
 const float CS_LOW_COVER = 0.75;

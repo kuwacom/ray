@@ -10,6 +10,16 @@
 #ifndef LIGHT_LIGHT_SELECT_GLSL
 #define LIGHT_LIGHT_SELECT_GLSL
 
+#include "/lib/settings.glsl"
+#include "/lib/common/constants.glsl"
+#include "/lib/common/math.glsl"
+#include "/lib/common/transforms.glsl"
+#include "/lib/common/voxel_space.glsl"
+#include "/lib/buffers/ssbo.glsl"
+#include "/lib/light/block_data.glsl"
+#include "/lib/light/light_bins.glsl"
+#include "/lib/light/trace.glsl"
+
 // 半影用に終点を動かす半径の上限 (ブロック)。光源セルの外に出ると光源の隣の壁で遮られてしまう
 const float LIGHT_JITTER_MAX_RADIUS = 0.45;
 // LightDef.shape.w (光源の物理半径) に対する LIGHT_SOURCE_SIZE の倍率。既定 0.5 で物理半径そのもの

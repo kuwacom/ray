@@ -1,4 +1,7 @@
 #include "/lib/common/common.glsl"
+#include "/lib/common/color.glsl"
+#include "/lib/common/gbuffer.glsl"
+#include "/lib/ids/material_ids.glsl"
 
 in vec2 texcoord;
 in vec4 glcolor;
