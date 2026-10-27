@@ -390,12 +390,15 @@ def properties_checks() -> list[str]:
 def static_checks(options: dict[str, Option], profiles: dict[str, list[str]]) -> list[str]:
     problems: list[str] = properties_checks()
     problems += include_deps.Tree(SHADERS).problems()
+    problems += gen_settings.check(SHADERS)
+    problems += gen_settings.definition_problems(SHADERS)
     for pname in profiles:
         for k, v in resolve_profile(pname, profiles).items():
             opt = options.get(k)
             if opt is None:
                 problems.append(f"profile.{pname}: 未定義の設定 {k}")
-            elif opt.kind != "bool" and opt.values and not any(float(v) == float(x) for x in opt.values):
+            # Iris は値を文字列で値リストと比べる
+            elif opt.kind != "bool" and opt.values and v not in opt.values:
                 problems.append(f"profile.{pname}: {k}={v} が値リストにない")
     # 素の既定値は HIGH と一致させる方針 (docs/architecture.md)
     if "HIGH" in profiles:
@@ -404,7 +407,7 @@ def static_checks(options: dict[str, Option], profiles: dict[str, list[str]]) ->
             if opt is None:
                 continue
             default = opt.default
-            same = (v is True) == default if opt.kind == "bool" else (v is not False and float(v) == float(str(default).rstrip("f")))
+            same = (v is True) == default if opt.kind == "bool" else v == default
             if not same:
                 problems.append(f"HIGH と既定値が不一致: {k} (HIGH={v}, 既定={default})")
     # Iris は workGroups / workGroupsRender をリテラルとしてしか読めない (式やマクロは #if で分岐して書く)
