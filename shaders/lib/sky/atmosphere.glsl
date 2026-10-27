@@ -49,9 +49,7 @@ const ivec2 SKYVIEW_LUT_SIZE = ivec2(192, 108);
 const float SUN_ANGULAR_RADIUS = 0.0093;
 const float MOON_ANGULAR_RADIUS = 0.0093;
 
-/*------------------------------------------------------------------------------
-  位相関数 (公知の式。名前の衝突を避けるため sky 接頭辞)
-------------------------------------------------------------------------------*/
+// 位相関数 (公知の式。名前の衝突を避けるため sky 接頭辞)
 float skyPhaseRayleigh(float cosTheta) {
     return 3.0 / (16.0 * PI) * (1.0 + cosTheta * cosTheta);
 }
@@ -72,9 +70,7 @@ float skyPhaseCS(float cosTheta, float g) {
 
 const float SKY_PHASE_ISOTROPIC = 1.0 / (4.0 * PI);
 
-/*------------------------------------------------------------------------------
-  幾何 (惑星中心原点, r = 中心からの距離, mu = 天頂角の余弦)
-------------------------------------------------------------------------------*/
+// 幾何 (惑星中心原点, r = 中心からの距離, mu = 天頂角の余弦)
 float atmoDistanceToTop(float r, float mu) {
     float disc = r * r * (mu * mu - 1.0) + ATMO_TOP_RADIUS * ATMO_TOP_RADIUS;
     return max(-r * mu + sqrt(max(disc, 0.0)), 0.0);
@@ -99,9 +95,7 @@ float atmoViewerRadius() {
     return ATMO_GROUND_RADIUS + max(cameraPosition.y - SKY_SEA_LEVEL, 0.0) * 1e-3 + 0.002;
 }
 
-/*------------------------------------------------------------------------------
-  媒質
-------------------------------------------------------------------------------*/
+// 媒質
 void atmoMedium(float altitude, out vec3 rayleighScatter, out float mieScatter, out vec3 extinction) {
     float h = max(altitude, 0.0);
     float rayleighDensity = exp(-h / ATMO_RAYLEIGH_HEIGHT);
@@ -119,9 +113,7 @@ void atmoMedium(float altitude, out vec3 rayleighScatter, out float mieScatter, 
  */
 float atmoSkySunMu(float mu) { return mu < 0.0 ? mu / TWILIGHT_STRETCH : mu; }
 
-/*------------------------------------------------------------------------------
-  LUT のパラメータ化
-------------------------------------------------------------------------------*/
+// LUT のパラメータ化
 // テクセル中心が [0,1] の端に来るようにする (LUT の端でクランプされた値を読まないため)
 vec2 atmoUnitToSubUv(vec2 unit, vec2 size) { return (unit * (size - 1.0) + 0.5) / size; }
 vec2 atmoSubUvToUnit(vec2 uv, vec2 size) { return (uv * size - 0.5) / (size - 1.0); }
@@ -175,9 +167,7 @@ void atmoSkyViewParams(vec2 uv, float r, out float viewMu, out float azimuth) {
     azimuth = unit.x * unit.x * PI;
 }
 
-/*------------------------------------------------------------------------------
-  解析近似 (ATMOSPHERE_MODE=0 と、LUT が無いディメンション用)
-------------------------------------------------------------------------------*/
+// 解析近似 (ATMOSPHERE_MODE=0 と、LUT が無いディメンション用)
 // Kasten & Young 1989 の相対空気量 (天頂 = 1)。地平線下はなめらかに大きくする
 float atmoAirMass(float mu) {
     float elevationDeg = degrees(asin(clamp(mu, -1.0, 1.0)));

@@ -22,7 +22,7 @@ const float WATER_IOR = 1.333;
 const float WATER_GRAVITY = 9.81;
 // 横向きの面 (滝・流れの側面) には海のスペクトルを貼らず、側面専用の落ちる水の乱れ (waterFallNormal) を使う
 
-// ---- 波テクスチャ (gen_water_waves.py と揃える) ----
+// 波テクスチャ (gen_water_waves.py と揃える)
 const int WATER_LAYERS = 5;
 const float WATER_LAYER_RATIO = 2.9;
 // 最大の層のタイルの大きさ (ブロック)。帯の中心の波長はタイル / WATER_BAND_CENTER (既定で 22, 7.8, 2.7, 0.93, 0.32 ブロック)
@@ -40,7 +40,7 @@ const float WATER_LAYER_ANGLE[WATER_LAYERS] = float[](0.0, 0.41, -0.33, 0.57, -0
 const vec2 WATER_LAYER_OFFSET[WATER_LAYERS] = vec2[](vec2(0.0), vec2(0.37, 0.71), vec2(0.13, 0.29), vec2(0.83, 0.51), vec2(0.61, 0.07));
 const float WATER_WIND_ANGLE = 0.6;            // 風下の向き (ワールド x 軸から, ラジアン)
 
-// ---- スペクトル ----
+// スペクトル
 // 吹送距離 (m)。海は十分に発達した波 (Pierson-Moskowitz)、湖・川は JONSWAP の吹送距離で頭打ち
 const float WATER_FETCH_OCEAN = 1e6;
 const float WATER_FETCH_LAKE = 1500.0;
@@ -58,7 +58,7 @@ const float WATER_CAPILLARY_WAVELENGTH = 0.016;
 // 屋根の下・洞窟 (スカイライトが少ない所) は風が当たらない
 const float WATER_SHELTER_WIND = 0.15;
 
-// ---- 波頭・流れ ----
+// 波頭・流れ
 const float WATER_JACOBIAN_MIN = 0.3;          // 勾配を割る Jacobian の下限 (勾配は最大でこの逆数倍)
 const float WATER_FLOW_SPEED = 2.5;            // 流れの速さ (ブロック/秒, 面の傾き 1 あたり)
 const float WATER_FLOW_MAX = 3.0;

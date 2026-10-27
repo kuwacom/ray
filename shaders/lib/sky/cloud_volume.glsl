@@ -48,9 +48,7 @@ uniform sampler2D cloudNoiseTex;
     #define CLOUD_CB
 #endif
 
-/*------------------------------------------------------------------------------
-  定数
-------------------------------------------------------------------------------*/
+// 定数
 // 天気図: カメラ中心の 512^2。テクセル単位に原点を丸めて、カメラが動いても値がちらつかないようにする
 const float CLOUD_MAP_RES = 512.0;
 const float CLOUD_MAP_TEXEL = 256.0; // m
@@ -425,9 +423,7 @@ const float CLOUD_BOTTOM_REACH = 0.6;    // この高さで 1 に戻る
 #endif
 const int CLOUD_MID_LIGHT_STEPS = CLOUD_QUALITY >= 2 ? 4 : 3;
 
-/*------------------------------------------------------------------------------
-  天気図 (水平位置は参照空間)
-------------------------------------------------------------------------------*/
+// 天気図 (水平位置は参照空間)
 vec2 cloudMapCenter() { return floor(cameraPosition.xz * CLOUD_KH / CLOUD_MAP_TEXEL) * CLOUD_MAP_TEXEL; }
 
 // カメラ基準の水平位置 rel の天気図。手動バイリニア (カスタムイメージのサンプラーのフィルタ設定に依存しない)
@@ -450,9 +446,7 @@ vec4 cloudMapFetch(vec2 rel) {
     return map;
 }
 
-/*------------------------------------------------------------------------------
-  地域テンプレート (CLOUD_REGION_PRESET)・気候 (天気・日替わり・時刻) と風
-------------------------------------------------------------------------------*/
+// 地域テンプレート (CLOUD_REGION_PRESET)・気候 (天気・日替わり・時刻) と風
 struct CloudRegion {
     vec2 humidity;    // 低層の被覆の日替わりの範囲 (乾いた日, 湿った日)
     float convection; // 積雲の発達しやすさ
@@ -613,9 +607,7 @@ CloudContext cloudContextSetup(CloudClimate climate) {
     return ctx;
 }
 
-/*------------------------------------------------------------------------------
-  密度
-------------------------------------------------------------------------------*/
+// 密度
 struct CloudColumn {
     float cover;
     float type;
@@ -1133,9 +1125,7 @@ float cloudHighExtinction(CloudContext ctx, float cover, vec2 rel, float altitud
     return extinction;
 }
 
-/*------------------------------------------------------------------------------
-  ライティング
-------------------------------------------------------------------------------*/
+// ライティング
 // Draine の位相関数 (HG に (1 + alpha cos^2) を掛けて正規化したもの)
 float cloudPhaseDraine(float cosTheta, float g, float alpha) {
     float g2 = g * g;
@@ -1333,9 +1323,7 @@ float cloudUpperTransmittance(CloudContext ctx, vec2 rel, float altitude, vec3 l
     return transmittance;
 }
 
-/*------------------------------------------------------------------------------
-  レイマーチ (ワールドの視線で歩き、サンプルを参照空間へ写す)
-------------------------------------------------------------------------------*/
+// レイマーチ (ワールドの視線で歩き、サンプルを参照空間へ写す)
 struct CloudAccum {
     vec3 scattering;
     float transmittance;

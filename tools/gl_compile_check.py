@@ -160,9 +160,7 @@ class ProgramResult:
     usage_problems: list[str] = field(default_factory=list)
 
 
-# ---------------------------------------------------------------------------
 # GL コンテキストと上限値
-# ---------------------------------------------------------------------------
 
 def nv_rendering_gpu(selector: str) -> tuple[str, str]:
     """
@@ -272,9 +270,7 @@ def gl_string(enum: int) -> str:
     return v.decode(errors="replace") if v else "?"
 
 
-# ---------------------------------------------------------------------------
 # shaders.properties の #if を評価して program.*.enabled = false を拾う (Iris と同じく無効なプログラムは読まれない)
-# ---------------------------------------------------------------------------
 
 def effective_macros(overrides: dict[str, str | bool], options: dict[str, vs.Option]) -> dict[str, str]:
     """設定の実効値 -> マクロ表 (ブール設定は定義の有無, 値設定は値)"""
@@ -347,9 +343,7 @@ def disabled_programs(prop_lines: list[str]) -> set[str]:
     return result
 
 
-# ---------------------------------------------------------------------------
 # 前処理 (glslang -E) と宣言数
-# ---------------------------------------------------------------------------
 
 def glslang_preprocess(glslang: str | None, tmpdir: Path, src: StageSource, tag: str) -> str:
     if glslang is None:
@@ -432,9 +426,7 @@ def ssbo_tail_counts() -> dict[int, str]:
     return out
 
 
-# ---------------------------------------------------------------------------
 # GL でのコンパイルとリンク
-# ---------------------------------------------------------------------------
 
 def map_log(log: str, default_stage: str, sources: dict[str, StageSource], level: str) -> list[str]:
     msgs: list[str] = []
@@ -692,9 +684,7 @@ def compile_and_link(stages: list[StageSource], level: str, started: list[int] |
     return finish_link(start_link(stages, level, started), level)
 
 
-# ---------------------------------------------------------------------------
 # 上限との比較 (静的チェック)
-# ---------------------------------------------------------------------------
 
 def check_usage(name: str, stages: list[StageSource], res: ProgramResult, limits: dict, buffer_sizes: dict[int, int]) -> list[str]:
     problems: list[str] = []
@@ -832,9 +822,7 @@ def check_properties(prop_lines: list[str], limits: dict) -> list[str]:
     return problems
 
 
-# ---------------------------------------------------------------------------
 # メイン
-# ---------------------------------------------------------------------------
 
 def run_key(stages: list[StageSource]) -> str:
     # 前処理後の本文が同じなら結果も同じなので 1 回の実行の中で使い回す (設定差分が効かないプログラムが多い)

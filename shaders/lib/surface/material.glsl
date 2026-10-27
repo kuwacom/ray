@@ -101,9 +101,7 @@ void readSurfaceExtra(ivec2 texel, out float parallaxShadow, out float puddle) {
     puddle = v.y;
 }
 
-/*------------------------------------------------------------------------------
-  gbuffers 用: labPBR v1.3 のデコードと自動推定
-------------------------------------------------------------------------------*/
+// gbuffers 用: labPBR v1.3 のデコードと自動推定
 
 struct SurfaceParams {
     float smoothness; // labPBR R

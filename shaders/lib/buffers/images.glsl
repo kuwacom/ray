@@ -15,7 +15,7 @@
 #ifndef BUFFERS_IMAGES_GLSL
 #define BUFFERS_IMAGES_GLSL
 
-// ---- light: ボクセル (毎フレームクリア, VOXEL_SIZE) ----
+// light: ボクセル (毎フレームクリア, VOXEL_SIZE)
 // bits 0-11 = ブロック ID (block.properties, 0=空気 1=未登録の固体), bits 12-15 = 発光レベル (at_midBlock.w)
 #ifdef IMG_VOXEL_BLOCK
 layout(r16ui) uniform uimage3D voxelBlockImg;
@@ -32,7 +32,7 @@ layout(r32ui) uniform uimage3D voxelEmitImg;
 #endif
 uniform usampler3D voxelEmitSampler;
 
-// ---- light: floodfill (永続, VOXEL_SIZE, フレームの偶奇でピンポン。読み書きは常に両方使うので 1 マクロ) ----
+// light: floodfill (永続, VOXEL_SIZE, フレームの偶奇でピンポン。読み書きは常に両方使うので 1 マクロ)
 #ifdef IMG_FLOOD
 layout(r11f_g11f_b10f) uniform image3D floodImgA;
 layout(r11f_g11f_b10f) uniform image3D floodImgB;
@@ -40,7 +40,7 @@ layout(r11f_g11f_b10f) uniform image3D floodImgB;
 uniform sampler3D floodSamplerA;
 uniform sampler3D floodSamplerB;
 
-// ---- sky: 大気 LUT / 雲 ----
+// sky: 大気 LUT / 雲
 #ifdef IMG_SKY_TRANSMITTANCE
 layout(rgba16f) uniform image2D skyTransmittanceImg;   // 256x64 (setup1)
 #endif
@@ -62,7 +62,7 @@ layout(rgba8) uniform image2D cloudWeatherImg;         // 512x512 (prepare2)
 #endif
 uniform sampler2D cloudWeatherSampler;
 
-// ---- 画面サイズ相対 (1.0 倍で確保。低解像度で使う場合は左上の部分領域を使う) ----
+// 画面サイズ相対 (1.0 倍で確保。低解像度で使う場合は左上の部分領域を使う)
 #ifdef IMG_BLOCKLIGHT_RAW
 layout(rgba16f) uniform image2D blockLightRawImg;  // light: トレース結果 (生)
 #endif
@@ -89,7 +89,7 @@ layout(rgba16f) uniform image2D debugImg;
 #endif
 uniform sampler2D debugSampler;
 
-// ---- colortex を compute から書くための image (フォーマットは formats.glsl と一致) ----
+// colortex を compute から書くための image (フォーマットは formats.glsl と一致)
 #ifdef IMG_COLORIMG0
 layout(rgba16f) uniform image2D colorimg0;
 #endif

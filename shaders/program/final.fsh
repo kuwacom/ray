@@ -142,7 +142,7 @@ void main() {
     float exposure = getExposure();
 
     /*
-     * ---- レンズ: 歪曲・魚眼の再投影 (以降のシーンの読み出しは全て再投影後の位置 uvL で行う) ----
+     * レンズ: 歪曲・魚眼の再投影 (以降のシーンの読み出しは全て再投影後の位置 uvL で行う)
      * 直線写像で歪曲の無いプリセットでは定数畳み込みで丸ごと消える
      */
 #ifdef LENS_DISTORTION
@@ -185,7 +185,7 @@ void main() {
     vec3 center = distort && !LENS_WARP_TAA ? sanitizeColor(sampleCatmullRom(colortex0, uvL, viewSize())) : fetchScene(texel);
     vec3 hdr = center;
 
-    // ---- レンズ: 倍率色収差 (波長ごとに倍率が違い、画面の隅ほど縁が虹色にずれる) ----
+    // レンズ: 倍率色収差 (波長ごとに倍率が違い、画面の隅ほど縁が虹色にずれる)
 #ifdef LENS_CHROMATIC
     #if defined LENS_DISTORTION && LENS_PROJECTION == 1
     if (LP_CA != 0.0) hdr = LENS_WARP_TAA ? lensChromaticSample(colortex0, uv, LP_CA) : lensChromaticProjected(colortex0, uv, LP_CA);
@@ -199,7 +199,7 @@ void main() {
     // 溶岩のブルームの滲みが占める割合。溶岩と同じ色を保つトーンマップに寄せる (AgX では周りの煙・壁の滲みが淡いサーモン色に抜けた)
     float lavaGlowShare = 0.0;
 
-    // ---- レンズ: ブルーム (PSF の畳み込みとして mix。総エネルギーは変えない) ----
+    // レンズ: ブルーム (PSF の畳み込みとして mix。総エネルギーは変えない)
 #ifdef BLOOM
     BloomBands bands;
     vec3 bloom = sampleBloom(uvL, bands);
@@ -246,7 +246,7 @@ void main() {
     #endif
 #endif
 
-    // ---- レンズ: 太陽・月のフレア (ゴースト・スターバースト・ハロー・グレア・汚れ・ストリーク) ----
+    // レンズ: 太陽・月のフレア (ゴースト・スターバースト・ハロー・グレア・汚れ・ストリーク)
 #if defined LENS_FLARE && defined HAS_SKY
     if (shadowLightPosition.z < 0.0) {
         float vis = flareVisibility();
@@ -264,13 +264,13 @@ void main() {
     }
 #endif
 
-    // ---- レンズ: トリウムガラスの黄変 (青を吸う。明るさは変えない) ----
+    // レンズ: トリウムガラスの黄変 (青を吸う。明るさは変えない)
     if (LP_YELLOWING > 0.0) {
         vec3 tint = mix(vec3(1.0), LENS_YELLOWING_TINT, LP_YELLOWING);
         hdr *= tint / luminance(tint);
     }
 
-    // ---- レンズ: 周辺減光 (演出のビネット + 口径食。処方のあるレンズは自然減光込みの周辺光量の表) ----
+    // レンズ: 周辺減光 (演出のビネット + 口径食。処方のあるレンズは自然減光込みの周辺光量の表)
     hdr *= vignette(uv);
 #ifdef LENS_OPTICAL_VIGNETTING
     #ifdef LENS_RI_TABLE
@@ -280,7 +280,7 @@ void main() {
     #endif
 #endif
 
-    // ---- フィルム: ハレーション (フィルムベースで反射した光が赤い層だけを感光させる。レンズの後段) ----
+    // フィルム: ハレーション (フィルムベースで反射した光が赤い層だけを感光させる。レンズの後段)
 #if defined BLOOM && defined LENS_HALATION
     if (LP_HALATION > 0.0) {
         float halation = max(luminance(bands.mid) * exposure - LENS_HALATION_THRESHOLD, 0.0) / exposure;
@@ -290,7 +290,7 @@ void main() {
 
     hdr *= inside;
 
-    // ---- 目 / センサー: Purkinje 効果 -> 露出 ----
+    // 目 / センサー: Purkinje 効果 -> 露出
     hdr = applyPurkinje(hdr, frameData.averageLuminance, exposure);
     vec3 color = hdr * exposure;
 

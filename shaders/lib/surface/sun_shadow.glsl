@@ -225,7 +225,7 @@ SunShadow evalSunShadow(vec3 playerPos, vec3 geoNormal, float sss, float dither)
         r.thickness = max(z0 - d, 0.0) / depthPerBlock;
     }
 #else
-    // ---- 段 1: ブロッカー探索 (PCSS の半影幅と SSS の厚み) ----
+    // 段 1: ブロッカー探索 (PCSS の半影幅と SSS の厚み)
     float searchRadius = SHADOW_MAX_BLOCKER_DISTANCE * SHADOW_SUN_ANGULAR_RADIUS * SHADOW_SOFTNESS + 2.0 * texelWorld;
     searchRadius = max(searchRadius, sss * SHADOW_SSS_SEARCH_RADIUS);
     float blockerSum = 0.0;
@@ -266,7 +266,7 @@ SunShadow evalSunShadow(vec3 playerPos, vec3 geoNormal, float sss, float dither)
     #endif
     radius += sss * SHADOW_SSS_FILTER_RADIUS;
 
-    // ---- 段 2: 可変半径 PCF ----
+    // 段 2: 可変半径 PCF
     float vo = 0.0;
     float va = 0.0;
     for (int i = 0; i < SHADOW_SAMPLES; i++) {

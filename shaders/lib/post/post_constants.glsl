@@ -5,7 +5,7 @@
 #ifndef POST_POST_CONSTANTS_GLSL
 #define POST_POST_CONSTANTS_GLSL
 
-// ---- 露出 ----
+// 露出
 // 自動露出が平均輝度を写す先の中間グレー (AgX は 0.18 を表示値 0.5 付近に置く)
 const float EXPOSURE_KEY = 0.18;
 // 反射光式の較正定数 (EV100 = log2(L * 100 / K))。設定の EV はこの EV100 として扱う
@@ -82,14 +82,14 @@ const float HISTOGRAM_HIGH_PERCENT = 0.92;
 // 中央重点測光: 画面端の重み
 const float METERING_EDGE_WEIGHT = 0.35;
 
-// ---- Purkinje 効果 (薄暗視の青シフト) ----
+// Purkinje 効果 (薄暗視の青シフト)
 // 強さは設定 PURKINJE_STRENGTH。青すぎると不評になりやすいので既定は控えめ
 // 順応輝度 (露出前のシーン単位) がこの範囲で錐体 -> 桿体へ移る
 // 室内・洞窟のたいまつ (順応輝度 0.015-0.025) で効くと木材や石が灰緑に濁るので、月明かりの水準 (0.002 前後) から下だけにする
 const float PURKINJE_LUM_LOW = 0.0005;
 const float PURKINJE_LUM_HIGH = 0.008;
 
-// ---- TAA ----
+// TAA
 // 静止時の今フレームの重み (= 履歴の実効長 1/α フレーム)
 const float TAA_BLEND_STATIC = 0.07;
 // 動いている時の重み (ゴーストを減らしつつ AA を残す)
@@ -104,7 +104,7 @@ const float TAA_DEPTH_TOLERANCE = 0.04;
 // 履歴の a に書く空の距離 (RGBA16F で表せる範囲)
 const float TAA_SKY_DISTANCE = 60000.0;
 
-// ---- モーションブラー (McGuire 2012) ----
+// モーションブラー (McGuire 2012)
 const int MOTION_BLUR_SAMPLES = 12;
 // シャッター角 180 度 = 1 フレームの半分の移動量
 const float MOTION_BLUR_SHUTTER = 0.5;
@@ -113,7 +113,7 @@ const float MOTION_BLUR_MAX_LENGTH = 0.04;
 // 深度の前後判定の柔らかさ (ブロック)
 const float MOTION_BLUR_DEPTH_SOFTNESS = 0.5;
 
-// ---- 被写界深度 ----
+// 被写界深度
 /*
  * センサー高さ (mm)。FOV から焦点距離を出すのに使う (画面の縦 = センサーの縦)
  * 同じ画角・同じ F 値なら、センサーが大きいほど焦点距離が伸びてボケ (画面比) がセンサー高さに比例して増える
@@ -184,7 +184,7 @@ const float DOF_LARGE_LOD_BIAS = 0.75;
 const float DOF_BLADE_ROTATION = 0.2;
 // 絞り羽根の丸みはレンズプリセット (LP_BLADE_ROUNDNESS)
 
-// ---- ブルーム ----
+// ブルーム
 const int BLOOM_LEVELS = 7;          // 1/2 .. 1/128
 const int BLOOM_PADDING = 4;         // タイル間の隙間 (ピクセル)。ぼかしの滲み込みを防ぐ
 // 合成時のレベル間の減衰 (幾何級数)。小さいほど狭くタイトな光
@@ -212,7 +212,7 @@ const float LAVA_BLOOM_GAIN = 1.0 + 9.0 * LAVA_BLOOM;
 const float LAVA_SELF_BLOOM = 1.5;
 const float LAVA_SELF_BLOOM_CUT = max(1.0 - LAVA_SELF_BLOOM / LAVA_BLOOM_GAIN, 0.0);
 
-// ---- レンズ (強さの割合はプリセット lib/post/lens_presets.glsl) ----
+// レンズ (強さの割合はプリセット lib/post/lens_presets.glsl)
 const float VIGNETTE_SCALE = 0.8;
 // F 値の上限と、DOF_STRENGTH 既定 (0.5) での F 値 (焦点距離 17mm / 絞り径 8mm)。収差の開放連動の基準
 const float LENS_F_MAX = 22.0;

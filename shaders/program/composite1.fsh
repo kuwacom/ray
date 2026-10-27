@@ -511,14 +511,14 @@ void main() {
             : surfaceSunVisibility(surfPlayer, vec3(0.0, 1.0, 0.0), dither, sunSpecVis);
         if (side) sunSpecVis = sunVis;
 
-        // ---- 側面から入った光が水を出る所 (水の厚み) ----
+        // 側面から入った光が水を出る所 (水の厚み)
         vec3 exitOutward = vec3(0.0);
         float exitDist = -1.0;
         // 面のすぐ内側 (水のセル)。深度の精度の分だけ遠いほど深く入れる
         vec3 insidePlayer = surfPlayer - faceN * (0.01 + dist * 0.002);
         if (!below && side && dot(refrDir, refrDir) > 0.5) exitDist = waterExitDistance(insidePlayer, refrDir, exitOutward);
 
-        // ---- 屈折 ----
+        // 屈折
         vec2 refrUv = texcoord;
         float pathLen = d1 >= 1.0 ? WATER_SKY_PATH : distance(floorPlayer, surfPlayer);
         if (exitDist > 0.0) pathLen = min(pathLen, exitDist);
@@ -649,7 +649,7 @@ void main() {
 #endif
         if (!refrDone) behind = texture(colortex0, refrUv).rgb;
 
-        // ---- 吸収と内散乱 (水の上から見た時だけ。水中側は sky のフォグ) ----
+        // 吸収と内散乱 (水の上から見た時だけ。水中側は sky のフォグ)
         if (!below) {
             vec3 ext = waterExtinction();
             vec3 T = exp(-ext * pathLen);
@@ -657,7 +657,7 @@ void main() {
             behind = behind * T + waterInscatter(lmT.y, sunVis, muView, pathLen);
         }
 
-        // ---- 反射と太陽 ----
+        // 反射と太陽
         vec3 R = reflect(-V, below ? N : waterReflectNormal(N, V));
         /*
          * composite.csh と同じく、下向きの反射は平均水面でもう一度反射させる。上向きの水面だけ
@@ -702,13 +702,13 @@ void main() {
                 float crest = smoothstep(0.0, 2.0 * sea.heightRms, waves.x);
                 LightSample sun = getCelestialLight();
 
-                // ---- 波頭の透過光: 太陽の側を向いて見た時だけ。真上の太陽では横から波頭へ入る光が無い ----
+                // 波頭の透過光: 太陽の側を向いて見た時だけ。真上の太陽では横から波頭へ入る光が無い
                 vec2 toSun = sun.direction.xz;
                 float back = dot(toSun, toSun) > 1e-4 ? saturate(dot(normalize(-V.xz), normalize(toSun))) : 0.0;
                 float sss = WATER_CREST_SSS * crest * sqr(sqr(back)) * (1.0 - sqr(sun.direction.y)) * (1.0 - F);
                 color += sun.irradiance * sunVis * waterScattering() / waterExtinction() * sss;
 
-                // ---- 泡: 崩れかけた波頭の白波 (沖だけ。視線に沿った水の厚みが薄い水際には出さない) ----
+                // 泡: 崩れかけた波頭の白波 (沖だけ。視線に沿った水の厚みが薄い水際には出さない)
                 float t = frameTimeCounter;
                 float pattern = valueNoise3d(vec3(surfWorld.xz * 3.0, t * 0.4)) * 0.6
                     + valueNoise3d(vec3(surfWorld.xz * 9.0, t * 0.9)) * 0.4;
@@ -721,7 +721,7 @@ void main() {
             }
         }
     } else {
-        // ---- ガラス・氷・スライム等 ----
+        // ガラス・氷・スライム等
         float ior = matT == MAT_ICE ? ICE_IOR : GLASS_IOR;
         float F = fresnelDielectric(NoV, ior);
         vec2 refrUv = texcoord;

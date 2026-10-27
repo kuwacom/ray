@@ -74,7 +74,7 @@ float expectedPreviousDistance(vec2 uv, float depth, out float tolerance) {
 }
 
 /*
- * ---- 歪曲・魚眼を TAA の中で組み立てる (LENS_WARP_TAA, lib/post/lens.glsl) ----
+ * 歪曲・魚眼を TAA の中で組み立てる (LENS_WARP_TAA, lib/post/lens.glsl)
  * 出力 (再投影後) の画素ごとに、写っている元画像の点を今フレーム (ジッター込み) から読み、出力の座標の履歴に積む
  * 魚眼の中央は元画像を 2 倍以上に引き伸ばすので、1 フレームの補間ではぼける。ジッターで毎フレーム違う所に来る
  * 元の画素のうち、出力の画素の中心に近いものほど強く混ぜると、静止時は元画像より細かい像が履歴に溜まる (時間方向の超解像)

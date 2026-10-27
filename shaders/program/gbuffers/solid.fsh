@@ -281,7 +281,7 @@ void main() {
     materialId = MAT_BASIC;
 #endif
 
-    // ---- マテリアル ----
+    // マテリアル
 #ifdef USE_LABPBR
     vec4 normalTex = SAMPLE_ATLAS(normals);
     vec4 specTex = SAMPLE_ATLAS(specular);
@@ -297,7 +297,7 @@ void main() {
     SurfaceParams sp = estimateSurfaceParams(materialId, albedo.rgb);
 #endif
 
-    // ---- 法線 ----
+    // 法線
     bool isPlant = materialId == MAT_PLANT || materialId == MAT_UNDERWATER_PLANT;
     vec3 normalTs = vec3(0.0, 0.0, 1.0);
 #if defined USE_LABPBR && defined NORMAL_MAPPING
@@ -314,7 +314,7 @@ void main() {
         geoNormal = normal;
     }
 
-    // ---- 雨の濡れと水たまり (Lagarde 2013: 空隙が水で満ちると暗くなり、表面に水膜ができて滑らかになる) ----
+    // 雨の濡れと水たまり (Lagarde 2013: 空隙が水で満ちると暗くなり、表面に水膜ができて滑らかになる)
     float puddle = 0.0;
     float wetAmount = 0.0;
 #if defined RAIN_PUDDLES && defined HAS_SKY && defined GBUF_TERRAIN
@@ -358,7 +358,7 @@ void main() {
     }
 #endif
 
-    // ---- 鏡面のちらつき対策 ----
+    // 鏡面のちらつき対策
     // テクスチャ法線が視線の裏を向くと NoV が 0 に張り付き、かすめ角の照り返しがテクセル単位で明滅する
     if (!isPlant && dot(geoNormal, -viewDirPlayer) > 0.0) normal = frontFacingNormal(normal, -viewDirPlayer, FRONT_FACING_MIN_NOV);
     // 鏡面 AA (法線の画面微分で alpha^2 を広げる) は逆効果なので入れない。自動法線はテクセル内で一定のため

@@ -132,7 +132,7 @@ void main() {
     float glintVar = puddleSlopeVar() * puddleWeight;
     float glintLum = 0.0;
 
-    // ---- 太陽 / 月 ----
+    // 太陽 / 月
     LightSample sun = getCelestialLight();
 #ifdef SSS
     SunShadow ss = evalSunShadow(playerPos, g.geoNormal, m.sss, dither);
@@ -177,7 +177,7 @@ void main() {
     }
 #endif
 
-    // ---- 手持ち光源・ブロックライトの鏡面 ----
+    // 手持ち光源・ブロックライトの鏡面
     LightSample handMain, handOff;
     getHandLights(playerPos, g.geoNormal, dither, handMain, handOff);
 #ifdef SSS
@@ -191,7 +191,7 @@ void main() {
     int blockSpecCount = getBlockLightSpecular(texel, playerPos, g.geoNormal, blockSpec);
     for (int j = 0; j < blockSpecCount; j++) color += directSpecular(m, g.normal, V, blockSpec[j], playerPos, g.geoNormal, glintVar, glintShare, glintLum);
 
-    // ---- 環境光 (空・ブロックライト・GI) ----
+    // 環境光 (空・ブロックライト・GI)
     float ao = g.ao * indirect.a;
     vec3 skyE = getSkyIrradiance(g.normal);
     bool giSky = false;

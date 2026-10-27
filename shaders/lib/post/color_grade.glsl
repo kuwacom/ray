@@ -12,7 +12,7 @@
 #ifndef POST_COLOR_GRADE_GLSL
 #define POST_COLOR_GRADE_GLSL
 
-// ---- 実効値 ----
+// 実効値
 const float G_TINT = GRADE_TINT + LKG_TINT;
 const vec3 G_OFFSET = vec3(GRADE_OFFSET_R, GRADE_OFFSET_G, GRADE_OFFSET_B) + LKG_OFFSET;
 const float G_PIVOT = GRADE_PIVOT + LKG_PIVOT;
@@ -53,7 +53,7 @@ const float G_CURVE_Y[7] = float[7](
     GRADE_CURVE_0 + LKG_CURVE[0], GRADE_CURVE_10 + LKG_CURVE[1], GRADE_CURVE_25 + LKG_CURVE[2], GRADE_CURVE_50 + LKG_CURVE[3],
     GRADE_CURVE_75 + LKG_CURVE[4], GRADE_CURVE_90 + LKG_CURVE[5], GRADE_CURVE_100 + LKG_CURVE[6]);
 
-// ---- 段ごとの有効フラグ (既定値の段は定数畳み込みで消える) ----
+// 段ごとの有効フラグ (既定値の段は定数畳み込みで消える)
 const bool G_BALANCE_ON = G_TINT != 0.0 || G_OFFSET != vec3(0.0);
 const bool G_ZONES_ON = G_SHADOW != vec4(0.0) || G_MID != vec4(0.0) || G_HIGHLIGHT != vec4(0.0) || G_ZONE_CONTRAST != vec3(1.0);
 const bool G_ZONE_SAT_ON = G_ZONE_SAT != vec3(1.0);
@@ -71,7 +71,7 @@ const bool G_CURVE_ON =
     G_CURVE_Y[4] != G_CURVE_X[4] || G_CURVE_Y[5] != G_CURVE_X[5] || G_CURVE_Y[6] != G_CURVE_X[6];
 const bool G_SPLIT_ON = GRADE_SPLIT_SHADOW_AMOUNT + LKG_SPLIT_SHADOW_AMOUNT > 0.0 || GRADE_SPLIT_HIGHLIGHT_AMOUNT + LKG_SPLIT_HIGHLIGHT_AMOUNT > 0.0;
 
-// ---- Oklab (Björn Ottosson 2020)。HDR の線形でも、明るさを k 倍すると L・a・b がそろって k^(1/3) 倍になるので、色相と a,b / L の比は露出に依らない ----
+// Oklab (Björn Ottosson 2020)。HDR の線形でも、明るさを k 倍すると L・a・b がそろって k^(1/3) 倍になるので、色相と a,b / L の比は露出に依らない
 const mat3 OKLAB_M1 = mat3(
     0.4122214708, 0.2119034982, 0.0883024619,
     0.5363325363, 0.6806995451, 0.2817188376,
@@ -110,7 +110,7 @@ vec2 hueToOklabDir(float hueDeg) {
     return ab / max(length(ab), 1e-6);
 }
 
-// ---- シーンの値の段 ----
+// シーンの値の段
 
 // ティントで動かす緑の量 (EV)。+ でマゼンタ、- で緑
 const float GRADE_TINT_EV = 1.0;
@@ -232,7 +232,7 @@ vec3 gradeChroma(vec3 c) {
     return max(oklabToLinear(lab), 0.0) * exp2(lumEv);
 }
 
-// ---- 表示値の段 ----
+// 表示値の段
 
 /*
  * リフト・ガンマ・ゲイン (表示値)。out = (gain (x + lift (1 - x)))^(2^-gamma)

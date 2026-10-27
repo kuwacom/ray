@@ -31,9 +31,7 @@ const float CLOUD_SHADOW_PENUMBRA = 45.0;
 const float CLOUD_SHADOW_BLEND = 0.08;
 const float CLOUD_SHADOW_RESET_DISTANCE = 64.0;
 
-/*------------------------------------------------------------------------------
-  非周期の 2D 勾配ノイズ (天気図用)
-------------------------------------------------------------------------------*/
+// 非周期の 2D 勾配ノイズ (天気図用)
 vec2 weatherGradient(ivec2 cell, uint seed) {
     float a = hash3(uvec3(uvec2(cell), seed)).x * TAU;
     return vec2(cos(a), sin(a));

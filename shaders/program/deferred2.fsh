@@ -74,7 +74,7 @@ void main() {
         return;
     }
 
-    // ---- 空間: 低解像度サンプルの深度・法線付き重み付き和 ----
+    // 空間: 低解像度サンプルの深度・法線付き重み付き和
     ivec2 offset = traceFrameOffset(frameCounter);
     ivec2 lowSize = traceLowSize();
     vec2 lp = vec2(texel - offset) / float(LIGHT_TRACE_RES);
@@ -128,7 +128,7 @@ void main() {
         mean = ratio;
     }
 
-    // ---- 時間: 再投影 + 遮蔽判定 + 分散クリップ ----
+    // 時間: 再投影 + 遮蔽判定 + 分散クリップ
     vec2 prevUv = getPreviousUv(texcoord, hd);
     if (all(greaterThanEqual(prevUv, vec2(0.0))) && all(lessThan(prevUv, vec2(1.0)))) {
         // 動くもの (速度ベクトルあり) は距離がほぼ変わらないとみなし、静止物は前フレームのカメラで距離を求める

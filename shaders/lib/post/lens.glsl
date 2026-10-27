@@ -44,7 +44,7 @@ vec2 uvToTan(vec2 uv) { return (uv * 2.0 - 1.0) * lensTanHalf(); }
 vec2 tanToUv(vec2 t) { return t / lensTanHalf() * 0.5 + 0.5; }
 
 /*
- * ---- 分光 ----
+ * 分光
  * 波長 (nm) -> 線形 sRGB の重み。CIE 1931 等色関数の多峰ガウス近似 (Wyman, Sloan, Shirley 2013) を
  * XYZ -> sRGB 変換して負を切り捨てる。サンプルの組ごとに重みの和で割って白を保つ
  */
@@ -69,7 +69,7 @@ float lensWavelength(int k, int n) {
     return mix(410.0, 690.0, (float(k) + 0.5) / float(n));
 }
 
-// ---- 周辺減光 ----
+// 周辺減光
 // 演出のビネット (cos^4 則に近い 1 / (1 + k r^2)^2 の形)。シーン線形に掛ける
 float vignette(vec2 uv) {
     float k = VIGNETTE * VIGNETTE_SCALE;
@@ -107,7 +107,7 @@ float lensOpticalVignette(vec2 uv) {
 }
 
 /*
- * ---- 写像 (歪曲収差・魚眼) ----
+ * 写像 (歪曲収差・魚眼)
  * TAA・DoF・ブルームは直線写像 (ゲームの描画) のまま行い、final の最初で出力の画素 -> 元画像の位置へ再投影する
  * 画面の位置 p: 中心 0、縦の半分 = 1、横は縦横比倍
  */
@@ -241,7 +241,7 @@ float lensFieldRho(vec2 uvSrc) {
 }
 
 /*
- * ---- 歪曲・魚眼を TAA の中で組み立てるか (LENS_WARP_IN_TAA) ----
+ * 歪曲・魚眼を TAA の中で組み立てるか (LENS_WARP_IN_TAA)
  * true なら composite20 (TAA) が出力 (再投影後) の画面を作り、以降の colortex0 は出力の座標になる
  * (final での再投影はしない)。深度・G バッファ・速度は元画像のままなので、後段は postSourceUv で読む位置を写す
  * 自動: 魚眼か、歪曲で画面の倍率が LENS_WARP_AUTO_AMOUNT より大きく変わる時
@@ -354,7 +354,7 @@ vec2 lensFieldDefocus(float rho) {
 #endif
 
 /*
- * ---- 倍率色収差 ----
+ * 倍率色収差
  * 波長ごとに像の倍率が違う (画面の端ほど虹色にずれる)。波長を LENS_SPECTRAL_SAMPLES 個サンプルし、
  * 各サンプルの色をその波長の RGB 重みで積分する。平坦な面の色は変わらず、縁だけが紫 / 緑に色付く
  */
@@ -407,7 +407,7 @@ vec3 applyGrain(vec3 srgb, vec2 pixel) {
     return srgb + n * amp;
 }
 
-// ---- ゴースト表の補間 ----
+// ゴースト表の補間
 // 3 点 (450 / 550 / 650 nm) の 2 次補間
 float ghostLagrange(vec3 v, float l) {
     float t = (l - 550.0) / 100.0;
@@ -433,7 +433,7 @@ const int LENS_GHOST_COUNT = GHOST_S.length() < LENS_GHOST_LIMIT ? GHOST_S.lengt
 const int LENS_SCREEN_GHOST_COUNT = GHOST_S.length() < LENS_SCREEN_GHOST_LIMIT ? GHOST_S.length() : LENS_SCREEN_GHOST_LIMIT;
 
 /*
- * ---- ゴースト (光源 1 個, 解析的) ----
+ * ゴースト (光源 1 個, 解析的)
  * Lee & Eisemann 2013 の近軸行列近似。表のゴーストごとに、画素 y (tan 座標) に届く光線の前玉の高さ h を逆算し、
  * 前玉の縁 (円) と絞り (多角形) の両方を通るかで形を決める。光源の位置 lightTan で 2 つの円がずれるので、
  * 光源が端へ行くほどゴーストは欠けた形 (レモン形・三日月形) になる
@@ -502,7 +502,7 @@ vec3 lensGhosts(vec2 yTan, vec2 lightTan, float fNumber, float pxTan) {
 }
 
 /*
- * ---- スターバースト (絞りの Fraunhofer 回折) ----
+ * スターバースト (絞りの Fraunhofer 回折)
  * 事前ベイクの極座標テクスチャ (tools/gen_lens_textures.py) を引く。光条の向きは絞り羽根に垂直で、
  * 偶数枚なら枚数本、奇数枚なら 2 倍の本数。赤の光条が青より長い
  * 中心 (Airy 円盤) は太陽の円盤と重なるので消す

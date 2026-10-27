@@ -41,7 +41,7 @@ BUNDLED = ("split_tone", "film", "portra", "ektar", "vision3_500t", "velvia", "p
 MCMETA = {"texture": {"blur": True, "clamp": True}}
 
 
-# ---- 色の変換 (sRGB の区分曲線, Oklab) ----
+# 色の変換 (sRGB の区分曲線, Oklab)
 def srgb_to_linear(c: np.ndarray) -> np.ndarray:
     return np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
 
@@ -72,7 +72,7 @@ def oklab_to_linear(lab: np.ndarray) -> np.ndarray:
 LUMA = np.array([0.2126, 0.7152, 0.0722])
 
 
-# ---- LUT の格子 (形 (B, G, R, 3) の表示値) ----
+# LUT の格子 (形 (B, G, R, 3) の表示値)
 def identity_lut(size: int) -> np.ndarray:
     t = np.linspace(0.0, 1.0, size)
     b, g, r = np.meshgrid(t, t, t, indexing="ij")
@@ -104,7 +104,7 @@ def resize_lut(lut: np.ndarray, size: int) -> np.ndarray:
     return sample_lut(lut, identity_lut(size))
 
 
-# ---- 読み書き ----
+# 読み書き
 def write_dat(lut: np.ndarray, path: Path) -> None:
     n = lut.shape[0]
     q = np.round(np.clip(lut, 0.0, 1.0) * 65535.0).astype("<u2")
@@ -203,7 +203,7 @@ def write_any(lut: np.ndarray, path: Path) -> None:
     print(f"{path}")
 
 
-# ---- パラメーターから焼く ----
+# パラメーターから焼く
 @dataclass
 class HueBand:
     center: float            # Oklab の色相 (度)
@@ -339,7 +339,7 @@ def bake(p: BakeParams, size: int) -> np.ndarray:
     return np.clip(out, 0.0, 1.0).reshape(size, size, size, 3)
 
 
-# ---- 確認 ----
+# 確認
 def check(path: Path) -> None:
     lut = read_any(path)
     n = lut.shape[0]
