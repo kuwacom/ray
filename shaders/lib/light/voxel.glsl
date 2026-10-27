@@ -11,6 +11,7 @@
 #include "/lib/ids/id_decode.glsl"
 #include "/lib/ids/light_ids.glsl"
 #include "/lib/light/block_data.glsl"
+#include "/lib/light/voxel_read.glsl"
 
 const uint VOXEL_ENTITY_MASK = 0x00FFu; // 全エンティティ (自分を含む) の 2x2x2 サブセル占有
 const uint VOXEL_PLAYER_MASK = 0xFF00u; // 自分 (current_player) だけのサブセル占有
@@ -18,7 +19,6 @@ const uint VOXEL_PLAYER_MASK = 0xFF00u; // 自分 (current_player) だけのサ�
 uint packVoxelBlock(int voxelId, int emission) {
     return uint(voxelId & 0xFFF) | (uint(clamp(emission, 0, 15)) << 12u);
 }
-int unpackVoxelBlockId(uint v) { return int(v & 0xFFFu); }
 int unpackVoxelEmission(uint v) { return int(v >> 12u); }
 
 uint readVoxelBlock(ivec3 cell) {

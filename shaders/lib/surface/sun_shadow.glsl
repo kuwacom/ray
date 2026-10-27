@@ -31,6 +31,7 @@
 #include "/lib/ids/block_ids.glsl"
 #include "/lib/ids/id_decode.glsl"
 #include "/lib/common/shadow_volume.glsl"
+#include "/lib/light/voxel_read.glsl"
 #include "/lib/common/water.glsl"
 
 const float SHADOW_NORMAL_OFFSET_MIN = 0.6;   // 法線オフセット (テクセル)。正面向きの面
@@ -118,7 +119,7 @@ float leafLayersAlong(vec3 topPlayer, vec3 L, float len, out float edge) {
     for (int i = 0; i < LEAF_MAX_CELLS && t < len; i++) {
         if (!isInVoxelVolume(cell)) break;
         float tNext = min(minOf(tMax), len);
-        int id = int(texelFetch(voxelBlockSampler, cell, 0).r & 0xFFFu);
+        int id = fetchVoxelBlockId(cell);
         if (id == BLOCK_LEAVES) {
             path += tNext - t;
             if (path > LEAF_MAX_LAYERS * LEAF_LAYER_PATH) break;

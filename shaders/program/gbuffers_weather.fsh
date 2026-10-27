@@ -1,4 +1,5 @@
 #include "/lib/common/common.glsl"
+#include "/lib/common/phase.glsl"
 #include "/lib/sky/sky.glsl"
 #include "/lib/light/light.glsl"
 
@@ -33,7 +34,7 @@ void main() {
         color = srgbToLinear(c.rgb) * (ambient + celestial.irradiance * 0.5 * sunVisibility) * RCP_PI;
         opacity = c.a * SNOW_OPACITY;
     } else {
-        float phase = skyPhaseHG(dot(V, celestial.direction), 0.7);
+        float phase = phaseHG(dot(V, celestial.direction), 0.7);
         color = srgbToLinear(c.rgb) * (ambient * RCP_PI + celestial.irradiance * phase * RAIN_FORWARD_SCATTER * sunVisibility);
         opacity = c.a * RAIN_OPACITY;
     }

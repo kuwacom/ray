@@ -90,7 +90,7 @@ vec3 getHandLightPosition(bool mainHand) {
 vec3 getHandLightPositionSafe(bool mainHand) {
     vec3 p = getHandLightPosition(mainHand);
     ivec3 cell = playerToVoxelCell(p);
-    if (isInVoxelVolume(cell) && isVoxelOpaque(unpackVoxelBlockId(texelFetch(voxelBlockSampler, cell, 0).r))) {
+    if (isInVoxelVolume(cell) && isVoxelOpaque(fetchVoxelBlockId(cell))) {
         p = firstPersonCamera ? vec3(0.0) : getEyePlayerPos();
     }
     return p;

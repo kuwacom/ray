@@ -7,6 +7,7 @@
 #include "/lib/common/common.glsl"
 #include "/lib/buffers/block_data.glsl"
 #include "/lib/common/gbuffer.glsl"
+#include "/lib/common/phase.glsl"
 #include "/lib/common/water.glsl"
 #include "/lib/sky/sky.glsl"
 #include "/lib/light/light.glsl"
@@ -101,7 +102,7 @@ vec3 handLightGlow(vec3 dir, float dist, vec3 scatterCoeff, bool inWater) {
         }
     }
 #endif
-    return glow * scatterCoeff * SKY_PHASE_ISOTROPIC;
+    return glow * scatterCoeff * PHASE_ISOTROPIC;
 }
 
 void main() {

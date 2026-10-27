@@ -188,7 +188,7 @@ const float VOXEL_RAY_FACE_EPS = 0.01;      // 固体セルから押し出した
 vec3 voxelRayOrigin(vec3 playerPos, vec3 geoNormal) {
     vec3 v = playerToVoxel(playerPos + geoNormal * (VOXEL_RAY_OFFSET + VOXEL_RAY_OFFSET_DIST * length(playerPos)));
     ivec3 c = ivec3(floor(v));
-    if (isInVoxelVolume(c) && isVoxelOpaque(unpackVoxelBlockId(texelFetch(voxelBlockSampler, c, 0).r))) {
+    if (isInVoxelVolume(c) && isVoxelOpaque(fetchVoxelBlockId(c))) {
         vec3 a = abs(geoNormal);
         int axis = a.x >= a.y && a.x >= a.z ? 0 : (a.y >= a.z ? 1 : 2);
         v[axis] = geoNormal[axis] > 0.0 ? float(c[axis]) + 1.0 + VOXEL_RAY_FACE_EPS : float(c[axis]) - VOXEL_RAY_FACE_EPS;

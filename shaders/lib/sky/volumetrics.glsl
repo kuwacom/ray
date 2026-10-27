@@ -16,6 +16,7 @@
 #include "/lib/common/dimension.glsl"
 #include "/lib/common/math.glsl"
 #include "/lib/common/noise.glsl"
+#include "/lib/common/phase.glsl"
 #include "/lib/common/samplers.glsl"
 #include "/lib/common/shading_types.glsl"
 #include "/lib/common/shadow_space.glsl"
@@ -229,7 +230,7 @@ vec4 marchAirFog(vec3 dir, float endDist, float dither, float farVisibility) {
 
 // 水の粒子の位相関数 (前方に尖る)。太陽とブロックライトで同じ形を使う
 float waterPhase(float cosTheta) {
-    return mix(skyPhaseHG(cosTheta, WATER_PHASE_G), SKY_PHASE_ISOTROPIC, WATER_PHASE_ISO);
+    return mix(phaseHG(cosTheta, WATER_PHASE_G), PHASE_ISOTROPIC, WATER_PHASE_ISO);
 }
 
 #ifdef FOG_BLOCKLIGHT
@@ -255,7 +256,7 @@ float waterBlockLightPhaseWeight(vec3 voxelPos, vec3 dir) {
         sumP += e * waterPhase(dot(toL, dir) / max(d, 1e-3));
         sumE += e;
     }
-    return sumE > 0.0 ? sumP / (sumE * SKY_PHASE_ISOTROPIC) : 1.0;
+    return sumE > 0.0 ? sumP / (sumE * PHASE_ISOTROPIC) : 1.0;
 }
 #endif
 

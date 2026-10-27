@@ -1,6 +1,6 @@
 /*
  * 日替わりの天気の傾向と地域 (sky モジュール。フォグが使う)
- * 雲 (cloud_volume.glsl cloudDayRandom) と同じ種と同じ式なので、湿った日・快晴の日は雲とフォグでそろう
+ * 雲 (cloud_volume.glsl の cloudClimate) も climateDayRandom を同じ種で呼ぶので、湿った日・快晴の日は雲とフォグでそろう
  */
 #ifndef SKY_CLIMATE_GLSL
 #define SKY_CLIMATE_GLSL

@@ -39,7 +39,7 @@ vec3 sampleFloodFiltered(vec3 voxelPos) {
         ivec3 o = ivec3(i & 1, (i >> 1) & 1, i >> 2);
         ivec3 c = base + o;
         if (!isInVoxelVolume(c)) continue;
-        if (isVoxelOpaque(unpackVoxelBlockId(texelFetch(voxelBlockSampler, c, 0).r))) continue;
+        if (isVoxelOpaque(fetchVoxelBlockId(c))) continue;
         vec3 w3 = mix(1.0 - f, f, vec3(o));
         float w = w3.x * w3.y * w3.z;
         sum += fetchFlood(c) * w;

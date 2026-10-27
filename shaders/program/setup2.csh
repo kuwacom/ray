@@ -7,6 +7,7 @@
 // このプログラムで書く image (lib/buffers/images.glsl。宣言は 8 個まで)
 #define IMG_SKY_MULTISCATTER
 #include "/lib/common/common.glsl"
+#include "/lib/common/phase.glsl"
 #include "/lib/sky/sky.glsl"
 
 layout(local_size_x = 8, local_size_y = 8) in;
@@ -58,7 +59,7 @@ void main() {
             vec3 stepT = exp(-extinction * dt);
             vec3 integral = (1.0 - stepT) / max(extinction, vec3(1e-9));
             // 2 次散乱は等方位相で近似 (論文と同じ)
-            luminance += throughput * sunT * scatter * SKY_PHASE_ISOTROPIC * integral;
+            luminance += throughput * sunT * scatter * PHASE_ISOTROPIC * integral;
             transfer += throughput * scatter * integral;
             throughput *= stepT;
         }

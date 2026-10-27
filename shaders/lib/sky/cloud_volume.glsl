@@ -39,11 +39,13 @@
 #include "/lib/common/constants.glsl"
 #include "/lib/common/math.glsl"
 #include "/lib/common/noise.glsl"
+#include "/lib/common/phase.glsl"
 #include "/lib/common/transforms.glsl"
 #include "/lib/common/uniforms.glsl"
 #include "/lib/buffers/images.glsl"
 #include "/lib/buffers/frame_data.glsl"
 #include "/lib/sky/atmosphere.glsl"
+#include "/lib/sky/climate.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/sky/sky_color.glsl"
 
@@ -517,22 +519,13 @@ struct CloudClimate {
     float storm;      // 晴れた日の積乱雲の出やすさ (遠くだけに立てる)
 };
 
-// 日ごとの天気の傾向 [0,1]。夕方から 0 時にかけて次の日の傾向へ移る (worldTime 0 = 6 時)
-float cloudDayRandom(uint seed) {
-    float t = float(worldDay) + float(worldTime + 6000) / 24000.0;
-    float day = floor(t);
-    float a = hash1(uint(int(day)) * 7919u + seed);
-    float b = hash1(uint(int(day) + 1) * 7919u + seed);
-    return mix(a, b, smoothstep(0.7, 1.0, t - day));
-}
-
 CloudClimate cloudClimate() {
     CloudClimate c;
     CloudRegion region = cloudRegion();
-    float humidity = cloudDayRandom(11u);
-    float instability = cloudDayRandom(23u);
-    float midMoisture = cloudDayRandom(37u);
-    float highMoisture = cloudDayRandom(53u);
+    float humidity = climateDayRandom(11u);
+    float instability = climateDayRandom(23u);
+    float midMoisture = climateDayRandom(37u);
+    float highMoisture = climateDayRandom(53u);
     // 日射による対流は 14 時ごろ最大、明け方に最小 (worldTime 8000 = 14 時)
     float diurnal = 0.5 + 0.5 * cos(TAU * (float(worldTime) - 8000.0) / 24000.0);
     // wetness は雨の後もしばらく残るので、雨上がりの雲がゆっくり晴れる
@@ -548,7 +541,7 @@ CloudClimate cloudClimate() {
     c.rainLight *= 1.0 - CLOUD_THUNDER_LIGHT_CUT * c.thunder;
     c.convection = saturate(instability * region.convection * CS_CONVECTION * mix(1.0 - region.diurnal, 1.0, diurnal) + c.thunder);
     // 快晴の日 (高気圧に覆われた乾いた日) は時々だけ。被覆の範囲の下端で作ると大半の日が寂しい空になる
-    float clearDay = 1.0 - smoothstep(0.5, 1.0, cloudDayRandom(78u) / CLOUD_CLEAR_DAY_CHANCE);
+    float clearDay = 1.0 - smoothstep(0.5, 1.0, climateDayRandom(78u) / CLOUD_CLEAR_DAY_CHANCE);
     float lowBase = mix(region.humidity.x, region.humidity.y, humidity) * mix(1.0, CLOUD_CLEAR_DAY_COVER, clearDay);
     // 対流が弱まる夕方から夜は、積雲が平たく横へ広がって層積雲になる (夕焼けの逆光の雲・月夜の雲が小さな塊だけにならないように)
     lowBase *= 1.0 + CLOUD_EVENING_SPREAD * (1.0 - diurnal);
@@ -1139,18 +1132,11 @@ float cloudHighExtinction(CloudContext ctx, float cover, vec2 rel, float altitud
 }
 
 // ライティング
-// Draine の位相関数 (HG に (1 + alpha cos^2) を掛けて正規化したもの)
-float cloudPhaseDraine(float cosTheta, float g, float alpha) {
-    float g2 = g * g;
-    float hg = (1.0 - g2) / pow(max(1.0 + g2 - 2.0 * g * cosTheta, 1e-6), 1.5);
-    return SKY_PHASE_ISOTROPIC * hg * (1.0 + alpha * cosTheta * cosTheta) / (1.0 + alpha * (1.0 + 2.0 * g2) / 3.0);
-}
-
 // 雲粒の位相 (HG + Draine の Mie 近似 + グローリー)。scale で非対称性を弱める (多重散乱のオクターブ・厚い所)
 float cloudPhase(float cosTheta, float scale) {
-    float forward = skyPhaseHG(cosTheta, CLOUD_MIE_G_HG * scale);
-    float bulk = cloudPhaseDraine(cosTheta, CLOUD_MIE_G_D * scale, CLOUD_MIE_ALPHA * scale);
-    float glory = skyPhaseHG(cosTheta, CLOUD_GLORY_G * scale) * CLOUD_GLORY_WEIGHT;
+    float forward = phaseHG(cosTheta, CLOUD_MIE_G_HG * scale);
+    float bulk = phaseDraine(cosTheta, CLOUD_MIE_G_D * scale, CLOUD_MIE_ALPHA * scale);
+    float glory = phaseHG(cosTheta, CLOUD_GLORY_G * scale) * CLOUD_GLORY_WEIGHT;
     return mix(forward, bulk, CLOUD_MIE_W_D) + glory;
 }
 
@@ -1218,7 +1204,7 @@ vec3 cloudInscatter(CloudLighting l, float extinction, float odLight, float odNe
     float msGain = growth * l.msGain;
     float anisotropy = 1.0 / (1.0 + CLOUD_ANISO_DECAY * odLight);
     // 銀の縁: 前方の光を後段でもう一段持ち上げる (光学的に薄い逆光の縁ほど単散乱が残るので際立つ)
-    float silver = l.silverBoost * skyPhaseHG(l.cosTheta, CLOUD_SILVER_G * anisotropy);
+    float silver = l.silverBoost * phaseHG(l.cosTheta, CLOUD_SILVER_G * anisotropy);
     float sun = cloudPhase(l.cosTheta, anisotropy) * cloudLightTransmittance(odLight) * (1.0 + silver);
     float ms = 0.0;
     float a = CLOUD_MS_ATTENUATION, b = CLOUD_MS_CONTRIBUTION, c = CLOUD_MS_ECCENTRICITY;
@@ -1240,7 +1226,7 @@ vec3 cloudInscatter(CloudLighting l, float extinction, float odLight, float odNe
     // powder: 順光ほど、散乱体の少ない縁が暗い縁取りになる (逆光では縁が銀に光るので効かせない)
     float powder = 1.0 - l.powder * saturate(0.5 - 0.5 * l.cosTheta) * exp(-extinction * CLOUD_POWDER_LENGTH);
     sun *= powder;
-    sun += l.overcastDiffuse * SKY_PHASE_ISOTROPIC / (1.0 + CLOUD_AMBIENT_DIFFUSION * odLight);
+    sun += l.overcastDiffuse * PHASE_ISOTROPIC / (1.0 + CLOUD_AMBIENT_DIFFUSION * odLight);
     // 空の光は上半球からの等方入射 = E / 2pi。地面の照り返しは雲の底ほど届く
     float sky = (1.0 + CLOUD_AMBIENT_MS * growth) / (1.0 + CLOUD_AMBIENT_DIFFUSION * odSky) * mix(0.6, 1.0, bottom);
     vec3 ambient = (l.skyRadiance * 0.5 * sky + l.groundRadiance * 0.5 * groundVisibility) * l.ambient;
@@ -1475,7 +1461,7 @@ CloudAccum cloudMarchHigh(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg,
     // 氷晶は前方散乱が液滴より弱い。巻層雲は太陽の周り 22 度にハロを作る
     float angle = acos(clamp(l.cosTheta, -1.0, 1.0));
     float haloLobe = CLOUD_HALO_STRENGTH * exp(-sqr((angle - CLOUD_HALO_ANGLE) / CLOUD_HALO_WIDTH));
-    float icePhase = (1.0 - CLOUD_ICE_BACK) * skyPhaseHG(l.cosTheta, CLOUD_ICE_G) + CLOUD_ICE_BACK * skyPhaseHG(l.cosTheta, -0.2);
+    float icePhase = (1.0 - CLOUD_ICE_BACK) * phaseHG(l.cosTheta, CLOUD_ICE_G) + CLOUD_ICE_BACK * phaseHG(l.cosTheta, -0.2);
     vec3 sums = vec3(0.0);
     for (int i = 0; i < steps; i++, t += dt) {
         float y = cloudAltitudeAt(y0, dir.y, t, yMid);
@@ -1492,7 +1478,7 @@ CloudAccum cloudMarchHigh(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg,
         // 光源までは層の上端まで、その点と同じ濃さで続くとみなす
         float odLight = extinction * (CLOUD_R_HIGH_TOP - altitude) / max(abs(lightDir.y), 0.05);
         float phase = icePhase + veil * haloLobe;
-        float multiScatter = SKY_PHASE_ISOTROPIC * (1.0 - exp(-odLight - extinction * 600.0));
+        float multiScatter = PHASE_ISOTROPIC * (1.0 - exp(-odLight - extinction * 600.0));
         vec3 inscatter = l.lightIrradiance * (phase * exp(-odLight) + multiScatter) + l.skyRadiance * 0.5 + l.groundRadiance * 0.25;
 
         float stepT = exp(-extinction * dt * cloudRefStretch(dir, CLOUD_KH_HIGH, slope));
@@ -1522,7 +1508,7 @@ CloudAccum cloudMarchShaft(CloudContext ctx, CloudLighting l, vec3 dir, float ma
     // 近くを細かく: 区間を距離の平方根で分ける
     float a = sqrt(tStart), b = sqrt(tEnd);
     float ds = (b - a) / float(CLOUD_SHAFT_STEPS);
-    vec3 radiance = l.skyRadiance * 0.18 + l.lightIrradiance * (SKY_PHASE_ISOTROPIC * 0.06) + l.groundRadiance * 0.3;
+    vec3 radiance = l.skyRadiance * 0.18 + l.lightIrradiance * (PHASE_ISOTROPIC * 0.06) + l.groundRadiance * 0.3;
     vec3 sums = vec3(0.0);
     for (int i = 0; i < CLOUD_SHAFT_STEPS; i++) {
         float s0 = a + ds * float(i);

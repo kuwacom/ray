@@ -203,7 +203,7 @@ vec3 traceVisibilityEx(vec3 fromVoxel, vec3 toVoxel, uint flags, float dither, f
      * 水の分だけ減衰が抜ける。その長さはブロックの中の位置で変わり、水の中の床の明るさがブロックの境目で段になっていた
      */
     if ((flags & TRACE_TINT) != 0u && isInVoxelVolume(cell)) {
-        int startId = int(texelFetch(voxelBlockSampler, cell, 0).r & 0xFFFu);
+        int startId = fetchVoxelBlockId(cell);
         if (startId == BLOCK_WATER) transmit = voxelCellTransmittance(startId, cell, fromVoxel, rdInv, 0.0, min(minOf(tMax), len), flags);
     }
     for (int i = 0; i < TRACE_MAX_STEPS && cell != endCell; i++) {
@@ -215,7 +215,7 @@ vec3 traceVisibilityEx(vec3 fromVoxel, vec3 toVoxel, uint flags, float dither, f
         if (cell == endCell || !isInVoxelVolume(cell)) break;
         float tLeave = min(minOf(tMax), len);
 
-        int id = int(texelFetch(voxelBlockSampler, cell, 0).r & 0xFFFu);
+        int id = fetchVoxelBlockId(cell);
         if (id != BLOCK_AIR) {
             transmit *= voxelCellTransmittance(id, cell, fromVoxel, rdInv, tEnter, tLeave, flags);
             if (maxOf(transmit) < TRACE_MIN_TRANSMITTANCE) return vec3(0.0);
@@ -275,7 +275,7 @@ bool traceVoxelRay(vec3 originVoxel, vec3 dir, float maxDist, out vec3 hitVoxel,
         else { cell.z += stepDir.z; tMax.z += tDelta.z; axis = vec3(0.0, 0.0, 1.0); }
         if (!isInVoxelVolume(cell)) return false;
 
-        int id = int(texelFetch(voxelBlockSampler, cell, 0).r & 0xFFFu);
+        int id = fetchVoxelBlockId(cell);
         if (id == BLOCK_AIR) continue;
         bool solid = false;
         float tHit = tEnter;

@@ -21,6 +21,7 @@
 #include "/lib/common/look_presets.glsl"
 #include "/lib/common/math.glsl"
 #include "/lib/common/noise.glsl"
+#include "/lib/common/phase.glsl"
 #include "/lib/common/shading_types.glsl"
 #include "/lib/common/transforms.glsl"
 #include "/lib/common/uniforms.glsl"
@@ -359,13 +360,13 @@ struct FogLighting {
 
 // もやの位相: g を半分ずつにしたオクターブ和 (多重散乱で位相が丸くなる近似, Kappa の 4 オクターブと同じ考え方)
 float fogPhaseHaze(float cosTheta) {
-    return (skyPhaseCS(cosTheta, FS_PHASE_G1) + FS_PHASE_W2 * skyPhaseCS(cosTheta, FS_PHASE_G2) + FS_PHASE_W3 * skyPhaseCS(cosTheta, FS_PHASE_G3))
+    return (phaseCS(cosTheta, FS_PHASE_G1) + FS_PHASE_W2 * phaseCS(cosTheta, FS_PHASE_G2) + FS_PHASE_W3 * phaseCS(cosTheta, FS_PHASE_G3))
          / (1.0 + FS_PHASE_W2 + FS_PHASE_W3);
 }
 
 // 霧は粒が大きく前方に鋭い。後方散乱を少し混ぜる (Nostalgia の fogMistPhase と同じ構成)
 float fogPhaseMist(float cosTheta) {
-    return mix(skyPhaseCS(cosTheta, FS_MIST_G), skyPhaseHG(cosTheta, -0.25), 0.19);
+    return mix(phaseCS(cosTheta, FS_MIST_G), phaseHG(cosTheta, -0.25), 0.19);
 }
 
 #if defined HAS_SKY

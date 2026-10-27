@@ -15,6 +15,7 @@
 #include "/lib/common/constants.glsl"
 #include "/lib/common/dimension.glsl"
 #include "/lib/common/math.glsl"
+#include "/lib/common/phase.glsl"
 #include "/lib/common/uniforms.glsl"
 #include "/lib/buffers/images.glsl"
 
@@ -56,27 +57,6 @@ const ivec2 SKYVIEW_LUT_SIZE = ivec2(192, 108);
 // 太陽・月の円盤の見かけの半径 (rad)。実際 (0.0047) の 2 倍にして画面上で読める大きさにする
 const float SUN_ANGULAR_RADIUS = 0.0093;
 const float MOON_ANGULAR_RADIUS = 0.0093;
-
-// 位相関数 (公知の式。名前の衝突を避けるため sky 接頭辞)
-float skyPhaseRayleigh(float cosTheta) {
-    return 3.0 / (16.0 * PI) * (1.0 + cosTheta * cosTheta);
-}
-
-// Henyey-Greenstein
-float skyPhaseHG(float cosTheta, float g) {
-    float gg = g * g;
-    float denom = 1.0 + gg - 2.0 * g * cosTheta;
-    return (1.0 - gg) / (4.0 * PI * denom * sqrt(denom));
-}
-
-// Cornette-Shanks (HG より後方が膨らみ、ミー散乱の実測に近い)
-float skyPhaseCS(float cosTheta, float g) {
-    float gg = g * g;
-    float denom = 1.0 + gg - 2.0 * g * cosTheta;
-    return 3.0 / (8.0 * PI) * (1.0 - gg) * (1.0 + cosTheta * cosTheta) / ((2.0 + gg) * denom * sqrt(denom));
-}
-
-const float SKY_PHASE_ISOTROPIC = 1.0 / (4.0 * PI);
 
 // 幾何 (惑星中心原点, r = 中心からの距離, mu = 天頂角の余弦)
 float atmoDistanceToTop(float r, float mu) {
@@ -232,8 +212,8 @@ vec3 atmoIntegrateScattering(vec3 origin, vec3 dir, vec3 sunDir, vec3 sunIllumin
 
     float cosSun = dot(dir, sunDir);
     float cosMoon = dot(dir, moonDir);
-    float rayleighPhaseSun = skyPhaseRayleigh(cosSun), miePhaseSun = skyPhaseCS(cosSun, ATMO_MIE_G);
-    float rayleighPhaseMoon = skyPhaseRayleigh(cosMoon), miePhaseMoon = skyPhaseCS(cosMoon, ATMO_MIE_G);
+    float rayleighPhaseSun = phaseRayleigh(cosSun), miePhaseSun = phaseCS(cosSun, ATMO_MIE_G);
+    float rayleighPhaseMoon = phaseRayleigh(cosMoon), miePhaseMoon = phaseCS(cosMoon, ATMO_MIE_G);
 
     vec3 luminance = vec3(0.0);
     transmittance = vec3(1.0);
@@ -285,10 +265,10 @@ vec3 atmoAnalyticSkyForLight(vec3 dir, vec3 lightDir) {
     // 視線上の各点で光源側の減衰を一様と仮定: ∫ exp(-od (mView s + mLight)) ds の形
     vec3 viewT = exp(-odTotal * mView);
     vec3 lightT = exp(-odTotal * mLight);
-    vec3 singleScatter = (odRayleigh * skyPhaseRayleigh(cosTheta) + odMie * skyPhaseCS(cosTheta, ATMO_MIE_G))
+    vec3 singleScatter = (odRayleigh * phaseRayleigh(cosTheta) + odMie * phaseCS(cosTheta, ATMO_MIE_G))
                        * mView * lightT * (1.0 - viewT) / max(odTotal * mView, vec3(1e-6));
     // 多重散乱の寄与 (Hillaire 2020 で晴天時に単散乱の 2-3 割程度) を等方で近似
-    vec3 multiScatter = odRayleigh * 0.35 * (1.0 - viewT) * smoothstep(-0.2, 0.3, lightDir.y) * SKY_PHASE_ISOTROPIC * 4.0;
+    vec3 multiScatter = odRayleigh * 0.35 * (1.0 - viewT) * smoothstep(-0.2, 0.3, lightDir.y) * PHASE_ISOTROPIC * 4.0;
     float horizon = smoothstep(-0.12, 0.02, lightDir.y);
     return (singleScatter + multiScatter) * horizon;
 }
