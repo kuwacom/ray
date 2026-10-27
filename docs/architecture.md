@@ -639,7 +639,7 @@ DEBUG_VIEW の値 (0-12) と表示内容の対応は `shaders/lang/ja_JP.lang` /
 |---|---|---|
 | light (ボクセル・ブロックライト) | ボクセル化、floodfill、光源リスト・ビン、光源シャドウ (DDA)、デノイズ、手持ち光源、エンティティ光源、`traceVoxelRay` (surface の GI / 反射が使う) | `lib/light/*`, `program/setup.csh`, `begin.csh`, `shadow.*`, `shadow_entities.*`, `shadow_block.*`, `deferred.csh`, `deferred_a.csh`, `deferred1.csh`, `deferred2.*` |
 | sky (空・大気・雲・フォグ・VL) | 大気 LUT、太陽/月の照度と空の SH、空の描画、星、雲 (体積・2D・影)、高さフォグ、VL、水中フォグ、雨 | `lib/sky/*`, `program/setup1.csh`, `setup2.csh`, `prepare.csh`, `prepare1.csh`, `prepare2.csh`, `gbuffers_skybasic.*`, `gbuffers_skytextured.*`, `gbuffers_clouds.*`, `gbuffers_weather.*`, `deferred20.*`, `deferred21.*`, `composite10.csh`, `composite11.*` |
-| surface (太陽影・GI・マテリアル・水・反射) | gbuffers (不透明/半透明/オーバーレイ)、マテリアル (labPBR・自動法線・POM・揺れ)、BRDF、太陽影、AO・GI、不透明シェーディング (deferred30)、水、反射、半透明合成 | `lib/surface/*`, `program/gbuffers/*`, `program/gbuffers_*` (sky の 4 つを除く), `deferred10.csh`, `deferred11.*`, `deferred30.*`, `composite.csh`, `composite1.*` |
+| surface (太陽影・GI・マテリアル・水・反射) | gbuffers (不透明/半透明/オーバーレイ)、マテリアル (labPBR・自動法線・POM・揺れ)、BRDF、太陽影、AO・GI、不透明シェーディング (deferred30)、水、反射、半透明合成 | `lib/surface/*`, `lib/common/water.glsl`, `program/gbuffers/*`, `program/gbuffers_*` (sky の 4 つを除く), `deferred10.csh`, `deferred11.*`, `deferred30.*`, `composite.csh`, `composite1.*` |
 | post (ポストプロセス) | 速度ベクトルの関数、TAA、モーションブラー、DoF、ブルーム、露出、オートフォーカス、トーンマップ、色調整、CAS、レンズフレア、デバッグ表示 | `lib/post/*`, `program/composite20-24.*`, `composite25.csh`, `final.*` |
 
 - shadow パスの出力 (shadowcolor の内容) は surface (RSM・色付き影) と sky (色付き光芒) も使う。内容を変える時は「colortex」の節の定義を守り、docs/architecture.md も更新する
@@ -701,10 +701,10 @@ surface モジュールが提供 (`#include "/lib/surface/surface.glsl"`):
 | `vec3 evalDirectLight(Material m, vec3 N, vec3 V, LightSample L)` | surface | 直接光 1 つの出射放射 |
 | `vec3 evalDiffuseIrradiance(Material m, vec3 irradiance)` | surface | 方向のない照度の出射放射 |
 | `vec3 getSunShadow(vec3 playerPos, vec3 geoNormal, float dither)` | surface, light (GI 的な用途) | 太陽影 (色付き透過率) |
-| `vec3 sampleShadowVolume(vec3 playerPos)` | sky (VL), light (floodfill のスカイライト等) | 1 タップの色付き影 |
+| `vec3 sampleShadowVolume(vec3 playerPos)` (`lib/common/shadow_volume.glsl`) | sky (VL), light (floodfill のスカイライト等) | 1 タップの色付き影 |
 | `vec4 getIndirectLight(ivec2 texel)` | surface | rgb 間接光, a AO |
 | `vec3 applyWaving(vec3 playerPos, int blockId, bool isTopVertex, float skyLight)` | gbuffers, shadow.vsh (light) | 植物の揺れ (影と一致させる) |
-| `vec3 getWaterNormal(vec3 worldPos, vec3 geoNormal)` | surface, sky (水中の光芒等) | 水面の法線 |
+| `vec3 getWaterNormal(vec3 worldPos, vec3 geoNormal)` (`lib/common/water.glsl`) | surface, sky (水中の光芒等) | 水面の法線 |
 
 post モジュールが提供 (`#include "/lib/post/post.glsl"`):
 
@@ -713,9 +713,9 @@ post モジュールが提供 (`#include "/lib/post/post.glsl"`):
 | `vec4 encodeVelocity(vec3 viewPos)` (カメラの動きのみ。Iris 26.1 に at_velocity は無い) / `vec4 encodeHandVelocity()` | gbuffers (surface) | colortex15 へ書く値 |
 | `vec2 getPreviousUv(vec2 uv, float depth)` | light / sky / surface の時間蓄積 | 前フレームの UV (速度 or 深度再投影) |
 | `vec3 tonemap(vec3 x)` | post, デバッグ表示 | トーンマップ |
-| `float getExposure()` (common) | 全員 | FrameData.exposure |
+| `float getExposure()` (`lib/common/exposure.glsl`) | 全員 | FrameData.exposure |
 
-共通基盤: `lib/common/*` (座標変換・ボクセル空間・影空間・ノイズ・ブルーノイズ・色空間・数学・G バッファ pack/unpack・ジッター), `lib/buffers/*`, `lib/ids/*`。
+共通基盤: `lib/common/*` (座標変換・ボクセル空間・影空間・ノイズ・ブルーノイズ・色空間・数学・G バッファ pack/unpack・ジッター・水面 (`water.glsl`)・影マップの 1 点の読み取り (`shadow_volume.glsl`)・露出 (`exposure.glsl`)), `lib/buffers/*`, `lib/ids/*`。`common.glsl` 自体は核 (settings・dimension・constants・uniforms・samplers・math・shading_types・SSBO・images) だけを読み、ほかは使うファイルが自分で include する。
 
 ### バッファの読み書き権
 
