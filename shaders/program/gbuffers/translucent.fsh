@@ -16,6 +16,7 @@
 #include "/lib/surface/surface.glsl"
 #include "/lib/sky/sky.glsl"
 #include "/lib/light/light.glsl"
+#include "/lib/surface/surface_lights.glsl"
 
 in vec2 texcoord;
 in vec2 lmcoord;
@@ -57,29 +58,35 @@ vec4 encodeTranslucentDataTint(vec3 normal, vec2 lightmap, int materialId, int t
 
 // 前方シェーディングの拡散 (太陽 + 手持ち光源 + 空 + ブロックライト)
 vec3 forwardDiffuse(Material m, vec3 playerPos, vec3 normal, vec3 geoNormal, vec3 V, float dither) {
-    LightSample sun = getCelestialLight();
-    sun.irradiance *= getSunShadow(playerPos, geoNormal, dither) * getCloudShadow(playerPos);
-    vec3 color = evalDirectDiffuse(m, normal, V, sun);
-
-    LightSample handMain, handOff;
-    getHandLights(playerPos, geoNormal, dither, handMain, handOff);
-    color += evalDirectDiffuse(m, normal, V, handMain);
-    color += evalDirectDiffuse(m, normal, V, handOff);
-
+    // 集める項: 太陽の影 (影マップの外は 1)・手持ち光源・空・ブロックライト
+    // 省く項: 接触影と POM (深度に半透明が無い・POM なし)、鏡面 (composite1 が掛ける)、GI と AO (この経路にバッファが無い)
+    // 太陽 -> 手持ち -> 空とブロックライト -> 手持ちの照り返し に分けて集め、拡散を掛ける順番を保つ
+    // (まとめて 1 回で集めると、手持ち光源のトレースが太陽の拡散より前に並んでドライバの出す命令の並びが変わる)
 #ifdef GBUF_FORWARD_OPAQUE
-    vec3 blockLight = getBlockLightForwardEntity(playerPos, geoNormal, normal, lmcoord.x);
+    const int blockMode = SL_BLOCK_FORWARD_ENTITY;
 #else
-    vec3 blockLight = getBlockLightForward(playerPos, normal, lmcoord.x);
+    const int blockMode = SL_BLOCK_FORWARD;
 #endif
-    vec3 ambient = getSkyIrradiance(normal) * skylightCurve(lmcoord.y) + blockLight
-        + MIN_AMBIENT + nightVision * NIGHT_VISION_AMBIENT;
+    SurfacePoint p = surfacePoint(playerPos, normal);
+    p.geoNormal = geoNormal;
+    p.lightmap = lmcoord;
+    p.dither = dither;
+    SurfaceLights L = gatherSurfaceLights(p, SL_SUN_SHADOW_MAP, SL_BLOCK_NONE, 0u);
+    vec3 color = evalDirectDiffuse(m, normal, V, L.sun);
+    L = gatherSurfaceLights(p, SL_SUN_NONE, SL_BLOCK_NONE, SL_HAND);
+    color += evalDirectDiffuse(m, normal, V, L.handMain);
+    color += evalDirectDiffuse(m, normal, V, L.handOff);
+    L = gatherSurfaceLights(p, SL_SUN_NONE, blockMode, SL_SKY);
+
+    vec3 ambient = L.sky + L.block + MIN_AMBIENT + nightVision * NIGHT_VISION_AMBIENT;
 #ifdef GBUF_ENTITIES_TRANSLUCENT
     /*
      * 手持ち光源は floodfill に入らず、この経路には GI も無いので、三人称の自分の背中 (光源の反対側) が真っ黒になる
      * 周りの壁・床で跳ね返った光を、影なし・向きなしの照度の一定割合の環境光として足す
      * (影付きの照度に掛けると、体で遮られた側に何も残らない)
      */
-    ambient += getHandLightFill(playerPos) * HAND_LIGHT_BOUNCE;
+    L = gatherSurfaceLights(p, SL_SUN_NONE, SL_BLOCK_NONE, SL_HAND_FILL);
+    ambient += L.handFill * HAND_LIGHT_BOUNCE;
 #endif
     return color + evalDiffuseIrradiance(m, ambient);
 }
