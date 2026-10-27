@@ -154,6 +154,8 @@ uv run tools/shader_options.py set GI_MODE=0 LIGHT_SHADOWS=false
 uv run tools/mc.py --stop
 ```
 
+`run_scene.py` は、各シーンの撮影の直前と後片付けの後に、落ちたアイテムと経験値オーブを消します (`tag=ray` のものは残す)。後片付けの間はブロックのドロップを止めるので、壊したたいまつなどが光源として写り込みません
+
 ## リポジトリに含めないもの
 
 | パス | 理由 |

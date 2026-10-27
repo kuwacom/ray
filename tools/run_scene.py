@@ -18,6 +18,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 
+# 撮影用の空間を壊すと、支えを失ったたいまつなどが落ちて光源として写り込み、画素の差分が当てにならなくなる
+# プレイヤーの持ち物には影響しないのでワールド全体で消す。シーンが光らせるために summon したアイテムは tag=ray で残す
+DROP_CLEAR = [{"cmd": "kill @e[type=item,tag=!ray]"}, {"cmd": "kill @e[type=experience_orb,tag=!ray]"}]
+
+# 後片付けでブロックを壊した時にアイテムが落ちないようにする。元の値を読まないので最後に true に戻す
+NO_TILE_DROPS = [{"cmd": "gamerule block_drops false"}]
+RESTORE_TILE_DROPS = [{"cmd": "gamerule block_drops true"}]
+
 
 def dimension_of(scene) -> str | None:
     """シーンの最初の `execute in minecraft:<dim>` からディメンションを返す (無ければ None)"""
@@ -52,7 +60,7 @@ def main() -> None:
     if not names or unknown:
         raise SystemExit(f"シーン名を指定する。候補: {', '.join(conf['scenes'])}")
 
-    steps = list(conf["setup"])
+    steps = list(conf["setup"]) + NO_TILE_DROPS
     if args.reload:
         # 再読み込み直後はコンパイルと履歴バッファの蓄積待ちが必要
         steps += [{"reload_shaders": True}, {"wait": 6}]
@@ -64,6 +72,7 @@ def main() -> None:
         shot = f"{args.tag}_{name}"
         # シーン内の途中撮影 (turn の shot など) もタグ付きの名前にできるよう {name} を置き換える
         steps += [json.loads(json.dumps(s).replace("{name}", shot)) for s in scene["steps"]]
+        steps += DROP_CLEAR
         steps += [json.loads(json.dumps(s).replace("{name}", shot)) for s in conf["capture"]]
         after = scene.get("after", [])
         # 同じディメンションのシーンが続く時はオーバーワールドへ戻らない (ディメンション移動はパイプラインを作り直しメモリを食う)
@@ -73,6 +82,8 @@ def main() -> None:
         steps += after
     # HUD や FOV などプレイ用の設定を撮影前の状態に戻す
     steps += conf.get("teardown", [])
+    steps += RESTORE_TILE_DROPS
+    steps += DROP_CLEAR
 
     cmd = [sys.executable, str(ROOT / "mc.py"), json.dumps(steps, ensure_ascii=False),
            "--timeout", str(args.timeout), "--log-lines", "20"]
