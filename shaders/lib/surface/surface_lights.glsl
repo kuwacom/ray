@@ -61,6 +61,7 @@ struct SurfacePoint {
     float dither;
     float pomShadow;  // SL_POM の時の太陽の可視率の倍率
     float sss;        // 太陽の影のブロッカー探索の SSS の強さ
+    float sunFade;    // 太陽の影を別の呼び出しで集めた時の sunShadow.fade (SL_GI の RSM が空を置き換える範囲)
     bool hand;        // 一人称の手
 };
 
@@ -76,6 +77,7 @@ SurfacePoint surfacePoint(vec3 playerPos, vec3 normal) {
     p.dither = 0.0;
     p.pomShadow = 1.0;
     p.sss = 0.0;
+    p.sunFade = 0.0;
     p.hand = false;
     return p;
 }
@@ -219,7 +221,8 @@ SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, ui
     #endif
 #elif GI_MODE == 1 && defined HAS_SUN_SHADOWS
             // RSM が置き換えるのは影マップの中だけ (deferred10 と同じスカイライトの絞り)
-            if (!p.hand) skyE = max(skyE - getSkyGroundIrradiance(p.normal) * (GI_GROUND_REPLACE * L.sunShadow.fade * smoothstep(RSM_SKYLIGHT_MIN, RSM_SKYLIGHT_MAX, p.lightmap.y)), 0.0);
+            float sunFade = sunMode == SL_SUN_SHADOW_MAP_FALLBACK ? L.sunShadow.fade : p.sunFade;
+            if (!p.hand) skyE = max(skyE - getSkyGroundIrradiance(p.normal) * (GI_GROUND_REPLACE * sunFade * smoothstep(RSM_SKYLIGHT_MIN, RSM_SKYLIGHT_MAX, p.lightmap.y)), 0.0);
 #endif
         }
         L.sky = skyE * skylightCurve(p.lightmap.y);

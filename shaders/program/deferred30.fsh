@@ -1,11 +1,9 @@
 /*
  * deferred30: 不透明面のシェーディング (全モジュールの光をここで合成) と空の描画
- *   太陽/月: sky の getCelestialLight x surface の getSunShadow x sky の getCloudShadow
- *   空の環境光: sky の getSkyIrradiance x スカイライト x surface の AO
+ *   光は surface の gatherSurfaceLights (lib/surface/surface_lights.glsl) で集め、BRDF・AO・溶岩・水たまり・SSS の減衰をここで掛ける
+ *   太陽/月: 影 x 雲影、空の環境光: SH x スカイライト x AO
  *     (SSGI / ボクセル RT では GI のレイが向きと遮蔽込みで空の光を運び、これを置き換える。GI_TRACES_SKY)
- *   ブロックライト: light の getBlockLightOpaque (+ 鏡面 getBlockLightSpecular)
- *   手持ち光源: light の getHandLights
- *   GI: surface の getIndirectLight
+ *   ブロックライト: 拡散 (+ 鏡面)、手持ち光源、GI
  * surface モジュール (lib/surface)
  *
  * 環境光の鏡面 (反射バッファ・空) はここでは足さず composite1 で足す (反射パスが colortex0 のこの結果を映すため)
@@ -19,6 +17,7 @@
 #include "/lib/surface/surface.glsl"
 #include "/lib/sky/sky.glsl"
 #include "/lib/light/light.glsl"
+#include "/lib/surface/surface_lights.glsl"
 
 in vec2 texcoord;
 
@@ -26,11 +25,10 @@ in vec2 texcoord;
 layout(location = 0) out vec4 outColor;
 
 const float AO_BLOCKLIGHT_WEIGHT = 0.5;
-// GI が空の光を運ぶ時 (GI_TRACES_SKY): テクスチャ法線の凹凸の戻し方の範囲、GTAO を掛ける割合、ボクセル体積の判定で面から浮かせる量
+// GI が空の光を運ぶ時 (GI_TRACES_SKY): テクスチャ法線の凹凸の戻し方の範囲、GTAO を掛ける割合
 const float GI_NORMAL_DETAIL_MIN = 0.5;
 const float GI_NORMAL_DETAIL_MAX = 1.5;
 const float GI_SKY_GTAO_WEIGHT = 0.5;
-const float GI_VOLUME_TEST_OFFSET = 0.1;
 // SSS の減衰 (1/ブロック, sss = 1 の時)。葉 1 枚 (~0.1 ブロック) は通し、葉ブロック 1 個分でかなり暗くなる
 const float SSS_DENSITY = 2.5;
 // 溶岩の面が受けるブロックライト・GI の割合
@@ -59,8 +57,6 @@ vec3 lavaRadiance(vec3 albedo) {
     return albedo / lum * (pattern * LAVA_LUMINANCE * limit);
 }
 
-// 影マップの外での日向の判定 (スカイライトがこれ以上なら日向とみなす)
-const vec2 SHADOW_FALLBACK_SKYLIGHT = vec2(0.8, 0.97);
 const float PUDDLE_GLINT_MIN_VOH = 0.05;
 
 /*
@@ -124,7 +120,14 @@ void main() {
     vec3 playerPos = viewToPlayer(viewPos);
     vec3 V = -normalize(playerPos);
     float dither = interleavedGradientNoise(gl_FragCoord.xy, frameCounter);
-    vec4 indirect = getIndirectLight(texel);
+    SurfacePoint sp = surfacePoint(playerPos, g.normal);
+    sp.viewPos = viewPos;
+    sp.geoNormal = g.geoNormal;
+    sp.lightmap = g.lightmap;
+    sp.texel = texel;
+    sp.dither = dither;
+    sp.hand = hand;
+    vec4 indirect = gatherSurfaceLights(sp, SL_SUN_NONE, SL_BLOCK_NONE, SL_GI).indirect;
     float pomShadow, puddle;
     readSurfaceExtra(texel, pomShadow, puddle);
     // 水たまりの照り返しを輝点に分ける割合と傾きの分散。縁の半分から内側を水面とみなす (solid.fsh の法線の混ぜ方と同じ)
@@ -133,99 +136,64 @@ void main() {
     float glintVar = puddleSlopeVar() * puddleWeight;
     float glintLum = 0.0;
 
-    // 太陽 / 月
-    LightSample sun = getCelestialLight();
+    // 集める項: 太陽 (PCSS・POM・接触影・葉の透過。影マップの外はスカイライトで近似)・手持ち光源・ブロックライトの鏡面・
+    //   空 (GI が運ぶ分を引く)・ブロックライト・手持ちの照り返し・GI
+    // 省く項: なし (不透明面は全部掛かる)。環境光の鏡面 (反射) は composite1 が足す
+    // 項ごとに分けて、太陽 -> 手持ち -> 鏡面 -> 空 -> ブロックライト -> 手持ちの照り返しの順に集める
+    // (1 回にまとめると、トレースが太陽の BRDF より前に並んでドライバの出す命令の並びが変わる)
+    sp.pomShadow = pomShadow;
 #ifdef SSS
-    SunShadow ss = evalSunShadow(playerPos, g.geoNormal, m.sss, dither);
-#else
-    // 透過を足さないので、裏向きの面の厚みの探索と影のにじみも要らない
-    SunShadow ss = evalSunShadow(playerPos, g.geoNormal, 0.0, dither);
+    sp.sss = m.sss;
 #endif
-    float fallback = smoothstep(SHADOW_FALLBACK_SKYLIGHT.x, SHADOW_FALLBACK_SKYLIGHT.y, g.lightmap.y);
-    vec3 sunVis = mix(vec3(fallback), ss.visibility, ss.fade) * pomShadow;
+    // SSS が無ければ透過を足さないので、裏向きの面の厚みの探索と影のにじみも要らない
+    SurfaceLights L = gatherSurfaceLights(sp, SL_SUN_SHADOW_MAP_FALLBACK, SL_BLOCK_NONE, SL_SUN_CONTACT | SL_SUN_LEAF | SL_POM);
+
+    // 太陽 / 月
+    vec3 color = directLight(m, g.normal, V, L.sun, playerPos, g.geoNormal, glintVar, glintShare, glintLum);
     // 葉を透過した分 (拡散だけに使う。鏡面の太陽は葉の隙間を抜けた光だけで照り返す)
-    vec3 leafVis = ss.leaf * (ss.fade * pomShadow);
-    // 一人称の手は影マップ上で自分の体の影の中にあるので、スカイライトから日向を推定する
-    if (hand) {
-        sunVis = vec3(fallback);
-        leafVis = vec3(0.0);
-    }
-#ifdef SCREEN_SPACE_SHADOWS
-    if (!hand && maxOf(sunVis) > 0.0) {
-        float contact = sunContactShadow(viewPos, playerToViewDir(g.geoNormal), playerToViewDir(sun.direction), dither);
-        sunVis *= contact;
-        leafVis *= contact;
-    }
-#endif
-    float cloudShadow = getCloudShadow(playerPos);
-    LightSample sunLit = sun;
-    sunLit.irradiance *= max(sunVis - leafVis, 0.0) * cloudShadow;
-    vec3 color = directLight(m, g.normal, V, sunLit, playerPos, g.geoNormal, glintVar, glintShare, glintLum);
-    if (maxOf(leafVis) > 0.0) {
-        LightSample leafLit = sun;
-        leafLit.irradiance *= leafVis * cloudShadow;
+    if (maxOf(L.sunLeafVis) > 0.0) {
+        LightSample leafLit = L.celestial;
+        leafLit.irradiance *= L.sunLeafVis * L.cloudShadow;
         color += max(evalDirectLight(m, g.normal, V, leafLit) - evalDirectSpecular(m, g.normal, V, leafLit), 0.0);
     }
 
 #ifdef SSS
     if (m.sss > 0.0) {
         // 厚みに応じた減衰。アルベドの色ほど通りやすい (葉は緑に透ける)
-        float thickness = mix(1.0 - fallback, ss.thickness, ss.fade);
+        float thickness = mix(1.0 - L.sunFallback, L.sunShadow.thickness, L.sunShadow.fade);
         vec3 transmit = exp(-thickness * SSS_DENSITY / max(m.sss, 0.05) * (1.15 - m.albedo));
-        LightSample through = sun;
-        through.irradiance *= transmit * cloudShadow * pomShadow;
+        LightSample through = L.celestial;
+        through.irradiance *= transmit * L.cloudShadow * pomShadow;
         color += evalTranslucency(m, g.normal, V, through) * SSS_STRENGTH;
     }
 #endif
 
     // 手持ち光源・ブロックライトの鏡面
-    LightSample handMain, handOff;
-    getHandLights(playerPos, g.geoNormal, dither, handMain, handOff);
+    sp.sunFade = L.sunShadow.fade;
+    SurfaceLights H = gatherSurfaceLights(sp, SL_SUN_NONE, SL_BLOCK_NONE, SL_HAND);
 #ifdef SSS
-    color += directLight(m, g.normal, V, handMain, playerPos, g.geoNormal, glintVar, glintShare, glintLum) + evalTranslucency(m, g.normal, V, handMain);
-    color += directLight(m, g.normal, V, handOff, playerPos, g.geoNormal, glintVar, glintShare, glintLum) + evalTranslucency(m, g.normal, V, handOff);
+    color += directLight(m, g.normal, V, H.handMain, playerPos, g.geoNormal, glintVar, glintShare, glintLum) + evalTranslucency(m, g.normal, V, H.handMain);
+    color += directLight(m, g.normal, V, H.handOff, playerPos, g.geoNormal, glintVar, glintShare, glintLum) + evalTranslucency(m, g.normal, V, H.handOff);
 #else
-    color += directLight(m, g.normal, V, handMain, playerPos, g.geoNormal, glintVar, glintShare, glintLum);
-    color += directLight(m, g.normal, V, handOff, playerPos, g.geoNormal, glintVar, glintShare, glintLum);
+    color += directLight(m, g.normal, V, H.handMain, playerPos, g.geoNormal, glintVar, glintShare, glintLum);
+    color += directLight(m, g.normal, V, H.handOff, playerPos, g.geoNormal, glintVar, glintShare, glintLum);
 #endif
-    LightSample blockSpec[BLOCKLIGHT_SPECULAR_LIGHTS];
-    int blockSpecCount = getBlockLightSpecular(texel, playerPos, g.geoNormal, blockSpec);
-    for (int j = 0; j < blockSpecCount; j++) color += directSpecular(m, g.normal, V, blockSpec[j], playerPos, g.geoNormal, glintVar, glintShare, glintLum);
+    SurfaceLights S = gatherSurfaceLights(sp, SL_SUN_NONE, SL_BLOCK_NONE, SL_BLOCK_SPECULAR);
+    for (int j = 0; j < S.blockSpecCount; j++) color += directSpecular(m, g.normal, V, S.blockSpec[j], playerPos, g.geoNormal, glintVar, glintShare, glintLum);
 
     // 環境光 (空・ブロックライト・GI)
     float ao = g.ao * indirect.a;
-    vec3 skyE = getSkyIrradiance(g.normal);
-    bool giSky = false;
-    // 地面の照り返しは GI が実際の色で足すので、SH の灰色の地面の分を引く (lib/sky/sky_color.glsl)。一人称の手には GI が無いので引かない
-#if GI_MODE == 2 || GI_MODE == 3
-    #ifdef GI_TRACES_SKY
-        // GI のレイが空の光を向きと遮蔽込みで運ぶので、空の環境光は置き換えない分 (GI_SKY_OCCLUSION, GI_GROUND_REPLACE) だけ残す
-        // (lib/surface/gi.glsl)。ボクセル体積の外は GI が 0 なので空の環境光をそのまま使う
-        #if GI_MODE == 3
-            giSky = !hand && isInVoxelVolume(playerToVoxel(playerPos + g.geoNormal * GI_VOLUME_TEST_OFFSET));
-        #else
-            giSky = !hand;
-        #endif
-        if (giSky) {
-            vec3 groundE = getSkyGroundIrradiance(g.normal);
-            skyE = max(skyE - groundE, 0.0) * (1.0 - LOOK_GI_SKY_OCCLUSION) + groundE * (1.0 - GI_GROUND_REPLACE);
-        }
-    #else
-        if (!hand) skyE = max(skyE - getSkyGroundIrradiance(g.normal) * GI_GROUND_REPLACE, 0.0);
-    #endif
-#elif GI_MODE == 1 && defined HAS_SUN_SHADOWS
-    // RSM が置き換えるのは影マップの中だけ (deferred10 と同じスカイライトの絞り)
-    if (!hand) skyE = max(skyE - getSkyGroundIrradiance(g.normal) * (GI_GROUND_REPLACE * ss.fade * smoothstep(RSM_SKYLIGHT_MIN, RSM_SKYLIGHT_MAX, g.lightmap.y)), 0.0);
-#endif
-    vec3 skyAmbient = skyE * skylightCurve(g.lightmap.y) * aoMultiBounce(ao, m.albedo + m.f0 * m.metalness);
-    vec3 blockLight = getBlockLightOpaque(texel, playerPos, g.geoNormal, g.normal, g.lightmap.x) * mix(1.0, ao, AO_BLOCKLIGHT_WEIGHT);
+    SurfaceLights A = gatherSurfaceLights(sp, SL_SUN_NONE, SL_BLOCK_NONE, SL_SKY | SL_GI);
+    vec3 skyAmbient = A.sky * aoMultiBounce(ao, m.albedo + m.f0 * m.metalness);
+    vec3 blockLight = gatherSurfaceLights(sp, SL_SUN_NONE, SL_BLOCK_OPAQUE, 0u).block * mix(1.0, ao, AO_BLOCKLIGHT_WEIGHT);
     // 手の見える面は大抵カメラ (= 光源の反対側) を向くので直接光が当たらず真っ黒になる
     // 画面に貼り付いた小物なので、立ち位置のバニラのライトマップ相当を下限にする
     if (hand) blockLight = max(blockLight, blockLightmapFallback(g.lightmap.x));
-    else blockLight += getHandLightFill(playerPos) * ao;
+    else blockLight += gatherSurfaceLights(sp, SL_SUN_NONE, SL_BLOCK_NONE, SL_HAND_FILL).handFill * ao;
     vec3 indirectLight = indirect.rgb * g.ao;
-    if (giSky) {
+    if (A.giSky) {
         // GI は幾何法線で張った半球なので、テクスチャ法線の凹凸は空の SH の向きによる差で戻す
+        // (照度として足すのではなく、2 つの法線の SH の比を取るだけなので gatherSurfaceLights を通さない)
         float detail = luminance(getSkyIrradiance(g.normal)) / max(luminance(getSkyIrradiance(g.geoNormal)), 1e-6);
         // ボクセルに入らない小物 (草・柵・エンティティ) の遮蔽は GTAO で足す。ブロックの遮蔽はレイが見ているので半分だけ
         indirectLight *= clamp(detail, GI_NORMAL_DETAIL_MIN, GI_NORMAL_DETAIL_MAX) * mix(1.0, indirect.a, GI_SKY_GTAO_WEIGHT);
