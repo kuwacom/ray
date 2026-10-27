@@ -1,3 +1,4 @@
 #version 460 compatibility
 #define WORLD_NETHER
-#include "/program/gbuffers_spidereyes.vsh"
+#define GBUF_SPIDEREYES
+#include "/program/gbuffers/overlay.vsh"

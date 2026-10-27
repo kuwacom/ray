@@ -1,3 +1,4 @@
 #version 460 compatibility
 #define WORLD_NETHER
-#include "/program/gbuffers_hand_water.fsh"
+#define GBUF_HAND_WATER
+#include "/program/gbuffers/translucent.fsh"

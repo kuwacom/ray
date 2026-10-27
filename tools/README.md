@@ -26,7 +26,7 @@ uv sync
 
 | スクリプト | 生成するもの |
 |---|---|
-| `gen_wrappers.py` | `shaders/world0`, `world-1`, `world1` の include だけのラッパー。プログラムを追加・削除したときに実行します。`--check` で過不足の確認だけもできます |
+| `gen_wrappers.py` | `shaders/world0`, `world-1`, `world1` のラッパー (ディメンションと本体のマクロを定義して、本体を直接 include するだけ)。プログラムと本体の対応は `gen_wrappers.py` の表にあり、追加・削除・変更したときに実行します。`--check` で過不足と本文の一致の確認だけもできます |
 | `gen_block_properties.py` | `shaders/block.properties` と `shaders/item.properties`、ブロックの平均の色の表 `shaders/lib/ids/block_albedo.glsl`。ブロック・アイテム ID の表はこのスクリプトの中にあります。表に無いブロックは `block_colors.json` の色ごとに 2000 番台の ID にまとめます |
 | `gen_block_colors.py <client.jar>` | `tools/block_colors.json` (ブロックごとの平均の色)。Minecraft のクライアント jar のブロックモデルとテクスチャを読むだけで、jar は変更しません。バージョンを上げたときに実行し、続けて `gen_block_properties.py` を実行します |
 | `gen_blue_noise.py` | `shaders/textures/blue_noise.png` |

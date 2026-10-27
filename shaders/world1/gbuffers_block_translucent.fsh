@@ -1,3 +1,4 @@
 #version 460 compatibility
 #define WORLD_END
-#include "/program/gbuffers_block_translucent.fsh"
+#define GBUF_BLOCK_TRANSLUCENT
+#include "/program/gbuffers/translucent.fsh"

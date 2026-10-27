@@ -1,3 +1,4 @@
 #version 460 compatibility
 #define WORLD_OVERWORLD
-#include "/program/gbuffers_damagedblock.vsh"
+#define GBUF_DAMAGEDBLOCK
+#include "/program/gbuffers/overlay.vsh"

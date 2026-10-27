@@ -31,7 +31,7 @@
 | ボクセルが光の基盤 | shadow パスで地形 + エンティティをボクセル化し、floodfill・光源シャドウ・GI・反射の全部で共有 |
 | 光は「間接 = floodfill、直接 = レイ」 | floodfill を色と広がり (間接光) に、上位 N 光源の DDA を影 (直接光) に使う二段構え |
 | 計算する所と BRDF を掛ける所を分ける | 光源側 (light: ブロック/手持ち, sky: 太陽/空) は `LightSample` で照度と方向を返し、BRDF は surface だけが掛ける |
-| 1 か所の本体 + 薄いラッパー | `shaders/program/` に本体 1 セット、`world0/-1/1` は include だけ |
+| 1 か所の本体 + 薄いラッパー | `shaders/program/` に本体 1 セット、`world0/-1/1` は本体の include とマクロの定義だけ |
 | 重い機能は丸ごと外せる | `#ifdef` + `program.<world>/<pass>.enabled` |
 | ルック | AgX + 非対称自動露出 + 控えめブルーム (iterationT)、雲・フォグ・DoF は Nostalgia / Kappa、ブロックライトは中性色 |
 
@@ -44,7 +44,7 @@ README.md / CREDITS.md / AGENTS.md / .gitignore
 pyproject.toml / uv.lock / .python-version     tools 用の Python 環境 (uv)
 docs/architecture.md
 tools/
-  gen_wrappers.py                           ディメンション別ラッパーの生成 (プログラム一覧の正本)
+  gen_wrappers.py                           ディメンション別ラッパーの生成 (プログラム一覧と、プログラムごとの本体・マクロの正本)
   gen_block_properties.py                   block.properties / item.properties の生成 (正本)
   gen_blue_noise.py / gen_cloud_noise.py / gen_water_waves.py / gen_lens_textures.py
                                             shaders/textures/ のテクスチャの生成
@@ -66,10 +66,10 @@ shaders/
   lib/sky/*                                 sky モジュール
   lib/surface/*                             surface モジュール
   lib/post/*                                post モジュール
-  program/common/fullscreen.vsh
-  program/*.vsh|gsh|fsh|csh                 各モジュール (「モジュールと範囲」の表)
-  program/gbuffers/*.vsh|fsh                surface モジュール (gbuffers の共有本体)
-  world0/  world-1/  world1/                gen_wrappers.py が生成するラッパー
+  program/common/fullscreen.vsh             全画面クアッドの頂点シェーダー (composite / deferred / final が共有)
+  program/*.vsh|gsh|fsh|csh                 各モジュールの本体 (「モジュールと範囲」の表)
+  program/gbuffers/*.vsh|fsh                surface モジュール (gbuffers_* が共有する本体。GBUF_* マクロで分岐)
+  world0/  world-1/  world1/                gen_wrappers.py が生成するラッパー (WORLD_* と本体のマクロを定義して本体を include)
 ```
 
 `lib/settings.glsl` と共通基盤 (`lib/common`, `lib/buffers`, `lib/ids`) はパイプライン全体から参照される。変更すると全プログラムに影響するので、関数シグネチャを変えるときは呼び出し側もすべて直し、docs/architecture.md の表も更新する。

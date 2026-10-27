@@ -1,3 +1,3 @@
 #version 460 compatibility
 #define WORLD_OVERWORLD
-#include "/program/deferred21.vsh"
+#include "/program/common/fullscreen.vsh"

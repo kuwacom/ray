@@ -1,3 +1,4 @@
 #version 460 compatibility
 #define WORLD_OVERWORLD
-#include "/program/gbuffers_hand_water.vsh"
+#define GBUF_HAND_WATER
+#include "/program/gbuffers/translucent.vsh"

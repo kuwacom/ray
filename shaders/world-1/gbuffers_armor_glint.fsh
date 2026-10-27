@@ -1,3 +1,4 @@
 #version 460 compatibility
 #define WORLD_NETHER
-#include "/program/gbuffers_armor_glint.fsh"
+#define GBUF_ARMOR_GLINT
+#include "/program/gbuffers/overlay.fsh"

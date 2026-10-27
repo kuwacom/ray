@@ -1,3 +1,3 @@
 #version 460 compatibility
 #define WORLD_NETHER
-#include "/program/final.vsh"
+#include "/program/common/fullscreen.vsh"

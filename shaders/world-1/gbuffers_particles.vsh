@@ -1,3 +1,4 @@
 #version 460 compatibility
 #define WORLD_NETHER
-#include "/program/gbuffers_particles.vsh"
+#define GBUF_PARTICLES
+#include "/program/gbuffers/solid.vsh"

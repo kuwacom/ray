@@ -1,3 +1,4 @@
 #version 460 compatibility
 #define WORLD_OVERWORLD
-#include "/program/gbuffers_terrain.vsh"
+#define GBUF_TERRAIN
+#include "/program/gbuffers/solid.vsh"

@@ -1,3 +1,4 @@
 #version 460 compatibility
 #define WORLD_END
-#include "/program/gbuffers_terrain.fsh"
+#define GBUF_TERRAIN
+#include "/program/gbuffers/solid.fsh"

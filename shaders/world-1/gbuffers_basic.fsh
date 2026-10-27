@@ -1,3 +1,4 @@
 #version 460 compatibility
 #define WORLD_NETHER
-#include "/program/gbuffers_basic.fsh"
+#define GBUF_BASIC
+#include "/program/gbuffers/solid.fsh"

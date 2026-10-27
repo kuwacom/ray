@@ -1,3 +1,4 @@
 #version 460 compatibility
 #define WORLD_END
-#include "/program/gbuffers_damagedblock.fsh"
+#define GBUF_DAMAGEDBLOCK
+#include "/program/gbuffers/overlay.fsh"

@@ -1,3 +1,4 @@
 #version 460 compatibility
 #define WORLD_END
-#include "/program/gbuffers_entities_translucent.vsh"
+#define GBUF_ENTITIES_TRANSLUCENT
+#include "/program/gbuffers/translucent.vsh"

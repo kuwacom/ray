@@ -1,3 +1,4 @@
 #version 460 compatibility
 #define WORLD_OVERWORLD
-#include "/program/gbuffers_spidereyes.fsh"
+#define GBUF_SPIDEREYES
+#include "/program/gbuffers/overlay.fsh"

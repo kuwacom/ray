@@ -1,3 +1,4 @@
 #version 460 compatibility
 #define WORLD_OVERWORLD
-#include "/program/shadow_block.vsh"
+#define PROGRAM_SHADOW_BLOCK
+#include "/program/shadow_entities.vsh"

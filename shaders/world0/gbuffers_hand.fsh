@@ -1,3 +1,4 @@
 #version 460 compatibility
 #define WORLD_OVERWORLD
-#include "/program/gbuffers_hand.fsh"
+#define GBUF_HAND
+#include "/program/gbuffers/solid.fsh"

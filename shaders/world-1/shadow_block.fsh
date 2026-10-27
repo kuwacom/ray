@@ -1,3 +1,4 @@
 #version 460 compatibility
 #define WORLD_NETHER
-#include "/program/shadow_block.fsh"
+#define PROGRAM_SHADOW_BLOCK
+#include "/program/shadow_entities.fsh"

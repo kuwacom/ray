@@ -1,3 +1,4 @@
 #version 460 compatibility
 #define WORLD_OVERWORLD
-#include "/program/gbuffers_textured_lit.vsh"
+#define GBUF_TEXTURED_LIT
+#include "/program/gbuffers/solid.vsh"

@@ -1,3 +1,4 @@
 #version 460 compatibility
 #define WORLD_NETHER
-#include "/program/gbuffers_particles_translucent.fsh"
+#define GBUF_PARTICLES_TRANSLUCENT
+#include "/program/gbuffers/translucent.fsh"

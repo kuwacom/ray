@@ -1,3 +1,4 @@
 #version 460 compatibility
 #define WORLD_END
-#include "/program/gbuffers_basic.vsh"
+#define GBUF_BASIC
+#include "/program/gbuffers/solid.vsh"

@@ -1,3 +1,4 @@
 #version 460 compatibility
 #define WORLD_END
-#include "/program/gbuffers_water.fsh"
+#define GBUF_WATER
+#include "/program/gbuffers/translucent.fsh"
