@@ -21,6 +21,7 @@
 #include "/lib/surface/screen_trace.glsl"
 #include "/lib/surface/lighting.glsl"
 #include "/lib/surface/reflection.glsl"
+#include "/lib/surface/surface_lights.glsl"
 
 in vec2 texcoord;
 
@@ -125,22 +126,30 @@ vec3 opaqueEnvSpecular(ivec2 texel, float depth) {
         refl = mirrorReflection(refl, playerToView(playerPos), playerPos, Ng, Rm, dist, true, false,
             interleavedGradientNoise(gl_FragCoord.xy, frameCounter));
     }
+    // 照度を集めるのではなく、環境光の鏡面の遮蔽に AO だけ読む
     float ao = g.ao * getIndirectLight(texel).a;
     return refl * envSpecularWeight(m, NoV) * specularOcclusion(NoV, ao, m.roughness);
 }
 
 // 面での太陽の可視率 (影 + 雲影)。PCSS は重いので 1 ピクセル 1 回にして鏡面・内散乱・泡で使い回す
+// 集める項は太陽の影だけ (空・ブロックライトは泡と内散乱が別に集める。GI・AO・接触影・手持ち光源は水・ガラスに掛けない)
 // specular: 太陽の照り返しに使う分 (葉を透過した拡散光を除く。葉越しの太陽が緑の光源として映らないように)
 vec3 surfaceSunVisibility(vec3 playerPos, vec3 geoNormal, float dither, out vec3 specular) {
-    float cloud = getCloudShadow(playerPos);
-    vec3 vis = getSunShadow(playerPos, geoNormal, dither, specular) * cloud;
-    specular *= cloud;
-    return vis;
+    SurfacePoint p = surfacePoint(playerPos, geoNormal);
+    p.dither = dither;
+    SurfaceLights L = gatherSurfaceLights(p, SL_SUN_SHADOW_MAP, SL_BLOCK_NONE, SL_SUN_LEAF);
+    specular = L.sunVis;
+    return L.sunVisAll;
+}
+
+// 影を掛ける前の太陽 (方向・角半径・照度)。水の側面の近似と水中は可視率を呼ぶ側が決める
+LightSample unshadowedSun() {
+    return gatherSurfaceLights(surfacePoint(vec3(0.0), vec3(0.0, 1.0, 0.0)), SL_SUN_NONE, SL_BLOCK_NONE, SL_CELESTIAL).celestial;
 }
 
 // 太陽の鏡面だけ。f0 と alpha を与えた誘電体として
 vec3 sunSpecular(vec3 N, vec3 V, float f0, float roughness, vec3 sunVis) {
-    LightSample sun = getCelestialLight();
+    LightSample sun = unshadowedSun();
     sun.irradiance *= sunVis;
     GBufferData g = gbufferDefault();
     g.f0 = f0;
@@ -154,7 +163,7 @@ vec3 sunSpecular(vec3 N, vec3 V, float f0, float roughness, vec3 sunVis) {
  * slopeVar: 画素より細かい波の傾きの分散。戻り値 rgb = 足す放射輝度, a = そのうち輝点の輝度 (TAA を通さずに足す分)
  */
 vec4 sunGlint(vec3 surfPlayer, vec3 N, vec3 V, float slopeVar, vec3 sunVis, float dist, float NoVGeo) {
-    LightSample sun = getCelestialLight();
+    LightSample sun = unshadowedSun();
     vec3 lobe = sunSpecular(N, V, 0.02, sqrt(sqr(WATER_ROUGHNESS) + slopeVar), sunVis);
     if (maxOf(lobe) <= 0.0) return vec4(0.0);
     float pixelWorld = dist * 2.0 / (gbufferProjection[1][1] * viewSize().y);
@@ -306,12 +315,12 @@ bool waterRefractVoxel(vec3 surfPlayer, vec3 dir, vec3 floorPlayer, float d1, fl
  * muView: 屈折した視線の下向きの cos (側面から入る水平の視線は 0 で深さが変わらない), pathLen: 水の中の経路長
  */
 vec3 waterInscatter(float skyLm, vec3 sunVis, float muView, float pathLen) {
-    LightSample sun = getCelestialLight();
+    LightSample sun = unshadowedSun();
     vec3 ext = waterExtinction();
     float sunY = saturate(sun.direction.y);
     float muSun = sqrt(max(1.0 - (1.0 - sunY * sunY) / sqr(WATER_IOR), 0.0));
     vec3 sunE = sun.irradiance * sunY * sunVis;
-    vec3 skyE = getSkyIrradiance(vec3(0.0, 1.0, 0.0)) * skylightCurve(skyLm);
+    vec3 skyE = secondaryHitSky(vec3(0.0), vec3(0.0, 1.0, 0.0), skyLm);
     vec3 kSun = ext * (1.0 + muView / muSun);
     vec3 kSky = ext * (1.0 + muView);
     vec3 E = sunE * (1.0 - exp(-kSun * pathLen)) / kSun + skyE * (1.0 - exp(-kSky * pathLen)) / kSky;
@@ -442,10 +451,11 @@ float waterExitDistance(vec3 originPlayer, vec3 dir, out vec3 outward) {
 
 // 泡 (拡散の白) の放射輝度。n は泡の面の向き (水面なら真上、滝なら側面)
 vec3 foamRadiance(vec3 surfPlayer, vec3 n, vec2 lm, vec3 sunVis) {
-    LightSample sun = getCelestialLight();
-    vec3 E = sun.irradiance * saturate(dot(n, sun.direction)) * sunVis
-        + getSkyIrradiance(n) * skylightCurve(lm.y)
-        + getBlockLightForward(surfPlayer, n, lm.x);
+    LightSample sun = unshadowedSun();
+    SurfacePoint p = surfacePoint(surfPlayer, n);
+    p.lightmap = lm;
+    SurfaceLights L = gatherSurfaceLights(p, SL_SUN_NONE, SL_BLOCK_FORWARD, SL_SKY);
+    vec3 E = sun.irradiance * saturate(dot(n, sun.direction)) * sunVis + L.sky + L.block;
     return vec3(FOAM_ALBEDO) * RCP_PI * E;
 }
 
@@ -701,7 +711,7 @@ void main() {
                 vec3 surfWorld = surfPlayer + cameraPosition;
                 vec4 waves = waterWaveSum(sea, surfWorld.xz, 0, 3, footprint);
                 float crest = smoothstep(0.0, 2.0 * sea.heightRms, waves.x);
-                LightSample sun = getCelestialLight();
+                LightSample sun = unshadowedSun();
 
                 // 波頭の透過光: 太陽の側を向いて見た時だけ。真上の太陽では横から波頭へ入る光が無い
                 vec2 toSun = sun.direction.xz;

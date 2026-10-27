@@ -169,6 +169,7 @@ vec3 skyReflectionFallback(vec3 dir, float skyLm, float perceptualRoughness) {
 #ifdef HAS_SKY
     float horizon = exp(-max(-dir.y, 0.0) * 1.77);
     vec3 sharp = getSkyRadiance(dir);
+    // 反射の空は照度ではなく放射輝度なので gatherSurfaceLights では集めない
     vec3 blurry = getSkyIrradiance(dir) * (RCP_PI * SH_LOOK_UNDO);
     vec3 sky = mix(sharp, blurry, saturate(perceptualRoughness * 1.5));
     return sky * horizon * skylightCurve(skyLm);

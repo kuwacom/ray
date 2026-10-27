@@ -45,6 +45,7 @@ const uint SL_GI = 1u << 4;               // colortex8 を読み、GI が運ぶ�
 const uint SL_HAND = 1u << 5;             // 手持ち光源の LightSample (トレース付き)
 const uint SL_HAND_FILL = 1u << 6;
 const uint SL_BLOCK_SPECULAR = 1u << 7;
+const uint SL_CELESTIAL = 1u << 8;      // 太陽の影を取らなくても、影を掛ける前の太陽 / 月を celestial に返す
 
 // 影マップの外での日向の判定 (スカイライトがこれ以上なら日向とみなす)
 const vec2 SHADOW_FALLBACK_SKYLIGHT = vec2(0.8, 0.97);
@@ -104,7 +105,7 @@ struct SurfaceLights {
 
 SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, uint terms) {
     SurfaceLights L;
-    L.celestial = noLight();
+    L.celestial = (terms & SL_CELESTIAL) != 0u ? getCelestialLight() : noLight();
     L.sun = noLight();
     L.sunVis = vec3(0.0);
     L.sunVisAll = vec3(0.0);
