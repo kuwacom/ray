@@ -172,8 +172,8 @@ void main() {
     sp.sunFade = L.sunShadow.fade;
     SurfaceLights H = gatherSurfaceLights(sp, SL_SUN_NONE, SL_BLOCK_NONE, SL_HAND);
 #ifdef SSS
-    color += directLight(m, g.normal, V, H.handMain, playerPos, g.geoNormal, glintVar, glintShare, glintLum) + evalTranslucency(m, g.normal, V, H.handMain);
-    color += directLight(m, g.normal, V, H.handOff, playerPos, g.geoNormal, glintVar, glintShare, glintLum) + evalTranslucency(m, g.normal, V, H.handOff);
+    color += directLight(m, g.normal, V, H.handMain, playerPos, g.geoNormal, glintVar, glintShare, glintLum) + evalTranslucency(m, g.normal, V, H.handMain) * SSS_STRENGTH;
+    color += directLight(m, g.normal, V, H.handOff, playerPos, g.geoNormal, glintVar, glintShare, glintLum) + evalTranslucency(m, g.normal, V, H.handOff) * SSS_STRENGTH;
 #else
     color += directLight(m, g.normal, V, H.handMain, playerPos, g.geoNormal, glintVar, glintShare, glintLum);
     color += directLight(m, g.normal, V, H.handOff, playerPos, g.geoNormal, glintVar, glintShare, glintLum);
