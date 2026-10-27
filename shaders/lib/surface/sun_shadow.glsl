@@ -353,10 +353,7 @@ float sunContactShadow(vec3 viewPos, vec3 geoNormalView, vec3 lightView, float d
         if (isHandDepth(d)) continue;
         float delta = -p.z - linearizeDepth(d);
         // 自分の面に当たらないよう、深度の精度分の余裕を取る
-        if (delta > 0.002 * dist + 0.01 && delta < thickness) {
-            vec2 edge = min(s.xy, 1.0 - s.xy);
-            return 1.0 - saturate(minOf(edge) * 20.0);
-        }
+        if (delta > 0.002 * dist + 0.01 && delta < thickness) return 0.0;
     }
     return 1.0;
 }
