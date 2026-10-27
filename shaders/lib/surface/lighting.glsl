@@ -11,6 +11,7 @@
 #include "/lib/common/constants.glsl"
 #include "/lib/common/dimension.glsl"
 #include "/lib/common/encoding.glsl"
+#include "/lib/common/gbuffer.glsl"
 #include "/lib/common/look_presets.glsl"
 #include "/lib/common/math.glsl"
 #include "/lib/common/samplers.glsl"
@@ -21,6 +22,9 @@
 #include "/lib/buffers/images.glsl"
 #include "/lib/buffers/block_data.glsl"
 #include "/lib/buffers/global_lights.glsl"
+#include "/lib/ids/id_decode.glsl"
+#include "/lib/ids/light_ids.glsl"
+#include "/lib/ids/material_ids.glsl"
 #include "/lib/light/block_data.glsl"
 #include "/lib/light/floodfill.glsl"
 #include "/lib/light/hand_light.glsl"
@@ -161,6 +165,34 @@ vec3 secondaryHitBlockLight(vec3 playerPos, vec3 normal, ivec2 screenTexel, floa
 }
 
 /*
+ * 2 次ヒット点の発光 (albedo に掛ける放射輝度)。GI のレイが光源として拾う
+ * 登録した光源 (たいまつ・グロウストーンなど) の光は着色点の直接光 (colortex6) と floodfill が数えているので除く
+ * 溶岩は直接光を水平に間引いて登録している (deferred.csh) ので表面の発光を残す
+ * 登録していない発光 (labPBR の発光、鉱物ブロック DECORATIVE_BLOCK_LIGHTS = 1、溶岩) は GI の方式によらず足す
+ */
+bool isRegisteredLightHit(int voxelId, int materialId) {
+    if (materialId == MAT_EMISSIVE_ENTITY || materialId == MAT_HAND_EMISSIVE || materialId == MAT_LIGHTNING) return true;
+    int light = getBlockLightIndex(voxelId);
+    return light != LIGHT_NONE && (getLightDef(light).info.x & LIGHT_FLAG_FLUID) == 0u;
+}
+
+float secondaryHitEmission(float emission, int voxelId, int materialId) {
+    if (emission <= 0.0 || isRegisteredLightHit(voxelId, materialId)) return 0.0;
+    return emission * EMISSION_LUMINANCE * EMISSION_STRENGTH;
+}
+
+// 画面に映ったヒット点 (G バッファ h) の発光。ヒット点が属するボクセルは面から少し内側のセル
+const float VOXEL_HIT_INSET = 0.05;
+float screenHitEmission(GBufferData h, vec3 hitPlayer) {
+    if (h.emission <= 0.0) return 0.0;
+    int voxelId = unpackVoxelBlockId(readVoxelBlock(ivec3(floor(playerToVoxel(hitPlayer - h.geoNormal * VOXEL_HIT_INSET)))));
+    return secondaryHitEmission(h.emission, voxelId, h.materialId);
+}
+
+// 画面に映らないボクセルのヒットで分かる登録外の発光は溶岩だけ (G バッファの推定値 0.12-0.3 の中ほど)
+const float LAVA_HIT_EMISSION = 0.2;
+
+/*
  * 反射が何にも当たらなかった時の空 (太陽円盤なし)
  * 下向きの反射は地面に遮られる (Kappa の horizon 減衰)、スカイライトの低い所は空を映さない
  * 粗い面ほど空の SH (余弦畳み込み) に寄せて反射をぼかす
@@ -211,6 +243,8 @@ vec4 traceVoxelRadiance(vec3 originPlayer, vec3 dir, float maxDist, float skyLm,
     vec3 hitPlayer = voxelToPlayer(hitVoxel);
     vec3 albedo = getBlockAlbedo(hitBlock, hitNormal);
     ivec2 screenTexel = ivec2(-1);
+    float emission = getBlockLightIndex(hitBlock) == LIGHT_LAVA ? LAVA_HIT_EMISSION : 0.0;
+    int hitMaterial = MAT_TERRAIN;
     vec3 s = viewToScreen(playerToView(hitPlayer));
     if (all(greaterThan(s.xy, vec2(0.0))) && all(lessThan(s.xy, vec2(1.0))) && s.z > 0.0 && s.z < 1.0) {
         ivec2 t = ivec2(s.xy * viewSize());
@@ -223,16 +257,20 @@ vec4 traceVoxelRadiance(vec3 originPlayer, vec3 dir, float maxDist, float skyLm,
             // 画面外の当たりは分からないので着色点の値のまま
             skyLm = unpack2x8(texelFetch(colortex2, t, 0).a).y;
             screenTexel = t;
+            emission = unpack2x8(texelFetch(colortex3, t, 0).g).y;
+            hitMaterial = readMaterialId(t);
         }
     }
     // useSceneColor = false は GI (多重反射込み)、true は反射
     if (useSceneColor) {
         vec3 E = secondaryHitBlockLight(hitPlayer, hitNormal, screenTexel, 1.0);
-        return vec4(shadeSecondaryHit(hitPlayer, hitNormal, albedo, skyLm) + albedo * RCP_PI * E, 1.0);
+        return vec4(shadeSecondaryHit(hitPlayer, hitNormal, albedo, skyLm) + albedo * RCP_PI * E
+            + albedo * secondaryHitEmission(emission, hitBlock, hitMaterial), 1.0);
     }
     vec3 E = secondaryHitBlockLight(hitPlayer, hitNormal, screenTexel, handLightIndirectScale()) * SECONDARY_BLOCKLIGHT_GAIN;
     vec3 prev = GI_MULTI_BOUNCE > 0.0 && screenTexel.x >= 0 ? giHistoryAtPlayer(hitPlayer) : vec3(-1.0);
-    return vec4(shadeSecondaryHitGi(hitPlayer, hitNormal, albedo, skyLm, prev) + albedo * RCP_PI * E, 1.0);
+    return vec4(shadeSecondaryHitGi(hitPlayer, hitNormal, albedo, skyLm, prev) + albedo * RCP_PI * E
+        + albedo * secondaryHitEmission(emission, hitBlock, hitMaterial), 1.0);
 }
 
 #endif

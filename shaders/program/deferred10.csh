@@ -207,7 +207,7 @@ vec3 ssgiIndirect(vec3 viewPos, vec3 normal, float skyLm, vec4 noise) {
         vec3 prev = GI_MULTI_BOUNCE > 0.0 ? giHistoryAtPlayer(hitPlayer) : vec3(-1.0);
         sum += giBounceGrade(shadeSecondaryHitGi(hitPlayer, h.normal, h.albedo, h.lightmap.y, prev)
             + h.albedo * RCP_PI * secondaryHitBlockLight(hitPlayer, h.normal, ht, handLightIndirectScale()) * SECONDARY_BLOCKLIGHT_GAIN
-            + h.albedo * h.emission * EMISSION_LUMINANCE * EMISSION_STRENGTH);
+            + h.albedo * screenHitEmission(h, hitPlayer));
     }
     // 余弦重みサンプルの照度の推定量 E = pi / N * sum(L)
     return sum * PI / float(GI_SAMPLES);
