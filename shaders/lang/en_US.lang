@@ -5,7 +5,11 @@ profile.MEDIUM=Medium
 profile.HIGH=High
 profile.ULTRA=Ultra
 profile.EXTREME=Extreme
-profile.comment=Low: floodfill light only. Medium: traced light shadows and hand light rays. High (default): entity occlusion, volumetric clouds, DoF. Ultra: SSGI, more samples. Extreme: voxel GI and full resolution everything.
+profile.HIGH_FASTEST=High (Fastest)
+profile.HIGH_FAST=High (Fast)
+profile.EXTREME_LITE=Extreme (Lite)
+profile.EXTREME_BALANCED=Extreme (Balanced)
+profile.comment=Lightest first. Low: floodfill light only. Medium: traced light shadows and hand light rays. High (Fastest) / High (Fast): the High look with lower internal resolutions and fewer samples, filled in by temporal accumulation and denoising. High (default): entity occlusion, volumetric clouds, DoF. Ultra: SSGI, more samples. Extreme (Lite): voxel GI and voxel reflections with the Ultra ranges and resolutions. Extreme (Balanced): Extreme at half resolution for light tracing, GI, clouds and volumetric light. Extreme: voxel GI and full resolution everything. Clouds look the same from Medium up; only their cost changes.
 
 screen.LIGHTING=Block Lighting
 screen.LIGHT_SHADOW_OPTIONS=Light Source Shadows
