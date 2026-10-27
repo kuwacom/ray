@@ -391,8 +391,6 @@ const float CLOUD_POWDER_LENGTH = 700.0;
 const float CLOUD_POWDER_STRENGTH = min(0.4 * CLOUD_POWDER, 1.0); // 順光 (太陽を背にした時) での効き
 // 暗く重い底: その雲の中の高さ (底 0 / 頂 1) で多重散乱と空の光を落とす。底の光は厚い雲を何度も散乱して
 // 横へ逃げながら届くので、光方向の光学的深さだけで見積もるより暗い (iterationT の底 0.15 + pow(h, 0.75) 相当)
-const float CLOUD_BOTTOM_LIGHT = max(1.0 - 0.8 * CLOUD_BASE_SHADE, 0.0); // 雲底での残り
-const float CLOUD_BOTTOM_SUN = max(1.0 - 0.25 * CLOUD_BASE_SHADE, 0.0); // 雲底での太陽の光 (単散乱込み) の残り
 const float CLOUD_BOTTOM_REACH = 0.6;    // この高さで 1 に戻る
 
 #if CLOUD_QUALITY == 0

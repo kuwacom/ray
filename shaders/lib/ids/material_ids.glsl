@@ -42,7 +42,5 @@ const int MAT_BASIC = 43;
 
 bool isHandMaterial(int m) { return m >= MAT_HAND && m < MAT_HAND + 10; }
 bool isEntityMaterial(int m) { return m >= MAT_ENTITY && m < MAT_ENTITY + 10; }
-bool isPlantMaterial(int m) { return m == MAT_PLANT || m == MAT_LEAVES || m == MAT_UNDERWATER_PLANT; }
-bool isTranslucentMaterial(int m) { return m >= MAT_WATER && m < MAT_WATER + 10; }
 
 #endif

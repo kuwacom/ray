@@ -9,7 +9,7 @@
  * 描画距離 R の端で光学的深さが FOG_EDGE_DEPTH になるよう距離を d (1 + d / D) に写して縮める (手前の霞み方は R によらない)。
  * 地表の霧は縮めない (霧の中の距離は本当の距離で見える)
  * 不透明・半透明の大半は composite10/11 (sky のパス) でまとめて掛ける
- * 前方シェーディングで個別に掛ける必要があるもの (パーティクル・雨) だけが applyForwardFog を使う
+ * 前方シェーディングのパーティクル・雨もまとめ掛けに含まれる (個別のフォグは掛けない)
  */
 #ifndef SKY_FOG_GLSL
 #define SKY_FOG_GLSL
@@ -531,20 +531,6 @@ float getBorderFog(vec3 playerPos) {
 // 地形が描画距離端で溶ける先の色 (空のピクセルと同じ値)
 vec3 getBorderFogColor(vec3 dir) {
     return skyBelowHorizon(dir, getSkyRadiance(dir));
-}
-
-/*
- * 前方シェーディング用のフォグ適用 (composite11 の VL OFF 時と同じモデル)
- * 水中・溶岩の中などカメラ側の媒質は composite11 がまとめて掛けるのでここでは扱わない
- */
-vec3 applyForwardFog(vec3 color, vec3 playerPos) {
-    float dist = length(playerPos);
-    vec3 dir = playerPos / max(dist, EPS);
-    color = applyAerialPerspective(color, playerPos);
-    color = mix(color, getBorderFogColor(dir), getBorderFog(playerPos));
-    float outdoor = 1.0 - getCaveFactor();
-    vec4 fog = fogAnalyticSegment(dir, 0.0, dist, fogLightingSetup(dir), outdoor, max(outdoor, 0.05));
-    return color * fog.a + fog.rgb;
 }
 
 #endif

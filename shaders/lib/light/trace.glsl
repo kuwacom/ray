@@ -7,7 +7,7 @@
 #ifndef LIGHT_TRACE_GLSL
 #define LIGHT_TRACE_GLSL
 
-// traceVisibility のフラグ
+// トレースのフラグ
 const uint TRACE_ENTITIES = 1u; // エンティティ占有で遮る (LIGHT_ENTITY_OCCLUSION)
 const uint TRACE_PLAYER = 2u;   // 自分 (current_player) で遮る。一人称の手持ち光源では外す
 const uint TRACE_TINT = 4u;     // 半透明ブロックで色付け
@@ -227,13 +227,6 @@ vec3 traceVisibilityEx(vec3 fromVoxel, vec3 toVoxel, uint flags, float dither, f
     }
 #endif
     return transmit;
-}
-
-/*
- * 公開インターフェース (設計書の「モジュール間インターフェース」)。dither は現状未使用 (半影の揺らぎは呼び出し側で終点を動かして作る)
- */
-vec3 traceVisibility(vec3 fromVoxel, vec3 toVoxel, uint flags, float dither) {
-    return traceVisibilityEx(fromVoxel, toVoxel, flags, dither, TRACE_ENTITY_SKIP_START, TRACE_ENTITY_SKIP_END);
 }
 
 /*

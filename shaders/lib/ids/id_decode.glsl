@@ -32,7 +32,6 @@ int getEntityLightIndex(int entId) {
 
 bool isTintBlock(int blockId) { return blockId >= 200 && blockId < 300; }
 int getTintIndex(int blockId) { return blockId - 200; }
-bool isShapeBlock(int blockId) { return blockId >= 300 && blockId < 400; }
 int getShapeIndex(int blockId) { return blockId - 300; }
 
 bool isPlantBlock(int blockId) { return blockId >= 100 && blockId < 130; }

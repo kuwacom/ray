@@ -1,5 +1,5 @@
 // composite 系パス共通の全画面クアッド
-#include "/lib/common/common.glsl"
+// common を読まない (ftransform / gl_MultiTexCoord0 は組み込みなので include は要らない)
 
 out vec2 texcoord;
 

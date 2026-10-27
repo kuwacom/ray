@@ -89,8 +89,6 @@ vec2 wrapTile(vec2 uv) {
     return origin + fract((uv - origin) / size) * size;
 }
 
-vec2 clampTile(vec2 uv) { return clamp(uv, tileMid - tileHalf, tileMid + tileHalf); }
-
 #if defined RAIN_PUDDLES && defined HAS_SKY && defined GBUF_TERRAIN
 // 2D の勾配ノイズ (格子点ごとにランダムな向きの勾配)。値ノイズより格子に沿った角が出にくく、水たまりの輪郭が丸くなる
 float puddleGradientNoise(vec2 p, uint seed) {

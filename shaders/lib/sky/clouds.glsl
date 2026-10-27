@@ -150,7 +150,6 @@ float cloudRefStretch(vec3 dir, float kh, float slope) { return length(vec2(leng
 #else
     #define CLOUD_WORLD_Y(a) (CLOUD_MAP_Y0 + ((a) - CLOUD_R_BASE) / CLOUD_MAP_KV)
 #endif
-float cloudWorldAltitude(float a) { return CLOUD_WORLD_Y(a); }
 
 // ワールドの値 (他のモジュール・画面空間のパスが使う)
 const float CLOUD_BASE = CLOUD_WORLD_Y(CLOUD_R_BASE);
@@ -210,8 +209,6 @@ vec2 cloudShellIntersectK(float y0, float dy, float A, float k) {
     float t2 = k > 1e-14 ? q / k : (dy > 0.0 ? 1e12 : -1e12);
     return vec2(min(t1, t2), max(t1, t2));
 }
-
-vec2 cloudShellIntersect(float y0, float dy, float A) { return cloudShellIntersectK(y0, dy, A, cloudCurvature(dy, A)); }
 
 /*
  * 視線が雲の層 [base, top] の中を通る最初の区間 (t の範囲)。無ければ x >= y

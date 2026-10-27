@@ -46,8 +46,6 @@ const float SSGI_DISTANCE = 16.0;
 const int SSGI_STEPS = 16;
 const float VOXEL_GI_DISTANCE = 32.0;
 
-float linearDepthAt(vec2 uv) { return linearizeDepth(texture(depthtex1, uv).r); }
-
 #if AO_MODE == 2
 float gtao(vec3 viewPos, vec3 viewNormal, vec2 noise) {
     vec3 V = normalize(-viewPos);

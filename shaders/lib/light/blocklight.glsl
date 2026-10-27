@@ -21,30 +21,6 @@ vec3 blockLightmapFallback(float lm) {
 }
 
 /*
- * 鏡面用の代表光源 (deferred1 が選んだ寄与最大の光源)。可視率は deferred2 の可視率 (colortex7) で近似する
- * 戻り値 false なら代表光源なし
- */
-bool getDominantBlockLight(ivec2 texel, vec3 playerPos, out LightSample s) {
-    s = noLight();
-#if defined LIGHT_SPECULAR && defined LIGHT_SHADOWS
-    ivec2 low = traceNearestLow(texel, frameCounter);
-    int idx = decodeLightIndex(texelFetch(blockLightAuxSampler, low, 0).a);
-    if (idx < 0 || idx >= int(globalLightCount())) return false;
-    LightInstance L = globalLights.lights[idx];
-    vec3 toL = L.posRadius.xyz - playerToVoxel(playerPos);
-    float dist = length(toL);
-    if (dist >= L.posRadius.w) return false;
-    float visibility = saturate(luminance(texelFetch(colortex7, texel, 0).rgb));
-    s.direction = toL / max(dist, EPS);
-    s.irradiance = L.colorSize.rgb * lightFalloff(dist, L.posRadius.w) * visibility;
-    s.angularSize = atan(L.colorSize.a, max(dist, EPS));
-    return maxOf(s.irradiance) > 0.0;
-#else
-    return false;
-#endif
-}
-
-/*
  * 不透明面のブロックライト照度 (拡散用)。deferred30 から呼ぶ
  * texel: 画面座標, normal: テクスチャ法線, geoNormal: 幾何法線, lm: バニラのブロックライトマップ
  */
@@ -116,7 +92,7 @@ const int BLOCKLIGHT_SPECULAR_LIGHTS = LIGHT_SPECULAR_COUNT;
 
 /*
  * ブロックライトの鏡面ハイライト用の光 (LIGHT_SPECULAR)。照度の大きい順に最大 BLOCKLIGHT_SPECULAR_LIGHTS 個を s に入れ、個数を返す
- * 代表光源 1 つ (getDominantBlockLight) だけだと、2 つの光源の拡散が釣り合う線で代表が入れ替わり、床の照り返しが斜めの直線で切れた
+ * 代表光源 1 つだけだと、2 つの光源の拡散が釣り合う線で代表が入れ替わり、床の照り返しが斜めの直線で切れた
  * 光源ごとの可視率は無いので、deferred2 の可視率 (colortex7, トレースした光源全体の比) を共通に掛ける。
  * 体積の端ではフォールバックと同じ割合で弱める
  */

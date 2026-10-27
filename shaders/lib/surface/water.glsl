@@ -14,9 +14,6 @@
 #ifndef SURFACE_WATER_GLSL
 #define SURFACE_WATER_GLSL
 
-// FFT の波テクスチャを使う水であることの印 (方式を見分けて分岐する側のため)
-#define WATER_FFT_WAVES
-
 uniform sampler3D waterWaveTex;
 // カメラのバイオームが川 (shaders.properties の smooth)。海は distantOcean を使う
 uniform float waterRiver;
@@ -213,11 +210,6 @@ vec4 waterWaveSumFlow(WaterSea sea, vec2 p, int first, int last, float footprint
  */
 float waterJacobian(vec4 w) { return max(1.0 - WATER_CHOPPINESS * w.w, WATER_JACOBIAN_MIN); }
 vec3 waterChoppy(vec4 w) { return vec3(w.x, w.yz / waterJacobian(w)); }
-
-// 視差・コースティクス用: 長い 4 層の高さと (尖らせた) 勾配。戻り値 x = 高さ, yz = 勾配
-vec3 waterWaves(vec2 p) {
-    return waterChoppy(waterWaveSum(waterSeaState(1.0), p, 0, WATER_LAYERS - 1, 0.0));
-}
 
 /*
  * 法線で表せなかった傾きの分散 (GGX の alpha^2 に足す)。画素の中で平均された波は面を粗くする (LEAN / Toksvig と同じ考え)
