@@ -13,7 +13,7 @@
 #include "/lib/common/color.glsl"
 #include "/lib/common/constants.glsl"
 #include "/lib/common/math.glsl"
-#include "/lib/buffers/ssbo.glsl"
+#include "/lib/buffers/block_data.glsl"
 #include "/lib/ids/block_ids.glsl"
 #include "/lib/ids/light_ids.glsl"
 

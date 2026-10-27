@@ -2,7 +2,16 @@
  * setup (起動時・リサイズ時に 1 回): ブロックデータ表を SSBO に構築し、FrameData を初期化する
  * light モジュール (lib/light)
  */
+// このプログラムで書く SSBO (lib/buffers。ほかのプログラムでは readonly)
+#define SSBO_FRAME_DATA_WRITE
+#define SSBO_BLOCK_DATA_WRITE
+#define SSBO_GLOBAL_LIGHTS_WRITE
+#define SSBO_LIGHT_BINS_WRITE
 #include "/lib/common/common.glsl"
+#include "/lib/buffers/frame_data.glsl"
+#include "/lib/buffers/block_data.glsl"
+#include "/lib/buffers/global_lights.glsl"
+#include "/lib/buffers/light_bins.glsl"
 #include "/lib/light/light.glsl"
 #include "/lib/ids/block_albedo.glsl"
 

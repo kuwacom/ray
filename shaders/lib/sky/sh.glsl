@@ -6,7 +6,7 @@
 #ifndef SKY_SH_GLSL
 #define SKY_SH_GLSL
 
-#include "/lib/buffers/ssbo.glsl"
+#include "/lib/buffers/frame_data.glsl"
 
 void shBasis(vec3 n, out float b[9]) {
     b[0] = 0.282095;

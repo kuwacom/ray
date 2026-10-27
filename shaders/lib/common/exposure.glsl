@@ -1,7 +1,7 @@
 #ifndef COMMON_EXPOSURE_GLSL
 #define COMMON_EXPOSURE_GLSL
 
-#include "/lib/buffers/ssbo.glsl"
+#include "/lib/buffers/frame_data.glsl"
 
 // 露出 (post の composite25 が FrameData に書く)。誰でも読める
 float getExposure() { return frameData.exposure > 0.0 ? frameData.exposure : 1.0; }

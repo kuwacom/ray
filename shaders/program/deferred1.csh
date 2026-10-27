@@ -17,6 +17,7 @@
 #define IMG_BLOCKLIGHT_RAW
 #define IMG_BLOCKLIGHT_AUX
 #include "/lib/common/common.glsl"
+#include "/lib/buffers/global_lights.glsl"
 #include "/lib/common/encoding.glsl"
 #include "/lib/common/gbuffer.glsl"
 #include "/lib/light/light.glsl"

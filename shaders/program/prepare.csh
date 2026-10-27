@@ -9,7 +9,10 @@
  *   [1] x = 前フレームの worldTime, y = 履歴が有効な連続フレーム数 (0 = 時刻が飛んだのでリセット), zw = 予備
  * sky モジュール (lib/sky)
  */
+// このプログラムで書く SSBO (lib/buffers。ほかのプログラムでは readonly)
+#define SSBO_FRAME_DATA_WRITE
 #include "/lib/common/common.glsl"
+#include "/lib/buffers/frame_data.glsl"
 #include "/lib/sky/sky.glsl"
 
 layout(local_size_x = 1) in;

@@ -100,7 +100,7 @@ uv run tools/gl_compile_check.py --full --limits --report
 uv run tools/equiv_check.py --gpu 1070                # 既定値・オーバーワールド
 uv run tools/equiv_check.py --gpu 1070 --full         # 3 ディメンションと全プロファイル
 uv run tools/equiv_check.py --text                    # glslang -E 後の本文 (コメント・空行・#line を除く) を比べる
-uv run tools/equiv_check.py --gpu 1070 --layout       # SSBO のメンバーのオフセットと間隔を比べる
+uv run tools/equiv_check.py --gpu 1070 --layout       # SSBO のメンバーのオフセットと間隔を比べる (片方だけが宣言するブロックは違いに数えない)
 uv run tools/equiv_check.py --base HEAD~1 --new HEAD -v
 ```
 

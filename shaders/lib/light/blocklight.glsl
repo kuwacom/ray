@@ -19,7 +19,7 @@
 #include "/lib/common/samplers.glsl"
 #include "/lib/common/shading_types.glsl"
 #include "/lib/common/voxel_space.glsl"
-#include "/lib/buffers/ssbo.glsl"
+#include "/lib/buffers/global_lights.glsl"
 #include "/lib/light/block_data.glsl"
 #include "/lib/light/floodfill.glsl"
 #include "/lib/light/light_select.glsl"

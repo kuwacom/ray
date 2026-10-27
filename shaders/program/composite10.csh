@@ -9,6 +9,7 @@
 #define IMG_COLORIMG12
 #define IMG_FOG_HISTORY
 #include "/lib/common/common.glsl"
+#include "/lib/buffers/frame_data.glsl"
 #include "/lib/sky/sky.glsl"
 #include "/lib/surface/surface.glsl"
 #include "/lib/light/light.glsl"

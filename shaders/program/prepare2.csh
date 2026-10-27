@@ -13,6 +13,7 @@
 #define IMG_CLOUD_SHADOW
 #define IMG_CLOUD_WEATHER
 #include "/lib/common/common.glsl"
+#include "/lib/buffers/frame_data.glsl"
 #include "/lib/sky/sky.glsl"
 #include "/lib/sky/cloud_volume.glsl"
 

@@ -15,7 +15,7 @@ NVIDIA のバイナリには本文のハッシュ (コメントを変えても�
     uv run tools/equiv_check.py --full                  # 既定値 x 3 ディメンション + 全プロファイル (world0)
     uv run tools/equiv_check.py --base HEAD~3 --new HEAD
     uv run tools/equiv_check.py --text                  # バイナリの代わりに glslang -E の本文 (コメント・空行・#line を除く) を比べる
-    uv run tools/equiv_check.py --layout                # SSBO のメンバーのオフセットと間隔を比べる
+    uv run tools/equiv_check.py --layout                # SSBO のメンバーのオフセットと間隔を比べる (片方だけが宣言するブロックは違いに数えない)
     uv run tools/equiv_check.py --gpu 1070 --filter deferred -v
 """
 
@@ -180,12 +180,18 @@ def compare_binary(base: bytes, salts: list[bytes], new: bytes, noise: tuple[int
     return int(hits.sum()) + abs(len(b) - len(x)), int(mask.sum()), np.flatnonzero(hits)[:16].tolist()
 
 
-def compare_layout(base: dict, new: dict) -> list[str]:
+def compare_layout(base: dict, new: dict) -> tuple[list[str], list[str]]:
+    """
+    (両方にあるブロックのメンバーの違い, 片方だけにあるブロック)
+    NVIDIA は宣言しただけのブロックも全メンバーを返すので、宣言を使うプログラムだけに絞ると base にだけブロックが残る。
+    宣言の無いブロックはずれようがないので違いには数えず、名前だけを返す
+    """
     lines = []
-    for block in sorted(set(base) | set(new)):
-        a, b = set(base.get(block, [])), set(new.get(block, []))
+    only = [f"{block} ({'base' if block in base else 'new'} のみ)" for block in sorted(set(base) ^ set(new))]
+    for block in sorted(set(base) & set(new)):
+        a, b = set(base[block]), set(new[block])
         lines += [f"{block}: base {r}" for r in sorted(a - b)] + [f"{block}: new  {r}" for r in sorted(b - a)]
-    return lines
+    return lines, only
 
 
 def main() -> int:
@@ -326,8 +332,9 @@ def main() -> int:
                                 info = f"{diff} bytes differ ({masked} masked, {len(b_data)} -> {len(n_data)} bytes)"
                                 pair_cache[(bkey, nkey)] = ("DIFF", [info, f"offsets {where}"]) if diff else ("SAME", [info])
                             else:
-                                rows = compare_layout(b_data, n_data)
-                                pair_cache[(bkey, nkey)] = ("DIFF", [f"{len(rows)} rows"] + rows[:40]) if rows else ("SAME", [])
+                                rows, only = compare_layout(b_data, n_data)
+                                pair_cache[(bkey, nkey)] = (("DIFF", [f"{len(rows)} rows"] + rows[:40] + only) if rows
+                                                            else ("SAME", [f"片方だけの宣言 {len(only)}"] + only if only else []))
                         status, detail = pair_cache[(bkey, nkey)]
                         report(status, label, detail)
     finally:

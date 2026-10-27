@@ -9,9 +9,11 @@
  * DoF (composite22) はこのパスより前に走るので、1 フレーム前のフォーカスを使う
  * post モジュール (lib/post)
  */
+// このプログラムで書く SSBO (lib/buffers。ほかのプログラムでは readonly)
+#define SSBO_FRAME_DATA_WRITE
 #include "/lib/common/common.glsl"
 #include "/lib/common/gbuffer.glsl"
-#include "/lib/buffers/ssbo.glsl"
+#include "/lib/buffers/frame_data.glsl"
 #include "/lib/ids/material_ids.glsl"
 #include "/lib/post/post_internal.glsl"
 

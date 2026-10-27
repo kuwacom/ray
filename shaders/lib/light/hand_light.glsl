@@ -20,7 +20,7 @@
 #include "/lib/common/uniforms.glsl"
 #include "/lib/common/voxel_space.glsl"
 #include "/lib/buffers/images.glsl"
-#include "/lib/buffers/ssbo.glsl"
+#include "/lib/buffers/block_data.glsl"
 #include "/lib/ids/id_decode.glsl"
 #include "/lib/ids/light_ids.glsl"
 #include "/lib/light/block_data.glsl"

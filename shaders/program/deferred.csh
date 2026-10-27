@@ -3,11 +3,15 @@
  * gbuffers_entities / shadow_entities が今フレームに登録したエンティティ光源 (voxelEmitImg + 蓄積表) もここで取り込む
  * light モジュール (lib/light)
  */
+// このプログラムで書く SSBO (lib/buffers。ほかのプログラムでは readonly)
+#define SSBO_GLOBAL_LIGHTS_WRITE
 // このプログラムで書く image (lib/buffers/images.glsl。宣言は 8 個まで)
 #define IMG_VOXEL_BLOCK
 #define IMG_VOXEL_EMIT
 #define IMG_FLOOD
 #include "/lib/common/common.glsl"
+#include "/lib/buffers/block_data.glsl"
+#include "/lib/buffers/global_lights.glsl"
 #include "/lib/light/light.glsl"
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;

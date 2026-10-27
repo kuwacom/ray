@@ -7,7 +7,7 @@
  *   2. deferred.csh: 発光セルの塊ごとに代表セルを 1 つ選び (局所最大)、蓄積表から重心を求めて
  *      グローバル光源リストへ 1 個だけ登録する (大きいエンティティが複数セルにまたがっても 1 光源になる)
  *
- * 蓄積表は SSBO3 lightBins.entityAcc (begin でクリア -> shadow / gbuffers で蓄積 -> deferred で読む)。大きさは lib/buffers/ssbo.glsl
+ * 蓄積表は SSBO3 lightBins.entityAcc (begin でクリア -> shadow / gbuffers で蓄積 -> deferred で読む)。大きさは lib/buffers/light_bins.glsl
  * binLights とは分ける (ビンを重要度順に詰める方式 (LIGHT_CULL_MODE 1/2) は枠が 0 で始まる必要があり、先頭を借りられない)
  */
 #ifndef LIGHT_ENTITY_LIGHT_GLSL
@@ -18,7 +18,9 @@
 #include "/lib/common/noise.glsl"
 #include "/lib/common/voxel_space.glsl"
 #include "/lib/buffers/images.glsl"
-#include "/lib/buffers/ssbo.glsl"
+#include "/lib/buffers/frame_data.glsl"
+#include "/lib/buffers/block_data.glsl"
+#include "/lib/buffers/light_bins.glsl"
 #include "/lib/ids/entity_ids.glsl"
 #include "/lib/ids/id_decode.glsl"
 #include "/lib/ids/light_ids.glsl"
@@ -39,6 +41,8 @@ uint entityAccSlot(uint h, int i) {
     return ((h + uint(i)) & uint(ENTITY_ACC_SIZE - 1)) * uint(ENTITY_ACC_STRIDE);
 }
 
+// 蓄積表に書くのは登録するプログラムだけ (ほかのプログラムでは lightBins が readonly なので関数ごと外す)
+#ifdef SSBO_LIGHT_BINS_WRITE
 void entityAccAdd(ivec3 cell, vec3 local) {
     uint key = entityCellKey(cell);
     uint h = pcgHash(key);
@@ -55,6 +59,7 @@ void entityAccAdd(ivec3 cell, vec3 local) {
         }
     }
 }
+#endif
 
 // セルの頂点数と位置の和 (セルローカル, [0,1]) を探す。見つからなければ false
 bool entityAccFind(ivec3 cell, out float count, out vec3 localSum) {
@@ -125,9 +130,9 @@ int resolveEntityLight(int entId, int itemId, vec4 entColor, out float level) {
  * 同じセルへの登録は voxelEmitImg の atomicMax で 1 つ (最も明るいもの) にまとまり、
  * 位置は蓄積表の平均 -> deferred.csh で塊の重心になる
  * 雷は形が細長く巨大なので、ここでは登録せず deferred.csh が lightningBoltPosition から登録する
- * 呼ぶプログラムは IMG_VOXEL_EMIT を定義する (lib/buffers/images.glsl)
+ * 呼ぶプログラムは IMG_VOXEL_EMIT (lib/buffers/images.glsl) と SSBO_LIGHT_BINS_WRITE (lib/buffers/light_bins.glsl) を定義する
  */
-#ifdef IMG_VOXEL_EMIT
+#if defined IMG_VOXEL_EMIT && defined SSBO_LIGHT_BINS_WRITE
 void injectLightAt(vec3 playerPos, int index, float level) {
     vec3 voxelPos = playerToVoxel(playerPos);
     ivec3 cell = ivec3(floor(voxelPos));

@@ -21,7 +21,7 @@
 #include "/lib/common/math.glsl"
 #include "/lib/common/samplers.glsl"
 #include "/lib/common/voxel_space.glsl"
-#include "/lib/buffers/ssbo.glsl"
+#include "/lib/buffers/entity_tris.glsl"
 #include "/lib/light/floodfill.glsl"
 
 const uint ENT_TRI_CAPACITY = uint(min(LIGHT_ENTITY_TRIANGLES, ENT_TRI_MAX));
@@ -74,6 +74,8 @@ uvec2 entityTriAlphaMask(vec2 uv0, vec2 uv1, vec2 uv2, float vertexAlpha) {
     return mask;
 }
 
+// 書く関数は書くプログラム (shadow_entities・shadow_block・begin) だけが持つ (ほかでは entityTris が readonly)
+#ifdef SSBO_ENTITY_TRIS_WRITE
 void entityTriGrowBounds(bool group, uint index, vec3 lo, vec3 hi) {
     uint base = index * 6u;
     for (int k = 0; k < 3; k++) {
@@ -151,6 +153,7 @@ void clearEntityTriangles(uint i) {
     if (i < uint(ENT_TRI_MAX_GROUPS * 6)) entityTris.groupBounds[i] = (i % 6u) < 3u ? 0xFFFFFFFFu : 0u;
     if (i < 4u) entityTris.counts[i] = 0u;
 }
+#endif
 
 // 区間 [t0, t1] のレイが AABB (bounds の base から 6 uint) に入るか
 bool entityTriRayBox(bool group, uint index, vec3 ro, vec3 rdInv, float t0, float t1) {

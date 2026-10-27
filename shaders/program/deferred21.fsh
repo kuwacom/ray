@@ -6,6 +6,7 @@
  * sky モジュール (lib/sky)
  */
 #include "/lib/common/common.glsl"
+#include "/lib/buffers/frame_data.glsl"
 #include "/lib/sky/sky.glsl"
 
 in vec2 texcoord;

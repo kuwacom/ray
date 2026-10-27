@@ -1,13 +1,14 @@
 /*
  * 光源リストとライトビンの、設定で変わる大きさ (light モジュール)
- * SSBO の宣言 (lib/buffers/ssbo.glsl) は全プログラムに入るので、設定の値はそこに置かず、光源を扱うプログラムだけが読むここに置く
+ * SSBO の宣言 (lib/buffers/global_lights.glsl, light_bins.glsl) は光源を読むだけのプログラムにも入るので、設定の値はそこに置かず、
+ * 光源を扱うプログラムだけが読むここに置く
  * 確保量は設定の最大で固定 (shaders.properties の bufferObject.2 / 3)
  */
 #ifndef LIGHT_LIGHT_BINS_GLSL
 #define LIGHT_LIGHT_BINS_GLSL
 
 #include "/lib/settings.glsl"
-#include "/lib/buffers/ssbo.glsl"
+#include "/lib/buffers/light_bins.glsl"
 
 const int MAX_GLOBAL_LIGHTS = LIGHT_MAX_COUNT; // 1 フレームに登録できる光源インスタンス数
 

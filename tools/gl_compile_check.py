@@ -406,8 +406,9 @@ def int_const_values(pre: str) -> dict[str, int]:
     return values
 
 
-# ssbo.glsl の大きさなしの配列の注記: `uint binLights[]; // 要素数: LIGHT_BIN_KEYS_ALLOC`
-SSBO_BLOCK_RE = re.compile(r"layout\s*\(\s*std430\s*,\s*binding\s*=\s*(\d+)\s*\)\s*buffer\s+\w+\s*\{(.*?)\}", re.S)
+# lib/buffers/*.glsl の大きさなしの配列の注記: `uint binLights[]; // 要素数: LIGHT_BIN_KEYS_ALLOC`
+# buffer の前の修飾 (readonly を切り替えるマクロ) は読み飛ばす
+SSBO_BLOCK_RE = re.compile(r"layout\s*\(\s*std430\s*,\s*binding\s*=\s*(\d+)\s*\)\s*(?:\w+\s+)*buffer\s+\w+\s*\{(.*?)\}", re.S)
 SSBO_TAIL_RE = re.compile(r"\w+\s+\w+\s*\[\s*\]\s*;[^\n]*要素数:\s*(\w+)")
 
 
@@ -416,8 +417,8 @@ TAIL_CHECKED: set[int] = set()
 
 
 def ssbo_tail_counts() -> dict[int, str]:
-    """binding -> 大きさなしの最後の配列の要素数を表す定数名 (lib/buffers/ssbo.glsl の注記から読む)"""
-    text = (vs.SHADERS / "lib" / "buffers" / "ssbo.glsl").read_text(encoding="utf-8")
+    """binding -> 大きさなしの最後の配列の要素数を表す定数名 (lib/buffers/*.glsl の注記から読む)"""
+    text = "\n".join(p.read_text(encoding="utf-8") for p in sorted((vs.SHADERS / "lib" / "buffers").glob("*.glsl")))
     out: dict[int, str] = {}
     for m in SSBO_BLOCK_RE.finditer(text):
         t = SSBO_TAIL_RE.search(m.group(2))
@@ -699,7 +700,7 @@ def check_usage(name: str, stages: list[StageSource], res: ProgramResult, limits
             problems.append(f"SSBO binding {binding} に対応する bufferObject.{binding} が shaders.properties に無い")
         elif size > alloc:
             problems.append(f"SSBO binding {binding} のブロック {size} bytes > bufferObject.{binding} = {alloc}")
-    # 大きさなしの最後の配列は、ssbo.glsl の注記の定数 (要素数) を掛けた大きさで比べる
+    # 大きさなしの最後の配列は、lib/buffers の注記の定数 (要素数) を掛けた大きさで比べる
     tails = {int(k.split(".")[1]): v for k, v in u.items() if k.startswith("ssboTailOffset.")}
     if tails:
         names = ssbo_tail_counts()
@@ -709,7 +710,7 @@ def check_usage(name: str, stages: list[StageSource], res: ProgramResult, limits
             alloc = buffer_sizes.get(binding)
             const = names.get(binding)
             if const is None:
-                problems.append(f"SSBO binding {binding} の大きさなしの配列に「要素数:」の注記が無い (lib/buffers/ssbo.glsl)")
+                problems.append(f"SSBO binding {binding} の大きさなしの配列に「要素数:」の注記が無い (lib/buffers)")
                 continue
             if not pre_all:
                 continue  # glslang が無く定数を評価できない

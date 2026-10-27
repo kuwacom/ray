@@ -4,7 +4,15 @@
  * エンティティの三角形 (lib/light/entity_tri.glsl) のカウンタと AABB もここで空にする
  * light モジュール (lib/light)
  */
+// このプログラムで書く SSBO (lib/buffers。ほかのプログラムでは readonly)
+#define SSBO_FRAME_DATA_WRITE
+#define SSBO_GLOBAL_LIGHTS_WRITE
+#define SSBO_LIGHT_BINS_WRITE
+#define SSBO_ENTITY_TRIS_WRITE
 #include "/lib/common/common.glsl"
+#include "/lib/buffers/frame_data.glsl"
+#include "/lib/buffers/global_lights.glsl"
+#include "/lib/buffers/light_bins.glsl"
 #include "/lib/light/light.glsl"
 
 layout(local_size_x = 256) in;

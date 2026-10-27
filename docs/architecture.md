@@ -195,21 +195,26 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 
 `tools/gl_compile_check.py` がプログラムごとの宣言数・アクティブ数を実機の上限と比べる。
 
-### SSBO (正本は `lib/buffers/ssbo.glsl`)
+### SSBO (正本は `lib/buffers/` の binding ごとのファイル)
+
+- 1 binding = 1 ファイルで、ファイル名はアクセサ名 (`frame_data.glsl`, `block_data.glsl`, `global_lights.glsl`, `light_bins.glsl`, `entity_tris.glsl`)。使うファイルだけが include し、使わないプログラムは宣言しない (NVIDIA は使っていない宣言もリンクで扱うので、宣言が減るとコンパイルが速くなる)。レイアウトは宣言するプログラムの間で同じでなければならない (Iris の仕様)。`tools/equiv_check.py --layout` で前後のオフセットを比べられる
+- 既定は `readonly`。書くプログラムは最初の include の前に `SSBO_<名前>_WRITE` を定義する (下の表の「書く」)。書く関数 (`entityAccAdd`・`injectEntityLight`・`storeEntityTriangle` など) は同じマクロで囲み、書かないプログラムには入らない。`readonly` のブロックに書くとコンパイルエラーになるので、定義の漏れは検証で見つかる
 
 - 各ブロックの最後の配列は大きさなし (`[]`) で宣言し、確保量は shaders.properties の `bufferObject.N` で決める。NVIDIA のリンクは、使っていなくても宣言された固定長の配列の要素数に比例して時間がかかり (`binLights` が 266 万要素あった時は main が空のプログラムでも vs+fs で 7-10 秒)、全プログラムに入るので読み込み全体が数倍になる
 - 大きさなしの配列の要素数は宣言の行の注記 `// 要素数: <定数>` に書き、添字の上限もその定数で見る (`.length()` は使わない)。`tools/gl_compile_check.py` が注記を読み、配列の先頭 + 要素の間隔 x 要素数が `bufferObject.N` に収まるかをプログラムごとに確かめる
-- ssbo.glsl には設定の値を入れない (全プログラムに入るので、設定の値が前処理後の本文に残ると、その設定を変えるたびに全プログラムのドライバのキャッシュが外れる)。設定で変わる大きさ (`MAX_GLOBAL_LIGHTS`, `LIGHT_BIN_CAPACITY` / `STRIDE` / `STRIDE_ALLOC` / `GRID`, `LIGHT_BIN_KEYS_ALLOC`) は `lib/light/light_bins.glsl` に置き、`lib/light/light.glsl` を include するプログラム (world0 で 23 個) だけが読む。LIGHT_BIN_LIGHTS・LIGHT_MAX_COUNT・LIGHT_CULL_MODE を変えた時に作り直すのはこの 23 個 (前は 53 個全部)。VOXEL_VOLUME は `lib/common/voxel_space.glsl` の `VOXEL_SIZE` が全プログラムに入るので、まだ全部作り直しになる
+- `lib/buffers/` には設定の値を入れない (宣言を読む全プログラムで、設定の値が前処理後の本文に残ると、その設定を変えるたびにドライバのキャッシュが外れる)。設定で変わる大きさ (`MAX_GLOBAL_LIGHTS`, `LIGHT_BIN_CAPACITY` / `STRIDE` / `STRIDE_ALLOC` / `GRID`, `LIGHT_BIN_KEYS_ALLOC`) は `lib/light/light_bins.glsl` に置き、`lib/light/light.glsl` を include するプログラム (world0 で 23 個) だけが読む。LIGHT_BIN_LIGHTS・LIGHT_MAX_COUNT・LIGHT_CULL_MODE を変えた時に作り直すのはこの 23 個 (前は 53 個全部)。VOXEL_VOLUME は `lib/common/voxel_space.glsl` の `VOXEL_SIZE` が全プログラムに入るので、まだ全部作り直しになる
 - ブロックの途中の配列 (`albedo`, `lights`, `binCount`, `entityAcc`, `groupBounds`, `clusterBounds`) は固定長のまま。合わせても 1 プログラム 0.4 秒程度で、並べ替えるとレイアウトが変わるので動かしていない
 
-| binding | 名前 (アクセサ) | サイズ | 内容と書き込み権 |
-|---|---|---|---|
-| 0 | FrameDataBuffer (`frameData`) | 4096 | post: exposure, exposureTarget, averageLuminance, focusDistance, histogram[256], postParams[] (4 個) / sky: sunIrradiance, moonIrradiance, shadowLightIrradiance, skySH[9], skyParams[4] / light: lightStats / surface: surfaceParams[4]。setup.csh が初期値を入れる |
-| 1 | BlockDataBuffer (`blockData`) | 57344 | `LightDef lightDefs[256]`, `uvec4 shapes[128]`, `vec4 tints[128]`, `uint albedo[4096]` (ブロックの平均の色), `uint albedoUp[]` (上向きの面の色、4096 個)。setup.csh のみが書く |
-| 2 | GlobalLightsBuffer (`globalLights`) | 295200 | `count/blockCount/entityCount/overflow`, `cullDistance/culled` + `cullHist[64]` (間引き距離と距離の分布), `LightInstance lights[8192]` (posRadius: ボクセル空間位置 + 到達半径, colorSize: 放射 + 光源半径), `lightPower[]` (揺らぎ前の放射の輝度、8192 個)。使うのは LIGHT_MAX_COUNT 個まで。light のみ |
-| 3 | LightBinsBuffer (`lightBins`) | 10944512 (LIGHT_BIN_LIGHTS > 64 で 21430272) | `binCount[40960]`, `entityAcc[32768]` (エンティティ光源の蓄積表), `binLights[]` (40960 x 65 個、> 64 で x 129)。ビン = 8³ ブロック、1 ビン LIGHT_BIN_LIGHTS + 1 枠。枠のキー = 重要度 19 bit + 光源インデックス 13 bit。light のみ |
-| 4 | EntityTriangleBuffer (`entityTris`) | 838672 | `counts[4]`, `groupBounds`, `clusterBounds` + `EntityTriangle tris[]` (16384 個) (ボクセル空間の三角形 v0/e1/e2 + アルファマスク)。begin.csh がクリア、shadow_entities.gsh が書く。light のみ |
-| 5-8 | - | - | 予備 |
+| binding | 名前 (アクセサ) | ファイル | サイズ | 内容 | 書くプログラム (`SSBO_<名前>_WRITE`) |
+|---|---|---|---|---|---|
+| 0 | FrameDataBuffer (`frameData`) | `frame_data.glsl` | 4096 | post: exposure, exposureTarget, averageLuminance, focusDistance, histogram[256], postParams[] (4 個) / sky: sunIrradiance, moonIrradiance, shadowLightIrradiance, skySH[9], skyParams[4] / light: lightStats / surface: surfaceParams[4] | `FRAME_DATA`: setup (初期値), begin・deferred_a (lightStats), prepare (sky), composite25 (post) |
+| 1 | BlockDataBuffer (`blockData`) | `block_data.glsl` | 57344 | `LightDef lightDefs[256]`, `uvec4 shapes[128]`, `vec4 tints[128]`, `uint albedo[4096]` (ブロックの平均の色), `uint albedoUp[]` (上向きの面の色、4096 個) | `BLOCK_DATA`: setup のみ |
+| 2 | GlobalLightsBuffer (`globalLights`) | `global_lights.glsl` | 295200 | `count/blockCount/entityCount/overflow`, `cullDistance/culled` + `cullHist[64]` (間引き距離と距離の分布), `LightInstance lights[8192]` (posRadius: ボクセル空間位置 + 到達半径, colorSize: 放射 + 光源半径), `lightPower[]` (揺らぎ前の放射の輝度、8192 個)。使うのは LIGHT_MAX_COUNT 個まで | `GLOBAL_LIGHTS`: setup, begin, deferred, deferred_a |
+| 3 | LightBinsBuffer (`lightBins`) | `light_bins.glsl` | 10944512 (LIGHT_BIN_LIGHTS > 64 で 21430272) | `binCount[40960]`, `entityAcc[32768]` (エンティティ光源の蓄積表), `binLights[]` (40960 x 65 個、> 64 で x 129)。ビン = 8³ ブロック、1 ビン LIGHT_BIN_LIGHTS + 1 枠。枠のキー = 重要度 19 bit + 光源インデックス 13 bit | `LIGHT_BINS`: setup, begin, deferred_a, shadow_entities・shadow_block の gsh と gbuffers_entities・gbuffers_entities_translucent の vsh (蓄積表) |
+| 4 | EntityTriangleBuffer (`entityTris`) | `entity_tris.glsl` | 838672 | `counts[4]`, `groupBounds`, `clusterBounds` + `EntityTriangle tris[]` (16384 個) (ボクセル空間の三角形 v0/e1/e2 + アルファマスク) | `ENTITY_TRIS`: begin (クリア), shadow_entities・shadow_block の gsh |
+| 5-8 | - | - | - | 予備 | - |
+
+world0 の既定値で SSBO を 1 つも宣言しないのは 17 プログラム (gbuffers の 14 と composite21/23・deferred11)。frameData だけを宣言するのは 13 プログラム (prepare・prepare1/2・setup1/2・composite20/22/24/25・deferred20/21・gbuffers_lightning/skytextured)。光源モジュール (`lib/light/light.glsl`) を読むプログラムは 5 つすべてを宣言する
 
 ```glsl
 struct LightDef {
@@ -715,7 +720,7 @@ post モジュールが提供 (`#include "/lib/post/post.glsl"`):
 | `vec3 tonemap(vec3 x)` | post, デバッグ表示 | トーンマップ |
 | `float getExposure()` (`lib/common/exposure.glsl`) | 全員 | FrameData.exposure |
 
-共通基盤: `lib/common/*` (座標変換・ボクセル空間・影空間・ノイズ・ブルーノイズ・色空間・数学・G バッファ pack/unpack・ジッター・水面 (`water.glsl`)・影マップの 1 点の読み取り (`shadow_volume.glsl`)・露出 (`exposure.glsl`)), `lib/buffers/*`, `lib/ids/*`。`common.glsl` 自体は核 (settings・dimension・constants・uniforms・samplers・math・shading_types・SSBO・images) だけを読み、ほかは使うファイルが自分で include する。
+共通基盤: `lib/common/*` (座標変換・ボクセル空間・影空間・ノイズ・ブルーノイズ・色空間・数学・G バッファ pack/unpack・ジッター・水面 (`water.glsl`)・影マップの 1 点の読み取り (`shadow_volume.glsl`)・露出 (`exposure.glsl`)), `lib/buffers/*`, `lib/ids/*`。`common.glsl` 自体は核 (settings・dimension・constants・uniforms・samplers・math・shading_types) だけを読み、ほかは使うファイルが自分で include する (SSBO と images も)。
 
 ### バッファの読み書き権
 
@@ -723,7 +728,7 @@ post モジュールが提供 (`#include "/lib/post/post.glsl"`):
 |---|---|---|---|---|
 | voxelBlock / Entity / Emit | 書く | 読む | 読む | 読む (debug) |
 | floodImgA/B | 書く | 読む (関数経由) | 読む (関数経由) | 読む (debug) |
-| SSBO1 BlockData, SSBO2, SSBO3 | 書く | 読む | 読む | 読む |
+| SSBO1 BlockData, SSBO2, SSBO3, SSBO4 | 書く | 読む | 読む | 読む |
 | SSBO0 FrameData | lightStats を書く | sun/moon/SH/skyParams を書く | surfaceParams を書く | exposure/focus/histogram/postParams を書く |
 | shadowtex / shadowcolor | 書く (shadow パス) | 読む | 読む | - |
 | colortex1/2/3/15 | 読む | 読む | 書く | 読む |

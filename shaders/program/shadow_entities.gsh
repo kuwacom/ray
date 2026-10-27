@@ -3,6 +3,9 @@
  * PROGRAM_SHADOW_BLOCK が定義されていればブロックエンティティ (blockEntityId)
  * light モジュール (lib/light)
  */
+// このプログラムで書く SSBO (lib/buffers。ほかのプログラムでは readonly)
+#define SSBO_LIGHT_BINS_WRITE
+#define SSBO_ENTITY_TRIS_WRITE
 // このプログラムで書く image (lib/buffers/images.glsl。宣言は 8 個まで)
 #define IMG_VOXEL_ENTITY
 #define IMG_VOXEL_EMIT

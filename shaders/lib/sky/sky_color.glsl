@@ -16,7 +16,7 @@
 #include "/lib/common/transforms.glsl"
 #include "/lib/common/uniforms.glsl"
 #include "/lib/buffers/images.glsl"
-#include "/lib/buffers/ssbo.glsl"
+#include "/lib/buffers/frame_data.glsl"
 #include "/lib/sky/atmosphere.glsl"
 #include "/lib/sky/celestial.glsl"
 #include "/lib/sky/sh.glsl"
