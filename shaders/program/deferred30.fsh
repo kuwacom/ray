@@ -207,7 +207,7 @@ void main() {
         blockLight *= LAVA_RECEIVED_LIGHT;
         indirectLight *= LAVA_RECEIVED_LIGHT;
     }
-    vec3 ambient = skyAmbient + blockLight + indirectLight + (MIN_AMBIENT + nightVision * NIGHT_VISION_AMBIENT) * ao;
+    vec3 ambient = skyAmbient + blockLight + indirectLight + minAmbientIrradiance() * ao;
     color += evalDiffuseIrradiance(m, ambient);
 
     if (lava) color += lavaRadiance(g.albedo) * EMISSION_STRENGTH;

@@ -363,7 +363,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 - 半影: 光源半径 (LightDef.shape.w x LIGHT_SOURCE_SIZE) 内でターゲット点を時間的に揺らし (ブルーノイズ)、デノイズと TAA で均す。RV の SDF コーントレースは SDF 構築コストが大きいので採らない
 - 接触影 (LIGHT_CONTACT_SHADOWS): ボクセルに入らない細部 (手・小さいエンティティ・草) を深度バッファのレイマーチで補う
 - 低解像度 (LIGHT_TRACE_RES) + 時空間デノイズ (再投影 + 近傍の平均・分散によるクリップ + エッジ停止の空間フィルタ)。LIGHT_DENOISE=0 で最寄りの 1 サンプルのみ (フィルタなし)、1 で 2x2 + 時間、2 で 4x4 + 時間
-- 鏡面 (LIGHT_SPECULAR): `getBlockLightSpecular()` が着色点のビンから照度の大きい順に最大 4 光源を `LightSample` の配列で surface に渡す (可視率は deferred2 の比を共通に掛ける)。代表 1 光源だと 2 光源の拡散が釣り合う線で照り返しが切れた
+- 鏡面 (LIGHT_SPECULAR): `getBlockLightSpecular()` が着色点のビンから照度の大きい順に最大 4 光源を `LightSample` の配列で surface に渡す (可視率は deferred2 の比を共通に掛ける。水・ガラスは光源ごとにトレースする)。代表 1 光源だと 2 光源の拡散が釣り合う線で照り返しが切れた
 
 ### 手持ち光源
 
@@ -592,7 +592,7 @@ light モジュールが提供 (`#include "/lib/light/light.glsl"`):
 | `void injectEntityLight(vec3 playerPos, int entId, int itemId, vec4 entColor)` | gbuffers/solid.vsh (GBUF_ENTITIES), shadow_entities.gsh | エンティティ光源の登録 |
 | `vec3 getBlockLightOpaque(ivec2 texel, vec3 playerPos, vec3 geoNormal, vec3 normal, float lm)` | surface (`gatherSurfaceLights`) | 不透明面のブロックライト照度 (直接 + 間接 + 体積外フォールバック) |
 | `vec3 getBlockLightForward(vec3 playerPos, vec3 normal, float lm)` | surface (`gatherSurfaceLights`)、パーティクル・雨 | トレースなし版 |
-| `int getBlockLightSpecular(ivec2 texel, vec3 playerPos, vec3 geoNormal, out LightSample s[BLOCKLIGHT_SPECULAR_LIGHTS])` | surface (`gatherSurfaceLights`) | ブロックライトの鏡面用の光 (個数を返す) |
+| `int getBlockLightSpecular(ivec2 texel, vec3 playerPos, vec3 geoNormal, bool traced, out LightSample s[BLOCKLIGHT_SPECULAR_LIGHTS])` | surface (`gatherSurfaceLights`) | ブロックライトの鏡面用の光 (個数を返す)。traced = 半透明の面で、可視率を光源ごとにトレースする |
 | `void getHandLights(vec3 playerPos, vec3 geoNormal, float dither, out LightSample mainHand, out LightSample offHand)` | surface (`gatherSurfaceLights`) | 両手の光 |
 | `vec3 getHandLightPosition(bool mainHand)` | sky (composite11 の手持ち光源のフォグ) | 手持ち光源の player 空間位置 |
 | `vec3 sampleFloodfill(vec3 playerPos, vec3 normal)` / `vec3 sampleFloodfillVolume(vec3 playerPos)` / `float floodCoverage(vec3 playerPos)` | surface (GI), sky | floodfill 照度 |
@@ -633,14 +633,16 @@ surface モジュールが提供 (`#include "/lib/surface/surface.glsl"`):
 
 | 項 | deferred30 (不透明) | 半透明の前方シェーディング | composite1 (水・ガラス) | 二次ヒット (GI・反射・屈折先) |
 |---|---|---|---|---|
-| 太陽の影 | PCSS + 葉の透過。影マップの外と一人称の手はスカイライトで近似 (`SL_SUN_SHADOW_MAP_FALLBACK`) | PCSS。外は 1 (`SL_SUN_SHADOW_MAP`) | PCSS。外は 1。水の側面は雲影とスカイライトで近似、水中は 0 | ボクセル体積の 1 タップ (`SL_SUN_VOLUME`) |
+| 太陽の影 | PCSS + 葉の透過。影マップの外と一人称の手はスカイライトで近似 (`SL_SUN_SHADOW_MAP_FALLBACK`) | PCSS。外は 1 (`SL_SUN_SHADOW_MAP`) | PCSS。外は 1 (影の距離より遠い地下の水・ガラスは日向になる)。水の側面は雲影とスカイライトで近似、水中は 0 | ボクセル体積の 1 タップ (`SL_SUN_VOLUME`) |
 | 接触影・POM の自己影 | ○ | - | - | - |
 | 空 (SH x スカイライト) | ○ (GI が運ぶ分を引く) | ○ | 内散乱・泡 | ○ |
 | GI・AO | ○ | - | - | 前フレームの GI を多重反射に使う |
-| ブロックライト | `SL_BLOCK_OPAQUE` | `SL_BLOCK_FORWARD` (エンティティは `SL_BLOCK_FORWARD_ENTITY`) | 泡だけ `SL_BLOCK_FORWARD` | floodfill (`SL_BLOCK_HIT_FLOOD`) + 直接光 (`secondaryHitBlockLight`) |
-| 手持ち光源 | 拡散・鏡面・SSS | 拡散 | - | `secondaryHitBlockLight` が影なしで足す |
-| 手持ち光源の照り返し | ○ | 半透明エンティティだけ | - | GI が受け持つ |
-| ブロックライトの鏡面 | ○ | - | - | - |
+| ブロックライト | `SL_BLOCK_OPAQUE` | `SL_BLOCK_FORWARD` (エンティティは `SL_BLOCK_FORWARD_ENTITY`) | 泡・内散乱 `SL_BLOCK_FORWARD` | floodfill (`SL_BLOCK_HIT_FLOOD`) + 直接光 (`secondaryHitBlockLight`) |
+| 手持ち光源 | 拡散・鏡面・SSS (`SSS_STRENGTH` を掛ける) | 拡散 | 鏡面・内散乱・泡 | `secondaryHitBlockLight` が影なしで足す |
+| 手持ち光源の照り返し | ○ | ○ | - | GI が受け持つ |
+| ブロックライトの鏡面 | ○ (`SL_BLOCK_SPECULAR`) | - | ○ (光源ごとにトレース `SL_BLOCK_SPECULAR_TRACED`) | - |
+| 最低限の環境光と暗視 (`minAmbientIrradiance`) | ○ | ○ | - | ○ |
+| 発光 | ○ | ネザーポータル・発光エンティティ | - | GI のレイが拾う。登録した光源は直接光が数えるので除き、登録していない発光 (溶岩・テクスチャの発光) を足す |
 
 post モジュールが提供 (`#include "/lib/post/post.glsl"`):
 

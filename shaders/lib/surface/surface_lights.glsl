@@ -9,11 +9,13 @@
 #define SURFACE_SURFACE_LIGHTS_GLSL
 
 #include "/lib/settings.glsl"
+#include "/lib/common/constants.glsl"
 #include "/lib/common/look_presets.glsl"
 #include "/lib/common/math.glsl"
 #include "/lib/common/shading_types.glsl"
 #include "/lib/common/shadow_volume.glsl"
 #include "/lib/common/transforms.glsl"
+#include "/lib/common/uniforms.glsl"
 #include "/lib/common/voxel_space.glsl"
 #include "/lib/light/blocklight.glsl"
 #include "/lib/light/floodfill.glsl"
@@ -24,6 +26,8 @@
 #include "/lib/surface/sun_shadow.glsl"
 
 // 太陽の影の取り方 (どれか 1 つ)
+// 影マップの外の扱い: SHADOW_MAP_FALLBACK だけスカイライトで日向を推定する。半透明の面と 2 次ヒットは軽さのため 1 (日向) にするので、
+// 影の距離より遠い地下の水・ガラスは日向になり、太陽の鏡面と水の内散乱が出うる。遠くで画面に占める面積は小さいので近似しない
 const int SL_SUN_NONE = 0;
 const int SL_SUN_SHADOW_MAP = 1;          // PCSS。影マップの外は 1
 const int SL_SUN_SHADOW_MAP_FALLBACK = 2; // PCSS。影マップの外と一人称の手はスカイライトで近似
@@ -46,11 +50,15 @@ const uint SL_HAND = 1u << 5;             // 手持ち光源の LightSample (ト
 const uint SL_HAND_FILL = 1u << 6;
 const uint SL_BLOCK_SPECULAR = 1u << 7;
 const uint SL_CELESTIAL = 1u << 8;      // 太陽の影を取らなくても、影を掛ける前の太陽 / 月を celestial に返す
+const uint SL_BLOCK_SPECULAR_TRACED = 1u << 9; // 鏡面の光源を 1 つずつトレースして可視率を出す (colortex7 に無い半透明の面用)
 
 // 影マップの外での日向の判定 (スカイライトがこれ以上なら日向とみなす)
 const vec2 SHADOW_FALLBACK_SKYLIGHT = vec2(0.8, 0.97);
 // GI が空の光を運ぶ時 (GI_TRACES_SKY): ボクセル体積の判定で面から浮かせる量
 const float GI_VOLUME_TEST_OFFSET = 0.1;
+
+// 洞窟の最低限の可視光と暗視の環境光 (照度)。AO は呼ぶ側で掛ける
+float minAmbientIrradiance() { return MIN_AMBIENT + nightVision * NIGHT_VISION_AMBIENT; }
 
 struct SurfacePoint {
     vec3 playerPos;
@@ -188,7 +196,8 @@ SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, ui
         L.handMain = noLight();
         L.handOff = noLight();
     }
-    if ((terms & SL_BLOCK_SPECULAR) != 0u) L.blockSpecCount = getBlockLightSpecular(p.texel, p.playerPos, p.geoNormal, L.blockSpec);
+    if ((terms & SL_BLOCK_SPECULAR) != 0u) L.blockSpecCount = getBlockLightSpecular(p.texel, p.playerPos, p.geoNormal, false, L.blockSpec);
+    else if ((terms & SL_BLOCK_SPECULAR_TRACED) != 0u) L.blockSpecCount = getBlockLightSpecular(p.texel, p.playerPos, p.geoNormal, true, L.blockSpec);
 
     if (blockMode == SL_BLOCK_OPAQUE) {
         L.block = getBlockLightOpaque(p.texel, p.playerPos, p.geoNormal, p.normal, p.lightmap.x);

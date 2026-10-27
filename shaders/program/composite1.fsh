@@ -132,7 +132,7 @@ vec3 opaqueEnvSpecular(ivec2 texel, float depth) {
 }
 
 // 面での太陽の可視率 (影 + 雲影)。PCSS は重いので 1 ピクセル 1 回にして鏡面・内散乱・泡で使い回す
-// 集める項は太陽の影だけ (空・ブロックライトは泡と内散乱が別に集める。GI・AO・接触影・手持ち光源は水・ガラスに掛けない)
+// 集める項は太陽の影だけ (空・ブロックライト・手持ち光源は泡・内散乱・鏡面が別に集める。GI・AO・接触影は水・ガラスに掛けない)
 // specular: 太陽の照り返しに使う分 (葉を透過した拡散光を除く。葉越しの太陽が緑の光源として映らないように)
 vec3 surfaceSunVisibility(vec3 playerPos, vec3 geoNormal, float dither, out vec3 specular) {
     SurfacePoint p = surfacePoint(playerPos, geoNormal);
@@ -147,15 +147,31 @@ LightSample unshadowedSun() {
     return gatherSurfaceLights(surfacePoint(vec3(0.0), vec3(0.0, 1.0, 0.0)), SL_SUN_NONE, SL_BLOCK_NONE, SL_CELESTIAL).celestial;
 }
 
-// 太陽の鏡面だけ。f0 と alpha を与えた誘電体として
-vec3 sunSpecular(vec3 N, vec3 V, float f0, float roughness, vec3 sunVis) {
-    LightSample sun = unshadowedSun();
-    sun.irradiance *= sunVis;
+// 光 L の鏡面だけ。f0 と alpha を与えた誘電体として
+vec3 dielectricSpecular(vec3 N, vec3 V, float f0, float roughness, LightSample L) {
     GBufferData g = gbufferDefault();
     g.f0 = f0;
     g.smoothness = 1.0 - sqrt(roughness);
     g.albedo = vec3(0.0);
-    return evalDirectSpecular(decodeMaterial(g), N, V, sun);
+    return evalDirectSpecular(decodeMaterial(g), N, V, L);
+}
+
+vec3 sunSpecular(vec3 N, vec3 V, float f0, float roughness, vec3 sunVis) {
+    LightSample sun = unshadowedSun();
+    sun.irradiance *= sunVis;
+    return dielectricSpecular(N, V, f0, roughness, sun);
+}
+
+// 手持ち光源とブロックライトの鏡面 (太陽以外の光)。L は gatherSurfaceLights の SL_HAND | SL_BLOCK_SPECULAR_TRACED
+vec3 localLightSpecular(SurfaceLights L, vec3 N, vec3 V, float f0, float roughness) {
+    vec3 s = dielectricSpecular(N, V, f0, roughness, L.handMain) + dielectricSpecular(N, V, f0, roughness, L.handOff);
+    for (int j = 0; j < L.blockSpecCount; j++) s += dielectricSpecular(N, V, f0, roughness, L.blockSpec[j]);
+    return s;
+}
+
+// 手持ち光源が向き n の面に与える照度
+vec3 handIrradiance(SurfaceLights L, vec3 n) {
+    return L.handMain.irradiance * saturate(dot(n, L.handMain.direction)) + L.handOff.irradiance * saturate(dot(n, L.handOff.direction));
 }
 
 /*
@@ -300,7 +316,7 @@ bool waterRefractVoxel(vec3 surfPlayer, vec3 dir, vec3 floorPlayer, float d1, fl
             hasRef = true;
         }
     }
-    if (!hasRef) voxelColor = shadeSecondaryHit(hitPlayer, hitNormal, getBlockAlbedo(hitBlock, hitNormal), skyLm);
+    if (!hasRef) voxelColor = shadeSecondaryHitReflected(hitPlayer, hitNormal, getBlockAlbedo(hitBlock, hitNormal), skyLm, ivec2(-1));
     color = mix(voxelColor, screenColor, wS);
     return true;
 }
@@ -313,14 +329,15 @@ bool waterRefractVoxel(vec3 surfPlayer, vec3 dir, vec3 floorPlayer, float d1, fl
  * 経路 [0, S] の積分は E0 b (1 - exp(-(c + Kd mu_view) S)) / (c + Kd mu_view) で閉じる
  * 光源の照度を深さによらず一定にすると、深い所ほど内散乱が水面の明るさのまま飽和し、浅瀬 (底の照り返し) との差が出ない
  * muView: 屈折した視線の下向きの cos (側面から入る水平の視線は 0 で深さが変わらない), pathLen: 水の中の経路長
+ * localE: 水面に届くブロックライト (floodfill) と手持ち光源の照度。向きは持たないので空の光と同じ減衰で扱う
  */
-vec3 waterInscatter(float skyLm, vec3 sunVis, float muView, float pathLen) {
+vec3 waterInscatter(float skyLm, vec3 sunVis, vec3 localE, float muView, float pathLen) {
     LightSample sun = unshadowedSun();
     vec3 ext = waterExtinction();
     float sunY = saturate(sun.direction.y);
     float muSun = sqrt(max(1.0 - (1.0 - sunY * sunY) / sqr(WATER_IOR), 0.0));
     vec3 sunE = sun.irradiance * sunY * sunVis;
-    vec3 skyE = secondaryHitSky(vec3(0.0), vec3(0.0, 1.0, 0.0), skyLm);
+    vec3 skyE = secondaryHitSky(vec3(0.0), vec3(0.0, 1.0, 0.0), skyLm) + localE;
     vec3 kSun = ext * (1.0 + muView / muSun);
     vec3 kSky = ext * (1.0 + muView);
     vec3 E = sunE * (1.0 - exp(-kSun * pathLen)) / kSun + skyE * (1.0 - exp(-kSky * pathLen)) / kSky;
@@ -449,13 +466,13 @@ float waterExitDistance(vec3 originPlayer, vec3 dir, out vec3 outward) {
     return -1.0;
 }
 
-// 泡 (拡散の白) の放射輝度。n は泡の面の向き (水面なら真上、滝なら側面)
-vec3 foamRadiance(vec3 surfPlayer, vec3 n, vec2 lm, vec3 sunVis) {
+// 泡 (拡散の白) の放射輝度。n は泡の面の向き (水面なら真上、滝なら側面)。hand は手持ち光源を集めた SurfaceLights
+vec3 foamRadiance(vec3 surfPlayer, vec3 n, vec2 lm, vec3 sunVis, SurfaceLights hand) {
     LightSample sun = unshadowedSun();
     SurfacePoint p = surfacePoint(surfPlayer, n);
     p.lightmap = lm;
     SurfaceLights L = gatherSurfaceLights(p, SL_SUN_NONE, SL_BLOCK_FORWARD, SL_SKY);
-    vec3 E = sun.irradiance * saturate(dot(n, sun.direction)) * sunVis + L.sky + L.block;
+    vec3 E = sun.irradiance * saturate(dot(n, sun.direction)) * sunVis + L.sky + L.block + handIrradiance(hand, n);
     return vec3(FOAM_ALBEDO) * RCP_PI * E;
 }
 
@@ -521,6 +538,15 @@ void main() {
             : side ? vec3(smoothstep(0.6, 0.95, lmT.y)) * getCloudShadow(surfPlayer)
             : surfaceSunVisibility(surfPlayer, vec3(0.0, 1.0, 0.0), dither, sunSpecVis);
         if (side) sunSpecVis = sunVis;
+
+        // 太陽以外の光: 手持ち光源 (内散乱・泡・鏡面) とブロックライトの鏡面 (光源ごとにトレース)。水中から見た面の裏は掛けない
+        // 省く項: 太陽 (上で別に取る)・GI・AO・接触影 (水面の下に不透明面の深度しか無い)
+        SurfacePoint wp = surfacePoint(surfPlayer, faceN);
+        wp.lightmap = lmT;
+        wp.texel = texel;
+        wp.dither = dither;
+        SurfaceLights WL = gatherSurfaceLights(wp, SL_SUN_NONE, SL_BLOCK_NONE, 0u);
+        if (!below) WL = gatherSurfaceLights(wp, SL_SUN_NONE, SL_BLOCK_FORWARD, SL_HAND | SL_BLOCK_SPECULAR_TRACED);
 
         // 側面から入った光が水を出る所 (水の厚み)
         vec3 exitOutward = vec3(0.0);
@@ -665,7 +691,7 @@ void main() {
             vec3 ext = waterExtinction();
             vec3 T = exp(-ext * pathLen);
             float muView = dot(refrDir, refrDir) > 0.5 ? saturate(-refrDir.y) : saturate(V.y);
-            behind = behind * T + waterInscatter(lmT.y, sunVis, muView, pathLen);
+            behind = behind * T + waterInscatter(lmT.y, sunVis, WL.block + handIrradiance(WL, vec3(0.0, 1.0, 0.0)), muView, pathLen);
         }
 
         // 反射と太陽
@@ -699,6 +725,7 @@ void main() {
             // 上向きの水面は照り返しの一部を輝点にする。輝点の傾きの分布は画素より細かい波の全部 (表面張力波を含む)
             float g = N.y > 0.5 ? WATER_GLINT * WATER_GLINT_POINT_SHARE : 0.0;
             color += sunSpecular(N, V, 0.02, sunAlpha, sunSpecVis) * (1.0 - g);
+            color += localLightSpecular(WL, N, V, 0.02, sunAlpha);
             if (g > 0.0) {
                 float glintVar = unresolvedVar + sea.microVar * (1.0 - WATER_MICRO_ROUGHNESS);
                 vec4 glint = sunGlint(surfPlayer, N, V, glintVar, sunSpecVis, dist, NoVGeo);
@@ -728,7 +755,7 @@ void main() {
                 float cap = smoothstep(WHITECAP_J0, WHITECAP_J1, J) * smoothstep(WHITECAP_WIND0, WHITECAP_WIND1, sea.wind)
                     * smoothstep(0.3, 0.6, pattern) * offshore;
                 float foam = saturate(cap * WATER_FOAM) * FOAM_OPACITY;
-                if (foam > 0.0) color = mix(color, foamRadiance(surfPlayer, vec3(0.0, 1.0, 0.0), lmT, sunVis), foam);
+                if (foam > 0.0) color = mix(color, foamRadiance(surfPlayer, vec3(0.0, 1.0, 0.0), lmT, sunVis, WL), foam);
             }
         }
     } else {
@@ -755,8 +782,16 @@ void main() {
         if (roughness < MIRROR_ROUGHNESS) refl = mirrorReflection(refl, surfView, surfPlayer, N, R, dist, false, false, dither);
         vec3 glassSunVis;
         surfaceSunVisibility(surfPlayer, N, dither, glassSunVis);
-        color = behind * transmit * (1.0 - F) + translucent.rgb + refl * F
-            + sunSpecular(N, V, 0.04, max(roughness * roughness, WATER_ROUGHNESS), glassSunVis);
+        // 太陽以外の光の鏡面。省く項は水と同じ
+        SurfacePoint gp = surfacePoint(surfPlayer, N);
+        gp.lightmap = lmT;
+        gp.texel = texel;
+        gp.dither = dither;
+        SurfaceLights GL = gatherSurfaceLights(gp, SL_SUN_NONE, SL_BLOCK_NONE, SL_HAND | SL_BLOCK_SPECULAR_TRACED);
+        float glassAlpha = max(roughness * roughness, WATER_ROUGHNESS);
+        // 前方で照らした拡散 (translucent.rgb) は鏡面で反射する F の分を除く (太陽の鏡面を足すので、その分だけ明るくならないように)
+        color = behind * transmit * (1.0 - F) + translucent.rgb * (1.0 - F) + refl * F
+            + sunSpecular(N, V, 0.04, glassAlpha, glassSunVis) + localLightSpecular(GL, N, V, 0.04, glassAlpha);
         outColor = vec4(color, 1.0);
         return;
     }

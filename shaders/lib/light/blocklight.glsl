@@ -109,8 +109,9 @@ const int BLOCKLIGHT_SPECULAR_LIGHTS = LIGHT_SPECULAR_COUNT;
  * 代表光源 1 つだけだと、2 つの光源の拡散が釣り合う線で代表が入れ替わり、床の照り返しが斜めの直線で切れた
  * 光源ごとの可視率は無いので、deferred2 の可視率 (colortex7, トレースした光源全体の比) を共通に掛ける。
  * 体積の端ではフォールバックと同じ割合で弱める
+ * traced: colortex7 は不透明面の可視率なので、水・ガラスなど半透明の面は光源ごとにトレースして可視率を出す
  */
-int getBlockLightSpecular(ivec2 texel, vec3 playerPos, vec3 geoNormal, out LightSample s[BLOCKLIGHT_SPECULAR_LIGHTS]) {
+int getBlockLightSpecular(ivec2 texel, vec3 playerPos, vec3 geoNormal, bool traced, out LightSample s[BLOCKLIGHT_SPECULAR_LIGHTS]) {
     for (int j = 0; j < BLOCKLIGHT_SPECULAR_LIGHTS; j++) s[j] = noLight();
 #if defined LIGHT_SPECULAR && defined LIGHT_SHADOWS
     // 光源の選び方は deferred1 と同じ (幾何法線で地平線の下の光源を除く)
@@ -134,7 +135,9 @@ int getBlockLightSpecular(ivec2 texel, vec3 playerPos, vec3 geoNormal, out Light
             }
         }
     }
-    float scale = saturate(luminance(texelFetch(colortex7, texel, 0).rgb)) * floodCoverage(playerPos);
+    float scale = traced ? floodCoverage(playerPos) : saturate(luminance(texelFetch(colortex7, texel, 0).rgb)) * floodCoverage(playerPos);
+    // 半影の揺らぎは入れない (半透明の面はデノイズも TAA の速度も無い)。エンティティの遮蔽は getBlockLightForwardEntity と同じく使わない
+    uint traceFlags = blockLightTraceFlags() & ~(TRACE_ENTITIES | TRACE_PLAYER);
     vec3 voxelPos = playerToVoxel(playerPos);
     int count = 0;
     for (int j = 0; j < BLOCKLIGHT_SPECULAR_LIGHTS; j++) {
@@ -144,6 +147,7 @@ int getBlockLightSpecular(ivec2 texel, vec3 playerPos, vec3 geoNormal, out Light
         float dist = length(toL);
         s[j].direction = toL / max(dist, EPS);
         s[j].irradiance = L.colorSize.rgb * lightFalloff(dist, L.posRadius.w) * scale;
+        if (traced) s[j].irradiance *= traceVisibilityEx(fromVoxel, L.posRadius.xyz, traceFlags, 0.5, 0.0, 0.0);
         s[j].angularSize = atan(L.colorSize.a, max(dist, EPS));
         count++;
     }

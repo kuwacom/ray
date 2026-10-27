@@ -5,7 +5,7 @@
  *
  * 水: 色は書かず (a = 0)、法線とライトマップだけを colortex5 に残す。水の見た目 (屈折・吸収・反射・泡・太陽の鏡面) は
  *     composite1 でまとめて計算する (屈折先の深度と経路長が要るため)
- * ガラス等: 拡散だけを前方で照らす。鏡面 (太陽・反射) と透過は composite1 が掛ける
+ * ガラス等: 拡散だけを前方で照らす。鏡面 (太陽・手持ち光源・ブロックライト・反射) と透過は composite1 が掛ける
  *     透過色は block_data の tints 表 (光源シャドウ・色付き影と同じ色) を使うので、その index を colortex5 に残す
  * 半透明パーティクル: 普通のアルファ合成。colortex5 は書かない (水面の情報を上書きして穴が開くのを防ぐ)
  * 半透明エンティティ / ブロックエンティティ: Iris 26.1 はプレイヤー (スキンが entityTranslucent)・文字・旗の模様などを
@@ -59,7 +59,7 @@ vec4 encodeTranslucentDataTint(vec3 normal, vec2 lightmap, int materialId, int t
 // 前方シェーディングの拡散 (太陽 + 手持ち光源 + 空 + ブロックライト)
 vec3 forwardDiffuse(Material m, vec3 playerPos, vec3 normal, vec3 geoNormal, vec3 V, float dither) {
     // 集める項: 太陽の影 (影マップの外は 1)・手持ち光源・空・ブロックライト
-    // 省く項: 接触影と POM (深度に半透明が無い・POM なし)、鏡面 (composite1 が掛ける)、GI と AO (この経路にバッファが無い)
+    // 省く項: 接触影と POM (深度に半透明が無い・POM なし)、鏡面 (composite1 が掛ける)、GI と AO (この経路にバッファが無い。手持ち光源の照り返しが GI の代わり)
     // 太陽 -> 手持ち -> 空とブロックライト -> 手持ちの照り返し に分けて集め、拡散を掛ける順番を保つ
     // (まとめて 1 回で集めると、手持ち光源のトレースが太陽の拡散より前に並んでドライバの出す命令の並びが変わる)
 #ifdef GBUF_FORWARD_OPAQUE
@@ -78,16 +78,14 @@ vec3 forwardDiffuse(Material m, vec3 playerPos, vec3 normal, vec3 geoNormal, vec
     color += evalDirectDiffuse(m, normal, V, L.handOff);
     L = gatherSurfaceLights(p, SL_SUN_NONE, blockMode, SL_SKY);
 
-    vec3 ambient = L.sky + L.block + MIN_AMBIENT + nightVision * NIGHT_VISION_AMBIENT;
-#ifdef GBUF_ENTITIES_TRANSLUCENT
+    vec3 ambient = L.sky + L.block + minAmbientIrradiance();
     /*
-     * 手持ち光源は floodfill に入らず、この経路には GI も無いので、三人称の自分の背中 (光源の反対側) が真っ黒になる
+     * 手持ち光源は floodfill に入らず、この経路には GI も無いので、三人称の自分の背中 (光源の反対側) やガラスの陰が真っ黒になる
      * 周りの壁・床で跳ね返った光を、影なし・向きなしの照度の一定割合の環境光として足す
      * (影付きの照度に掛けると、体で遮られた側に何も残らない)
      */
     L = gatherSurfaceLights(p, SL_SUN_NONE, SL_BLOCK_NONE, SL_HAND_FILL);
     ambient += L.handFill * HAND_LIGHT_BOUNCE;
-#endif
     return color + evalDiffuseIrradiance(m, ambient);
 }
 

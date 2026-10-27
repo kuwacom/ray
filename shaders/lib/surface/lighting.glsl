@@ -63,7 +63,7 @@ vec3 shadeSecondaryHit(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm) {
     SurfacePoint p = surfacePoint(playerPos, normal);
     p.lightmap.y = skyLm;
     SurfaceLights L = gatherSurfaceLights(p, SL_SUN_VOLUME, SL_BLOCK_HIT_FLOOD, SL_SKY);
-    return albedo * RCP_PI * (L.sun.irradiance + L.block + L.sky);
+    return albedo * RCP_PI * (L.sun.irradiance + L.block + L.sky + minAmbientIrradiance());
 }
 
 /*
@@ -88,7 +88,7 @@ vec3 shadeSecondaryHitGi(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm, 
     } else {
         E += sky;
     }
-    return albedo * RCP_PI * E;
+    return albedo * RCP_PI * (E + minAmbientIrradiance());
 }
 
 // GI の履歴 (照度, GI_STRENGTH を外した値)。前フレームの画面の外なら x = -1
@@ -162,6 +162,11 @@ vec3 secondaryHitBlockLight(vec3 playerPos, vec3 normal, ivec2 screenTexel, floa
 #else
     return vec3(0.0);
 #endif
+}
+
+// 反射に映る 2 次ヒット点の拡散の放射輝度。shadeSecondaryHit に設置光源・手持ち光源の直接光を足す (倍率は掛けない)
+vec3 shadeSecondaryHitReflected(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm, ivec2 screenTexel) {
+    return shadeSecondaryHit(playerPos, normal, albedo, skyLm) + albedo * RCP_PI * secondaryHitBlockLight(playerPos, normal, screenTexel, 1.0);
 }
 
 /*
@@ -263,8 +268,7 @@ vec4 traceVoxelRadiance(vec3 originPlayer, vec3 dir, float maxDist, float skyLm,
     }
     // useSceneColor = false は GI (多重反射込み)、true は反射
     if (useSceneColor) {
-        vec3 E = secondaryHitBlockLight(hitPlayer, hitNormal, screenTexel, 1.0);
-        return vec4(shadeSecondaryHit(hitPlayer, hitNormal, albedo, skyLm) + albedo * RCP_PI * E
+        return vec4(shadeSecondaryHitReflected(hitPlayer, hitNormal, albedo, skyLm, screenTexel)
             + albedo * secondaryHitEmission(emission, hitBlock, hitMaterial), 1.0);
     }
     vec3 E = secondaryHitBlockLight(hitPlayer, hitNormal, screenTexel, handLightIndirectScale()) * SECONDARY_BLOCKLIGHT_GAIN;
