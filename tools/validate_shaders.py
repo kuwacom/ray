@@ -46,7 +46,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import gen_settings  # noqa: E402
 import include_deps  # noqa: E402
-from gen_settings import CONST_RE, DEFINE_RE, Option  # noqa: E402
+from gen_settings import CONST_RE, DEFINE_RE, Option, read_properties_logical_lines, resolve_profile  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 SHADERS = ROOT / "shaders"
@@ -103,52 +103,8 @@ def parse_settings() -> dict[str, Option]:
     return gen_settings.parse_settings(SHADERS)
 
 
-def read_properties_logical_lines(path: Path) -> list[str]:
-    """`\\` の行継続を結合した論理行のリスト"""
-    lines: list[str] = []
-    buf = ""
-    for raw in path.read_text(encoding="utf-8").splitlines():
-        s = raw.rstrip()
-        if s.endswith("\\"):
-            buf += s[:-1] + " "
-            continue
-        lines.append(buf + s)
-        buf = ""
-    if buf:
-        lines.append(buf)
-    return lines
-
-
 def parse_profiles() -> dict[str, list[str]]:
-    profiles: dict[str, list[str]] = {}
-    if not PROPERTIES.exists():
-        return profiles
-    for line in read_properties_logical_lines(PROPERTIES):
-        m = re.match(r"^\s*profile\.(\w+)\s*=\s*(.*)$", line)
-        if m:
-            profiles[m.group(1)] = m.group(2).split()
-    return profiles
-
-
-def resolve_profile(name: str, profiles: dict[str, list[str]], seen: set[str] | None = None) -> dict[str, str | bool]:
-    seen = seen or set()
-    if name in seen:
-        raise ValueError(f"profile cycle: {name}")
-    seen.add(name)
-    result: dict[str, str | bool] = {}
-    for tok in profiles[name]:
-        if tok.startswith("profile."):
-            result.update(resolve_profile(tok[len("profile."):], profiles, seen))
-        elif tok.startswith("!program."):
-            continue
-        elif tok.startswith("!"):
-            result[tok[1:]] = False
-        elif "=" in tok or ":" in tok:
-            k, v = re.split(r"[=:]", tok, maxsplit=1)
-            result[k] = v
-        else:
-            result[tok] = True
-    return result
+    return gen_settings.parse_profiles(SHADERS)
 
 
 def parse_features() -> tuple[list[str], list[str]]:

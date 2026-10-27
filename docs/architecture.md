@@ -412,7 +412,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 
 ## 設定とプリセット
 
-以下の表は主な設定だけを載せる。全項目は `lib/settings/` と shaders.properties (設定画面と `profile.*`) にある。
+以下の表はプロファイルで値の変わる設定を載せる。全設定の既定値と候補は [settings.md](settings.md)、定義は `lib/settings/` と shaders.properties (設定画面と `profile.*`) にある。
 
 - 全設定は `lib/settings/` の `#define` / `const`。プロファイルは shaders.properties の `profile.*` (ULTRA = HIGH + 差分、EXTREME = ULTRA + 差分、HIGH_FAST = HIGH + 差分、HIGH_FASTEST = HIGH_FAST + 差分、EXTREME_LITE / EXTREME_BALANCED = EXTREME + 差分の継承)。Iris は設定の数でプロファイルを並べ替えてから巡回するので、宣言順 (軽い順) で巡回させるために全プロファイルが同じ設定の組を持つ (新しいプロファイルは全部入りのプロファイルを継承して値だけ上書きする)
 - HIGH_FASTEST / HIGH_FAST: HIGH と同じ手法・見た目のまま、内部の解像度 (光源トレース・VL・雲) とサンプル数 (PCSS・RSM・SSR・光源) を下げ、時間方向の積み重ねとデノイズで補う
@@ -423,12 +423,6 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 - 雲の形と陰影は MEDIUM 以上で同じ。CLOUD_QUALITY は視線方向の歩数だけを変え (光源方向・真上方向の歩数は品質 0 でも 1 と同じ)、中層は全品質で描く。CLOUD_MULTISCATTER が 8 より少ない時は残りのオクターブの寄与 (等比の和) を最後のオクターブにまとめる
 
 太字は既定値 (= HIGH) と異なる値。
-
-#### バージョン
-
-| 設定 | 既定 | LOW | MEDIUM | HIGH_FASTEST | HIGH_FAST | HIGH | ULTRA | EXTREME_LITE | EXTREME_BALANCED | EXTREME |
-|---|---|---|---|---|---|---|---|---|---|---|
-| RAY_VERSION | 1 (v0.1.0-alpha) | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
 
 #### ルック (プロファイルに含めない)
 
@@ -447,29 +441,25 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | CLOUD_STYLE | 1 | 0 = カスタム、1 = Ray、2 = Bliss 風、3 = Nostalgia 風、4 = 現実に忠実、5 = 綿あめ、6 = 入道雲、7 = まばらな晴天積雲、8 = 層積雲の曇り (値は `lib/sky/cloud_styles.glsl`) |
 | CLOUD_S_* | Ray の値 | カスタムの時だけ使う (形 (積雲 / 板)・積雲の背丈・対流・雲種のずらし・雲の間隔・こぶの段・雲底のちぎれ・こぶの陰・多重散乱) |
 
-#### ブロックライト / ボクセル (light)
+<!-- BEGIN GENERATED settings (tools/gen_settings.py) -->
+#### light (`lib/settings/light.glsl`)
 
 | 設定 | 既定 | LOW | MEDIUM | HIGH_FASTEST | HIGH_FAST | HIGH | ULTRA | EXTREME_LITE | EXTREME_BALANCED | EXTREME |
 |---|---|---|---|---|---|---|---|---|---|---|
 | VOXEL_VOLUME | 2 | **0** | **1** | 2 | 2 | 2 | 2 | 2 | **3** | **3** |
 | FLOODFILL | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
-| FLOODFILL_STRENGTH | 0.35 | 0.35 | 0.35 | 0.35 | 0.35 | 0.35 | 0.35 | 0.35 | 0.35 | 0.35 |
-| BLOCKLIGHT_BOUNCE | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 |
-| BLOCKLIGHT_BRIGHTNESS | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
-| BLOCKLIGHT_WARMTH | 0.6 | 0.6 | 0.6 | 0.6 | 0.6 | 0.6 | 0.6 | 0.6 | 0.6 | 0.6 |
-| LIGHT_FLICKER | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
 | LIGHT_SHADOWS | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
 | LIGHT_TRACE_COUNT | 4 | **1** | **2** | **2** | 4 | 4 | **8** | **8** | **16** | **16** |
 | LIGHT_TRACE_RES | 2 | **4** | 2 | **4** | **4** | 2 | **1** | 2 | 2 | **1** |
 | LIGHT_SHAPE_TRACE | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
-| LIGHT_SOURCE_SIZE | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 |
 | LIGHT_TRANSLUCENT_TINT | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
 | LIGHT_SPECULAR | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
 | LIGHT_DENOISE | 2 | **1** | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 |
 | LIGHT_ENTITY_OCCLUSION | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
 | LIGHT_PLAYER_OCCLUSION | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
+| LIGHT_OCCLUSION_MODE | 1 | **0** | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
+| LIGHT_ENTITY_TRIANGLES | 4096 | **2048** | **2048** | 4096 | 4096 | 4096 | **8192** | **8192** | **16384** | **16384** |
 | LIGHT_CONTACT_SHADOWS | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
-| LIGHT_CULL_MODE | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 |
 | LIGHT_MAX_COUNT | 4096 | **2048** | 4096 | 4096 | 4096 | 4096 | 4096 | 4096 | **8192** | **8192** |
 | LIGHT_BIN_LIGHTS | 64 | **32** | **48** | **48** | 64 | 64 | 64 | 64 | **96** | **96** |
 | LIGHT_TRACE_STEPS | 96 | **64** | 96 | 96 | 96 | 96 | 96 | 96 | **128** | **128** |
@@ -478,160 +468,85 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | HAND_LIGHT | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
 | HAND_LIGHT_RAYS | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
 | HAND_LIGHT_SS_SHADOWS | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
-| HAND_LIGHT_BRIGHTNESS | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
-| HAND_LIGHT_SHADOW_STRENGTH | 0.6 | 0.6 | 0.6 | 0.6 | 0.6 | 0.6 | 0.6 | 0.6 | 0.6 | 0.6 |
 | ENTITY_LIGHTS | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
-| ITEM_LIGHTS | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
-| PROJECTILE_LIGHTS | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
-| BURNING_ENTITY_LIGHTS | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
-| GLOWING_ENTITY_LIGHTS | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
 
-#### 太陽影 / GI (surface)
+#### surface (`lib/settings/surface.glsl`)
 
 | 設定 | 既定 | LOW | MEDIUM | HIGH_FASTEST | HIGH_FAST | HIGH | ULTRA | EXTREME_LITE | EXTREME_BALANCED | EXTREME |
 |---|---|---|---|---|---|---|---|---|---|---|
 | shadowMapResolution | 4096 | **1024** | **2048** | 4096 | 4096 | 4096 | 4096 | 4096 | **8192** | **8192** |
 | shadowDistance | 192.0 | **96.0** | **128.0** | 192.0 | 192.0 | 192.0 | **256.0** | **256.0** | **512.0** | **512.0** |
-| shadowDistanceRenderMul | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
-| entityShadowDistanceMul | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 |
-| sunPathRotation | -30.0 | -30.0 | -30.0 | -30.0 | -30.0 | -30.0 | -30.0 | -30.0 | -30.0 | -30.0 |
 | SHADOW_FILTER | 2 | **1** | **1** | 2 | 2 | 2 | 2 | 2 | 2 | 2 |
 | SHADOW_SAMPLES | 16 | **4** | **8** | **8** | **12** | 16 | **24** | **24** | **32** | **32** |
-| SHADOW_SOFTNESS | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
 | SHADOW_COLORED | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
 | SHADOW_LEAF_TINT | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
-| SHADOW_LEAF_TRANSMISSION | 0.15 | 0.15 | 0.15 | 0.15 | 0.15 | 0.15 | 0.15 | 0.15 | 0.15 | 0.15 |
 | ENTITY_SHADOWS | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
 | BLOCK_ENTITY_SHADOWS | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
 | SCREEN_SPACE_SHADOWS | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
 | AO_MODE | 2 | **0** | **1** | 2 | 2 | 2 | 2 | 2 | 2 | 2 |
-| AO_STRENGTH | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
 | GI_MODE | 1 | **0** | **0** | 1 | 1 | 1 | **2** | **3** | **3** | **3** |
 | GI_SAMPLES | 2 | **1** | **1** | **1** | **1** | 2 | **4** | **4** | **4** | **8** |
-| GI_STRENGTH | 2.0 | 2.0 | 2.0 | 2.0 | 2.0 | 2.0 | 2.0 | 2.0 | 2.0 | 2.0 |
-| GI_MULTI_BOUNCE | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
-| GI_SKY_OCCLUSION | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 |
-| GI_GROUND_REPLACE | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
 | GI_RES | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | **1** |
 | GI_DENOISE | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 |
-
-#### マテリアル / 水 / 反射 (surface)
-
-| 設定 | 既定 | LOW | MEDIUM | HIGH_FASTEST | HIGH_FAST | HIGH | ULTRA | EXTREME_LITE | EXTREME_BALANCED | EXTREME |
-|---|---|---|---|---|---|---|---|---|---|---|
-| PBR_FORMAT | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| NORMAL_MAPPING | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
 | GENERATED_NORMALS | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
 | POM | OFF | OFF | OFF | OFF | OFF | OFF | **ON** | **ON** | **ON** | **ON** |
-| POM_DEPTH | 0.25 | 0.25 | 0.25 | 0.25 | 0.25 | 0.25 | 0.25 | 0.25 | 0.25 | 0.25 |
-| POM_SAMPLES | 32 | 32 | 32 | 32 | 32 | 32 | 32 | 32 | 32 | 32 |
-| POM_SHADOW | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
 | SSS | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
-| SSS_STRENGTH | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
-| WAVING_PLANTS | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
-| WAVING_LEAVES | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
 | RAIN_PUDDLES | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
-| EMISSION_STRENGTH | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
-| WATER_WAVES | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
-| WATER_WAVE_HEIGHT | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
 | WATER_PARALLAX | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
 | WATER_REFRACTION | 1 | **0** | 1 | 1 | 1 | 1 | **2** | **2** | **2** | **2** |
+| WATER_REFRACTION_MODE | 2 | **0** | **0** | 2 | 2 | 2 | 2 | 2 | 2 | 2 |
 | WATER_CAUSTICS | OFF | OFF | OFF | OFF | OFF | OFF | **ON** | **ON** | **ON** | **ON** |
-| WATER_TEXTURE | OFF | OFF | OFF | OFF | OFF | OFF | OFF | OFF | OFF | OFF |
-| WATER_FOG_DENSITY | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
-| WATER_TYPE | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | REFLECTIONS | 2 | **0** | **1** | 2 | 2 | 2 | 2 | **3** | **3** | **3** |
 | SSR_STEPS | 24 | **8** | **12** | **16** | 24 | 24 | **32** | **32** | **48** | **48** |
 
-#### 空 / 雲 / フォグ (sky)
+#### sky (`lib/settings/sky.glsl`)
 
 | 設定 | 既定 | LOW | MEDIUM | HIGH_FASTEST | HIGH_FAST | HIGH | ULTRA | EXTREME_LITE | EXTREME_BALANCED | EXTREME |
 |---|---|---|---|---|---|---|---|---|---|---|
 | ATMOSPHERE_MODE | 1 | **0** | **0** | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
-| SUN_BRIGHTNESS | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
-| MOON_BRIGHTNESS | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
-| SKY_BRIGHTNESS | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
-| SKY_AMBIENT_SATURATION | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 |
-| SUN_MOON_STYLE | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
-| STARS | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
-| TWILIGHT_STRETCH | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
 | CLOUDS | 3 | **0** | 3 | 3 | 3 | 3 | 3 | 3 | 3 | 3 |
 | CLOUD_QUALITY | 1 | **0** | **0** | 1 | 1 | 1 | **2** | **2** | **3** | **3** |
 | CLOUD_RES | 2 | **4** | **4** | **4** | 2 | 2 | 2 | 2 | 2 | **1** |
 | CLOUD_TEMPORAL | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
-| CLOUD_COVERAGE | 1.1 | 1.1 | 1.1 | 1.1 | 1.1 | 1.1 | 1.1 | 1.1 | 1.1 | 1.1 |
-| CLOUD_SCALE | 3.0 | 3.0 | 3.0 | 3.0 | 3.0 | 3.0 | 3.0 | 3.0 | 3.0 | 3.0 |
-| CLOUD_ALTITUDE | 1500.0 | 1500.0 | 1500.0 | 1500.0 | 1500.0 | 1500.0 | 1500.0 | 1500.0 | 1500.0 | 1500.0 |
-| CLOUD_THICKNESS | 4500.0 | 4500.0 | 4500.0 | 4500.0 | 4500.0 | 4500.0 | 4500.0 | 4500.0 | 4500.0 | 4500.0 |
-| CLOUD_SPEED | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
 | CLOUD_MULTISCATTER | 4 | **2** | 4 | 4 | 4 | 4 | **8** | **8** | **8** | **8** |
 | CLOUD_CIRRUS | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
-| CLOUD_CIRRUS_COVERAGE | 0.1 | 0.1 | 0.1 | 0.1 | 0.1 | 0.1 | 0.1 | 0.1 | 0.1 | 0.1 |
 | CLOUD_SHADOWS | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
-| FOG_STYLE | 0 (Ray) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| FOG_C_HAZE / FOG_C_EDGE / FOG_C_LAYER / FOG_C_GROUND / FOG_C_FORWARD | 1.0 / 0.6 / 1.0 / 1.0 / 1.0 | 同 | 同 | 同 | 同 | 同 | 同 | 同 | 同 | 同 |
-| FOG_BIOME | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
-| FOG_DENSITY | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
-| FOG_HEIGHT_PRESET | 4 (雲に合わせる) | 4 | 4 | 4 | 4 | 4 | 4 | 4 | 4 | 4 |
-| FOG_C_SEA_LEVEL / FOG_C_HAZE_TOP / FOG_C_LAYER_BASE / FOG_C_LAYER_THICKNESS | 63 / 0 / 70 / 35 | 同 | 同 | 同 | 同 | 同 | 同 | 同 | 同 | 同 |
 | FOG_LAYER | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
 | FOG_MIST | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
-| FOG_MIST_ALTITUDE | 72 | 72 | 72 | 72 | 72 | 72 | 72 | 72 | 72 | 72 |
 | VL | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
 | VL_SAMPLES | 8 | **4** | **6** | **6** | 8 | 8 | **12** | **12** | **16** | **16** |
 | VL_RES | 2 | **4** | **4** | **4** | **4** | 2 | 2 | 2 | 2 | **1** |
-| VL_STRENGTH | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
 | VL_COLORED_SHADOWS | OFF | OFF | OFF | OFF | OFF | OFF | **ON** | **ON** | **ON** | **ON** |
 | FOG_BLOCKLIGHT | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
-| FOG_BLOCKLIGHT_STRENGTH | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 |
 | FOG_CLOUD_SHADOWS | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
 | VL_FAR | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
-| CAVE_LEAK_PREVENTION | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
-| BORDER_FOG | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
-| NETHER_FOG_DENSITY | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
-| END_FOG_DENSITY | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
 
-#### カメラ / ポストプロセス (post)
+#### post (`lib/settings/post.glsl`)
 
 | 設定 | 既定 | LOW | MEDIUM | HIGH_FASTEST | HIGH_FAST | HIGH | ULTRA | EXTREME_LITE | EXTREME_BALANCED | EXTREME |
 |---|---|---|---|---|---|---|---|---|---|---|
 | TAA | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
-| CAS_STRENGTH | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 |
 | DOF | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
 | DOF_QUALITY | 0 | 0 | 0 | 0 | 0 | 0 | **1** | **1** | **2** | **2** |
-| DOF_STRENGTH | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 |
-| DOF_FOCUS_MODE | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| DOF_MANUAL_FOCUS | 8.0 | 8.0 | 8.0 | 8.0 | 8.0 | 8.0 | 8.0 | 8.0 | 8.0 | 8.0 |
-| DOF_FOCUS_SPEED | 2.5 | 2.5 | 2.5 | 2.5 | 2.5 | 2.5 | 2.5 | 2.5 | 2.5 | 2.5 |
-| DOF_APERTURE_BLADES | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | MOTION_BLUR | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
-| MOTION_BLUR_STRENGTH | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
+| LENS_QUALITY | 2 | **0** | **1** | **1** | 2 | 2 | 2 | 2 | **3** | **3** |
 | LENS_FLARE | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
-| LENS_FLARE_STRENGTH | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
+| LENS_GHOSTS | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
+| LENS_SCREEN_FLARE | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
+| LENS_STARBURST | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
 | LENS_HALO | OFF | OFF | OFF | OFF | OFF | OFF | **ON** | **ON** | **ON** | **ON** |
-| VIGNETTE | 0.3 | 0.3 | 0.3 | 0.3 | 0.3 | 0.3 | 0.3 | 0.3 | 0.3 | 0.3 |
+| LENS_DIRT | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
+| LENS_VEILING_GLARE | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
+| LENS_DISTORTION | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
+| LENS_CHROMATIC | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
+| LENS_AXIAL_CA | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
+| LENS_SOFT_FOCUS | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
+| LENS_SWIRL | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
+| LENS_OPTICAL_VIGNETTING | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
+| LENS_HALATION | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
 | BLOOM | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
-| BLOOM_STRENGTH | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 |
-| BLOOM_FOG | 0.15 | 0.15 | 0.15 | 0.15 | 0.15 | 0.15 | 0.15 | 0.15 | 0.15 | 0.15 |
 | EXPOSURE_MODE | 2 | **1** | **1** | 2 | 2 | 2 | 2 | 2 | 2 | 2 |
-| EXPOSURE_BIAS | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |
-| EXPOSURE_MANUAL_EV | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |
-| EXPOSURE_SPEED_BRIGHT | 3.0 | 3.0 | 3.0 | 3.0 | 3.0 | 3.0 | 3.0 | 3.0 | 3.0 | 3.0 |
-| EXPOSURE_SPEED_DARK | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
-| EXPOSURE_MIN_EV | -4.0 | -4.0 | -4.0 | -4.0 | -4.0 | -4.0 | -4.0 | -4.0 | -4.0 | -4.0 |
-| EXPOSURE_MAX_EV | 6.0 | 6.0 | 6.0 | 6.0 | 6.0 | 6.0 | 6.0 | 6.0 | 6.0 | 6.0 |
-| TONEMAP | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| SATURATION | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
-| CONTRAST | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
-| WHITE_BALANCE | 6500 | 6500 | 6500 | 6500 | 6500 | 6500 | 6500 | 6500 | 6500 | 6500 |
-| CDL_SLOPE | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
-| CDL_OFFSET | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |
-| CDL_POWER | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
-| CDL_SATURATION | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
-| PURKINJE_STRENGTH | 0.3 | 0.3 | 0.3 | 0.3 | 0.3 | 0.3 | 0.3 | 0.3 | 0.3 | 0.3 |
-| FILM_GRAIN | 0.008 | 0.008 | 0.008 | 0.008 | 0.008 | 0.008 | 0.008 | 0.008 | 0.008 | 0.008 |
-| SELECTION_OUTLINE | OFF | OFF | OFF | OFF | OFF | OFF | OFF | OFF | OFF | OFF |
-| DEBUG_VIEW | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+<!-- END GENERATED settings -->
 
 DEBUG_VIEW の値 (0-12) と表示内容の対応は `shaders/lang/ja_JP.lang` / `en_US.lang` の `value.DEBUG_VIEW.*` にあり、表示の実装は `shaders/program/final.fsh` の `#if DEBUG_VIEW == N` の分岐。
 

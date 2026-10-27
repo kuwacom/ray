@@ -29,8 +29,8 @@ glslang は `RAY_GLSLANG`、PATH、`tools/glslang/bin/glslang.exe` の順に探�
 - `lib/` と `program/` のファイルは、使う記号の定義元を自分で `#include` する (読む順番に頼らない)。ガード名はパスから決める (`lib/sky/fog.glsl` は `SKY_FOG_GLSL`)。漏れは `tools/include_deps.py` と validate_shaders.py が検出する
 - compute の `workGroups` / `workGroupsRender` はリテラルで書く (式・マクロ不可)
 - `block.properties` / `item.properties` は `tools/gen_block_properties.py` から生成する。ID の番号帯は `lib/ids/*.glsl` と合わせる
-- 設定を足したら `lib/settings/` の該当モジュールのファイル (ブールなら `gen_settings.py` も実行)、`shaders.properties` (画面と `profile.*`)、`lang/en_US.lang`、`lang/ja_JP.lang` をそろえる。漏れは validate_shaders.py が検出する
-- バッファ・ID・設定の割り当てを変えたら docs/architecture.md の表も直す
+- 設定を足したら `lib/settings/` の該当モジュールのファイル (`gen_settings.py` も実行)、`shaders.properties` (画面と `profile.*`)、`lang/en_US.lang`、`lang/ja_JP.lang` をそろえる。漏れは validate_shaders.py が検出する
+- バッファ・ID の割り当てを変えたら docs/architecture.md の表も直す。設定の表 (architecture.md の設定とプリセット、docs/settings.md) は `gen_settings.py` が生成する
 
 ## コードの書き方
 

@@ -31,6 +31,10 @@ BOOL_REFS = "lib/settings/bool_refs.glsl"
 PROPERTIES = "shaders.properties"
 SLIDERS_BEGIN = "# BEGIN GENERATED sliders (tools/gen_settings.py)"
 SLIDERS_END = "# END GENERATED sliders"
+ARCHITECTURE = "architecture.md"
+SETTINGS_DOC = "settings.md"
+TABLES_BEGIN = "<!-- BEGIN GENERATED settings (tools/gen_settings.py) -->"
+TABLES_END = "<!-- END GENERATED settings -->"
 
 NUMBER_RE = re.compile(r"-?\d+(\.\d+)?")
 # 値がすべて数値で 4 個以上ならスライダーにする。名前の付いたモード・プリセットはドロップダウンのままにする
@@ -70,6 +74,56 @@ def settings_files(shaders: Path = SHADERS) -> list[Path]:
         if m and m.group(1).lstrip("/") != BOOL_REFS:
             files.append(shaders / m.group(1).lstrip("/"))
     return files
+
+
+def read_properties_logical_lines(path: Path) -> list[str]:
+    """`\\` の行継続を結合した論理行のリスト"""
+    lines: list[str] = []
+    buf = ""
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        s = raw.rstrip()
+        if s.endswith("\\"):
+            buf += s[:-1] + " "
+            continue
+        lines.append(buf + s)
+        buf = ""
+    if buf:
+        lines.append(buf)
+    return lines
+
+
+def parse_profiles(shaders: Path = SHADERS) -> dict[str, list[str]]:
+    """shaders.properties の profile.* を宣言順に返す"""
+    profiles: dict[str, list[str]] = {}
+    path = shaders / PROPERTIES
+    if not path.exists():
+        return profiles
+    for line in read_properties_logical_lines(path):
+        m = re.match(r"^\s*profile\.(\w+)\s*=\s*(.*)$", line)
+        if m:
+            profiles[m.group(1)] = m.group(2).split()
+    return profiles
+
+
+def resolve_profile(name: str, profiles: dict[str, list[str]], seen: set[str] | None = None) -> dict[str, str | bool]:
+    seen = seen or set()
+    if name in seen:
+        raise ValueError(f"profile cycle: {name}")
+    seen.add(name)
+    result: dict[str, str | bool] = {}
+    for tok in profiles[name]:
+        if tok.startswith("profile."):
+            result.update(resolve_profile(tok[len("profile."):], profiles, seen))
+        elif tok.startswith("!program."):
+            continue
+        elif tok.startswith("!"):
+            result[tok[1:]] = False
+        elif "=" in tok or ":" in tok:
+            k, v = re.split(r"[=:]", tok, maxsplit=1)
+            result[k] = v
+        else:
+            result[tok] = True
+    return result
 
 
 def definitions(shaders: Path = SHADERS) -> list[Option]:
@@ -160,24 +214,90 @@ def render_sliders(opts: dict[str, Option], shaders: Path = SHADERS) -> str:
     return "\n".join(lines)
 
 
-def replace_sliders(properties: str, block: str) -> str:
+def replace_block(text: str, begin: str, end: str, block: str, where: str) -> str:
     """マーカーの間だけを差し替える。改行は元のファイルに合わせる。マーカーが 1 組でなければ例外"""
-    if properties.count(SLIDERS_BEGIN) != 1 or properties.count(SLIDERS_END) != 1:
-        raise ValueError(f"{PROPERTIES}: {SLIDERS_BEGIN} と {SLIDERS_END} が 1 組だけ必要")
-    nl = "\r\n" if "\r\n" in properties else "\n"
-    head, rest = properties.split(SLIDERS_BEGIN)
-    tail = rest.split(SLIDERS_END)[1]
-    return head + SLIDERS_BEGIN + nl + block.replace("\n", nl) + nl + SLIDERS_END + tail
+    if text.count(begin) != 1 or text.count(end) != 1 or text.index(begin) > text.index(end):
+        raise ValueError(f"{where}: {begin} と {end} が 1 組だけ必要")
+    nl = "\r\n" if "\r\n" in text else "\n"
+    head, rest = text.split(begin)
+    tail = rest.split(end)[1]
+    return head + begin + nl + block.replace("\n", nl) + nl + end + tail
+
+
+def resolved_profiles(shaders: Path) -> dict[str, dict[str, str | bool]]:
+    profiles = parse_profiles(shaders)
+    return {name: resolve_profile(name, profiles) for name in profiles}
+
+
+def shown(o: Option, v: str | bool) -> str:
+    return ("ON" if v else "OFF") if o.kind == "bool" else str(v)
+
+
+def file_title(rel: str) -> str:
+    stem = Path(rel).stem
+    return f"{'version' if stem == 'settings' else stem} (`{rel}`)"
+
+
+def render_profile_tables(opts: dict[str, Option], shaders: Path = SHADERS) -> str:
+    """プロファイルのどれかが値を決めている設定を、設定ファイルごとの表にする (太字は既定値と違う値)"""
+    resolved = resolved_profiles(shaders)
+    decided = {k for r in resolved.values() for k in r}
+    out = []
+    for path in settings_files(shaders):
+        rel = path.relative_to(shaders).as_posix()
+        rows = sorted((o for o in opts.values() if o.file == rel and o.name in decided), key=lambda o: o.line)
+        if not rows:
+            continue
+        out += [f"#### {file_title(rel)}", "", "| 設定 | 既定 | " + " | ".join(resolved) + " |", "|---|---|" + "---|" * len(resolved)]
+        for o in rows:
+            default = shown(o, o.default)
+            cells = []
+            for r in resolved.values():
+                s = shown(o, r.get(o.name, o.default))
+                cells.append(s if s == default else f"**{s}**")
+            out.append(f"| {o.name} | {default} | " + " | ".join(cells) + " |")
+        out.append("")
+    return "\n".join(out[:-1])
+
+
+SETTINGS_DOC_HEAD = """\
+# 設定の一覧
+
+全設定の既定値と値の候補です。既定値は「高」(HIGH) プロファイルと同じです。プロファイルごとの値は [architecture.md](architecture.md) の「設定とプリセット」、設定の説明は設定画面にあります
+
+このファイルは `tools/gen_settings.py` が `shaders/lib/settings/` から生成します
+"""
+
+
+def render_settings_doc(opts: dict[str, Option], shaders: Path = SHADERS) -> str:
+    out = [SETTINGS_DOC_HEAD]
+    for path in settings_files(shaders):
+        rel = path.relative_to(shaders).as_posix()
+        rows = sorted((o for o in opts.values() if o.file == rel), key=lambda o: o.line)
+        if not rows:
+            continue
+        out += [f"## {file_title(rel)}", "", "| 設定 | 既定 | 値の候補 |", "|---|---|---|"]
+        for o in rows:
+            choices = "ON / OFF" if o.kind == "bool" else ", ".join(o.values) or "-"
+            out.append(f"| {o.name} | {shown(o, o.default)} | {choices} |")
+        out.append("")
+    return "\n".join(out)
 
 
 def generated(shaders: Path = SHADERS) -> dict[Path, str]:
-    """生成物のパスと、あるべき内容 (改行は LF に正規化したもの)"""
+    """生成物のパスと、あるべき内容 (改行は LF に正規化したもの)。docs が無いフォルダ (shaders だけの展開) では文書を含めない"""
     opts = parse_settings(shaders)
     props = shaders / PROPERTIES
-    return {
+    out = {
         shaders / BOOL_REFS: render_bool_refs(opts, shaders),
-        props: replace_sliders(props.read_bytes().decode("utf-8"), render_sliders(opts, shaders)).replace("\r\n", "\n"),
+        props: replace_block(props.read_bytes().decode("utf-8"), SLIDERS_BEGIN, SLIDERS_END, render_sliders(opts, shaders), PROPERTIES).replace("\r\n", "\n"),
     }
+    docs = shaders.parent / "docs"
+    if docs.is_dir():
+        arch = docs / ARCHITECTURE
+        out[arch] = replace_block(arch.read_bytes().decode("utf-8"), TABLES_BEGIN, TABLES_END, render_profile_tables(opts, shaders), f"docs/{ARCHITECTURE}").replace("\r\n", "\n")
+        out[docs / SETTINGS_DOC] = render_settings_doc(opts, shaders)
+    return out
 
 
 def read_normalized(path: Path) -> str | None:
@@ -192,7 +312,7 @@ def check(shaders: Path = SHADERS) -> list[str]:
         return [str(e)]
     for path, text in expected.items():
         if read_normalized(path) != text:
-            problems.append(f"生成物が古い: {path.relative_to(shaders).as_posix()} (uv run tools/gen_settings.py で再生成する)")
+            problems.append(f"生成物が古い: {path.relative_to(shaders.parent).as_posix()} (uv run tools/gen_settings.py で再生成する)")
     return problems
 
 
@@ -216,7 +336,7 @@ def main() -> int:
         if read_normalized(path) != text:
             nl = "\r\n" if path.exists() and b"\r\n" in path.read_bytes() else "\n"
             path.write_bytes(text.replace("\n", nl).encode("utf-8"))
-            print(f"書き込み: {path.relative_to(shaders).as_posix()}")
+            print(f"書き込み: {path.relative_to(shaders.parent).as_posix()}")
     return 0
 
 
