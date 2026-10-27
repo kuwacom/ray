@@ -26,6 +26,7 @@
 
 #include "/lib/settings.glsl"
 #include "/lib/common/dimension.glsl"
+#include "/lib/common/frame_offset.glsl"
 #include "/lib/common/math.glsl"
 #include "/lib/common/samplers.glsl"
 #include "/lib/common/transforms.glsl"
@@ -241,11 +242,11 @@ vec2 cloudLayerSegment(float y0, float dy, float base, float top) {
  */
 ivec2 cloudSampleOffset(int frame) {
 #if defined CLOUD_TEMPORAL && CLOUD_RES > 1
-    const ivec2 BAYER2[4] = ivec2[4](ivec2(0, 0), ivec2(1, 1), ivec2(1, 0), ivec2(0, 1));
-    int i = frame % (CLOUD_RES * CLOUD_RES);
     #if CLOUD_RES == 2
-        return BAYER2[i];
+        return bayerOffset2(frame % (CLOUD_RES * CLOUD_RES));
     #else
+        const ivec2 BAYER2[4] = BAYER2_ORDER;
+        int i = frame % (CLOUD_RES * CLOUD_RES);
         return BAYER2[i & 3] * 2 + BAYER2[(i >> 2) & 3];
     #endif
 #else

@@ -8,6 +8,7 @@
  */
 #include "/lib/common/common.glsl"
 #include "/lib/common/exposure.glsl"
+#include "/lib/common/temporal.glsl"
 #include "/lib/post/post_internal.glsl"
 
 in vec2 texcoord;
@@ -72,6 +73,42 @@ float expectedPreviousDistance(vec2 uv, float depth, out float tolerance) {
         return length(screenToPlayer(vec3(uv, depth)));
     }
     return getPreviousViewDistance(uv, depth);
+}
+
+// ディスオクルージョン: 履歴の 2x2 の距離のどれかが、中心か最も手前の点の予想距離と合えば有効
+bool taaHistoryValid(vec2 prevUv, ivec2 maxTexel, float expCenter, float tolCenter, float expClosest, float tolClosest) {
+    ivec2 base = ivec2(floor(prevUv * viewSize() - 0.5));
+    bool matched = false;
+    for (int i = 0; i < 4; i++) {
+        ivec2 p = clamp(base + ivec2(i & 1, i >> 1), ivec2(0), maxTexel);
+        float stored = texelFetch(colortex13, p, 0).a;
+        matched = matched || historyMatches(stored, expCenter, tolCenter) || historyMatches(stored, expClosest, tolClosest);
+    }
+    return matched;
+}
+
+// 履歴 (線形 HDR) を近傍の統計 (平均・標準偏差・min/max) の箱へ切り詰めて YCoCg で返す
+vec3 taaClipHistory(vec3 history, float exposure, vec3 mean, vec3 sigma, vec3 boxMin, vec3 boxMax, float motionPx) {
+    float motion = saturate(motionPx / 4.0);
+    float gamma = mix(TAA_GAMMA_STATIC, TAA_GAMMA_MOVING, motion);
+    /*
+     * 静止時は分散の箱だけで切る。min-max の箱と重ねると、ジッターで近傍の極値が毎フレーム入れ替わる高コントラストの
+     * テクスチャ (自動法線の付いた石・鉱石) で履歴が毎フレーム別の値に切り詰められ、静止していてもテクセル単位でちらつく
+     * 動いている時はゴーストを減らすため min-max の箱とも重ねる
+     */
+    vec3 clipMin = mean - gamma * sigma;
+    vec3 clipMax = mean + gamma * sigma;
+    if (motion > 0.0) {
+        clipMin = mix(clipMin, max(boxMin, clipMin), motion);
+        clipMax = mix(clipMax, min(boxMax, clipMax), motion);
+    }
+    return clipToBox(rgbToYCoCg(taaCompress(history, exposure)), clipMin, clipMax);
+}
+
+float taaBlendAlpha(float motionPx, float centerDepth) {
+    float alpha = mix(TAA_BLEND_STATIC, TAA_BLEND_MOVING, saturate(motionPx / 6.0));
+    if (isHandDepth(centerDepth)) alpha = max(alpha, TAA_BLEND_HAND);
+    return alpha;
 }
 
 /*
@@ -152,7 +189,7 @@ void taaWarped() {
         }
     }
     vec3 mean = m1 / 9.0;
-    vec3 sigma = sqrt(max(m2 / 9.0 - mean * mean, 0.0));
+    vec3 sigma = momentSigma(m2, mean, 9.0);
 
     // 前フレームの出力の位置
     vec2 closestUv = nearestUv + vec2(closestOffset) * texelSize();
@@ -164,36 +201,20 @@ void taaWarped() {
     vec3 currentColor = mix(smoothColor, nearColor, superResEff);
     vec3 currentYcc = rgbToYCoCg(taaCompress(currentColor, exposure));
 
-    bool valid = all(greaterThanEqual(prevUv, vec2(0.0))) && all(lessThanEqual(prevUv, vec2(1.0)));
+    bool valid = reprojectionInside(prevUv);
     vec3 history = vec3(0.0);
     if (valid) {
         float tolCenter, tolClosest;
         float expCenter = expectedPreviousDistance(nearestUv - jitter, centerDepth, tolCenter);
         float expClosest = expectedPreviousDistance(closestUv - jitter, closestDepth, tolClosest);
-        ivec2 base = ivec2(floor(prevUv * viewSize() - 0.5));
-        bool matched = false;
-        for (int i = 0; i < 4; i++) {
-            ivec2 p = clamp(base + ivec2(i & 1, i >> 1), ivec2(0), maxTexel);
-            float stored = texelFetch(colortex13, p, 0).a;
-            matched = matched || historyMatches(stored, expCenter, tolCenter) || historyMatches(stored, expClosest, tolClosest);
-        }
-        valid = matched;
+        valid = taaHistoryValid(prevUv, maxTexel, expCenter, tolCenter, expClosest, tolClosest);
         history = sanitizeColor(sampleCatmullRom(colortex13, prevUv, viewSize()));
     }
 
     vec3 resultYcc;
     if (valid) {
-        float motion = saturate(motionPx / 4.0);
-        float gamma = mix(TAA_GAMMA_STATIC, TAA_GAMMA_MOVING, motion);
-        vec3 clipMin = mean - gamma * sigma;
-        vec3 clipMax = mean + gamma * sigma;
-        if (motion > 0.0) {
-            clipMin = mix(clipMin, max(boxMin, clipMin), motion);
-            clipMax = mix(clipMax, min(boxMax, clipMax), motion);
-        }
-        vec3 historyYcc = clipToBox(rgbToYCoCg(taaCompress(history, exposure)), clipMin, clipMax);
-        float alpha = mix(TAA_BLEND_STATIC, TAA_BLEND_MOVING, saturate(motionPx / 6.0));
-        if (isHandDepth(centerDepth)) alpha = max(alpha, TAA_BLEND_HAND);
+        vec3 historyYcc = taaClipHistory(history, exposure, mean, sigma, boxMin, boxMax, motionPx);
+        float alpha = taaBlendAlpha(motionPx, centerDepth);
         // 出力の画素の中心から遠い元の画素は弱く混ぜる
         alpha = max(alpha * mix(1.0, nearWeight, superResEff), LENS_WARP_TAA_MIN_BLEND);
         resultYcc = mix(historyYcc, currentYcc, alpha);
@@ -248,51 +269,28 @@ void main() {
         }
     }
     vec3 mean = m1 / 9.0;
-    vec3 sigma = sqrt(max(m2 / 9.0 - mean * mean, 0.0));
+    vec3 sigma = momentSigma(m2, mean, 9.0);
     vec3 currentYcc = rgbToYCoCg(taaCompress(centerColor, exposure));
 
     vec2 closestUv = uv + vec2(closestOffset) * texelSize();
     vec2 prevUv = uv + (getPreviousUv(closestUv, closestDepth) - closestUv);
     float motionPx = length((prevUv - uv) * viewSize());
 
-    bool valid = all(greaterThanEqual(prevUv, vec2(0.0))) && all(lessThanEqual(prevUv, vec2(1.0)));
+    bool valid = reprojectionInside(prevUv);
 
     vec3 history = vec3(0.0);
     if (valid) {
-        // ディスオクルージョン: 履歴の 2x2 の距離のどれかが、中心か最も手前の点の予想距離と合えば有効
         float tolCenter, tolClosest;
         float expCenter = expectedPreviousDistance(unjitteredUv, centerDepth, tolCenter);
         float expClosest = expectedPreviousDistance(closestUv - taaJitterUv(), closestDepth, tolClosest);
-        ivec2 base = ivec2(floor(prevUv * viewSize() - 0.5));
-        bool matched = false;
-        for (int i = 0; i < 4; i++) {
-            ivec2 p = clamp(base + ivec2(i & 1, i >> 1), ivec2(0), maxTexel);
-            float stored = texelFetch(colortex13, p, 0).a;
-            matched = matched || historyMatches(stored, expCenter, tolCenter) || historyMatches(stored, expClosest, tolClosest);
-        }
-        valid = matched;
+        valid = taaHistoryValid(prevUv, maxTexel, expCenter, tolCenter, expClosest, tolClosest);
         history = sanitizeColor(sampleCatmullRom(colortex13, prevUv, viewSize()));
     }
 
     vec3 resultYcc;
     if (valid) {
-        float motion = saturate(motionPx / 4.0);
-        float gamma = mix(TAA_GAMMA_STATIC, TAA_GAMMA_MOVING, motion);
-        /*
-         * 静止時は分散の箱だけで切る。min-max の箱と重ねると、ジッターで近傍の極値が毎フレーム入れ替わる高コントラストの
-         * テクスチャ (自動法線の付いた石・鉱石) で履歴が毎フレーム別の値に切り詰められ、静止していてもテクセル単位でちらつく
-         * 動いている時はゴーストを減らすため min-max の箱とも重ねる
-         */
-        vec3 clipMin = mean - gamma * sigma;
-        vec3 clipMax = mean + gamma * sigma;
-        if (motion > 0.0) {
-            clipMin = mix(clipMin, max(boxMin, clipMin), motion);
-            clipMax = mix(clipMax, min(boxMax, clipMax), motion);
-        }
-        vec3 historyYcc = clipToBox(rgbToYCoCg(taaCompress(history, exposure)), clipMin, clipMax);
-
-        float alpha = mix(TAA_BLEND_STATIC, TAA_BLEND_MOVING, saturate(motionPx / 6.0));
-        if (isHandDepth(centerDepth)) alpha = max(alpha, TAA_BLEND_HAND);
+        vec3 historyYcc = taaClipHistory(history, exposure, mean, sigma, boxMin, boxMax, motionPx);
+        float alpha = taaBlendAlpha(motionPx, centerDepth);
         resultYcc = mix(historyYcc, currentYcc, alpha);
     } else {
         // 履歴が無い所は 1 フレームだけなのでジャギーが目立つ。近傍平均へ少し寄せて和らげる

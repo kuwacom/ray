@@ -39,8 +39,8 @@ layout(local_size_x = 8, local_size_y = 8) in;
 #endif
 // 接触影を付ける光源数 (寄与の大きい順)。全光源に付けると EXTREME で重くなり過ぎる
 const int CONTACT_SHADOW_LIGHTS = LIGHT_CONTACT_SHADOW_COUNT;
-const float CONTACT_SHADOW_LENGTH = 1.25;
-const int CONTACT_SHADOW_STEPS = 8;
+const float LIGHT_CONTACT_LENGTH = 1.25;
+const int LIGHT_CONTACT_STEPS = 8;
 
 /*
  * 光源 1 つの可視率 (色付き)。終点を光源半径の円板上で揺らして半影を作る
@@ -60,8 +60,8 @@ vec3 traceBlockLight(int li, vec3 fromVoxel, vec3 playerPos, vec3 geoNormal, uin
 #ifdef LIGHT_CONTACT_SHADOWS
     if (contact && maxOf(vis) > 0.0) {
         // 光源自身の形 (たいまつの棒・ランタンの枠) で遮らないよう手前で止める
-        float len = min(CONTACT_SHADOW_LENGTH, dist - 0.5);
-        vis *= screenSpaceShadow(playerPos, geoNormal, normalize(target - fromVoxel), len, CONTACT_SHADOW_STEPS, dither);
+        float len = min(LIGHT_CONTACT_LENGTH, dist - 0.5);
+        vis *= screenSpaceShadow(playerPos, geoNormal, normalize(target - fromVoxel), len, LIGHT_CONTACT_STEPS, dither);
     }
 #endif
     return vis;

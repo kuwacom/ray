@@ -12,6 +12,8 @@
  */
 #include "/lib/common/common.glsl"
 #include "/lib/common/encoding.glsl"
+#include "/lib/common/joint_bilateral.glsl"
+#include "/lib/common/temporal.glsl"
 #include "/lib/light/light.glsl"
 #include "/lib/post/post.glsl"
 
@@ -108,8 +110,8 @@ void main() {
         vec2 d = vec2(l) - lp;
         float d2 = dot(d, d);
         float w = exp(-d2 / (2.0 * SPATIAL_SIGMA * SPATIAL_SIGMA));
-        w *= exp(-abs(raw.a - viewDist) / depthTol);
-        w *= pow(saturate(dot(n, geoNormal)), NORMAL_POWER);
+        w *= bilateralDepthWeight(raw.a, viewDist, depthTol);
+        w *= bilateralNormalWeight(n, geoNormal, NORMAL_POWER);
         vec3 r = safeRatio(raw.rgb, u);
         if (d2 < nearestD) { nearestD = d2; nearestRatio = r; }
         if (w < 1e-4) continue;
@@ -124,7 +126,7 @@ void main() {
     ratio = luminance(sumU) > 0.0 ? safeRatio(sumS, sumU) : nearestRatio;
     if (wStat > 1e-4) {
         mean = m1 / wStat;
-        sigma = sqrt(max(m2 / wStat - mean * mean, 0.0));
+        sigma = momentSigma(m2, mean, wStat);
     } else {
         mean = ratio;
     }

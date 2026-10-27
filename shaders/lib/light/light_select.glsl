@@ -12,6 +12,7 @@
 
 #include "/lib/settings.glsl"
 #include "/lib/common/constants.glsl"
+#include "/lib/common/frame_offset.glsl"
 #include "/lib/common/math.glsl"
 #include "/lib/common/transforms.glsl"
 #include "/lib/common/voxel_space.glsl"
@@ -158,10 +159,9 @@ ivec2 traceFrameOffset(int frame) {
 #if LIGHT_TRACE_RES == 1
     return ivec2(0);
 #elif LIGHT_TRACE_RES == 2
-    const ivec2 o[4] = ivec2[4](ivec2(0, 0), ivec2(1, 1), ivec2(1, 0), ivec2(0, 1));
-    return o[frame & 3];
+    return bayerOffset2(frame & 3);
 #else
-    // 4x4 Bayer の順
+    // 4x4 Bayer の順 (bayerOffset2 を 2 段重ねた並びと同じ)
     const ivec2 o[16] = ivec2[16](
         ivec2(0, 0), ivec2(2, 2), ivec2(2, 0), ivec2(0, 2), ivec2(1, 1), ivec2(3, 3), ivec2(3, 1), ivec2(1, 3),
         ivec2(1, 0), ivec2(3, 2), ivec2(3, 0), ivec2(1, 2), ivec2(0, 1), ivec2(2, 3), ivec2(2, 1), ivec2(0, 3)

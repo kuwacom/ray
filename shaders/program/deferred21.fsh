@@ -6,6 +6,7 @@
  * sky モジュール (lib/sky)
  */
 #include "/lib/common/common.glsl"
+#include "/lib/common/temporal.glsl"
 #include "/lib/buffers/frame_data.glsl"
 #include "/lib/sky/sky.glsl"
 
@@ -24,6 +25,7 @@ const float CLOUD_BLEND_EXACT = CLOUD_RES == 1 ? 0.05 : 0.6;
 const float CLOUD_BLEND_INTERPOLATED = 0.03;
 // 近傍クランプの箱をノイズ分だけ広げる割合 (狭いとディザのノイズで履歴が揺れる)
 const float CLOUD_CLAMP_EXPAND = CLOUD_RES == 1 ? 1.0 : 0.5;
+const vec4 CLOUD_CLAMP_PAD = vec4(vec3(1e-4), 0.01);
 
 vec4 fetchLowRes(ivec2 q) {
     return texelFetch(colortex10, clamp(q, ivec2(0), cloudLowResSize() - 1), 0);
@@ -76,7 +78,7 @@ void main() {
                 #endif
             }
         }
-        vec4 pad = (hi - lo) * CLOUD_CLAMP_EXPAND + vec4(vec3(1e-4), 0.01);
+        vec4 pad = neighborBoxMargin(lo, hi, CLOUD_CLAMP_EXPAND, CLOUD_CLAMP_PAD);
         bool exact = all(equal(texel, nearest * CLOUD_RES + offset));
         if (exact) current = fetchLowRes(nearest);
         #if CLOUD_RES == 1
@@ -87,7 +89,7 @@ void main() {
 
         vec3 dir = normalize(viewToPlayerDir(screenToView(vec3(texcoord, 1.0))));
         vec2 prevUv = cloudPreviousUv(dir);
-        bool valid = all(greaterThanEqual(prevUv, vec2(0.0))) && all(lessThanEqual(prevUv, vec2(1.0))) && frameData.skyParams[1].y > 1.5;
+        bool valid = reprojectionInside(prevUv) && frameData.skyParams[1].y > 1.5;
         if (valid) {
             vec4 history = texture(colortex11, prevUv);
             history = clamp(history, lo - pad, hi + pad);

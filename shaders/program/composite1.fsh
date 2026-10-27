@@ -14,6 +14,7 @@
  * それ以外 (パーティクル・手持ちの半透明・雨): 乗算済みアルファでそのまま重ねる
  */
 #include "/lib/common/common.glsl"
+#include "/lib/common/joint_bilateral.glsl"
 #include "/lib/surface/surface.glsl"
 #include "/lib/sky/sky.glsl"
 #include "/lib/light/light.glsl"
@@ -365,7 +366,7 @@ vec4 sampleWaterReflection(ivec2 texel, float dist, out float skyWeight) {
             decodeTranslucentData(texelFetch(colortex5, src, 0), n, lm, mat);
             if (mat != MAT_WATER) continue;
             vec2 delta = abs(vec2(src - texel)) * 0.5;
-            float w = max(1.0 - delta.x, 0.05) * max(1.0 - delta.y, 0.05) * exp(-abs(r.a - dist) / (dist * 0.02 + 0.05));
+            float w = max(1.0 - delta.x, 0.05) * max(1.0 - delta.y, 0.05) * bilateralDepthWeight(r.a, dist, dist * 0.02 + 0.05);
             if (sky) skyWeight += w;
             else sum += r.rgb * w;
             wsum += w;

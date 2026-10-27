@@ -9,6 +9,7 @@
 #define IMG_COLORIMG12
 #define IMG_FOG_HISTORY
 #include "/lib/common/common.glsl"
+#include "/lib/common/temporal.glsl"
 #include "/lib/buffers/frame_data.glsl"
 #include "/lib/sky/sky.glsl"
 #include "/lib/surface/surface.glsl"
@@ -27,6 +28,7 @@ layout(local_size_x = 8, local_size_y = 8) in;
 // 新しいフレームの混合率 (約 5 フレームの蓄積)
 const float VL_HISTORY_BLEND = 0.2;
 const float VL_CLAMP_EXPAND = 0.35;
+const vec4 VL_CLAMP_PAD = vec4(vec3(1e-6), 0.005);
 
 shared vec4 sharedFog[8][8];
 
@@ -93,13 +95,13 @@ void main() {
     } else {
         prevUv = playerToPrevScreen(playerPos).xy;
     }
-    bool valid = all(greaterThanEqual(prevUv, vec2(0.0))) && all(lessThanEqual(prevUv, vec2(1.0))) && frameData.skyParams[1].y > 1.5;
+    bool valid = reprojectionInside(prevUv) && frameData.skyParams[1].y > 1.5;
 
     vec4 result = raw;
     if (valid) {
         vec2 prevLowPos = prevUv * viewSize() / float(VL_RES) - 0.5;
         vec4 history = sampleFogHistory(prevLowPos);
-        vec4 pad = (hi - lo) * VL_CLAMP_EXPAND + vec4(vec3(1e-6), 0.005);
+        vec4 pad = neighborBoxMargin(lo, hi, VL_CLAMP_EXPAND, VL_CLAMP_PAD);
         history = clamp(history, lo - pad, hi + pad);
         result = mix(history, raw, VL_HISTORY_BLEND);
     }

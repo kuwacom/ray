@@ -7,6 +7,7 @@
 #include "/lib/settings.glsl"
 #include "/lib/common/color.glsl"
 #include "/lib/common/dimension.glsl"
+#include "/lib/common/frame_offset.glsl"
 #include "/lib/common/look_presets.glsl"
 #include "/lib/common/math.glsl"
 #include "/lib/common/samplers.glsl"
@@ -96,8 +97,7 @@ float skylightCurve(float lm) {
  * 低解像度パス (GI_RES / 反射) のジッター: 2x2 ブロックの中の 1 ピクセルを 4 フレームで巡回する
  * デノイズ側はこのオフセットで低解像度テクセルが表すフル解像度のピクセルを復元する
  */
-// 対角を先に埋める順序にすると 2 フレームで 2x2 の偏りが消える
-const ivec2 LOW_RES_OFFSETS[4] = ivec2[4](ivec2(0, 0), ivec2(1, 1), ivec2(1, 0), ivec2(0, 1));
+const ivec2 LOW_RES_OFFSETS[4] = BAYER2_ORDER;
 
 ivec2 lowResOffset(int frame) { return LOW_RES_OFFSETS[frame & 3]; }
 

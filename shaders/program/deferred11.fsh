@@ -9,6 +9,8 @@
  *    (分散クリップ。ディスオクルージョンで古い値が残るのも同じクリップで抑える)
  */
 #include "/lib/common/common.glsl"
+#include "/lib/common/joint_bilateral.glsl"
+#include "/lib/common/temporal.glsl"
 #include "/lib/surface/surface.glsl"
 #include "/lib/post/post.glsl"
 
@@ -69,8 +71,8 @@ void main() {
             float dP = texelFetch(depthtex1, P, 0).r;
             if (dP >= 1.0 || isHandDepth(dP)) continue;
             vec4 raw = texelFetch(giRawSampler, L, 0);
-            float wDepth = exp(-abs(linearizeDepth(dP) - linZ) / (linZ * GI_DEPTH_SIGMA + 0.05));
-            float wNormal = pow(saturate(dot(normal, readGeoNormal(P))), GI_NORMAL_POWER);
+            float wDepth = bilateralDepthWeight(linearizeDepth(dP), linZ, linZ * GI_DEPTH_SIGMA + 0.05);
+            float wNormal = bilateralNormalWeight(normal, readGeoNormal(P), GI_NORMAL_POWER);
             float wSpatial = exp(-float(dx * dx + dy * dy) / float(GI_FILTER_RADIUS * GI_FILTER_RADIUS + 1));
             float w = wDepth * wNormal * wSpatial + 1e-5;
             sum += raw * w;
@@ -84,7 +86,7 @@ void main() {
 #if GI_DENOISE >= 1
     vec2 prevUv = getPreviousUv(texcoord, depth);
     if (all(greaterThan(prevUv, vec2(0.0))) && all(lessThan(prevUv, vec2(1.0)))) {
-        vec4 sigma = sqrt(max(sum2 / max(wsum, 1e-5) - mean * mean, 0.0));
+        vec4 sigma = momentSigma(sum2, mean, max(wsum, 1e-5));
         vec4 history = texture(colortex9, prevUv);
         history = clamp(history, mean - sigma * GI_HISTORY_CLIP - 1e-3, mean + sigma * GI_HISTORY_CLIP + 1e-3);
         result = mix(history, mean, GI_TEMPORAL_ALPHA);

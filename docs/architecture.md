@@ -637,7 +637,7 @@ post モジュールが提供 (`#include "/lib/post/post.glsl"`):
 | `vec3 tonemap(vec3 x)` | post, デバッグ表示 | トーンマップ |
 | `float getExposure()` (`lib/common/exposure.glsl`) | 全員 | FrameData.exposure |
 
-共通基盤: `lib/common/*` (座標変換・ボクセル空間・影空間・ノイズ・ブルーノイズ・色空間・数学・G バッファ pack/unpack・ジッター・水面 (`water.glsl`)・影マップの 1 点の読み取り (`shadow_volume.glsl`)・露出 (`exposure.glsl`)), `lib/buffers/*`, `lib/ids/*`。`common.glsl` 自体は核 (settings・dimension・constants・uniforms・samplers・math・shading_types) だけを読み、ほかは使うファイルが自分で include する (SSBO と images も)。
+共通基盤: `lib/common/*` (座標変換・ボクセル空間・影空間・ノイズ・ブルーノイズ・色空間・数学・G バッファ pack/unpack・ジッター・水面 (`water.glsl`)・影マップの 1 点の読み取り (`shadow_volume.glsl`)・露出 (`exposure.glsl`)・時間方向の蓄積の共通部 (`temporal.glsl`)・深度/法線の重み (`joint_bilateral.glsl`)・低解像度のジッターの並び (`frame_offset.glsl`)), `lib/buffers/*`, `lib/ids/*`。`common.glsl` 自体は核 (settings・dimension・constants・uniforms・samplers・math・shading_types) だけを読み、ほかは使うファイルが自分で include する (SSBO と images も)。
 
 ### バッファの読み書き権
 

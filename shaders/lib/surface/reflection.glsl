@@ -14,6 +14,7 @@
 #include "/lib/common/color.glsl"
 #include "/lib/common/encoding.glsl"
 #include "/lib/common/gbuffer.glsl"
+#include "/lib/common/joint_bilateral.glsl"
 #include "/lib/common/math.glsl"
 #include "/lib/common/samplers.glsl"
 #include "/lib/common/transforms.glsl"
@@ -219,7 +220,7 @@ vec4 sampleReflection(ivec2 texel, float dist, vec3 normal) {
             ivec2 src = L * 2 + offset;
             vec2 delta = abs(vec2(src - texel)) * 0.5;
             float wBilinear = max(1.0 - delta.x, 0.05) * max(1.0 - delta.y, 0.05);
-            float wDepth = exp(-abs(r.a - dist) / (dist * 0.02 + 0.05));
+            float wDepth = bilateralDepthWeight(r.a, dist, dist * 0.02 + 0.05);
             float w = wBilinear * wDepth;
             /*
              * 低解像度の 1 テクセルは隣のピクセルの法線で反射を求めている。自動生成法線はテクセルごとに向きが違うので
@@ -229,7 +230,7 @@ vec4 sampleReflection(ivec2 texel, float dist, vec3 normal) {
             float wc = w;
             if (useNormal) {
                 vec3 ns = readGBufferNormal(min(src, ivec2(viewSize()) - 1));
-                wc *= REFLECTION_NORMAL_WEIGHT_MIN + pow(saturate(dot(normal, ns)), REFLECTION_NORMAL_POWER);
+                wc *= REFLECTION_NORMAL_WEIGHT_MIN + bilateralNormalWeight(normal, ns, REFLECTION_NORMAL_POWER);
             }
             sum += r.rgb * wc;
             csum += wc;
