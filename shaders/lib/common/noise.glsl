@@ -19,14 +19,19 @@ uvec3 pcg3d(uvec3 v) {
     return v;
 }
 
-float hash1(uint v) { return float(pcgHash(v)) / 4294967295.0; }
-vec3 hash3(uvec3 v) { return vec3(pcg3d(v)) / 4294967295.0; }
+const float UINT32_MAX_F = 4294967295.0;
+
+float hash1(uint v) { return float(pcgHash(v)) / UINT32_MAX_F; }
+vec3 hash3(uvec3 v) { return vec3(pcg3d(v)) / UINT32_MAX_F; }
 vec3 hash3(ivec2 p, int frame) { return hash3(uvec3(uvec2(p), uint(frame))); }
 
 // Interleaved Gradient Noise (Jimenez 2014)。frame で時間方向にずらす
+const float IGN_FRAME_STEP = 5.588238;
+const vec3 IGN_MAGIC = vec3(0.06711056, 0.00583715, 52.9829189);
+
 float interleavedGradientNoise(vec2 pixel, int frame) {
-    pixel += 5.588238 * float(frame & 63);
-    return fract(52.9829189 * fract(0.06711056 * pixel.x + 0.00583715 * pixel.y));
+    pixel += IGN_FRAME_STEP * float(frame & 63);
+    return fract(IGN_MAGIC.z * fract(IGN_MAGIC.x * pixel.x + IGN_MAGIC.y * pixel.y));
 }
 
 // R2 低食い違い列 (Roberts 2018)

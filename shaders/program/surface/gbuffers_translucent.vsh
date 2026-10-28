@@ -9,6 +9,7 @@
     #define SSBO_LIGHT_BINS_WRITE
 #endif
 #include "/lib/common/common.glsl"
+#include "/lib/common/constants.glsl"
 #include "/lib/common/jitter.glsl"
 #include "/lib/surface/surface.glsl"
 #ifdef GBUF_ENTITIES_TRANSLUCENT
@@ -31,7 +32,7 @@ flat out int blockId;
 
 void main() {
     texcoord = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy;
-    lmcoord = saturate(((gl_TextureMatrix[1] * gl_MultiTexCoord1).xy - 1.0 / 32.0) * 32.0 / 30.0);
+    lmcoord = saturate(((gl_TextureMatrix[1] * gl_MultiTexCoord1).xy - 1.0 / LIGHTMAP_TEXELS) * LIGHTMAP_TEXELS / LIGHTMAP_RANGE);
     glcolor = gl_Color;
     normalPlayer = viewToPlayerDir(normalize(gl_NormalMatrix * gl_Normal));
     tangentPlayer = vec4(viewToPlayerDir(normalize(gl_NormalMatrix * at_tangent.xyz)), at_tangent.w);

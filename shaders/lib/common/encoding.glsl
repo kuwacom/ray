@@ -19,19 +19,22 @@ vec3 octDecode(vec2 e) {
     return normalize(n);
 }
 
+const float UNORM8_MAX = 255.0;
+const float UNORM16_MAX = 65535.0;
+
 // 16bit unorm チャンネル 1 つに 8bit 値 2 つを詰める (a,b は [0,1])
 float pack2x8(vec2 v) {
-    uvec2 u = uvec2(round(saturate(v) * 255.0));
-    return float(u.x | (u.y << 8u)) / 65535.0;
+    uvec2 u = uvec2(round(saturate(v) * UNORM8_MAX));
+    return float(u.x | (u.y << 8u)) / UNORM16_MAX;
 }
 
 vec2 unpack2x8(float p) {
-    uint u = uint(round(p * 65535.0));
-    return vec2(u & 255u, u >> 8u) / 255.0;
+    uint u = uint(round(p * UNORM16_MAX));
+    return vec2(u & 255u, u >> 8u) / UNORM8_MAX;
 }
 
 // 8bit unorm チャンネルに 0-255 の整数 ID を格納
-float encodeId8(int id) { return float(clamp(id, 0, 255)) / 255.0; }
-int decodeId8(float v) { return int(round(v * 255.0)); }
+float encodeId8(int id) { return float(clamp(id, 0, 255)) / UNORM8_MAX; }
+int decodeId8(float v) { return int(round(v * UNORM8_MAX)); }
 
 #endif

@@ -6,6 +6,7 @@
 // このプログラムで書く image (lib/buffers/images.glsl。宣言は 8 個まで)
 #define IMG_VOXEL_BLOCK
 #include "/lib/common/common.glsl"
+#include "/lib/common/constants.glsl"
 #include "/lib/light/light.glsl"
 #include "/lib/surface/surface.glsl"
 
@@ -23,7 +24,7 @@ void main() {
     texcoord = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy;
     glcolor = gl_Color;
     vec2 lm = (gl_TextureMatrix[1] * gl_MultiTexCoord1).xy;
-    skyLight = saturate((lm.y - 1.0 / 32.0) * 32.0 / 30.0);
+    skyLight = saturate((lm.y - 1.0 / LIGHTMAP_TEXELS) * LIGHTMAP_TEXELS / LIGHTMAP_RANGE);
     normalPlayer = mat3(shadowModelViewInverse) * normalize(gl_NormalMatrix * gl_Normal);
     blockId = int(round(mc_Entity.x));
     // 色付き影はブロックライト (floodfill / 光源シャドウ) と同じ透過色の表を使う

@@ -46,7 +46,7 @@ void main() {
     vec2 lmT;
     int matT;
     decodeTranslucentData(data, nT, lmT, matT);
-    int tintIndex = int(round(unpack2x8(data.a).y * 255.0));
+    int tintIndex = int(round(unpack2x8(data.a).y * UNORM8_MAX));
     float dither = interleavedGradientNoise(gl_FragCoord.xy, frameCounter);
 
     bool hasSurface = d0 < d1 && !isHandDepth(d0) && (matT == MAT_WATER || isReflectiveTranslucent(matT));

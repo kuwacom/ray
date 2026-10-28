@@ -87,13 +87,13 @@ int readMaterialId(ivec2 texel) { return decodeId8(texelFetch(colortex1, texel, 
  * 色は colortex4 (RGBA16F, 乗算済みアルファ)
  */
 vec4 encodeTranslucentData(vec3 normal, vec2 lightmap, int materialId) {
-    return vec4(octEncode(normal), pack2x8(lightmap), pack2x8(vec2(float(materialId) / 255.0, 0.0)));
+    return vec4(octEncode(normal), pack2x8(lightmap), pack2x8(vec2(float(materialId) / UNORM8_MAX, 0.0)));
 }
 
 void decodeTranslucentData(vec4 d, out vec3 normal, out vec2 lightmap, out int materialId) {
     normal = octDecode(d.rg);
     lightmap = unpack2x8(d.b);
-    materialId = int(round(unpack2x8(d.a).x * 255.0));
+    materialId = int(round(unpack2x8(d.a).x * UNORM8_MAX));
 }
 
 #endif

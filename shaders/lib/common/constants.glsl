@@ -22,6 +22,10 @@ const float MIN_AMBIENT = 0.004;          // 洞窟の最低限の可視光 (真
 const float NIGHT_VISION_AMBIENT = 0.6;
 const float LIGHT_LEVEL_MAX = 15.0;       // バニラの光源レベルの最大値
 
+// ライトマップ座標を [0,1] に直す: (x - 1/32) * 32 / 30 で、1/32 が 0、31/32 が 1
+const float LIGHTMAP_TEXELS = 32.0;
+const float LIGHTMAP_RANGE = 30.0;
+
 // 深度がこれ未満なら手持ちアイテム (Iris は手を near 寄りの深度で描く)
 const float HAND_DEPTH_THRESHOLD = 0.56;
 

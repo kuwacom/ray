@@ -107,7 +107,7 @@ const float WATER_FALL_EVOLVE = 0.35;
 vec3 waterFallTangent(vec3 geoNormal) { return normalize(vec3(-geoNormal.z, 0.0, geoNormal.x)); }
 
 float waterFallLayerResolved(int i, float footprint) {
-    return footprint > 0.0 ? 1.0 - smoothstep(1.5, 4.0, footprint * WATER_TEX_SIZE / WATER_FALL_TILE[i]) : 1.0;
+    return footprint > 0.0 ? 1.0 - smoothstep(WATER_LOD_FADE_START, WATER_LOD_FADE_END, footprint * WATER_TEX_SIZE / WATER_FALL_TILE[i]) : 1.0;
 }
 
 // 側面の波の勾配 (面内の 2D: x = 横, y = 高さ)

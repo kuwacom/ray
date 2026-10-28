@@ -28,6 +28,8 @@ const float WATER_LAYER_RATIO = 2.9;
 const float WATER_LAYER0_TILE = 192.0;
 const float WATER_BAND_CENTER = 8.5;
 const float WATER_TEX_SIZE = 128.0;
+const float WATER_LOD_FADE_START = 1.5;  // 細かい波の層を画素の大きさ (footprint) で薄める範囲
+const float WATER_LOD_FADE_END = 4.0;
 const float WATER_TEX_SLOPE_RANGE = 3.0;
 const float WATER_TEX_HEIGHT_RANGE = 0.085259;
 const float WATER_TEX_HEIGHT_SIGMA = 0.021315;
@@ -174,7 +176,7 @@ vec4 waterLayer(vec2 p, int i, float amp, float t) {
 // 層が画素の大きさ footprint (ブロック) に対して表せる割合。帯の短い端 (タイルの約 5 テクセル) が 2 画素を切る前に消す
 // (2.5-6 テクセル/画素では、帯の短い側が 1-2 画素の波になって中距離の水面が細かい白い砂目にざらついた)
 float waterLayerResolved(int i, float footprint) {
-    return footprint > 0.0 ? 1.0 - smoothstep(1.5, 4.0, footprint * WATER_TEX_SIZE / waterLayerTile(i)) : 1.0;
+    return footprint > 0.0 ? 1.0 - smoothstep(WATER_LOD_FADE_START, WATER_LOD_FADE_END, footprint * WATER_TEX_SIZE / waterLayerTile(i)) : 1.0;
 }
 
 // 層 first .. last-1 の和 (高さ, 勾配, 発散)。画素より細かい層は足さない (ちらつきの元になるため)
