@@ -27,7 +27,13 @@ glslang は `RAY_GLSLANG`、PATH、`tools/glslang/bin/glslang.exe` の順に探�
 - `*.properties` は ASCII のみ。Iris は ISO-8859-1 で読むので、日本語はコメントでも前処理を壊す
 - image uniform は 1 ステージ 8 個まで (NVIDIA)。`lib/buffers/images.glsl` は opt-in なので、使う `IMG_*` だけを `common.glsl` の宣言の前に `#define` する
 - `lib/` と `program/` のファイルは、使う記号の定義元を `//@include "/lib/..."` の行で宣言する (読む順番に頼らない)。lib のファイルには `#include` を書かない。コメントの中にも `#include` で始まる行を書かない (Iris は `#include` の行をコメントや `#if` の中でもガードを見ずに毎回差し込むので、lib 同士が include すると本文が数十倍に膨らみ、読み込みが遅くなる)。本体の `#include` は `uv run tools/gen_includes.py` が宣言から生成する (`BEGIN GENERATED includes` の間。手で編集しない)。lib の宣言はガードの直後にまとめ、本体の宣言は opt-in の `#define` の後にまとめる。ガード名はパスから決める (`lib/sky/fog.glsl` は `SKY_FOG_GLSL`)。宣言の漏れと生成の古さは `tools/include_deps.py` と validate_shaders.py が検出する
-- compute の `workGroups` / `workGroupsRender` はリテラルで書く (式・マクロ不可)
+- compute の `workGroups` / `workGroupsRender` はリテラルで書く (式・マクロ不可)。`setup` は 1x1 の画面として dispatch されるので、絶対の `workGroups` を使う
+- `/* RENDERTARGETS: 0,1,2 */` の `,` の後に空白を入れない (Iris が数として読めず失敗する)
+- `iris_`・`irisMain`・`moj_import` で始まる識別子は使わない (Iris の内部用で、読み込みが失敗する)
+- カスタム image (`image.*`) は Iris の上限 16 個をすべて使っている。足すときは既存のものを分け合うか、colortex か SSBO で代える
+- 設定で決まる分岐は `#if` / `const` で書き、uniform で分岐しない (実行しない側もリンクされ、レジスタも両側の多いほうになる)
+- グローバルの `const` を uniform で初期化しない。NVIDIA は通すが仕様では誤りで、他社のドライバでは落ちる
+- 書き方の判断 (パスを分けるかまとめるか、表の置き場所、リンクの時間、資源の上限、エラーの行の調べ方) は [docs/shader-guidelines.md](docs/shader-guidelines.md)
 - `block.properties` / `item.properties` / `entity.properties` と `lib/ids/{block,light,entity}_ids.glsl`、`lib/light/light_table_data.glsl` は `tools/gen_block_properties.py` (表は `tools/id_tables.py`) から生成する。手で編集しない。光源の追加は `id_tables.py` の `LIGHTS` に 1 行
 - 設定を足したら `lib/settings/` の該当モジュールのファイル (`gen_settings.py` も実行)、`shaders.properties` (画面と `profile.*`)、`lang/en_US.lang`、`lang/ja_JP.lang` をそろえる。漏れは validate_shaders.py が検出する
 - 設定・関数・定数の名前は docs/architecture.md の「命名」に従う。保存済みの設定の名前と番号は変えない
