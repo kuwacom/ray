@@ -1,5 +1,5 @@
 /*
- * ボリューメトリックライト / 高さフォグのレイマーチ (sky モジュール, composite10 専用)
+ * ボリューメトリックライト / 高さフォグのレイマーチ (sky モジュール, composite1_a 専用)
  * light の sampleBlockLightVolume と surface の sampleShadowVolume を使うので light.glsl / surface.glsl の後に include する
  *
  * - 指数分布のステップ (Chocapic13 / Solas): 近くを細かく、遠くを粗く。ステップ内の位置をディザで揺らす

@@ -80,7 +80,7 @@ shaders/
 ## レンダーパイプライン
 
 Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers 不透明 -> deferred -> gbuffers 半透明 -> composite -> final)。
-番号はモジュールごとに帯を分けてある (deferred: light 0-9 / surface 10-19 / sky 20-29 / surface 30, composite: surface 0-9 / sky 10-19 / post 20-39)。空き番号は将来の追加用。
+番号はモジュールごとに帯を分けてある (deferred: light 0-9 / surface 10-19 / sky 20-29 / surface 30, composite: surface 0-9 / sky 10-19 / post 20-39)。VL の compute は使う所の直前に置くため composite1_a (sky)。空き番号は将来の追加用。
 
 | # | プログラム | モジュール | 役割 | 主な入力 | 主な出力 | dispatch / 解像度 | 有効条件 |
 |---|---|---|---|---|---|---|---|
@@ -106,8 +106,8 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 20 | deferred30.vsh/fsh | surface | 不透明シェーディング (全モジュールの光を合成) + 空の描画 | G バッファ, colortex6/8/11, SSBO0 | colortex0 | 画面 | 常時 |
 | 21 | gbuffers_water / hand_water / particles_translucent / weather | surface (weather は sky) | 半透明の前方シェーディング | アトラス, 影, flood | colortex4 (乗算済み), colortex5 | 画面 | 常時 |
 | 22 | composite.csh | surface | 反射 (SSR / ラフ / ボクセル補完) | colortex0/2/3/5, voxel | reflectionImg | local 8², 0.5 | REFLECTIONS>0 |
-| 23 | composite1.vsh/fsh | surface | 半透明合成 (屈折・水中吸収・反射) | colortex0/4/5, reflectionImg | colortex0 | 画面 | 常時 |
-| 24 | composite10.csh | sky | VL / 高さフォグのレイマーチ (影マップ空間 + floodfill + 雲影) | 影マップ, flood, cloudShadow | colorimg12 (左上 1/VL_RES), fogHistoryImg | local 8², 1/VL_RES | VL |
+| 23 | composite1_a.csh | sky | VL / 高さフォグのレイマーチ (影マップ空間 + floodfill + 雲影) | 影マップ, flood, cloudShadow | colorimg12 (左上 1/VL_RES), fogHistoryImg | local 8², 1/VL_RES | VL |
+| 24 | composite1.vsh/fsh | surface | 半透明合成 (屈折・水中吸収・反射) | colortex0/4/5, reflectionImg | colortex0 | 画面 | 常時 |
 | 25 | composite11.vsh/fsh | sky | フォグ / VL の適用 (バイラテラルアップサンプル)、水中フォグ | colortex0/12 | colortex0 | 画面 | 常時 |
 | 26 | composite20.vsh/fsh | post | TAA (LENS_WARP_TAA の時は歪曲・魚眼の組み立ても) | colortex0/13/15 | colortex0, colortex13 | 画面 | TAA |
 | 27 | composite21.vsh/fsh | post | モーションブラー | colortex0/15 | colortex0 | 画面 | MOTION_BLUR |
@@ -119,6 +119,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 
 補足
 - shadowcomp は使わない。floodfill を deferred に置くのは、gbuffers_entities (deferred より前) が登録した画面内のエンティティ光源を同じフレームで取り込むため (voxelEmitImg は毎フレームクリアされる)
+- Iris は同じパスの compute (composite1_a) を fragment (composite1) の前に走らせる。VL の有効条件は `program.<world>/composite1_a.enabled` で、composite1 の fragment は止まらない
 - ネザー・エンドは大気 LUT と雲のパスを外す (shaders.properties)。shadow パスはボクセル化のため全ディメンションで回す
 - `particles.ordering = mixed`: 不透明パーティクルは G バッファ (gbuffers_particles)、半透明は前方 (gbuffers_particles_translucent)
 - DH (Distant Horizons) は未対応 (dh_* プログラムなし)
@@ -191,7 +192,7 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 | IMG_CLOUD_SHADOW + IMG_CLOUD_WEATHER | 雲 | prepare2 |
 | IMG_BLOCKLIGHT_RAW + IMG_BLOCKLIGHT_AUX | ブロックライト | deferred1 |
 | IMG_GI_RAW / IMG_REFLECTION | GI / 反射 | deferred10 / composite.csh |
-| IMG_COLORIMG12 + IMG_FOG_HISTORY | VL | composite10 |
+| IMG_COLORIMG12 + IMG_FOG_HISTORY | VL | composite1_a.csh |
 | IMG_DEBUG, IMG_COLORIMG0/6/8/10/14 | デバッグ / colortex への compute 書き込み | 使うモジュールが追加する |
 
 `tools/gl_compile_check.py` がプログラムごとの宣言数・アクティブ数を実機の上限と比べる。
@@ -560,7 +561,7 @@ DEBUG_VIEW の値 (0-12) と表示内容の対応は `shaders/lang/ja_JP.lang` /
 | モジュール | 範囲 | ファイル |
 |---|---|---|
 | light (ボクセル・ブロックライト) | ボクセル化、floodfill、光源リスト・ビン、光源シャドウ (DDA)、デノイズ、手持ち光源、エンティティ光源、`traceVoxelRay` (surface の GI / 反射が使う) | `lib/light/*`, `program/setup.csh`, `begin.csh`, `shadow.*`, `shadow_entities.*`, `shadow_block.*`, `deferred.csh`, `deferred_a.csh`, `deferred1.csh`, `deferred2.*` |
-| sky (空・大気・雲・フォグ・VL) | 大気 LUT、太陽/月の照度と空の SH、空の描画、星、雲 (体積・2D・影)、高さフォグ、VL、水中フォグ、雨 | `lib/sky/*`, `program/setup1.csh`, `setup2.csh`, `prepare.csh`, `prepare1.csh`, `prepare2.csh`, `gbuffers_skybasic.*`, `gbuffers_skytextured.*`, `gbuffers_clouds.*`, `gbuffers_weather.*`, `deferred20.*`, `deferred21.*`, `composite10.csh`, `composite11.*` |
+| sky (空・大気・雲・フォグ・VL) | 大気 LUT、太陽/月の照度と空の SH、空の描画、星、雲 (体積・2D・影)、高さフォグ、VL、水中フォグ、雨 | `lib/sky/*`, `program/setup1.csh`, `setup2.csh`, `prepare.csh`, `prepare1.csh`, `prepare2.csh`, `gbuffers_skybasic.*`, `gbuffers_skytextured.*`, `gbuffers_clouds.*`, `gbuffers_weather.*`, `deferred20.*`, `deferred21.*`, `composite1_a.csh`, `composite11.*` |
 | surface (太陽影・GI・マテリアル・水・反射) | gbuffers (不透明/半透明/オーバーレイ)、マテリアル (labPBR・自動法線・POM・揺れ)、BRDF、太陽影、AO・GI、不透明シェーディング (deferred30)、水、反射、半透明合成 | `lib/surface/*`, `lib/common/water.glsl`, `program/gbuffers/*`, `program/gbuffers_*` (sky の 4 つを除く), `deferred10.csh`, `deferred11.*`, `deferred30.*`, `composite.csh`, `composite1.*` |
 | post (ポストプロセス) | 速度ベクトルの関数、TAA、モーションブラー、DoF、ブルーム、露出、オートフォーカス、トーンマップ、色調整、CAS、レンズフレア、デバッグ表示 | `lib/post/*`, `program/composite20-24.*`, `composite25.csh`, `final.*` |
 
