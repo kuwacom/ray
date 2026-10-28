@@ -235,10 +235,10 @@ vec3 traceVisibility(vec3 fromVoxel, vec3 toVoxel, uint flags, float dither, flo
 #ifdef ENTITY_TRI_OCCLUSION
     /*
      * 三角形方式: ボクセルの占有にはブロックエンティティと容量から溢れたエンティティだけが残っている
-     * 三角形は形どおりなので着色点側の無視区間は要らない (自分の面での即ヒットは ENT_TRI_T_MIN と法線の押し出しで防ぐ)
+     * 三角形は形どおりなので着色点側の無視区間は要らない (自分の面での即ヒットは ENTITY_TRI_T_MIN と法線の押し出しで防ぐ)
      * 光源側の無視区間 (光源自身の体・手持ちの腕) は呼び出し側の entSkipEnd をそのまま使う
      */
-    if (testEntities && traceEntityTriangles(fromVoxel, dir, ENT_TRI_T_MIN, len - entSkipEnd,
+    if (testEntities && traceEntityTriangles(fromVoxel, dir, ENTITY_TRI_T_MIN, len - entSkipEnd,
                                              (flags & TRACE_PLAYER) != 0u, (flags & TRACE_ENTITIES) != 0u)) {
         return vec3(0.0);
     }
@@ -310,21 +310,21 @@ bool traceVoxelRay(vec3 originVoxel, vec3 dir, float maxDist, out vec3 hitVoxel,
  * 手 (手持ちアイテム) の深度は遮蔽物として扱わない (手持ち光源そのものを持っているため)
  * steps は指数的に伸ばす (近くほど細かく)。thickness より奥にある物は遮蔽物とみなさない
  */
-const float SS_SHADOW_THICKNESS = 0.35;     // 遮蔽物の厚みの想定 (ブロック, 距離に比例して増やす)
-const float SS_SHADOW_THICKNESS_DIST = 0.02;
-const float SS_SHADOW_MIN_LENGTH = 0.05;
-const float SS_SHADOW_OFFSET = 0.01;      // 開始点の押し出し (ブロック)。距離に比例した分を足す
-const float SS_SHADOW_OFFSET_DIST = 0.003;
-const float SS_SHADOW_BIAS = 0.02;        // 自己遮蔽を避ける深度の差の最小値。距離に比例した分を足す
-const float SS_SHADOW_BIAS_DIST = 0.002;
-const float SS_SHADOW_FADE_START = 0.75;
+const float LIGHT_CONTACT_THICKNESS = 0.35;     // 遮蔽物の厚みの想定 (ブロック, 距離に比例して増やす)
+const float LIGHT_CONTACT_THICKNESS_DIST = 0.02;
+const float LIGHT_CONTACT_MIN_LENGTH = 0.05;
+const float LIGHT_CONTACT_OFFSET = 0.01;      // 開始点の押し出し (ブロック)。距離に比例した分を足す
+const float LIGHT_CONTACT_OFFSET_DIST = 0.003;
+const float LIGHT_CONTACT_BIAS = 0.02;        // 自己遮蔽を避ける深度の差の最小値。距離に比例した分を足す
+const float LIGHT_CONTACT_BIAS_DIST = 0.002;
+const float LIGHT_CONTACT_FADE_START = 0.75;
 
 float lightContactShadow(vec3 playerPos, vec3 geoNormal, vec3 toLight, float maxDist, int steps, float dither) {
-    if (maxDist <= SS_SHADOW_MIN_LENGTH) return 1.0;
+    if (maxDist <= LIGHT_CONTACT_MIN_LENGTH) return 1.0;
     vec3 startView = playerToView(playerPos);
     float startDist = -startView.z;
     // 遠いほど深度の精度が落ちるので押し出しを増やす
-    startView += playerToViewDir(geoNormal) * (SS_SHADOW_OFFSET + SS_SHADOW_OFFSET_DIST * startDist);
+    startView += playerToViewDir(geoNormal) * (LIGHT_CONTACT_OFFSET + LIGHT_CONTACT_OFFSET_DIST * startDist);
     vec3 dirView = playerToViewDir(toLight);
     float rayLen = maxDist;
     // near 面の手前で止める (カメラに向かうレイ)
@@ -343,11 +343,11 @@ float lightContactShadow(vec3 playerPos, vec3 geoNormal, vec3 toLight, float max
         float sceneDist = -screenToView(vec3(sp.xy, d)).z;
         float rayDist = -p.z;
         float diff = rayDist - sceneDist;
-        float bias = SS_SHADOW_BIAS + SS_SHADOW_BIAS_DIST * rayDist;
-        float thickness = SS_SHADOW_THICKNESS + SS_SHADOW_THICKNESS_DIST * rayDist;
+        float bias = LIGHT_CONTACT_BIAS + LIGHT_CONTACT_BIAS_DIST * rayDist;
+        float thickness = LIGHT_CONTACT_THICKNESS + LIGHT_CONTACT_THICKNESS_DIST * rayDist;
         if (diff > bias && diff < thickness) {
             // レイの終わり近くの遮蔽は弱めて、打ち切り位置の境界を目立たなくする
-            return smoothstep(SS_SHADOW_FADE_START, 1.0, x);
+            return smoothstep(LIGHT_CONTACT_FADE_START, 1.0, x);
         }
     }
     return 1.0;

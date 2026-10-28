@@ -1,7 +1,7 @@
 /*
  * SSBO binding 2: 今フレームの光源インスタンス (light)
  * begin.csh で count 等を 0 に戻し、deferred.csh が追加する (エンティティ光源は shadow / gbuffers_entities が蓄積表 lightBins.entityAcc に溜めたものを deferred が登録)
- * 確保: 295200 バイト (MAX_GLOBAL_LIGHTS_ALLOC 個分、shaders.properties の bufferObject.2)
+ * 確保: 295200 バイト (GLOBAL_LIGHTS_ALLOC 個分、shaders.properties の bufferObject.2)
  * 既定は readonly。書くプログラム (setup・begin・deferred・deferred_a) は include の前に SSBO_GLOBAL_LIGHTS_WRITE を定義する
  *
  * 設定で変わる大きさ (LIGHT_MAX_COUNT, LIGHT_BIN_LIGHTS, VOXEL_VOLUME, LIGHT_CULL_MODE) は lib/buffers に入れない
@@ -17,7 +17,7 @@
     #define SSBO_GLOBAL_LIGHTS_ACCESS readonly
 #endif
 
-const int MAX_GLOBAL_LIGHTS_ALLOC = 8192;      // 確保数 (LIGHT_MAX_COUNT の最大)。ビンのキーの下位 13 bit に入る数
+const int GLOBAL_LIGHTS_ALLOC = 8192;      // 確保数 (LIGHT_MAX_COUNT の最大)。ビンのキーの下位 13 bit に入る数
 
 // 光源を間引く距離 (LIGHT_CULL_MODE 1/2) の分布の段数と 1 段の幅 (ブロック)
 const int LIGHT_CULL_BUCKETS = 64;
@@ -30,7 +30,7 @@ struct LightInstance {
 };
 
 layout(std430, binding = 2) SSBO_GLOBAL_LIGHTS_ACCESS buffer GlobalLightsBuffer {
-    uint count;       // 登録数 (atomicAdd で確保。MAX_GLOBAL_LIGHTS を超えた分は捨てる)
+    uint count;       // 登録数 (atomicAdd で確保。GLOBAL_LIGHTS_MAX を超えた分は捨てる)
     uint blockCount;  // うちブロック光源
     uint entityCount; // うちエンティティ光源 (ドロップ・投擲・燃焼・発光)
     uint overflow;    // 容量超過で捨てた数
@@ -39,8 +39,8 @@ layout(std430, binding = 2) SSBO_GLOBAL_LIGHTS_ACCESS buffer GlobalLightsBuffer 
     uint cullPad0;
     uint cullPad1;
     uint cullHist[LIGHT_CULL_BUCKETS]; // 登録しようとした光源の距離の分布 (deferred が足し、deferred_a が読んで 0 に戻す)
-    LightInstance lights[MAX_GLOBAL_LIGHTS_ALLOC];
-    float lightPower[]; // 揺らぎを掛ける前の放射の輝度 (ビンの重要度用。揺らぎで順位が入れ替わらないように)。要素数: MAX_GLOBAL_LIGHTS_ALLOC
+    LightInstance lights[GLOBAL_LIGHTS_ALLOC];
+    float lightPower[]; // 揺らぎを掛ける前の放射の輝度 (ビンの重要度用。揺らぎで順位が入れ替わらないように)。要素数: GLOBAL_LIGHTS_ALLOC
 } globalLights;
 
 #endif

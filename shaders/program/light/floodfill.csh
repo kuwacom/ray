@@ -79,7 +79,7 @@ vec3 floodBounce(ivec3 cell) {
 }
 
 /*
- * 光源の総数が MAX_GLOBAL_LIGHTS を超える時の間引き (LIGHT_CULL_MODE 1/2)
+ * 光源の総数が GLOBAL_LIGHTS_MAX を超える時の間引き (LIGHT_CULL_MODE 1/2)
  * 到着順で溢れた分を捨てると、毎フレーム違う光源が消えてちらつく。代わりにカメラからの距離で遠い光源から外す
  * 距離は 1 = 光源まで, 2 = 光源の届く球の縁まで (明るく遠くまで届く光源ほど残る)
  * 間引く距離 (deferred_a が前フレームの分布から決め、ゆっくり動かす) の手前 LIGHT_CULL_FADE ブロックで滑らかに弱める
@@ -113,7 +113,7 @@ void registerLight(vec3 voxelPos, float range, vec3 emission, float power, float
     }
 #endif
     uint slot = atomicAdd(globalLights.count, 1u);
-    if (slot >= uint(MAX_GLOBAL_LIGHTS)) {
+    if (slot >= uint(GLOBAL_LIGHTS_MAX)) {
         atomicAdd(globalLights.overflow, 1u);
         return;
     }

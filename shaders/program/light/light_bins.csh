@@ -85,8 +85,8 @@ void updateCullDistance() {
     const float maxDist = float(LIGHT_CULL_BUCKETS) * LIGHT_CULL_BUCKET_WIDTH;
     float soft = LIGHT_CULL_NONE;
     float hard = LIGHT_CULL_NONE;
-    float budgetSoft = float(MAX_GLOBAL_LIGHTS) * LIGHT_CULL_BUDGET;
-    float budgetHard = float(MAX_GLOBAL_LIGHTS);
+    float budgetSoft = float(GLOBAL_LIGHTS_MAX) * LIGHT_CULL_BUDGET;
+    float budgetHard = float(GLOBAL_LIGHTS_MAX);
     float cum = 0.0;
     for (int b = 0; b < LIGHT_CULL_BUCKETS; b++) {
         float h = float(globalLights.cullHist[b]);

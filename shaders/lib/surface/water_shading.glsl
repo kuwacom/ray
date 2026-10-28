@@ -300,7 +300,7 @@ vec4 sampleWaterReflection(ivec2 texel, float dist, out float skyWeight) {
             decodeTranslucentData(texelFetch(colortex5, src, 0), n, lm, mat);
             if (mat != MAT_WATER) continue;
             vec2 delta = abs(vec2(src - texel)) * 0.5;
-            float w = max(1.0 - delta.x, REFL_UPSAMPLE_MIN_WEIGHT) * max(1.0 - delta.y, REFL_UPSAMPLE_MIN_WEIGHT) * bilateralDepthWeight(r.a, dist, dist * REFL_UPSAMPLE_DEPTH_REL + REFL_UPSAMPLE_DEPTH_ABS);
+            float w = max(1.0 - delta.x, REFLECTION_UPSAMPLE_MIN_WEIGHT) * max(1.0 - delta.y, REFLECTION_UPSAMPLE_MIN_WEIGHT) * bilateralDepthWeight(r.a, dist, dist * REFLECTION_UPSAMPLE_DEPTH_REL + REFLECTION_UPSAMPLE_DEPTH_ABS);
             if (sky) skyWeight += w;
             else sum += r.rgb * w;
             wsum += w;

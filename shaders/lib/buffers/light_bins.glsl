@@ -16,7 +16,7 @@
 #endif
 
 const int LIGHT_BIN_SIZE = 8;       // ライトビン 1 辺のブロック数
-const int LIGHT_BIN_MAX = 40960;    // 最大体積 (384x128x384) のワールド格子のビン数 49x17x49 を 256 の倍数に。確保量はこれで固定
+const int LIGHT_BINS_ALLOC = 40960;    // 最大体積 (384x128x384) のワールド格子のビン数 49x17x49 を 256 の倍数に。確保量はこれで固定
 
 // エンティティ光源の蓄積表 (lib/light/entity_light.glsl)
 const int ENTITY_ACC_SIZE = 4096;      // エントリ数 (2 のべき乗)
@@ -24,7 +24,7 @@ const int ENTITY_ACC_STRIDE = 8;       // 1 エントリの uint 数: key, count
 const int ENTITY_ACC_UINTS = ENTITY_ACC_SIZE * ENTITY_ACC_STRIDE;
 
 layout(std430, binding = 3) SSBO_LIGHT_BINS_ACCESS buffer LightBinsBuffer {
-    uint binCount[LIGHT_BIN_MAX]; // 登録しようとした数 (容量超過を含む)
+    uint binCount[LIGHT_BINS_ALLOC]; // 登録しようとした数 (容量超過を含む)
     // エンティティ光源の蓄積表。begin でクリア -> shadow / gbuffers で蓄積 -> deferred で読む
     uint entityAcc[ENTITY_ACC_UINTS];
     // ビンの中身 (キー, lib/light/light_select.glsl)。下位 13 bit が globalLights.lights のインデックス

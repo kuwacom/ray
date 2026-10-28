@@ -76,7 +76,7 @@ float lightBinKeyImportance(uint key) { return uintBitsToFloat((key >> LIGHT_KEY
 uint lightBinBase(int bin) { return uint(bin * LIGHT_BIN_STRIDE); }
 uint lightBinCount(int bin) { return min(lightBins.binCount[bin], uint(LIGHT_BIN_CAPACITY)); }
 int lightBinEntry(int bin, uint k) { return int(lightBins.binLights[lightBinBase(bin) + k] & LIGHT_KEY_INDEX_MASK); }
-uint globalLightCount() { return min(globalLights.count, uint(MAX_GLOBAL_LIGHTS)); }
+uint globalLightCount() { return min(globalLights.count, uint(GLOBAL_LIGHTS_MAX)); }
 
 /*
  * 溢れたビンの境界で光源を弱める幅 (重要度の比)。外れた光源のうち最も重要なもの (最後の枠) の重要度 x (1 + この値) 以上で 1

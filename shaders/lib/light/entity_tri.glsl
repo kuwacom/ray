@@ -24,27 +24,27 @@
 #include "/lib/buffers/entity_tris.glsl"
 #include "/lib/light/floodfill.glsl"
 
-const uint ENT_TRI_CAPACITY = uint(min(LIGHT_ENTITY_TRIANGLES, ENT_TRI_MAX));
-// プレイヤー 1 人分 (外側レイヤー・防具・手持ち・エリトラ込み) に足りる量。ENT_TRI_GROUP の倍数
-const uint ENT_TRI_PLAYER_CAP = 1024u;
-// 近傍と遠方で残りを半分ずつ (容量の候補はどれも ENT_TRI_GROUP の倍数に割り切れる)
-const uint ENT_TRI_OTHER_CAP = (ENT_TRI_CAPACITY - ENT_TRI_PLAYER_CAP) / 2u;
+const uint ENTITY_TRI_CAPACITY = uint(min(LIGHT_ENTITY_TRIANGLES, ENTITY_TRI_MAX));
+// プレイヤー 1 人分 (外側レイヤー・防具・手持ち・エリトラ込み) に足りる量。ENTITY_TRI_GROUP の倍数
+const uint ENTITY_TRI_PLAYER_CAP = 1024u;
+// 近傍と遠方で残りを半分ずつ (容量の候補はどれも ENTITY_TRI_GROUP の倍数に割り切れる)
+const uint ENTITY_TRI_OTHER_CAP = (ENTITY_TRI_CAPACITY - ENTITY_TRI_PLAYER_CAP) / 2u;
 // 近傍: 手持ち光源の到達範囲を含む距離。遠方: これより先は占有ボクセルに任せる (player 空間の距離)
-const float ENT_TRI_NEAR_DIST = 16.0;
-const float ENT_TRI_FAR_DIST = 48.0;
+const float ENTITY_TRI_NEAR_DIST = 16.0;
+const float ENTITY_TRI_FAR_DIST = 48.0;
 // 遠方の三角形は floodfill の照度がこれ以上の所だけ保持する (光の届かない所の影は見えない)
-const float ENT_TRI_FAR_MIN_FLOOD = 0.01;
+const float ENTITY_TRI_FAR_MIN_FLOOD = 0.01;
 // アルファの閾値 (shadow_entities.fsh の discard と同じ)
-const float ENT_TRI_ALPHA_CUTOFF = 0.1;
+const float ENTITY_TRI_ALPHA_CUTOFF = 0.1;
 // 着色点側で無視する距離。法線方向の押し出し (TRACE_NORMAL_OFFSET) と合わせて自分の面での即ヒットを防ぐ
-const float ENT_TRI_T_MIN = 0.01;
+const float ENTITY_TRI_T_MIN = 0.01;
 // AABB の判定を少し太らせる (頂点の丸め誤差で縁の三角形を取りこぼさないため)
-const float ENT_TRI_AABB_PAD = 1e-3;
+const float ENTITY_TRI_AABB_PAD = 1e-3;
 
 uint entityTriRegionStart(int region) {
-    return region == 0 ? 0u : (region == 1 ? ENT_TRI_PLAYER_CAP : ENT_TRI_PLAYER_CAP + ENT_TRI_OTHER_CAP);
+    return region == 0 ? 0u : (region == 1 ? ENTITY_TRI_PLAYER_CAP : ENTITY_TRI_PLAYER_CAP + ENTITY_TRI_OTHER_CAP);
 }
-uint entityTriRegionCap(int region) { return region == 0 ? ENT_TRI_PLAYER_CAP : ENT_TRI_OTHER_CAP; }
+uint entityTriRegionCap(int region) { return region == 0 ? ENTITY_TRI_PLAYER_CAP : ENTITY_TRI_OTHER_CAP; }
 
 // float の大小と uint の大小が一致する符号化 (atomicMin/Max で AABB を広げるため)
 uint entityTriOrderedFromFloat(float f) {
@@ -65,7 +65,7 @@ uvec2 entityTriAlphaMask(vec2 uv0, vec2 uv1, vec2 uv2, float vertexAlpha) {
         for (int i = 0; i < 8 - j; i++) {
             vec2 b = (vec2(i, j) + 0.5) / 8.0;
             vec2 uv = uv0 + (uv1 - uv0) * b.x + (uv2 - uv0) * b.y;
-            if (textureLod(gtexture, uv, 0.0).a * vertexAlpha < ENT_TRI_ALPHA_CUTOFF) continue;
+            if (textureLod(gtexture, uv, 0.0).a * vertexAlpha < ENTITY_TRI_ALPHA_CUTOFF) continue;
             int bit = i + j * 8;
             if (bit < 32) mask.x |= 1u << uint(bit);
             else mask.y |= 1u << uint(bit - 32);
@@ -111,13 +111,13 @@ bool storeEntityTriangle(vec3 p0, vec3 p1, vec3 p2, vec2 uv0, vec2 uv1, vec2 uv2
     if (!isPlayer) {
         vec3 c = (p0 + p1 + p2) / 3.0;
         float d = length(c);
-        if (d < ENT_TRI_NEAR_DIST) {
+        if (d < ENTITY_TRI_NEAR_DIST) {
             region = 1;
-        } else if (d < ENT_TRI_FAR_DIST) {
+        } else if (d < ENTITY_TRI_FAR_DIST) {
             region = 2;
 #ifdef FLOODFILL
             ivec3 cell = ivec3(floor(playerToVoxel(c)));
-            if (!isInVoxelVolume(cell) || maxOf(fetchFlood(cell)) < ENT_TRI_FAR_MIN_FLOOD) return false;
+            if (!isInVoxelVolume(cell) || maxOf(fetchFlood(cell)) < ENTITY_TRI_FAR_MIN_FLOOD) return false;
 #endif
         } else {
             return false;
@@ -142,15 +142,15 @@ bool storeEntityTriangle(vec3 p0, vec3 p1, vec3 p2, vec2 uv0, vec2 uv1, vec2 uv2
     }
     uint index = entityTriRegionStart(region) + slot;
     entityTris.tris[index] = EntityTriangle(v0, mask.x, e1, mask.y, e2, 0u);
-    entityTriGrowBounds(false, index / uint(ENT_TRI_CLUSTER), lo, hi);
-    entityTriGrowBounds(true, index / uint(ENT_TRI_GROUP), lo, hi);
+    entityTriGrowBounds(false, index / uint(ENTITY_TRI_CLUSTER), lo, hi);
+    entityTriGrowBounds(true, index / uint(ENTITY_TRI_GROUP), lo, hi);
     return true;
 }
 
 // begin.csh: 今フレームの三角形を空にする (1 スレッド = 1 クラスタ / グループの AABB)
 void clearEntityTriangles(uint i) {
-    if (i < uint(ENT_TRI_MAX_CLUSTERS * 6)) entityTris.clusterBounds[i] = (i % 6u) < 3u ? 0xFFFFFFFFu : 0u;
-    if (i < uint(ENT_TRI_MAX_GROUPS * 6)) entityTris.groupBounds[i] = (i % 6u) < 3u ? 0xFFFFFFFFu : 0u;
+    if (i < uint(ENTITY_TRI_MAX_CLUSTERS * 6)) entityTris.clusterBounds[i] = (i % 6u) < 3u ? 0xFFFFFFFFu : 0u;
+    if (i < uint(ENTITY_TRI_MAX_GROUPS * 6)) entityTris.groupBounds[i] = (i % 6u) < 3u ? 0xFFFFFFFFu : 0u;
     if (i < 4u) entityTris.counts[i] = 0u;
 }
 #endif
@@ -170,8 +170,8 @@ bool entityTriRayBox(bool group, uint index, vec3 ro, vec3 rdInv, float t0, floa
         hi = vec3(entityTriFloatFromOrdered(entityTris.clusterBounds[base + 3u]), entityTriFloatFromOrdered(entityTris.clusterBounds[base + 4u]),
                   entityTriFloatFromOrdered(entityTris.clusterBounds[base + 5u]));
     }
-    vec3 a = (lo - ENT_TRI_AABB_PAD - ro) * rdInv;
-    vec3 b = (hi + ENT_TRI_AABB_PAD - ro) * rdInv;
+    vec3 a = (lo - ENTITY_TRI_AABB_PAD - ro) * rdInv;
+    vec3 b = (hi + ENTITY_TRI_AABB_PAD - ro) * rdInv;
     float tn = max(maxOf(min(a, b)), t0);
     float tf = min(minOf(max(a, b)), t1);
     return tn <= tf;
@@ -212,13 +212,13 @@ bool traceEntityTriangles(vec3 ro, vec3 dir, float t0, float t1, bool player, bo
         if (n == 0u) continue;
         uint start = entityTriRegionStart(region);
         uint end = start + n;
-        for (uint g = start / uint(ENT_TRI_GROUP); g * uint(ENT_TRI_GROUP) < end; g++) {
+        for (uint g = start / uint(ENTITY_TRI_GROUP); g * uint(ENTITY_TRI_GROUP) < end; g++) {
             if (!entityTriRayBox(true, g, ro, rdInv, t0, t1)) continue;
-            uint gEnd = min(end, (g + 1u) * uint(ENT_TRI_GROUP));
-            for (uint c = g * uint(ENT_TRI_GROUP / ENT_TRI_CLUSTER); c * uint(ENT_TRI_CLUSTER) < gEnd; c++) {
+            uint gEnd = min(end, (g + 1u) * uint(ENTITY_TRI_GROUP));
+            for (uint c = g * uint(ENTITY_TRI_GROUP / ENTITY_TRI_CLUSTER); c * uint(ENTITY_TRI_CLUSTER) < gEnd; c++) {
                 if (!entityTriRayBox(false, c, ro, rdInv, t0, t1)) continue;
-                uint cEnd = min(gEnd, (c + 1u) * uint(ENT_TRI_CLUSTER));
-                for (uint i = c * uint(ENT_TRI_CLUSTER); i < cEnd; i++) {
+                uint cEnd = min(gEnd, (c + 1u) * uint(ENTITY_TRI_CLUSTER));
+                for (uint i = c * uint(ENTITY_TRI_CLUSTER); i < cEnd; i++) {
                     if (entityTriHit(i, ro, dir, t0, t1)) return true;
                 }
             }

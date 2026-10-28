@@ -145,9 +145,9 @@ const float REFLECTION_MAX_LUMINANCE = 64.0; // VNDF のホタル (太陽の当�
 const float SSR_BACKFACE_EPS = 0.1;          // ヒット面の幾何法線と光線の内積がこれを超えたら裏面とみなす (oct 8 bit の量子化と深度の誤差の余裕)
 const float SSR_SELF_PLANE_DIST = 0.05;      // 始点の平面からこの距離 (ブロック) 以内に当たったら自己交差。距離に比例した分を足す
 const float SSR_SELF_PLANE_DIST_SCALE = 0.004;
-const float REFL_UPSAMPLE_MIN_WEIGHT = 0.05; // 低解像度の反射を引き直す重みの下限と深度の許容 (視線距離に対する比 + 固定分)
-const float REFL_UPSAMPLE_DEPTH_REL = 0.02;
-const float REFL_UPSAMPLE_DEPTH_ABS = 0.05;
+const float REFLECTION_UPSAMPLE_MIN_WEIGHT = 0.05; // 低解像度の反射を引き直す重みの下限と深度の許容 (視線距離に対する比 + 固定分)
+const float REFLECTION_UPSAMPLE_DEPTH_REL = 0.02;
+const float REFLECTION_UPSAMPLE_DEPTH_ABS = 0.05;
 const float SSR_SELF_PLANE_COS = 0.99;       // ヒット面と始点の幾何法線がこれ以上揃っていれば同じ向きの面
 const float REFLECT_MIN_NOV = 0.05;          // 反射に使うテクスチャ法線と視線の内積の下限
 const float REFLECT_MIN_ELEVATION = 0.02;    // 不透明面の反射の幾何面からの最低限の仰角 (cos)
@@ -224,8 +224,8 @@ vec4 sampleReflection(ivec2 texel, float dist, vec3 normal) {
             if (r.a <= 0.0) continue;
             ivec2 src = L * 2 + offset;
             vec2 delta = abs(vec2(src - texel)) * 0.5;
-            float wBilinear = max(1.0 - delta.x, REFL_UPSAMPLE_MIN_WEIGHT) * max(1.0 - delta.y, REFL_UPSAMPLE_MIN_WEIGHT);
-            float wDepth = bilateralDepthWeight(r.a, dist, dist * REFL_UPSAMPLE_DEPTH_REL + REFL_UPSAMPLE_DEPTH_ABS);
+            float wBilinear = max(1.0 - delta.x, REFLECTION_UPSAMPLE_MIN_WEIGHT) * max(1.0 - delta.y, REFLECTION_UPSAMPLE_MIN_WEIGHT);
+            float wDepth = bilateralDepthWeight(r.a, dist, dist * REFLECTION_UPSAMPLE_DEPTH_REL + REFLECTION_UPSAMPLE_DEPTH_ABS);
             float w = wBilinear * wDepth;
             /*
              * 低解像度の 1 テクセルは隣のピクセルの法線で反射を求めている。自動生成法線はテクセルごとに向きが違うので

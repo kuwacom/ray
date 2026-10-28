@@ -10,7 +10,7 @@
 #include "/lib/settings.glsl"
 #include "/lib/buffers/light_bins.glsl"
 
-const int MAX_GLOBAL_LIGHTS = LIGHT_MAX_COUNT; // 1 フレームに登録できる光源インスタンス数
+const int GLOBAL_LIGHTS_MAX = LIGHT_MAX_COUNT; // 1 フレームに登録できる光源インスタンス数
 
 const int LIGHT_BIN_CAPACITY = LIGHT_BIN_LIGHTS; // ビン 1 つに入る光源数
 /*
@@ -23,7 +23,7 @@ const int LIGHT_BIN_STRIDE = LIGHT_BIN_CAPACITY + 1;
 #else
     const int LIGHT_BIN_STRIDE_ALLOC = 65;
 #endif
-const int LIGHT_BIN_KEYS_ALLOC = LIGHT_BIN_MAX * LIGHT_BIN_STRIDE_ALLOC; // binLights の確保数
+const int LIGHT_BIN_KEYS_ALLOC = LIGHT_BINS_ALLOC * LIGHT_BIN_STRIDE_ALLOC; // binLights の確保数
 #if LIGHT_CULL_MODE == 0
     const ivec3 LIGHT_BIN_GRID = ivec3(VOXEL_SIZE_X, VOXEL_SIZE_Y, VOXEL_SIZE_Z) / LIGHT_BIN_SIZE;
 #else

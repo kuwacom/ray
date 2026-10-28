@@ -16,11 +16,11 @@
 #include "/lib/light/light.glsl"
 
 layout(local_size_x = 256) in;
-const ivec3 workGroups = ivec3(160, 1, 1); // LIGHT_BIN_MAX / 256
+const ivec3 workGroups = ivec3(160, 1, 1); // LIGHT_BINS_ALLOC / 256
 
 void main() {
     uint i = gl_GlobalInvocationID.x;
-    if (i < uint(LIGHT_BIN_MAX)) {
+    if (i < uint(LIGHT_BINS_ALLOC)) {
 #if LIGHT_CULL_MODE != 0
         // 重要度順の挿入 (deferred_a) は空きの枠が 0 である必要がある。前フレームに書いた枠だけを戻す
         uint used = min(lightBins.binCount[i], uint(LIGHT_BIN_STRIDE));
