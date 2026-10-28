@@ -75,27 +75,6 @@ float lightNearField(float dist, float radius) {
 }
 
 /*
- * ブロック全体が光る光源 (グロウストーン・シーランタン・光る鉱物ブロックなど) の面からの近距離の放射
- * 中心の点からの近距離の放射では、ブロックの隣の床や壁が根元ほど明るくならない (根元は中心から 0.7 ブロック離れている)。
- * ブロックの箱からの距離 s で、面光源の形態係数に似た s に対して急に落ちる形 h^2 / (s^2 + h^2) を使う (接した面で 1)
- * 面の明るさは見た目の発光で決まり、光源の明るさとレベル (遠くへの届き方) とは別なので、呼ぶ側がそれで割った係数を掛ける
- * 向きは中心への余弦。同じ平面に並ぶ面 (床に埋めた光源の隣の床) は光る面が見えないので 0 になる
- */
-const float LIGHT_BOX_CONTACT = 3.4;   // 接した面の照度 / (色 x BLOCKLIGHT_ILLUMINANCE)
-const float LIGHT_BOX_SPREAD = 0.7;    // 形態係数の広がり h (ブロック)
-const float LIGHT_BOX_REACH = 4.0;     // この距離で 0 へ落とす (ブロック)
-
-float lightBoxNearField(vec3 voxelPos, vec3 boxCenter, vec3 n) {
-    vec3 q = max(abs(voxelPos - boxCenter) - 0.5, 0.0);
-    float s = length(q);
-    if (s >= LIGHT_BOX_REACH) return 0.0;
-    float facing = saturate(dot(n, normalize(boxCenter - voxelPos)));
-    float w = 1.0 - s / LIGHT_BOX_REACH;
-    const float h2 = LIGHT_BOX_SPREAD * LIGHT_BOX_SPREAD;
-    return LIGHT_BOX_CONTACT * h2 / (s * s + h2) * facing * (w * w);
-}
-
-/*
  * 球光源の NdotL。光源の見かけの半径ぶん地平線の下まで回り込ませる (wrap 近似)
  * 点光源の NdotL のままだと大きな光源 (グロウストーン等) の横の面が不自然に真っ暗になる
  */

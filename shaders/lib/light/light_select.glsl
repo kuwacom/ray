@@ -11,6 +11,7 @@
 #define LIGHT_LIGHT_SELECT_GLSL
 
 #include "/lib/settings.glsl"
+#include "/lib/common/color.glsl"
 #include "/lib/common/constants.glsl"
 #include "/lib/common/frame_offset.glsl"
 #include "/lib/common/math.glsl"
@@ -23,6 +24,7 @@
 #include "/lib/light/block_data.glsl"
 #include "/lib/light/light_bins.glsl"
 #include "/lib/light/trace.glsl"
+#include "/lib/light/voxel.glsl"
 #include "/lib/light/voxel_read.glsl"
 
 // 半影用に終点を動かす半径の上限 (ブロック)。光源セルの外に出ると光源の隣の壁で遮られてしまう
@@ -106,9 +108,46 @@ LightInstance lightBinLight(int bin, uint k) {
 // 幾何法線の NdotL がこれ以下ではテクスチャ法線の効きを弱める
 const float LIGHT_NORMAL_GRAZING = 0.35;
 
+/*
+ * ブロック全体が光る光源 (グロウストーン・シーランタン・光る鉱物ブロックなど) の面からの近距離の放射
+ * 中心の点からの近距離の放射では、ブロックの隣の床や壁が根元ほど明るくならない (根元は中心から 0.7 ブロック離れている)。
+ * 着色点から見える面 (外向きの法線が着色点を向き、隣のセルが不透明でない面) ごとに、面の中心を面積 1 の面光源として
+ * 形態係数の近似 cos_e cos_r A / (pi d^2 + A) を足す。面の向き (cos_e) を入れないと、並べた光るブロックの根元に
+ * 隣のブロックの色が混ざって色が薄くなる。同じ平面に並ぶ面 (床に埋めた光源の隣の床) は cos_e = 0 で光らない
+ * 面の明るさは見た目の発光で決まり、光源の明るさとレベル (遠くへの届き方) とは別なので、呼ぶ側がそれで割った係数を掛ける
+ */
+const float LIGHT_BOX_RADIANCE = 10.0;  // 形態係数 1 の時の照度 / (色 x BLOCKLIGHT_ILLUMINANCE)
+const float LIGHT_BOX_REACH = 4.0;      // 箱からこの距離で 0 へ落とす (ブロック)
+const float LIGHT_BOX_COLOR_POWER = 1.5;
+
+float lightBoxNearField(vec3 voxelPos, vec3 boxCenter, vec3 n) {
+    vec3 rel = voxelPos - boxCenter;
+    float s = length(max(abs(rel) - 0.5, 0.0));
+    if (s >= LIGHT_BOX_REACH) return 0.0;
+    ivec3 cell = ivec3(floor(boxCenter));
+    float sum = 0.0;
+    for (int axis = 0; axis < 3; axis++) {
+        float side = rel[axis] >= 0.0 ? 1.0 : -1.0;
+        vec3 v = rel;
+        v[axis] -= 0.5 * side;
+        float d2 = dot(v, v);
+        float invD = inversesqrt(max(d2, 1e-6));
+        float cosE = v[axis] * side * invD;
+        if (cosE <= 0.0) continue;
+        ivec3 nb = cell;
+        nb[axis] += int(side);
+        if (isVoxelOpaque(fetchVoxelBlockId(nb))) continue;
+        float cosR = saturate(-dot(n, v) * invD);
+        sum += cosE * cosR / (PI * d2 + 1.0);
+    }
+    float w = 1.0 - s / LIGHT_BOX_REACH;
+    return LIGHT_BOX_RADIANCE * sum * (w * w);
+}
+
 // 光源がブロック全体が光る不透明ブロック (光源の表の LT_OCC) か。光源のセルのブロックから光源の定義を引く
-bool isBlockBoxLight(LightInstance L, out LightDef d) {
-    int light = getBlockLightIndex(fetchVoxelBlockId(ivec3(floor(L.posRadius.xyz))));
+bool isBlockBoxLight(LightInstance L, out LightDef d, out int voxelId) {
+    voxelId = fetchVoxelBlockId(ivec3(floor(L.posRadius.xyz)));
+    int light = getBlockLightIndex(voxelId);
     d = getLightDef(light);
     return light != LIGHT_NONE && (d.info.x & LIGHT_FLAG_OCCLUDES) != 0u;
 }
@@ -134,10 +173,17 @@ vec3 evalLightIrradiance(LightInstance L, vec3 voxelPos, vec3 n, vec3 gateNormal
     if (!nearField) return L.colorSize.rgb * falloff * ndl;
     // ブロック全体が光る光源は箱の面から、それ以外 (たいまつ・ランタンなど点に近い光源) は中心の点から近距離の放射を足す
     LightDef d;
-    if (dist < LIGHT_BOX_REACH + 1.0 && isBlockBoxLight(L, d)) {
+    int voxelId;
+    if (dist < LIGHT_BOX_REACH + 1.0 && isBlockBoxLight(L, d, voxelId)) {
         // 面の明るさは光源の明るさとレベルによらない (光る鉱物ブロックは遠くへは弱く届くが、面は他の発光ブロックと同じに光る)
-        float faceScale = 15.0 / max(d.color.a * d.params.z, EPS);
-        return L.colorSize.rgb * (falloff * ndl + lightBoxNearField(voxelPos, floor(L.posRadius.xyz) + 0.5, gateNormal) * faceScale);
+        float lightLum = luminance(d.color.rgb);
+        float power = luminance(L.colorSize.rgb) / max(lightLum, EPS) * 15.0 / max(d.color.a * d.params.z, EPS);
+        // 面の色はブロックのテクスチャの色 (光源の表の色より鮮やかで、ブロックごとの色が根元に出る)。明るさは表の色に合わせる
+        // 発光は明るい画素ほど強い (gbuffers の発光の推定) ので、平均色を 1.5 乗して明るく鮮やかな画素の色に寄せる
+        vec3 albedo = pow(getBlockAlbedo(voxelId), vec3(LIGHT_BOX_COLOR_POWER));
+        vec3 faceColor = albedo * (lightLum / max(luminance(albedo), EPS));
+        return L.colorSize.rgb * falloff * ndl
+            + faceColor * (power * lightBoxNearField(voxelPos, floor(L.posRadius.xyz) + 0.5, gateNormal));
     }
     return L.colorSize.rgb * (falloff + lightNearField(dist, radius)) * ndl;
 }
