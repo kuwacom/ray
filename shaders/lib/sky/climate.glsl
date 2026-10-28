@@ -1,6 +1,6 @@
 /*
  * 日替わりの天気の傾向と地域 (sky モジュール。フォグが使う)
- * 雲 (cloud_volume.glsl の cloudClimate) も climateDayRandom を同じ種で呼ぶので、湿った日・快晴の日は雲とフォグでそろう
+ * 雲 (cloud_weather.glsl の cloudClimate) も climateDayRandom を同じ種で呼ぶので、湿った日・快晴の日は雲とフォグでそろう
  */
 #ifndef SKY_CLIMATE_GLSL
 #define SKY_CLIMATE_GLSL
@@ -9,7 +9,7 @@
 #include "/lib/common/noise.glsl"
 #include "/lib/common/uniforms.glsl"
 
-// 日替わりの種 (cloud_volume.glsl の cloudClimate と同じ値)
+// 日替わりの種 (cloud_weather.glsl の cloudClimate と同じ値)
 const uint CLIMATE_SEED_HUMIDITY = 11u;
 const uint CLIMATE_SEED_CLEAR_DAY = 78u;
 const float CLIMATE_CLEAR_DAY_CHANCE = 0.12;

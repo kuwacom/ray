@@ -22,15 +22,15 @@
 | 大気散乱 LUT (透過率・多重散乱・SkyView) | Hillaire, "A Scalable and Production Ready Sky and Atmosphere Rendering Technique", EGSR 2020 | lib/sky/atmosphere.glsl, program/setup1-2, prepare1 |
 | 薄明の空 (オゾンの Chappuis 吸収による天頂の青、成層圏のエアロゾルによる紫の光) | Hulburt, "Explanation of the Brightness and Color of the Sky, Particularly the Twilight Sky", JOSA 1953 / Lange, Rozanov, von Savigny, "Revisiting the question 'Why is the sky blue?'", ACP 2023 / Lee & Hernández-Andrés, "Measuring and modeling twilight's purple light", Applied Optics 2003 | lib/sky/atmosphere.glsl, program/prepare1.csh |
 | 大気の物理モデル | Bruneton, "A Qualitative and Quantitative Evaluation of 8 Clear Sky Models", TVCG 2017 | lib/sky/atmosphere.glsl |
-| 体積雲の散乱 (多重散乱近似) | Wrenninge et al., "Oz: The Great and Volumetric", SIGGRAPH 2013 Talks | lib/sky/cloud_volume.glsl |
-| 積雲のこぶの陰影 (不透明な芯・光源方向の近くの光学的深さで多重散乱も落とす・塊の中は削らず境目だけ深く削る浸食) | Bliss Shaders (X0nk) の雲の見え方と考え方を参考に独自実装 (コードは不使用) | lib/sky/cloud_volume.glsl |
-| 角の丸い平らな板の雲 (雲の形 Nostalgia 風) | Nostalgia (RRe36) のバニラの雲を押し出した見え方を参考に独自実装 (コードは不使用) | lib/sky/cloud_volume.glsl |
+| 体積雲の散乱 (多重散乱近似) | Wrenninge et al., "Oz: The Great and Volumetric", SIGGRAPH 2013 Talks | lib/sky/cloud_lighting.glsl |
+| 積雲のこぶの陰影 (不透明な芯・光源方向の近くの光学的深さで多重散乱も落とす・塊の中は削らず境目だけ深く削る浸食) | Bliss Shaders (X0nk) の雲の見え方と考え方を参考に独自実装 (コードは不使用) | lib/sky/cloud_density.glsl, cloud_lighting.glsl |
+| 角の丸い平らな板の雲 (雲の形 Nostalgia 風) | Nostalgia (RRe36) のバニラの雲を押し出した見え方を参考に独自実装 (コードは不使用) | lib/sky/cloud_density.glsl |
 | 空中遠近 (消散と内散乱を組にし、遠景を地平線の空へ収束させる) | Koschmieder, "Theorie der horizontalen Sichtweite", Beiträge zur Physik der freien Atmosphäre, 1924 | lib/sky/fog.glsl |
 | 高さフォグの閉形式の光学的深さ | Quilez, "fog" (iquilezles.org) の指数の積分の考え方。上端のロジスティックの積分は独自に導出 | lib/sky/fog.glsl |
 | 遠方区間の画面空間の光芒 | Mitchell, "Volumetric Light Scattering as a Post-Process", GPU Gems 3, 2007 | lib/sky/volumetrics.glsl |
 | 時間帯・天気・バイオームで切り替えるフォグの構成と、太陽側で強く光る霧 (Bliss 風のスタイル) | Bliss Shaders (X0nk) の見え方と考え方を参考に独自実装 (コードは不使用) | lib/sky/fog.glsl, fog_styles.glsl |
 | 2 成分のもやと朝の霧の構成 (Nostalgia 風のスタイル) | Nostalgia Shader (RRe36) の見え方と考え方を参考に独自実装 (コードは不使用) | lib/sky/fog_styles.glsl |
-| 体積雲のレイマーチと天気マップ | Schneider, "The Real-time Volumetric Cloudscapes of Horizon Zero Dawn", SIGGRAPH 2015 | lib/sky/cloud_volume.glsl, program/prepare2, deferred20-21 |
+| 体積雲のレイマーチと天気マップ | Schneider, "The Real-time Volumetric Cloudscapes of Horizon Zero Dawn", SIGGRAPH 2015 | lib/sky/cloud_weather.glsl, cloud_march.glsl, program/prepare2, deferred20-21 |
 | 大気の高さ分布 | Kasten & Young, "Revised optical air mass tables and approximation formula", Applied Optics 1989 | lib/sky/atmosphere.glsl |
 | 月面の反射 | Lommel-Seeliger の法則 | lib/sky/celestial.glsl |
 | GGX / 可視法線サンプリング | Heitz, "Understanding the Masking-Shadowing Function", JCGT 2014 / "Sampling the GGX Distribution of Visible Normals", JCGT 2018 | lib/surface/brdf.glsl, reflection.glsl |
