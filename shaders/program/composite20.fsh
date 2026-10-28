@@ -40,7 +40,7 @@ vec3 clipToBox(vec3 history, vec3 boxMin, vec3 boxMax) {
 }
 
 /*
- * 水面の輝点の割合 (composite1 / composite11 が colortex0.a = 1 + 割合で渡す)
+ * 水面の輝点の割合 (composite1 (scene_fog) が colortex0.a = 1 + 割合で渡す)
  * 輝点は 1 画素ほどの HDR の点で、トーンマップ空間の近傍の箱と低い混合率では数十フレームかけないと履歴が追いつかず、
  * ブルームに届く前に平らな灰色へ潰れていた。輝点の分は箱の統計と履歴から外し、TAA の結果に今フレームの値を足す
  * (位置はワールドに固定してあり、ジッターで動かないので TAA を通さなくても静止時はちらつかない)
@@ -302,7 +302,7 @@ void main() {
 
     vec3 result = sanitizeColor(taaExpand(yCoCgToRgb(resultYcc), exposure));
     // 輝点は履歴に入れず、今フレームの値を足す (a は以降のパスでは使わないので 1 に戻す)
-    // a < 0 は溶岩の発光の割合 (composite11)。モーションブラー・DoF を素通りしてブルームの縮小 (composite23) が読む
+    // a < 0 は溶岩の発光の割合 (composite1 の scene_fog)。モーションブラー・DoF を素通りしてブルームの縮小 (composite23) が読む
     outColor = vec4(result + centerGlint, min(centerRaw.a, 0.0));
     outHistory = vec4(result, historyDistance(unjitteredUv, centerDepth));
 }
