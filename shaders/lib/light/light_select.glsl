@@ -18,9 +18,12 @@
 #include "/lib/common/voxel_space.glsl"
 #include "/lib/buffers/global_lights.glsl"
 #include "/lib/buffers/light_bins.glsl"
+#include "/lib/ids/id_decode.glsl"
+#include "/lib/ids/light_ids.glsl"
 #include "/lib/light/block_data.glsl"
 #include "/lib/light/light_bins.glsl"
 #include "/lib/light/trace.glsl"
+#include "/lib/light/voxel_read.glsl"
 
 // 半影用に終点を動かす半径の上限 (ブロック)。光源セルの外に出ると光源の隣の壁で遮られてしまう
 const float LIGHT_JITTER_MAX_RADIUS = 0.45;
@@ -103,6 +106,13 @@ LightInstance lightBinLight(int bin, uint k) {
 // 幾何法線の NdotL がこれ以下ではテクスチャ法線の効きを弱める
 const float LIGHT_NORMAL_GRAZING = 0.35;
 
+// 光源がブロック全体が光る不透明ブロック (光源の表の LT_OCC) か。光源のセルのブロックから光源の定義を引く
+bool isBlockBoxLight(LightInstance L, out LightDef d) {
+    int light = getBlockLightIndex(fetchVoxelBlockId(ivec3(floor(L.posRadius.xyz))));
+    d = getLightDef(light);
+    return light != LIGHT_NONE && (d.info.x & LIGHT_FLAG_OCCLUDES) != 0u;
+}
+
 /*
  * 光源 L が voxelPos の面 (法線 n) に作る影なしの照度 (NdotL 込み)
  * gateNormal: この法線で地平線の下なら 0 (テクスチャ法線で照らす時に、幾何的に裏側の光源を拾わないため)
@@ -118,7 +128,15 @@ vec3 evalLightIrradiance(LightInstance L, vec3 voxelPos, vec3 n, vec3 gateNormal
     // かすめ角ではテクスチャ法線の NdotL が幾何法線の何倍にも振れ、テクセルごとの明暗が強くなりすぎる
     // TAA のジッターでピクセルがテクセルの境界をまたぐたびに値が飛び、床が細かくちらついた。幾何法線の NdotL に寄せる
     float ndl = mix(gate, sphereLightNdotL(n, dir, dist, radius), smoothstep(0.0, LIGHT_NORMAL_GRAZING, gate));
-    return L.colorSize.rgb * (lightFalloff(dist, L.posRadius.w) + lightNearField(dist, radius)) * ndl;
+    float falloff = lightFalloff(dist, L.posRadius.w);
+    // ブロック全体が光る光源は箱の面から、それ以外 (たいまつ・ランタンなど点に近い光源) は中心の点から近距離の放射を足す
+    LightDef d;
+    if (dist < LIGHT_BOX_REACH + 1.0 && isBlockBoxLight(L, d)) {
+        // 面の明るさは光源の明るさとレベルによらない (光る鉱物ブロックは遠くへは弱く届くが、面は他の発光ブロックと同じに光る)
+        float faceScale = 15.0 / max(d.color.a * d.params.z, EPS);
+        return L.colorSize.rgb * (falloff * ndl + lightBoxNearField(voxelPos, floor(L.posRadius.xyz) + 0.5, gateNormal) * faceScale);
+    }
+    return L.colorSize.rgb * (falloff + lightNearField(dist, radius)) * ndl;
 }
 
 // 着色点のビンの全光源の影なし照度の和 (deferred2 がフル解像度で使う)
