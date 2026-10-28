@@ -1,3 +1,3 @@
 #version 460 compatibility
 #define WORLD_NETHER
-#include "/program/gbuffers_skytextured.vsh"
+#include "/program/sky/sun_moon.vsh"

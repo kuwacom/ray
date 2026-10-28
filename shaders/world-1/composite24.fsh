@@ -1,3 +1,3 @@
 #version 460 compatibility
 #define WORLD_NETHER
-#include "/program/composite24.fsh"
+#include "/program/post/bloom_blur.fsh"

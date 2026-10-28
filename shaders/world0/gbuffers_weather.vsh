@@ -1,3 +1,3 @@
 #version 460 compatibility
 #define WORLD_OVERWORLD
-#include "/program/gbuffers_weather.vsh"
+#include "/program/sky/weather.vsh"

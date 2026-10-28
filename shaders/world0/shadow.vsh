@@ -1,3 +1,3 @@
 #version 460 compatibility
 #define WORLD_OVERWORLD
-#include "/program/shadow.vsh"
+#include "/program/light/shadow_terrain.vsh"

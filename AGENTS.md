@@ -4,7 +4,7 @@ Iris 向け Minecraft シェーダーパック Ray のリポジトリ。人間�
 
 - `shaders/`: パック本体
   - `lib/`: 共有コード。`light` (ブロックライト) / `sky` (大気・雲・フォグ) / `surface` (マテリアル・影・GI・反射・水) / `post` (カメラ・ポストプロセス) と、共通部の `common` / `buffers` / `ids`
-  - `program/`: 各パスの本体
+  - `program/`: 各パスの本体。`light` / `sky` / `surface` / `post` のモジュールごとのフォルダに置く (`common/` は全画面の頂点シェーダー)。Iris のプログラム名との対応は `tools/gen_wrappers.py` の表
   - `world0/`, `world-1/`, `world1/`: ディメンションと本体のマクロを定義して本体を include するだけのラッパー。手で編集せず `uv run tools/gen_wrappers.py` で生成する
   - `lib/settings.glsl`: 設定の入口。設定の定義は `lib/settings/` に lib のモジュールごとのファイルで書く。素の既定値は「高」(HIGH) プロファイルと一致させる。`lib/settings/bool_refs.glsl` は `uv run tools/gen_settings.py` で生成する
 - `tools/`: 生成・検証・ゲーム内デバッグのスクリプト ([tools/README.md](tools/README.md))

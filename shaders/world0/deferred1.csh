@@ -1,3 +1,3 @@
 #version 460
 #define WORLD_OVERWORLD
-#include "/program/deferred1.csh"
+#include "/program/light/block_light_trace.csh"

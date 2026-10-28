@@ -1,3 +1,3 @@
 #version 460 compatibility
 #define WORLD_END
-#include "/program/deferred2.fsh"
+#include "/program/light/block_light_denoise.fsh"

@@ -1,3 +1,3 @@
 #version 460 compatibility
 #define WORLD_OVERWORLD
-#include "/program/gbuffers_lightning.vsh"
+#include "/program/surface/lightning.vsh"

@@ -1,4 +1,4 @@
 #version 460 compatibility
 #define WORLD_END
 #define GBUF_ARMOR_GLINT
-#include "/program/gbuffers/overlay.vsh"
+#include "/program/surface/gbuffers_overlay.vsh"

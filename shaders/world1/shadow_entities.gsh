@@ -1,3 +1,3 @@
 #version 460 compatibility
 #define WORLD_END
-#include "/program/shadow_entities.gsh"
+#include "/program/light/shadow_entities.gsh"

@@ -1,3 +1,3 @@
 #version 460 compatibility
 #define WORLD_OVERWORLD
-#include "/program/composite23.fsh"
+#include "/program/post/bloom_down.fsh"

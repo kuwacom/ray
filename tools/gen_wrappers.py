@@ -2,8 +2,8 @@
 ディメンション別ラッパー (shaders/world0, world-1, world1) を生成する
 
 ラッパーは `#version` + ディメンション define + 本体ごとのマクロ + `/program/<本体>` の include だけのファイル。
-プログラムと本体、本体に渡すマクロの対応は PROGRAMS の表 1 か所で持つ。
-本体は shaders/program/ に 1 セットだけ置く (BSL / Bliss 方式)。
+プログラムと本体、本体に渡すマクロの対応は PROGRAMS と BODIES の表で持つ。
+本体は shaders/program/<モジュール>/ に 1 セットだけ置く (BSL / Bliss 方式)。
 
 使い方:
     uv run tools/gen_wrappers.py            # 足りないラッパーだけ作る
@@ -27,10 +27,60 @@ WORLDS = {
     "world1": "WORLD_END",
 }
 
-# ステージ -> (本体の program/ からのパス, 本体の前に定義するマクロ)。None は同名の本体でマクロなし
+# ステージ -> (本体の program/ からのパス, 本体の前に定義するマクロ)。None は BODIES の本体でマクロなし
 Body = tuple[str, tuple[str, ...]]
 
 FULLSCREEN_VSH: Body = ("common/fullscreen.vsh", ())
+
+# 同名の本体 (マクロなし) の置き場: ラッパーのファイル名 -> program/ からのパス (モジュールごとの役割名)
+BODIES: dict[str, str] = {
+    # light
+    "setup.csh": "light/setup_tables.csh",
+    "begin.csh": "light/frame_begin.csh",
+    "shadow.vsh": "light/shadow_terrain.vsh",
+    "shadow.fsh": "light/shadow_terrain.fsh",
+    "shadow_entities.vsh": "light/shadow_entities.vsh",
+    "shadow_entities.gsh": "light/shadow_entities.gsh",
+    "shadow_entities.fsh": "light/shadow_entities.fsh",
+    "deferred.csh": "light/floodfill.csh",
+    "deferred_a.csh": "light/light_bins.csh",
+    "deferred1.csh": "light/block_light_trace.csh",
+    "deferred2.fsh": "light/block_light_denoise.fsh",
+    # sky
+    "setup1.csh": "sky/transmittance_lut.csh",
+    "setup2.csh": "sky/multiscatter_lut.csh",
+    "prepare.csh": "sky/sun_sky_light.csh",
+    "prepare1.csh": "sky/skyview_lut.csh",
+    "prepare2.csh": "sky/cloud_weather.csh",
+    "deferred20.fsh": "sky/cloud_march.fsh",
+    "deferred21.fsh": "sky/cloud_upscale.fsh",
+    "composite1_a.csh": "sky/fog_march.csh",
+    "composite11.fsh": "sky/fog_apply.fsh",
+    "gbuffers_skybasic.vsh": "sky/vanilla_sky.vsh",
+    "gbuffers_skybasic.fsh": "sky/vanilla_sky.fsh",
+    "gbuffers_skytextured.vsh": "sky/sun_moon.vsh",
+    "gbuffers_skytextured.fsh": "sky/sun_moon.fsh",
+    "gbuffers_clouds.vsh": "sky/vanilla_clouds.vsh",
+    "gbuffers_clouds.fsh": "sky/vanilla_clouds.fsh",
+    "gbuffers_weather.vsh": "sky/weather.vsh",
+    "gbuffers_weather.fsh": "sky/weather.fsh",
+    # surface
+    "gbuffers_lightning.vsh": "surface/lightning.vsh",
+    "gbuffers_lightning.fsh": "surface/lightning.fsh",
+    "deferred10.csh": "surface/gi_raw.csh",
+    "deferred11.fsh": "surface/gi_denoise.fsh",
+    "deferred30.fsh": "surface/opaque_shading.fsh",
+    "composite.csh": "surface/reflection_trace.csh",
+    "composite1.fsh": "surface/translucent_composite.fsh",
+    # post
+    "composite20.fsh": "post/taa.fsh",
+    "composite21.fsh": "post/motion_blur.fsh",
+    "composite22.fsh": "post/dof.fsh",
+    "composite23.fsh": "post/bloom_down.fsh",
+    "composite24.fsh": "post/bloom_blur.fsh",
+    "composite25.csh": "post/exposure_autofocus.csh",
+    "final.fsh": "post/final.fsh",
+}
 
 
 def shared(body: str, macro: str, stages: tuple[str, ...] = ("vsh", "fsh")) -> dict[str, Body]:
@@ -44,7 +94,7 @@ def fullscreen(*own_stages: str) -> dict[str, Body | None]:
 
 
 # プログラム名 -> ステージ。docs/architecture.md のパイプライン表と一致させる
-# ステージを list で書いたものは、すべて同名の本体でマクロなし
+# ステージを list で書いたものは、すべて BODIES の本体でマクロなし
 PROGRAMS: dict[str, list[str] | dict[str, Body | None]] = {
     # setup (起動時 1 回)
     "setup": ["csh"],
@@ -56,35 +106,35 @@ PROGRAMS: dict[str, list[str] | dict[str, Body | None]] = {
     "shadow": ["vsh", "fsh"],
     "shadow_entities": ["vsh", "gsh", "fsh"],
     # ブロックエンティティ用。本体は shadow_entities と共通 (light モジュール)
-    "shadow_block": shared("shadow_entities", "PROGRAM_SHADOW_BLOCK", ("vsh", "gsh", "fsh")),
+    "shadow_block": shared("light/shadow_entities", "PROGRAM_SHADOW_BLOCK", ("vsh", "gsh", "fsh")),
     # prepare (shadow の後, gbuffers の前)
     "prepare": ["csh"],
     "prepare1": ["csh"],
     "prepare2": ["csh"],
     # gbuffers
-    "gbuffers_basic": shared("gbuffers/solid", "GBUF_BASIC"),
-    "gbuffers_line": shared("gbuffers/solid", "GBUF_LINE"),
-    "gbuffers_textured": shared("gbuffers/solid", "GBUF_TEXTURED"),
-    "gbuffers_textured_lit": shared("gbuffers/solid", "GBUF_TEXTURED_LIT"),
+    "gbuffers_basic": shared("surface/gbuffers_solid", "GBUF_BASIC"),
+    "gbuffers_line": shared("surface/gbuffers_solid", "GBUF_LINE"),
+    "gbuffers_textured": shared("surface/gbuffers_solid", "GBUF_TEXTURED"),
+    "gbuffers_textured_lit": shared("surface/gbuffers_solid", "GBUF_TEXTURED_LIT"),
     "gbuffers_skybasic": ["vsh", "fsh"],
     "gbuffers_skytextured": ["vsh", "fsh"],
     "gbuffers_clouds": ["vsh", "fsh"],
-    "gbuffers_terrain": shared("gbuffers/solid", "GBUF_TERRAIN"),
-    "gbuffers_damagedblock": shared("gbuffers/overlay", "GBUF_DAMAGEDBLOCK"),
-    "gbuffers_block": shared("gbuffers/solid", "GBUF_BLOCK"),
-    "gbuffers_beaconbeam": shared("gbuffers/solid", "GBUF_BEACON"),
-    "gbuffers_entities": shared("gbuffers/solid", "GBUF_ENTITIES"),
-    "gbuffers_entities_translucent": shared("gbuffers/translucent", "GBUF_ENTITIES_TRANSLUCENT"),
-    "gbuffers_block_translucent": shared("gbuffers/translucent", "GBUF_BLOCK_TRANSLUCENT"),
-    "gbuffers_armor_glint": shared("gbuffers/overlay", "GBUF_ARMOR_GLINT"),
-    "gbuffers_spidereyes": shared("gbuffers/overlay", "GBUF_SPIDEREYES"),
-    "gbuffers_hand": shared("gbuffers/solid", "GBUF_HAND"),
-    "gbuffers_particles": shared("gbuffers/solid", "GBUF_PARTICLES"),
+    "gbuffers_terrain": shared("surface/gbuffers_solid", "GBUF_TERRAIN"),
+    "gbuffers_damagedblock": shared("surface/gbuffers_overlay", "GBUF_DAMAGEDBLOCK"),
+    "gbuffers_block": shared("surface/gbuffers_solid", "GBUF_BLOCK"),
+    "gbuffers_beaconbeam": shared("surface/gbuffers_solid", "GBUF_BEACON"),
+    "gbuffers_entities": shared("surface/gbuffers_solid", "GBUF_ENTITIES"),
+    "gbuffers_entities_translucent": shared("surface/gbuffers_translucent", "GBUF_ENTITIES_TRANSLUCENT"),
+    "gbuffers_block_translucent": shared("surface/gbuffers_translucent", "GBUF_BLOCK_TRANSLUCENT"),
+    "gbuffers_armor_glint": shared("surface/gbuffers_overlay", "GBUF_ARMOR_GLINT"),
+    "gbuffers_spidereyes": shared("surface/gbuffers_overlay", "GBUF_SPIDEREYES"),
+    "gbuffers_hand": shared("surface/gbuffers_solid", "GBUF_HAND"),
+    "gbuffers_particles": shared("surface/gbuffers_solid", "GBUF_PARTICLES"),
     "gbuffers_weather": ["vsh", "fsh"],
     "gbuffers_lightning": ["vsh", "fsh"],
-    "gbuffers_water": shared("gbuffers/translucent", "GBUF_WATER"),
-    "gbuffers_hand_water": shared("gbuffers/translucent", "GBUF_HAND_WATER"),
-    "gbuffers_particles_translucent": shared("gbuffers/translucent", "GBUF_PARTICLES_TRANSLUCENT"),
+    "gbuffers_water": shared("surface/gbuffers_translucent", "GBUF_WATER"),
+    "gbuffers_hand_water": shared("surface/gbuffers_translucent", "GBUF_HAND_WATER"),
+    "gbuffers_particles_translucent": shared("surface/gbuffers_translucent", "GBUF_PARTICLES_TRANSLUCENT"),
     # deferred
     "deferred": ["csh", "csh_a"],
     "deferred1": ["csh"],
@@ -122,7 +172,7 @@ def stage_bodies(name: str) -> dict[str, Body]:
     result: dict[str, Body] = {}
     for stage, body in stages.items():
         file_name = stage_file(name, stage)
-        result[file_name] = body if body is not None else (file_name, ())
+        result[file_name] = body if body is not None else (BODIES[file_name], ())
     return result
 
 

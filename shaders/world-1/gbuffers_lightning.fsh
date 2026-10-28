@@ -1,3 +1,3 @@
 #version 460 compatibility
 #define WORLD_NETHER
-#include "/program/gbuffers_lightning.fsh"
+#include "/program/surface/lightning.fsh"

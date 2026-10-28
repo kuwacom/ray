@@ -1,6 +1,6 @@
 /*
  * 不透明ジオメトリ共通の頂点シェーダー (G バッファ経路)
- * 呼び出し元の program/gbuffers_*.vsh が GBUF_* を 1 つ define してから include する
+ * 呼び出し元のラッパー (gbuffers_*.vsh) が GBUF_* を 1 つ define してから include する
  * surface モジュール (GBUF_ENTITIES の光源登録呼び出しは light モジュールの関数)
  */
 #ifdef GBUF_ENTITIES

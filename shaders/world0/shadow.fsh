@@ -1,3 +1,3 @@
 #version 460 compatibility
 #define WORLD_OVERWORLD
-#include "/program/shadow.fsh"
+#include "/program/light/shadow_terrain.fsh"

@@ -1,3 +1,3 @@
 #version 460 compatibility
 #define WORLD_OVERWORLD
-#include "/program/deferred11.fsh"
+#include "/program/surface/gi_denoise.fsh"

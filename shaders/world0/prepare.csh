@@ -1,3 +1,3 @@
 #version 460
 #define WORLD_OVERWORLD
-#include "/program/prepare.csh"
+#include "/program/sky/sun_sky_light.csh"

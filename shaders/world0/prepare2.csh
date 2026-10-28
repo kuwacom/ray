@@ -1,3 +1,3 @@
 #version 460
 #define WORLD_OVERWORLD
-#include "/program/prepare2.csh"
+#include "/program/sky/cloud_weather.csh"

@@ -1,3 +1,3 @@
 #version 460 compatibility
 #define WORLD_END
-#include "/program/gbuffers_clouds.vsh"
+#include "/program/sky/vanilla_clouds.vsh"

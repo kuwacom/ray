@@ -1,3 +1,3 @@
 #version 460 compatibility
 #define WORLD_OVERWORLD
-#include "/program/gbuffers_clouds.fsh"
+#include "/program/sky/vanilla_clouds.fsh"

@@ -31,7 +31,7 @@
 | ボクセルが光の基盤 | shadow パスで地形 + エンティティをボクセル化し、floodfill・光源シャドウ・GI・反射の全部で共有 |
 | 光は「間接 = floodfill、直接 = レイ」 | floodfill を色と広がり (間接光) に、上位 N 光源の DDA を影 (直接光) に使う二段構え |
 | 計算する所と BRDF を掛ける所を分ける | 光源側 (light: ブロック/手持ち, sky: 太陽/空) は `LightSample` で照度と方向を返し、BRDF は surface だけが掛ける |
-| 1 か所の本体 + 薄いラッパー | `shaders/program/` に本体 1 セット、`world0/-1/1` は本体の include とマクロの定義だけ |
+| 1 か所の本体 + 薄いラッパー | `shaders/program/<モジュール>/` に本体 1 セット、`world0/-1/1` は本体の include とマクロの定義だけ |
 | 重い機能は丸ごと外せる | `#ifdef` + `program.<world>/<pass>.enabled` |
 | ルック | AgX + 非対称自動露出 + 控えめブルーム (iterationT)、雲・フォグ・DoF は Nostalgia / Kappa、ブロックライトは中性色 |
 
@@ -68,8 +68,8 @@ shaders/
   lib/surface/*                             surface モジュール
   lib/post/*                                post モジュール
   program/common/fullscreen.vsh             全画面クアッドの頂点シェーダー (composite / deferred / final が共有)
-  program/*.vsh|gsh|fsh|csh                 各モジュールの本体 (「モジュールと範囲」の表)
-  program/gbuffers/*.vsh|fsh                surface モジュール (gbuffers_* が共有する本体。GBUF_* マクロで分岐)
+  program/light/*  sky/*  surface/*  post/*   各パスの本体 (モジュールごと。ファイル名は役割名で、プログラム名との対応は tools/gen_wrappers.py の BODIES)
+  program/surface/gbuffers_*.vsh|fsh        gbuffers_* が共有する本体 (GBUF_* マクロで分岐)
   world0/  world-1/  world1/                gen_wrappers.py が生成するラッパー (WORLD_* と本体のマクロを定義して本体を include)
 ```
 
@@ -186,7 +186,7 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 |---|---|---|
 | IMG_VOXEL_BLOCK | voxelBlockImg | shadow.vsh, deferred.csh |
 | IMG_VOXEL_ENTITY | voxelEntityImg | shadow_entities.gsh / shadow_block.gsh |
-| IMG_VOXEL_EMIT | voxelEmitImg | shadow_entities.gsh / shadow_block.gsh, gbuffers/solid.vsh (GBUF_ENTITIES), deferred.csh |
+| IMG_VOXEL_EMIT | voxelEmitImg | shadow_entities.gsh / shadow_block.gsh, surface/gbuffers_solid.vsh (GBUF_ENTITIES), deferred.csh |
 | IMG_FLOOD | floodImgA + floodImgB | deferred.csh |
 | IMG_SKY_TRANSMITTANCE / IMG_SKY_MULTISCATTER / IMG_SKY_VIEW | 大気 LUT | setup1 / setup2 / prepare1 |
 | IMG_CLOUD_SHADOW + IMG_CLOUD_WEATHER | 雲 | prepare2 |
@@ -550,7 +550,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | EXPOSURE_MODE | 2 | **1** | **1** | 2 | 2 | 2 | 2 | 2 | 2 | 2 |
 <!-- END GENERATED settings -->
 
-DEBUG_VIEW の値 (0-12) と表示内容の対応は `shaders/lang/ja_JP.lang` / `en_US.lang` の `value.DEBUG_VIEW.*` にあり、表示の実装は `shaders/program/final.fsh` の `#if DEBUG_VIEW == N` の分岐。
+DEBUG_VIEW の値 (0-12) と表示内容の対応は `shaders/lang/ja_JP.lang` / `en_US.lang` の `value.DEBUG_VIEW.*` にあり、表示の実装は `shaders/program/post/final.fsh` の `#if DEBUG_VIEW == N` の分岐。
 
 ---
 
@@ -560,14 +560,16 @@ DEBUG_VIEW の値 (0-12) と表示内容の対応は `shaders/lang/ja_JP.lang` /
 
 | モジュール | 範囲 | ファイル |
 |---|---|---|
-| light (ボクセル・ブロックライト) | ボクセル化、floodfill、光源リスト・ビン、光源シャドウ (DDA)、デノイズ、手持ち光源、エンティティ光源、`traceVoxelRay` (surface の GI / 反射が使う) | `lib/light/*`, `program/setup.csh`, `begin.csh`, `shadow.*`, `shadow_entities.*`, `shadow_block.*`, `deferred.csh`, `deferred_a.csh`, `deferred1.csh`, `deferred2.*` |
-| sky (空・大気・雲・フォグ・VL) | 大気 LUT、太陽/月の照度と空の SH、空の描画、星、雲 (体積・2D・影)、高さフォグ、VL、水中フォグ、雨 | `lib/sky/*`, `program/setup1.csh`, `setup2.csh`, `prepare.csh`, `prepare1.csh`, `prepare2.csh`, `gbuffers_skybasic.*`, `gbuffers_skytextured.*`, `gbuffers_clouds.*`, `gbuffers_weather.*`, `deferred20.*`, `deferred21.*`, `composite1_a.csh`, `composite11.*` |
-| surface (太陽影・GI・マテリアル・水・反射) | gbuffers (不透明/半透明/オーバーレイ)、マテリアル (labPBR・自動法線・POM・揺れ)、BRDF、太陽影、AO・GI、不透明シェーディング (deferred30)、水、反射、半透明合成 | `lib/surface/*`, `lib/common/water.glsl`, `program/gbuffers/*`, `program/gbuffers_*` (sky の 4 つを除く), `deferred10.csh`, `deferred11.*`, `deferred30.*`, `composite.csh`, `composite1.*` |
-| post (ポストプロセス) | 速度ベクトルの関数、TAA、モーションブラー、DoF、ブルーム、露出、オートフォーカス、トーンマップ、色調整、CAS、レンズフレア、デバッグ表示 | `lib/post/*`, `program/composite20-24.*`, `composite25.csh`, `final.*` |
+| light (ボクセル・ブロックライト) | ボクセル化、floodfill、光源リスト・ビン、光源シャドウ (DDA)、デノイズ、手持ち光源、エンティティ光源、`traceVoxelRay` (surface の GI / 反射が使う) | `lib/light/*`, `program/light/*` (setup, begin, shadow, shadow_entities / shadow_block, deferred, deferred_a, deferred1, deferred2) |
+| sky (空・大気・雲・フォグ・VL) | 大気 LUT、太陽/月の照度と空の SH、空の描画、星、雲 (体積・2D・影)、高さフォグ、VL、水中フォグ、雨 | `lib/sky/*`, `program/sky/*` (setup1, setup2, prepare, prepare1, prepare2, gbuffers_skybasic / skytextured / clouds / weather, deferred20, deferred21, composite1_a, composite11) |
+| surface (太陽影・GI・マテリアル・水・反射) | gbuffers (不透明/半透明/オーバーレイ)、マテリアル (labPBR・自動法線・POM・揺れ)、BRDF、太陽影、AO・GI、不透明シェーディング (deferred30)、水、反射、半透明合成 | `lib/surface/*`, `lib/common/water.glsl`, `program/surface/*` (gbuffers_* が共有する solid / translucent / overlay, gbuffers_lightning, deferred10, deferred11, deferred30, composite, composite1) |
+| post (ポストプロセス) | 速度ベクトルの関数、TAA、モーションブラー、DoF、ブルーム、露出、オートフォーカス、トーンマップ、色調整、CAS、レンズフレア、デバッグ表示 | `lib/post/*`, `program/post/*` (composite20-24, composite25, final) |
 
 - shadow パスの出力 (shadowcolor の内容) は surface (RSM・色付き影) と sky (色付き光芒) も使う。内容を変える時は「colortex」の節の定義を守り、docs/architecture.md も更新する
 - 表面の光 (light / sky の関数) は surface の `gatherSurfaceLights` が呼ぶ。deferred30・半透明・composite1・二次ヒットは light / sky の照度の関数を直接呼ばない
-- `program/gbuffers/solid.vsh` から `injectEntityLight`、`gbuffers/*` から `encodeVelocity` を呼び出す (関数本体は light / post モジュール)
+- `program/surface/gbuffers_solid.vsh` から `injectEntityLight`、`program/surface/gbuffers_*` から `encodeVelocity` を呼び出す (関数本体は light / post モジュール)
+- 本体のファイル名は役割名で、Iris のプログラム名との対応は `tools/gen_wrappers.py` の `BODIES` にある (例: composite1 は `program/surface/translucent_composite.fsh`)
+- 大きな処理は 600 行以下を目安にファイルを分ける。体積雲は `lib/sky/cloud_volume.glsl` が `cloud_constants` / `cloud_weather` / `cloud_density` / `cloud_lighting` / `cloud_march` を読む。半透明の合成の水と鏡面は `lib/surface/water_shading.glsl` と `composite_specular.glsl`
 - 各モジュールの補助ファイルはそのモジュールのディレクトリに置く (例: DDA は `lib/light/trace.glsl`)
 
 ### モジュール間インターフェース
@@ -590,7 +592,7 @@ light モジュールが提供 (`#include "/lib/light/light.glsl"`):
 | `void voxelizeTerrainVertex(vec3 playerPos, vec3 midOffset, int blockId, float emissionLevel)` | shadow.vsh | 地形の頂点をボクセルへ |
 | `void voxelizeEntityTriangle(vec3 p0, vec3 p1, vec3 p2, bool isCurrentPlayer)` | shadow_entities.gsh | エンティティの三角形をサブセル占有へ |
 | `int resolveEntityLight(int entId, int itemId, vec4 entColor, out float level)` | light 内部 (entity_light.glsl) | 光源インデックス (個別スイッチ反映済み) |
-| `void injectEntityLight(vec3 playerPos, int entId, int itemId, vec4 entColor)` | gbuffers/solid.vsh (GBUF_ENTITIES), shadow_entities.gsh | エンティティ光源の登録 |
+| `void injectEntityLight(vec3 playerPos, int entId, int itemId, vec4 entColor)` | surface/gbuffers_solid.vsh (GBUF_ENTITIES), shadow_entities.gsh | エンティティ光源の登録 |
 | `vec3 getBlockLightOpaque(ivec2 texel, vec3 playerPos, vec3 geoNormal, vec3 normal, float lm)` | surface (`gatherSurfaceLights`) | 不透明面のブロックライト照度 (直接 + 間接 + 体積外フォールバック) |
 | `vec3 getBlockLightForward(vec3 playerPos, vec3 normal, float lm)` | surface (`gatherSurfaceLights`)、パーティクル・雨 | トレースなし版 |
 | `int getBlockLightSpecular(ivec2 texel, vec3 playerPos, vec3 geoNormal, bool traced, out LightSample s[BLOCKLIGHT_SPECULAR_LIGHTS])` | surface (`gatherSurfaceLights`) | ブロックライトの鏡面用の光 (個数を返す)。traced = 半透明の面で、可視率を光源ごとにトレースする |
@@ -730,6 +732,6 @@ shaders.properties の `#if` を評価して `program.*.enabled = false` のプ�
 - MOD ブロックは未登録 = 完全な固体扱い。光る MOD ブロックはタグ (`%c:...`) か個別登録が必要
 - エンダーチェスト等ブロックエンティティの光源はボクセル地形に乗らない (shadow_block から登録する必要がある。「ドロップ・投擲・燃焼・発光エンティティ」参照)
 - DH / Voxy / Photonics 連携は未対応。DH を入れていると Iris は「DH シェーダーなし」として扱う (LOD の見た目は保証しない)
-- Iris 26.1 は半透明エンティティ (プレイヤーのスキン・マネキン・文字・旗の模様等) を deferred の後 (`renderTranslucentFeatures`) に gbuffers_entities_translucent / gbuffers_block_translucent で描く。G バッファ経路のフォールバック (gbuffers_entities) だと deferred30 で照明されず消えるので、両者は半透明の前方シェーディング (`program/gbuffers/translucent.*`) で用意した。速度は書かず深度再投影に任せる (並べ替えで at_velocity が使えないため)。画面空間の影 (手持ち光源の SS 影等) には写らないので、三人称の自分の影は手持ち光源のボクセル DDA で落とす
+- Iris 26.1 は半透明エンティティ (プレイヤーのスキン・マネキン・文字・旗の模様等) を deferred の後 (`renderTranslucentFeatures`) に gbuffers_entities_translucent / gbuffers_block_translucent で描く。G バッファ経路のフォールバック (gbuffers_entities) だと deferred30 で照明されず消えるので、両者は半透明の前方シェーディング (`program/surface/gbuffers_translucent.*`) で用意した。速度は書かず深度再投影に任せる (並べ替えで at_velocity が使えないため)。画面空間の影 (手持ち光源の SS 影等) には写らないので、三人称の自分の影は手持ち光源のボクセル DDA で落とす
 - gbuffers_item は未用意 (gbuffers_entities にフォールバック)
 - macOS (compute 非対応) は動かない

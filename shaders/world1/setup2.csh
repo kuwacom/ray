@@ -1,3 +1,3 @@
 #version 460
 #define WORLD_END
-#include "/program/setup2.csh"
+#include "/program/sky/multiscatter_lut.csh"

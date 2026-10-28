@@ -1,3 +1,3 @@
 #version 460
 #define WORLD_END
-#include "/program/prepare1.csh"
+#include "/program/sky/skyview_lut.csh"

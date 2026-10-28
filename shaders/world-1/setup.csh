@@ -1,3 +1,3 @@
 #version 460
 #define WORLD_NETHER
-#include "/program/setup.csh"
+#include "/program/light/setup_tables.csh"
