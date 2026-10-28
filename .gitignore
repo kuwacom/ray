@@ -23,6 +23,7 @@ Desktop.ini
 # dev
 docs/dev/
 docs/reference/
+docs/ideas/
 /.work/
 
 # tools: 各自の環境で用意するもの
