@@ -5,7 +5,7 @@
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.x%20%E2%80%93%2026.x-62b47a)
 ![License](https://img.shields.io/badge/license-Ray%20Shader%20License%201.0-lightgrey)
 
-Rayは元々私が欲しかった他のシェーダーにない機能を全て詰め込んだプライベートに作られた Minecraft Java Edition - Iris 向けのシェーダーパックです
+Rayは元々私が欲しかった他のシェーダーにない機能を全て詰め込んだプライベートに作られた Minecraft Java Edition - Iris 向けのシェーダーパックです  
 このシェーダーには、ボクセルレイトレースによる光源処理と実在レンズを再現するフィジカルレンズシミュレーションを搭載しています
 
 日常利用よりも、リプレイMODやレンダリングMODを併用した撮影に向いていますが、設定を軽くすれば、普段のプレイで臨場感を高めることもできます  

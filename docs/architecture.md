@@ -40,7 +40,7 @@
 ## ディレクトリ構成
 
 ```
-README.md / CREDITS.md / AGENTS.md / .gitignore
+README.md / CREDITS.md / LICENSE / AGENTS.md / .gitignore
 pyproject.toml / uv.lock / .python-version     tools 用の Python 環境 (uv)
 docs/architecture.md
 tools/
