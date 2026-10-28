@@ -1,0 +1,280 @@
+Ray Shader License 1.0
+
+Copyright (c) 2026 kuwacom
+
+https://github.com/kuwacom/ray
+
+All rights reserved unless explicitly granted below.
+
+0. Terminology
+
+  0.1. "The Pack" means the software package in which this exact license
+       file is found, including all shader sources, scripts, tools,
+       documentation, generated images and configuration files contained
+       in it. A Fork is not "The Pack" for the purposes of this license.
+
+  0.2. "Normal Usage" means using The Pack as intended for the general
+       public. This includes, but is not limited to:
+
+       a. Loading The Pack in Minecraft: Java Edition to play the game,
+          including on multiplayer servers and on servers that sell ranks,
+          subscriptions or other perks to their players.
+
+       b. Recording, streaming, screenshotting and rendering with The Pack,
+          and publishing or monetizing the resulting content.
+
+       c. Making cinematic works, films, music videos or other audiovisual
+          works with The Pack.
+
+       d. Modifying The Pack for personal use without publishing it.
+
+  0.3. "User" and "Users" means any person who accesses, uses or
+       distributes The Pack, including under sections 1.3, 1.4 and 1.5.
+
+  0.4. "Modpack" means a modification package made for the video game
+       "Minecraft: Java Edition" that bundles multiple independent pieces
+       of content.
+
+  0.5. "Fork" means a software package that contains code from The Pack
+       and in which that code has been intentionally changed to differ
+       from The Pack.
+
+  0.6. "Original Pack" means the pack named "Ray" published by kuwacom.
+
+  0.7. "Official Distribution Channels" means repositories and download
+       pages published by kuwacom, including the GitHub repository at
+       https://github.com/kuwacom/ray, and any Modrinth or CurseForge
+       project page that kuwacom controls.
+
+1. Grants
+
+  1.1. All Users are free to use The Pack for Normal Usage. No payment,
+       attribution or permission is required for Normal Usage.
+
+  1.2. Content created with The Pack, including videos, streams,
+       screenshots, films and renders, is the work of the person who
+       created it. kuwacom makes no claim of ownership over such content,
+       whether or not it is monetized. Credit is appreciated but not
+       required.
+
+  1.3. The Pack may be included in a Modpack, including a Modpack that is
+       sold or otherwise monetized, as long as the following conditions
+       are met:
+
+       a. The Modpack has substantial content of its own. A Modpack whose
+          primary purpose is to distribute The Pack, or which contains
+          little besides The Pack, does not qualify.
+
+       b. The Pack must be visibly credited, with a link to an Official
+          Distribution Channel, in the Modpack's description page(s),
+          whether or not The Pack is enabled by default for new users.
+
+       c. The copy of The Pack placed in the Modpack must be complete and
+          unmodified, including this license file. Changing option defaults,
+          changing block properties or adding content to The Pack itself does
+          not satisfy this condition.
+
+       Support is provided for The Pack as published by kuwacom only.
+       Problems caused by a Modpack, or by changes made to The Pack inside
+       one, are not covered.
+
+  1.4. A Fork may be published as long as the following conditions are met:
+
+       a. The Fork must visibly credit the Original Pack as "Based on Ray
+          by kuwacom", including a link to an Official Distribution
+          Channel. This credit must appear in the first paragraph of the
+          Fork's description page(s) and in the first paragraph of the
+          Fork's README or equivalent documentation. Burying the credit
+          at the end of a long description does not satisfy this
+          condition.
+
+       b. The Fork must not be named in a way that could reasonably be
+          mistaken for the Original Pack or for an official product of
+          kuwacom. Using "Ray" as the whole name, or in a variant that
+          suggests an official continuation (for example "Ray 2",
+          "Ray Reimagined", "Ray RT"), is not allowed. The word "Ray" may
+          only be used descriptively, to state that the Fork is based on
+          Ray. The same applies to domain names, social media handles,
+          repository names and store page titles.
+
+       c. The Fork must not use the name, logo, avatars or other identity
+          of kuwacom, or of the Original Pack, in a way that presents them
+          as belonging to the Fork or as an endorsement of the Fork.
+
+       d. The Fork must differ substantively from the Original Pack, either
+          in its visuals or in its functionality, as judged by a reasonable
+          observer.
+
+          Visual difference is judged at any time of day and in any
+          weather, using the default settings of both packs. A Fork that
+          only changes the appearance of a subset of times of day or weather
+          conditions, and otherwise reproduces the appearance of the
+          Original Pack, does not qualify on visual grounds. Difference
+          achieved only by changing option values or presets does not
+          qualify.
+
+          Functional difference means the Fork adds, removes or changes
+          features, settings or rendering behaviour in a way that is
+          noticeable in use. Adding presets, or adding settings whose
+          defaults reproduce the Original Pack, does not by itself qualify.
+
+          A Fork whose only difference from the Original Pack is its name,
+          its metadata, its packaging, or a cosmetic reorganisation of the
+          code, such as renaming or reformatting, does not qualify under
+          either heading.
+
+       e. The Fork must be distributed solely under this license. It must
+          not be accompanied by any other license, terms of service or
+          condition, regardless of how much new code has been added. This
+          does not prevent carrying the notices of third-party components
+          that are already present in the Original Pack.
+
+       f. This license file must be kept inside the Fork without
+          substantive changes. Changes to line endings, character encoding,
+          trailing whitespace or the file name do not count as changes.
+          When the Fork is updated to make use of code from a newer version
+          of the Original Pack, the license file must be replaced with the
+          one found in that newer version.
+
+       g. The Fork must not be sold, and must not be distributed in any way
+          described in section 2.1, except that the Fork may be included in
+          a Modpack on the terms of section 1.3. For that purpose, section
+          1.3 is read with the Fork in place of The Pack, and condition 1.3.c
+          requires only that the copy of the Fork placed in the Modpack be
+          complete and unmodified.
+
+  1.5. Unmodified copies of The Pack may be redistributed freely, including
+       by uploading the files to another download page, as long as the
+       following conditions are met:
+
+       a. The copy is complete, includes this license file, and carries the
+          same text of that file as the version being copied, apart from
+          line endings, character encoding and trailing whitespace.
+
+       b. kuwacom and the Original Pack are credited wherever the copy is
+          offered, with a link to an Official Distribution Channel.
+
+       c. The copy is not presented as the redistributor's own work, and is
+          not presented as an official release of, or as endorsed by,
+          kuwacom.
+
+       d. Section 2.1 still applies. The copy must not be sold or placed
+          behind any form of payment or advertisement gating.
+
+       Section 1.3 applies instead of this section when The Pack is included
+       in a Modpack.
+
+  1.6. Users are free to read, examine and learn from the source code of
+       The Pack. Implementing a technique, idea, algorithm, formula or
+       visual approach found in The Pack in a different work is allowed and
+       does not create a Fork. Copying code from The Pack into another work
+       does create a Fork, and section 1.4 then applies to that work.
+
+  1.7. Using The Pack, including its source code and generated assets, as
+       training data for machine learning models is allowed.
+
+  1.8. Any usage or redistribution not explicitly covered by this section
+       is not granted and remains All Rights Reserved. The only exception
+       is any file that carries a notice stating that it is covered by a
+       different license, in which case that notice takes precedence.
+
+2. Denied Cases
+
+  2.1. The Pack and any Fork must not be sold, rented, sublicensed, or
+       otherwise made available in exchange for money or any other
+       consideration, except as permitted by section 1.3. This includes, but
+       is not limited to:
+
+       a. Paid downloads, donations-gated downloads, and downloads that
+          require a paid membership.
+
+       b. Paid early access, paid beta access, or subscriber-only tiers on
+          platforms such as Patreon or Ko-fi.
+
+       c. Distribution through advertisement-gated or shortened URLs, such
+          as adfly and similar services.
+
+       d. Inclusion in a paid support plan, paid installation service, or
+          any product whose sale depends on The Pack or on a Fork.
+
+  2.2. Extracting files or assets from The Pack and redistributing them on
+       their own or as part of another work is not allowed. This includes
+       textures, LUT data, generated noise images, lens data and isolated
+       code snippets. Copying code into another shader pack is governed by
+       section 1.6 instead. Such assets may appear incidentally inside
+       screenshots, videos or renders made under Normal Usage, inside a copy
+       of The Pack redistributed under section 1.5, and inside a Fork
+       published under section 1.4.
+
+  2.3. A Fork must not be relicensed, and must not be merged into a work
+       that purports to license the Fork's code under different terms. This
+       does not prevent the Fork from being included in a Modpack under
+       section 1.3, where the Modpack's own terms apply only to the
+       Modpack's own content.
+
+  2.4. A Fork must not be presented as an official release of, or as
+       endorsed by, kuwacom or the Original Pack.
+
+3. Scope and Versioning
+
+  3.1. This license applies only to the version of The Pack in which this
+       license file is found. It does not apply to past or future versions
+       of The Pack unless those versions contain a license file identical
+       apart from line endings, character encoding and trailing whitespace.
+
+  3.2. kuwacom may publish new versions of this license for future
+       releases. Rights already granted for a published version are not
+       revoked by a later version.
+
+4. Contributions
+
+  4.1. By submitting code, text, documentation, translations, presets or
+       any other material to The Pack, you confirm that you are entitled to
+       submit it, and you agree that your contribution is provided under
+       this license. You grant kuwacom a perpetual, worldwide, irrevocable,
+       royalty-free right to use, modify, merge, publish and relicense your
+       contribution as part of The Pack.
+
+5. Disclaimer of Warranty and Limitation of Liability
+
+  5.1. THE PACK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+       OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+       NONINFRINGEMENT. This disclaimer applies to the maximum extent
+       permitted by applicable law.
+
+  5.2. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+       CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+       TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+       PACK OR THE USE OR OTHER DEALINGS IN THE PACK. This includes, without
+       limitation, graphical glitches, driver or GPU failures, game crashes,
+       and loss or corruption of world data.
+
+6. License Infringement
+
+  6.1. By using The Pack for any purpose, you agree that kuwacom has the
+       right to take action in the case of an infringement of this license,
+       whether The Pack is the Original Pack or a Fork.
+
+  6.2. kuwacom may choose not to take action against cases that are judged
+       harmless or not worth pursuing. Not having taken action against a
+       past case cannot be used as an excuse to ignore this license.
+
+  6.3. kuwacom may restore the rights granted by this license to a party
+       that fixes an infringement within a reasonable time after being
+       notified.
+
+  6.4. If you breach a condition of this license, the permissions granted
+       to you by it end. kuwacom may restore them under section 6.3, and
+       doing so does not waive any claim for the period before the breach
+       was fixed.
+
+7. General
+
+  7.1. If any provision of this license is held invalid or unenforceable,
+       the remaining provisions remain in effect, and the invalid provision
+       is replaced by the minimum provision needed to achieve its purpose.
+
+  7.2. The English text of this license is authoritative. Translations,
+       including the Japanese summary in README.md, are for convenience
+       only.
