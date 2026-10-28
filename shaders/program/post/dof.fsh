@@ -98,7 +98,7 @@ void main() {
      * 前ボケの縁が紫、後ボケの縁が緑に色付き、ピント面の明るい縁にも紫のにじみが出る (補正不足の大口径レンズの典型)
      */
 #ifdef LENS_AXIAL_CA
-    vec3 lca = -vec3(1.0, 0.0, 0.85) * (LENS_AXIAL_CA_PX * LP_AXIAL_CA * lensApertureFactor() * viewHeight / 1080.0);
+    vec3 lca = -vec3(1.0, 0.0, 0.85) * (LENS_AXIAL_CA_PX * LP_AXIAL_CA * lensApertureFactor() * viewHeight / REFERENCE_HEIGHT);
 #else
     const vec3 lca = vec3(0.0);
 #endif
@@ -133,7 +133,7 @@ void main() {
     }
 
     // 大きなボケは、1 サンプルの受け持ち幅が DOF_SAMPLE_SPACING (1080p 換算) 以下になるまでサンプルを増やす
-    float spacingLimit = DOF_SAMPLE_SPACING * viewHeight / 1080.0;
+    float spacingLimit = DOF_SAMPLE_SPACING * viewHeight / REFERENCE_HEIGHT;
     int sampleCount = clamp(int(ceil(PI * sqr(radius / spacingLimit))), DOF_SAMPLE_COUNT, DOF_SAMPLE_LIMIT);
     float sampleCountF = float(sampleCount);
     // サンプル 1 個が受け持つ円板の幅。ミップはこの幅に合わせる (MIP-Bokeh)

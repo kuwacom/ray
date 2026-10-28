@@ -20,6 +20,9 @@
 #include "/lib/post/sampling.glsl"
 #include "/lib/post/velocity.glsl"
 
+const float LENS_REF_WAVELENGTH = 550.0;  // nm
+const float LENS_CA_WAVELENGTH_RANGE = 140.0;
+
 #if LENS_QUALITY == 0
 const int LENS_GHOST_LIMIT = 8;
 const int LENS_SPECTRAL_SAMPLES = 3;
@@ -372,7 +375,7 @@ vec3 lensChromaticSample(sampler2D tex, vec2 uv, float amount) {
     for (int k = 0; k < LENS_SPECTRAL_SAMPLES; k++) {
         float l = lensWavelength(k, LENS_SPECTRAL_SAMPLES);
         vec3 w = wavelengthToRgb(l);
-        float scale = 1.0 + amount * LENS_CA_SCALE * ((l - 550.0) / 140.0) * r2;
+        float scale = 1.0 + amount * LENS_CA_SCALE * ((l - LENS_REF_WAVELENGTH) / LENS_CA_WAVELENGTH_RANGE) * r2;
         sum += sanitizeColor(textureLod(tex, 0.5 + d * scale, 0.0).rgb) * w;
         wSum += w;
     }
@@ -392,7 +395,7 @@ vec3 lensChromaticProjected(sampler2D tex, vec2 uv, float amount) {
     for (int k = 0; k < LENS_SPECTRAL_SAMPLES; k++) {
         float l = lensWavelength(k, LENS_SPECTRAL_SAMPLES);
         vec3 w = wavelengthToRgb(l);
-        float scale = 1.0 + amount * LENS_CA_SCALE * ((l - 550.0) / 140.0) * r2;
+        float scale = 1.0 + amount * LENS_CA_SCALE * ((l - LENS_REF_WAVELENGTH) / LENS_CA_WAVELENGTH_RANGE) * r2;
         float rho;
         vec2 src = clamp(lensProjectUv(0.5 + d * scale, rho), vec2(0.0), vec2(1.0));
         sum += sanitizeColor(sampleCatmullRom(tex, src, viewSize())) * w;

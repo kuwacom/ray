@@ -79,6 +79,7 @@ const float EXPOSURE_THUNDER_DIM = 1.0;
 // ヒストグラムの範囲 (log2 輝度)。MIN_AMBIENT 付近の暗所から太陽円盤の手前まで
 const float HISTOGRAM_LOG_MIN = -16.0;
 const float HISTOGRAM_LOG_MAX = 10.0;
+const float HISTOGRAM_LAST_BIN = 255.0;   // ビンは 0 (黒) と 1-255 (log2 輝度の等間隔)
 // パーセンタイル: 暗すぎる影と空・太陽の外れ値を平均から除く (UE 4.25 方式)
 const float HISTOGRAM_LOW_PERCENT = 0.35;
 const float HISTOGRAM_HIGH_PERCENT = 0.92;
@@ -163,6 +164,7 @@ const float DOF_MAX_LOD = 4.0;
  * 既定の上限半径 (画面高さの 2.2%) では基本数 (DOF_QUALITY) のままなので、既定の見た目と負荷は解像度に依らず変わらない
  */
 const float DOF_SAMPLE_SPACING = 11.0;
+const float REFERENCE_HEIGHT = 1080.0;  // px: 画素数で決めた値を画面の高さに合わせて拡縮する基準
 #if DOF_QUALITY == 0
 const int DOF_SAMPLE_LIMIT = 256;
 #elif DOF_QUALITY == 1

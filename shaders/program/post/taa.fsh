@@ -17,6 +17,13 @@ in vec2 texcoord;
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec4 outHistory;
 
+const float TAA_HISTORY_DEPTH_ABS = 0.05;      // 履歴の距離の許容の固定分 (ブロック)。距離に比例した分を足す
+const float TAA_MOVING_TOLERANCE_SCALE = 4.0;  // 動くエンティティの距離の許容の倍率
+const float TAA_CLIP_MOTION_PX = 4.0;         // 動きがこの画素数で履歴の切り詰めが動き用に切り替わる
+const float TAA_BLEND_MOTION_PX = 6.0;        // 動きがこの画素数で履歴の混ぜ方が動き用になる
+const float TAA_NO_HISTORY_MEAN_BLEND = 0.3;  // 履歴が無い所で近傍平均へ寄せる割合
+const float TAA_NEIGHBOR_COUNT = 9.0;         // 近傍の統計に使うサンプル数 (3x3)
+
 /*
  * 露出込みの可逆トーンマップ (Karis 2014)
  * HDR のまま混ぜると明るい画素が履歴を支配してちらつくので、表示に近い空間で混ぜてから戻す
@@ -59,7 +66,7 @@ bool historyMatches(float stored, float expected, float tolerance) {
     if (expected < 0.0) return stored < 0.0;
     if (expected >= TAA_SKY_DISTANCE) return stored >= TAA_SKY_DISTANCE * 0.5;
     if (stored < 0.0) return false;
-    return abs(stored - expected) <= expected * tolerance + 0.05;
+    return abs(stored - expected) <= expected * tolerance + TAA_HISTORY_DEPTH_ABS;
 }
 
 // 前フレームのカメラから見た距離の予想値 (手 = -1, 空 = TAA_SKY_DISTANCE)
@@ -69,7 +76,7 @@ float expectedPreviousDistance(vec2 uv, float depth, out float tolerance) {
     if (depth >= 1.0) return TAA_SKY_DISTANCE;
     // 動くエンティティは前フレームの位置が分からないので、今の距離を緩い許容で比べる
     if (texture(colortex15, uv).a > 0.5) {
-        tolerance = TAA_DEPTH_TOLERANCE * 4.0;
+        tolerance = TAA_DEPTH_TOLERANCE * TAA_MOVING_TOLERANCE_SCALE;
         return length(screenToPlayer(vec3(uv, depth)));
     }
     return getPreviousViewDistance(uv, depth);
@@ -89,7 +96,7 @@ bool taaHistoryValid(vec2 prevUv, ivec2 maxTexel, float expCenter, float tolCent
 
 // 履歴 (線形 HDR) を近傍の統計 (平均・標準偏差・min/max) の箱へ切り詰めて YCoCg で返す
 vec3 taaClipHistory(vec3 history, float exposure, vec3 mean, vec3 sigma, vec3 boxMin, vec3 boxMax, float motionPx) {
-    float motion = saturate(motionPx / 4.0);
+    float motion = saturate(motionPx / TAA_CLIP_MOTION_PX);
     float gamma = mix(TAA_GAMMA_STATIC, TAA_GAMMA_MOVING, motion);
     /*
      * 静止時は分散の箱だけで切る。min-max の箱と重ねると、ジッターで近傍の極値が毎フレーム入れ替わる高コントラストの
@@ -106,7 +113,7 @@ vec3 taaClipHistory(vec3 history, float exposure, vec3 mean, vec3 sigma, vec3 bo
 }
 
 float taaBlendAlpha(float motionPx, float centerDepth) {
-    float alpha = mix(TAA_BLEND_STATIC, TAA_BLEND_MOVING, saturate(motionPx / 6.0));
+    float alpha = mix(TAA_BLEND_STATIC, TAA_BLEND_MOVING, saturate(motionPx / TAA_BLEND_MOTION_PX));
     if (isHandDepth(centerDepth)) alpha = max(alpha, TAA_BLEND_HAND);
     return alpha;
 }
@@ -145,8 +152,8 @@ TaaNeighborhood taaNeighborhood(ivec2 center, ivec2 maxTexel, float exposure, fl
             }
         }
     }
-    nb.mean = m1 / 9.0;
-    nb.sigma = momentSigma(m2, nb.mean, 9.0);
+    nb.mean = m1 / TAA_NEIGHBOR_COUNT;
+    nb.sigma = momentSigma(m2, nb.mean, TAA_NEIGHBOR_COUNT);
     return nb;
 }
 
@@ -241,7 +248,7 @@ void taaWarped() {
         resultYcc = mix(historyYcc, currentYcc, alpha);
     } else {
         // 履歴が無い所は 1 フレームの補間 (final で引き伸ばす方式と同じぼけ方)
-        resultYcc = mix(rgbToYCoCg(taaCompress(smoothColor, exposure)), mean, 0.3 * (1.0 - superRes));
+        resultYcc = mix(rgbToYCoCg(taaCompress(smoothColor, exposure)), mean, TAA_NO_HISTORY_MEAN_BLEND * (1.0 - superRes));
     }
 
     vec3 result = sanitizeColor(taaExpand(yCoCgToRgb(resultYcc), exposure));
@@ -297,7 +304,7 @@ void main() {
         resultYcc = mix(historyYcc, currentYcc, alpha);
     } else {
         // 履歴が無い所は 1 フレームだけなのでジャギーが目立つ。近傍平均へ少し寄せて和らげる
-        resultYcc = mix(currentYcc, mean, 0.3);
+        resultYcc = mix(currentYcc, mean, TAA_NO_HISTORY_MEAN_BLEND);
     }
 
     vec3 result = sanitizeColor(taaExpand(yCoCgToRgb(resultYcc), exposure));

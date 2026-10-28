@@ -20,9 +20,10 @@ uniform sampler2D lensStarburstTex;
 uniform sampler2D lensDirtTex;
 
 // ゴースト表の補間
+const float GHOST_TABLE_SPACING = 100.0; // nm: 表の波長の間隔
 // 3 点 (450 / 550 / 650 nm) の 2 次補間
 float ghostLagrange(vec3 v, float l) {
-    float t = (l - 550.0) / 100.0;
+    float t = (l - LENS_REF_WAVELENGTH) / GHOST_TABLE_SPACING;
     return v.y + 0.5 * (v.z - v.x) * t + 0.5 * (v.z - 2.0 * v.y + v.x) * t * t;
 }
 
@@ -105,7 +106,7 @@ vec3 lensGhosts(vec2 yTan, vec2 lightTan, float fNumber, float pxTan) {
             // 縞は縁のくっきりしたゴーストの、縁から数画素の範囲にだけ出す (ぼけたゴーストの内側に同心円が並ばないように)
             float ePx = max(1.0 - stopN, 0.0) / pxStop;
             float sharp = saturate(2.0 * pxStop / edgeStop);
-            float ring = 1.0 + LP_RINGING * sharp * exp(-ePx * 0.15) * cos(ePx * 0.8 * (550.0 / l));
+            float ring = 1.0 + LP_RINGING * sharp * exp(-ePx * 0.15) * cos(ePx * 0.8 * (LENS_REF_WAVELENGTH / l));
             float energy = ghostReflectance(g, l) / (al * al);
             sum += wavelengthToRgb(l) * (inside * ring * energy);
         }
@@ -197,7 +198,7 @@ vec3 lensFlare(vec2 uv, vec2 lightUv, vec3 lightTint, float starGain) {
             float l = lensWavelength(k, LENS_SPECTRAL_SAMPLES);
             vec3 w = wavelengthToRgb(l);
             // 波長による半径の差は幅の半分程度 (幅と同じだと青から赤まで分かれた虹の帯になり、空で目立った)
-            float radius = LENS_HALO_RADIUS * (1.0 + 0.025 * (l - 550.0) / 140.0);
+            float radius = LENS_HALO_RADIUS * (1.0 + 0.025 * (l - LENS_REF_WAVELENGTH) / LENS_CA_WAVELENGTH_RANGE);
             ring += w * exp(-sqr((length(yTan) - radius) / LENS_HALO_WIDTH));
             wSum += w;
         }

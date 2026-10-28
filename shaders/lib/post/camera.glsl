@@ -48,10 +48,13 @@ float dofMaxRadius() {
  * 薄レンズ: c = A * f * (d - s) / (d * (s - f)) (センサー上の直径, mm)
  * dist / focus はブロック (= m)
  */
+const float CAMERA_BLOCK_TO_MM = 1000.0;
+const float CAMERA_MIN_DIST_RATIO = 1.01; // 距離は焦点距離のこの倍以上にして、(s - f) と (d * (s - f)) を 0 にしない
+
 float circleOfConfusion(float dist, float focus) {
     float f = cameraFocalLength();
-    float s = max(focus * 1000.0, f * 1.01);
-    float d = max(dist * 1000.0, f * 1.01);
+    float s = max(focus * CAMERA_BLOCK_TO_MM, f * CAMERA_MIN_DIST_RATIO);
+    float d = max(dist * CAMERA_BLOCK_TO_MM, f * CAMERA_MIN_DIST_RATIO);
     float c = cameraApertureDiameter() * f * (d - s) / (d * (s - f));
     float radiusPx = 0.5 * c / DOF_SENSOR_HEIGHT * viewHeight;
     float maxRadius = dofMaxRadius();

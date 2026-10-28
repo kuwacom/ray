@@ -99,6 +99,8 @@ const mat3 OKLAB_M1_INV = mat3(
     0.2309699292, -0.3413193965, 1.7076147010
 );
 
+const float HUE_TURN = 360.0;  // 色相の一周 (度)
+
 vec3 linearToOklab(vec3 c) {
     vec3 lms = OKLAB_M1 * c;
     return OKLAB_M2 * (sign(lms) * pow(abs(lms), vec3(1.0 / 3.0)));
@@ -194,13 +196,13 @@ const float GRADE_HUE_SHIFT_DEG = 1.0;
  */
 vec3 gradeHueValues(float hue) {
     // 最初の中心より小さい色相は、最後の中心 (マゼンタ) から一周した続きとして扱う
-    float h = hue < G_HUE_CENTER[0] ? hue + 360.0 : hue;
+    float h = hue < G_HUE_CENTER[0] ? hue + HUE_TURN : hue;
     // h 以下の中心の数 - 1 が区間の番号 (分岐の多いループより速い)
     int i = -1;
     for (int k = 0; k < 8; k++) i += h >= G_HUE_CENTER[k] ? 1 : 0;
     int j = (i + 1) % 8;
     float h0 = G_HUE_CENTER[i];
-    float h1 = G_HUE_CENTER[j] + (j == 0 ? 360.0 : 0.0);
+    float h1 = G_HUE_CENTER[j] + (j == 0 ? HUE_TURN : 0.0);
     float t = smoothstep(0.0, 1.0, (h - h0) / (h1 - h0));
     return mix(vec3(G_HUE_SHIFT[i], G_HUE_SAT[i], G_HUE_LUM[i]), vec3(G_HUE_SHIFT[j], G_HUE_SAT[j], G_HUE_LUM[j]), t);
 }
@@ -226,7 +228,7 @@ vec3 gradeChroma(vec3 c) {
     float lumEv = 0.0;
     if (G_HSL_ON) {
         float hue = degrees(atan(lab.z, lab.y));
-        hue = hue < 0.0 ? hue + 360.0 : hue;
+        hue = hue < 0.0 ? hue + HUE_TURN : hue;
         vec3 hv = gradeHueValues(hue);
         float m = smoothstep(GRADE_HUE_CHROMA_MIN, GRADE_HUE_CHROMA_FULL, rel);
         float rot = radians(hv.x * GRADE_HUE_SHIFT_DEG * m);

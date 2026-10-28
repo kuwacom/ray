@@ -139,6 +139,8 @@ float lavaToneMask(ivec2 texel) {
     return sum / 5.0;
 }
 
+const float OUTPUT_LEVELS = 255.0;  // 8bit 出力の最大値
+
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
     vec2 uv = texcoord;
@@ -340,6 +342,6 @@ void main() {
 
     color = debugView(texel, color);
     // 8bit 出力のバンディング対策
-    color += (interleavedGradientNoise(gl_FragCoord.xy, frameCounter) - 0.5) / 255.0;
+    color += (interleavedGradientNoise(gl_FragCoord.xy, frameCounter) - 0.5) / OUTPUT_LEVELS;
     outColor = vec4(color, 1.0);
 }

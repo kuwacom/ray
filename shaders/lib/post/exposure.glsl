@@ -10,22 +10,23 @@
 #include "/lib/post/post_constants.glsl"
 
 const float EXPOSURE_INIT_MARKER = 271.828;
+const float EXPOSURE_ISO = 100.0;
 
-float luminanceToEv100(float l) { return log2(max(l, 1e-10) * 100.0 / EXPOSURE_CALIBRATION); }
-float ev100ToLuminance(float ev) { return exp2(ev) * EXPOSURE_CALIBRATION / 100.0; }
+float luminanceToEv100(float l) { return log2(max(l, 1e-10) * EXPOSURE_ISO / EXPOSURE_CALIBRATION); }
+float ev100ToLuminance(float ev) { return exp2(ev) * EXPOSURE_CALIBRATION / EXPOSURE_ISO; }
 
 // 平均輝度 2^ev 相当の場面を中間グレーへ写す露出倍率
 float ev100ToExposure(float ev) { return EXPOSURE_KEY / ev100ToLuminance(ev); }
 
 // ヒストグラムのビン <-> log2 輝度 (ビン 0 は黒)
 float histogramBinToLog(float bin) {
-    return HISTOGRAM_LOG_MIN + (bin - 0.5) / 255.0 * (HISTOGRAM_LOG_MAX - HISTOGRAM_LOG_MIN);
+    return HISTOGRAM_LOG_MIN + (bin - 0.5) / HISTOGRAM_LAST_BIN * (HISTOGRAM_LOG_MAX - HISTOGRAM_LOG_MIN);
 }
 
 uint luminanceToHistogramBin(float l) {
     if (l < exp2(HISTOGRAM_LOG_MIN)) return 0u;
     float t = (log2(l) - HISTOGRAM_LOG_MIN) / (HISTOGRAM_LOG_MAX - HISTOGRAM_LOG_MIN);
-    return uint(clamp(t * 255.0 + 1.0, 1.0, 255.0));
+    return uint(clamp(t * HISTOGRAM_LAST_BIN + 1.0, 1.0, HISTOGRAM_LAST_BIN));
 }
 
 #endif
