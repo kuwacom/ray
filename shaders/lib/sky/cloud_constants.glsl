@@ -20,12 +20,11 @@
 #include "/lib/sky/climate.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/sky/sky_color.glsl"
+#include "/lib/sky/cloud_styles.glsl"
 
 uniform sampler3D cloudShapeTex;
 uniform sampler3D cloudDetailTex;
 uniform sampler2D cloudNoiseTex;
-
-#include "/lib/sky/cloud_styles.glsl"
 
 // 中層は品質によらず描く (品質で変えるのは歩数だけにして、雲の形と陰影をそろえる)
 #if CLOUDS == 3
