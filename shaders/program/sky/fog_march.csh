@@ -93,7 +93,7 @@ void main() {
         vec3 prevView = mat3(gbufferPreviousModelView) * dir;
         prevUv = prevView.z < 0.0 ? projectAndDivide(gbufferPreviousProjection, prevView).xy * 0.5 + 0.5 : vec2(-1.0);
     } else {
-        prevUv = playerToPrevScreen(playerPos).xy;
+        prevUv = playerToPreviousScreen(playerPos).xy;
     }
     bool valid = reprojectionInside(prevUv) && frameData.skyParams[1].y > 1.5;
 

@@ -57,7 +57,7 @@ vec3 traceBlockLight(int li, vec3 fromVoxel, vec3 playerPos, vec3 geoNormal, uin
     float a = xi.y * TAU;
     vec2 disk = sqrt(xi.x) * vec2(cos(a), sin(a)) * lightJitterRadius(L);
     vec3 target = lp + tbn[0] * disk.x + tbn[1] * disk.y;
-    vec3 vis = traceVisibilityEx(fromVoxel, target, flags, dither, skipStart, lightEntitySkip(L));
+    vec3 vis = traceVisibility(fromVoxel, target, flags, dither, skipStart, lightEntitySkip(L));
 #ifdef LIGHT_CONTACT_SHADOWS
     if (contact && maxOf(vis) > 0.0) {
         // 光源自身の形 (たいまつの棒・ランタンの枠) で遮らないよう手前で止める
@@ -70,8 +70,8 @@ vec3 traceBlockLight(int li, vec3 fromVoxel, vec3 playerPos, vec3 geoNormal, uin
 
 void main() {
     ivec2 low = ivec2(gl_GlobalInvocationID.xy);
-    if (any(greaterThanEqual(low, traceLowSize()))) return;
-    ivec2 src = traceSourceTexel(low, frameCounter);
+    if (any(greaterThanEqual(low, lightTraceLowResSize()))) return;
+    ivec2 src = lightTraceSourceTexel(low, frameCounter);
 
     float depth = texelFetch(depthtex0, src, 0).r;
     if (depth >= 1.0) {

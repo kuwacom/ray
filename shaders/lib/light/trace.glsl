@@ -173,7 +173,7 @@ bool traceSubcells(uint mask, vec3 ro, vec3 dir, vec3 rdInv, ivec3 stepDir, floa
  * エンティティ占有は区間 [entSkipStart, 長さ - entSkipEnd] だけで判定する (着色点・光源自身の体を除くため)
  * 体積の外に出たら以降は遮蔽なしとみなす
  */
-vec3 traceVisibilityEx(vec3 fromVoxel, vec3 toVoxel, uint flags, float dither, float entSkipStart, float entSkipEnd) {
+vec3 traceVisibility(vec3 fromVoxel, vec3 toVoxel, uint flags, float dither, float entSkipStart, float entSkipEnd) {
     vec3 delta = toVoxel - fromVoxel;
     float len = length(delta);
     if (len < 1e-4) return vec3(1.0);

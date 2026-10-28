@@ -65,7 +65,7 @@ float fixHandDepth(float depth) {
 bool isHandDepth(float depth) { return depth < HAND_DEPTH_THRESHOLD; }
 
 // 前フレームのスクリーン座標へ再投影 (静止ジオメトリ用。動くエンティティは colortex15 の速度を使う)
-vec3 playerToPrevScreen(vec3 playerPos) {
+vec3 playerToPreviousScreen(vec3 playerPos) {
     vec3 prevPlayer = playerPos + (cameraPosition - previousCameraPosition);
     vec3 prevView = (gbufferPreviousModelView * vec4(prevPlayer, 1.0)).xyz;
     return projectAndDivide(gbufferPreviousProjection, prevView) * 0.5 + 0.5;

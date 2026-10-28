@@ -47,7 +47,7 @@ const int ENTITY_GATHER_RADIUS = 2;
 const float LIGHTNING_RANGE_MUL = 2.0;
 const float LIGHTNING_HEIGHT = 3.0;
 
-vec3 loadPrevFlood(ivec3 cell) {
+vec3 loadPreviousFlood(ivec3 cell) {
     ivec3 prev = cell + getVoxelFrameOffset();
     if (!isInVoxelVolume(prev)) return vec3(0.0);
     return floodWritesA() ? imageLoad(floodImgB, prev).rgb : imageLoad(floodImgA, prev).rgb;
@@ -65,7 +65,7 @@ vec3 loadPrevFlood(ivec3 cell) {
 const float FLOOD_BOUNCE_MIN_ILLUMINANCE = 1e-4;
 
 vec3 floodBounce(ivec3 cell) {
-    vec3 self = loadPrevFlood(cell);
+    vec3 self = loadPreviousFlood(cell);
     if (maxOf(self) < FLOOD_BOUNCE_MIN_ILLUMINANCE) return vec3(0.0);
     vec3 reflectance = vec3(0.0);
     for (int i = 0; i < 6; i++) {
@@ -224,9 +224,9 @@ void main() {
 #ifdef FLOODFILL
     vec3 light = vec3(0.0);
     if (!isVoxelOpaque(voxelId)) {
-        light = loadPrevFlood(cell + ivec3(1, 0, 0)) + loadPrevFlood(cell - ivec3(1, 0, 0))
-              + loadPrevFlood(cell + ivec3(0, 1, 0)) + loadPrevFlood(cell - ivec3(0, 1, 0))
-              + loadPrevFlood(cell + ivec3(0, 0, 1)) + loadPrevFlood(cell - ivec3(0, 0, 1));
+        light = loadPreviousFlood(cell + ivec3(1, 0, 0)) + loadPreviousFlood(cell - ivec3(1, 0, 0))
+              + loadPreviousFlood(cell + ivec3(0, 1, 0)) + loadPreviousFlood(cell - ivec3(0, 1, 0))
+              + loadPreviousFlood(cell + ivec3(0, 0, 1)) + loadPreviousFlood(cell - ivec3(0, 0, 1));
         if (BLOCKLIGHT_BOUNCE > 0.0) light += floodBounce(cell);
         light *= (FLOOD_DECAY / 6.0) * floodCellTransmittance(voxelId);
     }

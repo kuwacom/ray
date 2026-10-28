@@ -35,7 +35,7 @@ const float REFLECTION_ALPHA_MIN = 0.12;     // 最も粗い面の時間蓄積�
 
 void main() {
     ivec2 low = ivec2(gl_GlobalInvocationID.xy);
-    ivec2 lowSize = reflectionLowSize();
+    ivec2 lowSize = reflectionLowResSize();
     if (any(greaterThanEqual(low, lowSize))) return;
     ivec2 region = reflectionRegion(frameCounter);
     ivec2 prevRegion = reflectionRegion(frameCounter + 1);

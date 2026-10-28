@@ -160,7 +160,7 @@ LightSample evalHandLight(bool mainHand, vec3 playerPos, vec3 geoNormal, float d
             skipEnd = HAND_THIRD_PERSON_SELF_SKIP;
         }
     #endif
-        s.irradiance *= traceVisibilityEx(fromVoxel, target, flags, dither, TRACE_ENTITY_SKIP_START, skipEnd);
+        s.irradiance *= traceVisibility(fromVoxel, target, flags, dither, TRACE_ENTITY_SKIP_START, skipEnd);
     }
 #endif
 #ifdef HAND_LIGHT_SS_SHADOWS

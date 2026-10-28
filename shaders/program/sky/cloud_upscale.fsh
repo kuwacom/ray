@@ -36,7 +36,7 @@ vec2 cloudPreviousUv(vec3 dir) {
     vec2 seg = cloudLayerSegment(cameraPosition.y, dir.y, CLOUD_BASE, CLOUD_TOP);
     if (seg.y > seg.x) {
         float dist = min(seg.x + 0.3 * (seg.y - seg.x), 30000.0 / CLOUD_KH);
-        return playerToPrevScreen(dir * dist).xy;
+        return playerToPreviousScreen(dir * dist).xy;
     }
     vec3 prevView = mat3(gbufferPreviousModelView) * dir;
     if (prevView.z >= 0.0) return vec2(-1.0);

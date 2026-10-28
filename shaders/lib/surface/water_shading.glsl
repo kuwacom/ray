@@ -279,7 +279,7 @@ bool refractionInWater(vec2 uv, float surfaceDepth, float surfaceY, bool checkHe
  * 戻り値 rgb = 物に当たった近傍の加重和 (重みで割っていない), a = 重みの合計 (空の分を含む)
  */
 vec4 sampleWaterReflection(ivec2 texel, float dist, out float skyWeight) {
-    ivec2 lowSize = reflectionLowSize();
+    ivec2 lowSize = reflectionLowResSize();
     ivec2 region = reflectionRegion(frameCounter);
     ivec2 offset = lowResOffset(frameCounter);
     ivec2 base = (texel - offset) >> 1;

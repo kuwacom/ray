@@ -83,8 +83,8 @@ void main() {
     }
 
     // 空間: 低解像度サンプルの深度・法線付き重み付き和
-    ivec2 offset = traceFrameOffset(frameCounter);
-    ivec2 lowSize = traceLowSize();
+    ivec2 offset = lightTraceFrameOffset(frameCounter);
+    ivec2 lowSize = lightTraceLowResSize();
     vec2 lp = vec2(texel - offset) / float(LIGHT_TRACE_RES);
     vec3 ratio;
     vec3 mean = vec3(1.0);
@@ -92,7 +92,7 @@ void main() {
 
 #if LIGHT_DENOISE == 0
     {
-        ivec2 l = traceNearestLow(texel, frameCounter);
+        ivec2 l = lightTraceNearestLow(texel, frameCounter);
         ratio = safeRatio(texelFetch(blockLightRawSampler, l, 0).rgb, texelFetch(blockLightAuxSampler, l, 0).rgb);
     }
 #else
@@ -110,7 +110,7 @@ void main() {
         vec4 raw = texelFetch(blockLightRawSampler, l, 0);
         if (raw.a < 0.0) continue;
         vec3 u = texelFetch(blockLightAuxSampler, l, 0).rgb;
-        ivec2 src = traceSourceTexel(l, frameCounter);
+        ivec2 src = lightTraceSourceTexel(l, frameCounter);
         vec3 n = octDecode(unpack2x8(texelFetch(colortex2, src, 0).b));
         vec2 d = vec2(l) - lp;
         float d2 = dot(d, d);

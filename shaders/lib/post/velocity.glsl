@@ -22,7 +22,7 @@
  */
 vec4 encodeVelocity(vec3 viewPos) {
     vec2 cur = viewToScreen(viewPos).xy;
-    vec2 prev = playerToPrevScreen(viewToPlayer(viewPos)).xy;
+    vec2 prev = playerToPreviousScreen(viewToPlayer(viewPos)).xy;
     return vec4(prev - cur, 0.0, 1.0);
 }
 
@@ -52,7 +52,7 @@ vec2 getPreviousUv(vec2 uv, float depth) {
         vec3 prevView = mat3(gbufferPreviousModelView) * dir;
         prev = projectAndDivide(gbufferPreviousProjection, prevView).xy * 0.5 + 0.5;
     } else {
-        prev = playerToPrevScreen(screenToPlayer(vec3(unjittered, depth))).xy;
+        prev = playerToPreviousScreen(screenToPlayer(vec3(unjittered, depth))).xy;
     }
     return uv + (prev - unjittered);
 }

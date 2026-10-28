@@ -206,7 +206,7 @@ float cloudAltitudeAt(float y0, float dy, float t, float A) { return y0 + t * (d
  * 高さ A の殻との交差 (放物面)。戻り値は小さい順の 2 解。交差なしは (1, -1)
  * 2 次方程式は桁落ちしない形 (q = -(b + sign(b) sqrt(D)) / 2) で解く
  */
-vec2 cloudShellIntersectK(float y0, float dy, float A, float k) {
+vec2 cloudShellIntersect(float y0, float dy, float A, float k) {
     float c = y0 - A;
     float disc = dy * dy - 4.0 * k * c;
     if (disc < 0.0) return vec2(1.0, -1.0);
@@ -225,11 +225,11 @@ vec2 cloudShellIntersectK(float y0, float dy, float A, float k) {
 vec2 cloudLayerSegment(float y0, float dy, float base, float top) {
     if (y0 < base && dy <= 0.0) return vec2(1.0, 0.0);
     float k = cloudCurvature(dy, 0.5 * (base + top));
-    vec2 tTop = cloudShellIntersectK(y0, dy, top, k);
+    vec2 tTop = cloudShellIntersect(y0, dy, top, k);
     if (tTop.x > tTop.y) return vec2(1.0, 0.0);
     float start = max(tTop.x, 0.0);
     float end = tTop.y;
-    vec2 tBase = cloudShellIntersectK(y0, dy, base, k);
+    vec2 tBase = cloudShellIntersect(y0, dy, base, k);
     if (tBase.x <= tBase.y && tBase.y > start && tBase.x < end) {
         // 下面より下の区間 [tBase.x, tBase.y] を除いた最初の部分
         if (start < tBase.x) end = tBase.x;

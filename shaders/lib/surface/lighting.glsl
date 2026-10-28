@@ -94,7 +94,7 @@ vec3 shadeSecondaryHitGi(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm, 
 // GI の履歴 (照度, GI_STRENGTH を外した値)。前フレームの画面の外なら x = -1
 const float GI_HISTORY_EDGE = 0.002;
 vec3 giHistoryAtPlayer(vec3 playerPos) {
-    vec2 uv = playerToPrevScreen(playerPos).xy;
+    vec2 uv = playerToPreviousScreen(playerPos).xy;
     if (any(lessThan(uv, vec2(GI_HISTORY_EDGE))) || any(greaterThan(uv, vec2(1.0 - GI_HISTORY_EDGE)))) return vec3(-1.0);
     return textureLod(colortex9, uv, 0.0).rgb / max(GI_EFFECTIVE_STRENGTH * LK_GI_BOUNCE, 1e-3);
 }
@@ -143,7 +143,7 @@ vec3 secondaryHitBlockLight(vec3 playerPos, vec3 normal, ivec2 screenTexel, floa
             }
             if (strongest >= 0) {
                 uint flags = blockLightTraceFlags() & ~(TRACE_ENTITIES | TRACE_PLAYER);
-                E *= luminance(traceVisibilityEx(fromVoxel, globalLights.lights[strongest].posRadius.xyz, flags, 0.5, 0.0, 0.0));
+                E *= luminance(traceVisibility(fromVoxel, globalLights.lights[strongest].posRadius.xyz, flags, 0.5, 0.0, 0.0));
             }
             if (nearField) E += sumBinBoxIrradiance(fromVoxel, normal);
         }

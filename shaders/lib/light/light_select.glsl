@@ -288,7 +288,7 @@ float lightEntitySkip(LightInstance L) {
  * 低解像度トレースのサンプル配置。低解像度テクセル l は毎フレーム違うフル解像度テクセル
  * l * RES + offset(frame) を受け持つ (時間方向にフル解像度を巡回し、デノイズで埋める)
  */
-ivec2 traceFrameOffset(int frame) {
+ivec2 lightTraceFrameOffset(int frame) {
 #if LIGHT_TRACE_RES == 1
     return ivec2(0);
 #elif LIGHT_TRACE_RES == 2
@@ -298,16 +298,16 @@ ivec2 traceFrameOffset(int frame) {
 #endif
 }
 
-ivec2 traceLowSize() { return (ivec2(viewSize()) + LIGHT_TRACE_RES - 1) / LIGHT_TRACE_RES; }
+ivec2 lightTraceLowResSize() { return (ivec2(viewSize()) + LIGHT_TRACE_RES - 1) / LIGHT_TRACE_RES; }
 
-ivec2 traceSourceTexel(ivec2 low, int frame) {
-    return min(low * LIGHT_TRACE_RES + traceFrameOffset(frame), ivec2(viewSize()) - 1);
+ivec2 lightTraceSourceTexel(ivec2 low, int frame) {
+    return min(low * LIGHT_TRACE_RES + lightTraceFrameOffset(frame), ivec2(viewSize()) - 1);
 }
 
 // フル解像度テクセルに最も近い低解像度テクセル
-ivec2 traceNearestLow(ivec2 texel, int frame) {
-    vec2 lp = vec2(texel - traceFrameOffset(frame)) / float(LIGHT_TRACE_RES);
-    return clamp(ivec2(floor(lp + 0.5)), ivec2(0), traceLowSize() - 1);
+ivec2 lightTraceNearestLow(ivec2 texel, int frame) {
+    vec2 lp = vec2(texel - lightTraceFrameOffset(frame)) / float(LIGHT_TRACE_RES);
+    return clamp(ivec2(floor(lp + 0.5)), ivec2(0), lightTraceLowResSize() - 1);
 }
 
 // 鏡面用の代表光源インデックスを fp16 に正確に入れる (fp16 は ±2048 までの整数が正確)

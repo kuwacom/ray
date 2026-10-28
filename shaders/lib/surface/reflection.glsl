@@ -196,8 +196,8 @@ vec3 reflectionHitRadiance(vec2 uv) {
     return lum > REFLECTION_MAX_LUMINANCE ? c * (REFLECTION_MAX_LUMINANCE / lum) : c;
 }
 
-ivec2 reflectionLowSize() { return ivec2(viewSize()) / 2; }
-ivec2 reflectionRegion(int frame) { return (frame & 1) == 0 ? ivec2(0) : ivec2(reflectionLowSize().x, 0); }
+ivec2 reflectionLowResSize() { return ivec2(viewSize()) / 2; }
+ivec2 reflectionRegion(int frame) { return (frame & 1) == 0 ? ivec2(0) : ivec2(reflectionLowResSize().x, 0); }
 
 // アップサンプルの法線の重み (不透明面のみ)。下限があるのは、全近傍の法線が違う時に反射が空のフォールバックへ落ちないため
 const float REFLECTION_NORMAL_POWER = 16.0;
@@ -209,7 +209,7 @@ const float REFLECTION_NORMAL_WEIGHT_MIN = 0.02;
  * normal: 不透明面のテクスチャ法線 (G バッファ)。0 ベクトルなら法線の重みを使わない (半透明)
  */
 vec4 sampleReflection(ivec2 texel, float dist, vec3 normal) {
-    ivec2 lowSize = reflectionLowSize();
+    ivec2 lowSize = reflectionLowResSize();
     ivec2 region = reflectionRegion(frameCounter);
     ivec2 offset = lowResOffset(frameCounter);
     ivec2 base = (texel - offset) >> 1;

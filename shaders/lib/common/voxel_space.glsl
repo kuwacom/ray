@@ -17,7 +17,7 @@ const ivec3 VOXEL_HALF = VOXEL_SIZE / 2;
 // Iris の cameraPositionInt は切り捨てなので、負の座標でも床関数になるよう補正する
 ivec3 getCameraBlock() { return cameraPositionInt + ivec3(floor(cameraPositionFract)); }
 vec3 getCameraFract() { return cameraPositionFract - floor(cameraPositionFract); }
-ivec3 getPrevCameraBlock() { return previousCameraPositionInt + ivec3(floor(previousCameraPositionFract)); }
+ivec3 getPreviousCameraBlock() { return previousCameraPositionInt + ivec3(floor(previousCameraPositionFract)); }
 
 vec3 playerToVoxel(vec3 playerPos) { return playerPos + getCameraFract() + vec3(VOXEL_HALF); }
 vec3 voxelToPlayer(vec3 voxelPos) { return voxelPos - getCameraFract() - vec3(VOXEL_HALF); }
@@ -33,7 +33,7 @@ bool isInVoxelVolume(vec3 voxelPos) {
 }
 
 // 今フレームのセル c に対応する前フレームのセル = c + getVoxelFrameOffset()
-ivec3 getVoxelFrameOffset() { return getCameraBlock() - getPrevCameraBlock(); }
+ivec3 getVoxelFrameOffset() { return getCameraBlock() - getPreviousCameraBlock(); }
 
 // 体積の端に近づくほど 0 に落ちる重み (外側はバニラのライトマップへフォールバックさせる)
 float voxelEdgeFade(vec3 voxelPos, float margin) {
