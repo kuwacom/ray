@@ -40,6 +40,8 @@
 const float VL_DISTRIBUTION = 3.0;
 // 水中のマーチ範囲 (ブロック)。これより先は透過率がほぼ 0
 const float VL_WATER_MAX_DIST = 48.0;
+const float VL_MIN_TRANSMITTANCE = 0.005;
+const float VL_WATER_COLUMN_DEFAULT = 4.0;
 // 水の粒子の位相関数: Henyey-Greenstein の非対称度と、等方散乱を混ぜる割合 (海の粒子は前方に強く尖る, Petzold の g は 0.9 前後)
 const float WATER_PHASE_G = 0.75;
 const float WATER_PHASE_ISO = 0.3;
@@ -83,12 +85,12 @@ vec3 vlShadow(vec3 playerPos, out bool inside) {
 float vlWaterColumn(vec3 playerPos) {
 #ifdef HAS_SUN_SHADOWS
     vec3 s = playerToShadowScreen(playerPos);
-    if (any(lessThan(s, vec3(0.0))) || any(greaterThan(s, vec3(1.0)))) return 4.0;
+    if (any(lessThan(s, vec3(0.0))) || any(greaterThan(s, vec3(1.0)))) return VL_WATER_COLUMN_DEFAULT;
     float surface = texture(shadowtex0, s.xy).r;
     float dScreen = max(s.z - surface, 0.0);
     return dScreen * 2.0 / (SHADOW_DEPTH_SCALE * abs(shadowProjection[2][2]));
 #else
-    return 4.0;
+    return VL_WATER_COLUMN_DEFAULT;
 #endif
 }
 
@@ -218,9 +220,9 @@ vec4 marchAirFog(vec3 dir, float endDist, float dither, float farVisibility) {
         float stepT = exp(-extinction * dt);
         scattering += transmittance * light * (1.0 - stepT);
         transmittance *= stepT;
-        if (transmittance < 0.005) break;
+        if (transmittance < VL_MIN_TRANSMITTANCE) break;
     }
-    if (endDist > marchEnd && transmittance > 0.005) {
+    if (endDist > marchEnd && transmittance > VL_MIN_TRANSMITTANCE) {
         vec4 rest = fogAnalyticSegment(dir, marchEnd, endDist, fl, farSunVisibility, outdoor);
         scattering += transmittance * rest.rgb;
         transmittance *= rest.a;

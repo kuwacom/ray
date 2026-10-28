@@ -215,7 +215,7 @@ float cloudLowDensityCumulus(CloudContext ctx, CloudColumn col, vec2 rel, float 
         float cumulus = -CLOUD_HAZE_REACH, cumulusX = 1.0, cumulusSize = 1.0;
         if (wStrat < 1.0) {
             // 塔の塊のノイズはここで読み、下の塔の削りでも使う
-            turret = texture(cloudShapeTex, p / (CLOUD_SHAPE_PERIOD * CLOUD_TURRET_SCALE) + vec3(0.13, 0.57, 0.31)).g;
+            turret = texture(cloudShapeTex, p / (CLOUD_SHAPE_PERIOD * CLOUD_TURRET_SCALE) + CLOUD_TURRET_NOISE_OFFSET).g;
             float lumpV = (turret - 0.5) * CLOUD_LUMP_V;
             // 対流の強さの 2 乗で伸ばす: 晴れた日の積雲はふつう背より幅が広い扁平雲・並雲で、雄大雲は対流がかなり強い時だけ
             // (一次だと並の日でも 1.5 km 級の丸い塊が並び、綿玉のように見えた)
@@ -301,7 +301,7 @@ float cloudLowDensityCumulus(CloudContext ctx, CloudColumn col, vec2 rel, float 
     if (d <= -hazeReach) { cloudHeight = fractusHeight; return fractus; }
     // 塔: 積雲の上半分を数百 m の丸い塊 (上昇気流の泡) の積み重なりにする。2D の足跡を縦に伸ばした側面は
     // 縦の幕の筋に見えるので、3D の Worley の塊で側面と頂を区切り、こぶごとに陰を作る (平らな底は残す)
-    if (turret < 0.0) turret = texture(cloudShapeTex, p / (CLOUD_SHAPE_PERIOD * CLOUD_TURRET_SCALE) + vec3(0.13, 0.57, 0.31)).g;
+    if (turret < 0.0) turret = texture(cloudShapeTex, p / (CLOUD_SHAPE_PERIOD * CLOUD_TURRET_SCALE) + CLOUD_TURRET_NOISE_OFFSET).g;
     d -= cloudLobeErosion(turret, coreBody) * CLOUD_TURRET_EROSION * mix(CLOUD_TURRET_BASE, 1.0, smoothstep(0.0, 0.6, x)) * (1.0 - wStrat) * (1.0 - wCb);
     if (d <= -hazeReach) { cloudHeight = fractusHeight; return fractus; }
     // 中間スケールのこぶ (200-400 m): 大きな塊の表面にカリフラワーの段を付ける。
@@ -498,13 +498,13 @@ float cloudHighExtinction(CloudContext ctx, float cover, vec2 rel, float altitud
         float body = smoothstep(threshold, threshold + 0.22, tuft) * patches;
         // 鉛直の分布: 房 (上) が濃く、落下筋 (下) は薄れながら垂れる
         cirrus = body * smoothstep(0.0, 0.45, h) * (1.0 - smoothstep(0.85, 1.0, h)) * mix(0.4, 1.0, smoothstep(0.35, 0.85, h));
-        if (detail && cirrus > 0.0 && dist < 50000.0) {
+        if (detail && cirrus > 0.0 && dist < CLOUD_CIRRUS_FIBER_DIST) {
             // 繊維: 細かい Worley を風下に伸ばし、房の形状ノイズで曲げて密度に掛ける (輪郭は房の柔らかいまま、中に糸の濃淡)
             vec3 warp = vec3(s.g - 0.5, 0.0, s.r - 0.5) * 2.0;
             vec3 pf = vec3(wq.x / CLOUD_CIRRUS_FIBER_ALONG, altitude / CLOUD_CIRRUS_FIBER_VERTICAL, wq.y / CLOUD_CIRRUS_FIBER_ACROSS) + warp * CLOUD_CIRRUS_FIBER_CURL;
             float fiber = texture(cloudDetailTex, pf).r;
             // 遠くは繊維が画素より細かくちらつくので均す
-            fiber = mix(fiber, 0.6, smoothstep(12000.0, 50000.0, dist));
+            fiber = mix(fiber, 0.6, smoothstep(CLOUD_CIRRUS_FIBER_FADE_NEAR, CLOUD_CIRRUS_FIBER_DIST, dist));
             cirrus *= mix(CLOUD_CIRRUS_FIBER_MIN, 1.0, fiber);
             // 房の縁は繊維の谷から先に消える (ほつれた縁)
             cirrus = max(cirrus - (1.0 - fiber) * 0.25 * (1.0 - cirrus), 0.0);
@@ -516,7 +516,7 @@ float cloudHighExtinction(CloudContext ctx, float cover, vec2 rel, float altitud
     float cirrocumulus = 0.0;
     if (ccPatch > 0.0) {
         float grain = texture(cloudNoiseTex, q / CLOUD_CC_PERIOD * vec2(1.0, 2.0)).a;
-        float grainFade = smoothstep(5000.0, 20000.0, dist);
+        float grainFade = smoothstep(CLOUD_CC_GRAIN_FADE_NEAR, CLOUD_CC_GRAIN_FADE_FAR, dist);
         cirrocumulus = mix(mix(0.3, 1.0, smoothstep(0.15, 0.85, grain)), 0.6, grainFade) * sqr(ccPatch) * smoothstep(0.65, 0.8, h) * (1.0 - smoothstep(0.92, 1.0, h));
     }
     // 巻層雲: 広く覆う時の一様なベール

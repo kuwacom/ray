@@ -33,6 +33,8 @@
 #include "/lib/common/uniforms.glsl"
 #include "/lib/buffers/images.glsl"
 
+const float CLOUD_RAY_FAR = 1e12; // 球との交差が無い方向の距離 (十分遠い値)
+
 // 参照空間の層の高さ (m)。調整はここが基準
 #if CLOUDS == 3
     const float CLOUD_R_BASE = 1500.0;
@@ -210,8 +212,8 @@ vec2 cloudShellIntersectK(float y0, float dy, float A, float k) {
     if (disc < 0.0) return vec2(1.0, -1.0);
     float s = sqrt(disc);
     float q = -0.5 * (dy + (dy >= 0.0 ? s : -s));
-    float t1 = abs(q) > 1e-12 ? c / q : 1e12;
-    float t2 = k > 1e-14 ? q / k : (dy > 0.0 ? 1e12 : -1e12);
+    float t1 = abs(q) > 1e-12 ? c / q : CLOUD_RAY_FAR;
+    float t2 = k > 1e-14 ? q / k : (dy > 0.0 ? CLOUD_RAY_FAR : -CLOUD_RAY_FAR);
     return vec2(min(t1, t2), max(t1, t2));
 }
 

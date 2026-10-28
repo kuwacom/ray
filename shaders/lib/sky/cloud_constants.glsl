@@ -76,6 +76,10 @@ const float CLOUD_CIRRUS_FIBER_CURL = 1.2;  // 繊維の座標を curl で曲げ
 const float CLOUD_CIRRUS_FALL_SHEAR = 1500.0;
 // 繊維の谷の濃さ (山に対する割合)。小さいと平行な細い筋が並んで刷毛目のように見える
 const float CLOUD_CIRRUS_FIBER_MIN = 0.6;
+const float CLOUD_CIRRUS_FIBER_DIST = 50000.0;       // m: これより遠くは繊維を省く
+const float CLOUD_CIRRUS_FIBER_FADE_NEAR = 12000.0; // m: ここから繊維を均し始め、CLOUD_CIRRUS_FIBER_DIST で完全に均す
+const float CLOUD_CC_GRAIN_FADE_NEAR = 5000.0;      // m: 巻積雲の粒を均し始める距離
+const float CLOUD_CC_GRAIN_FADE_FAR = 20000.0;
 
 // 風 (m/s)。上空ほど強く、向きも少し回る (温度風)。層ごとに違う速さで流れて奥行きが出る
 const float CLOUD_WIND_SPEED = CLOUD_LOW_WIND;
@@ -141,6 +145,9 @@ const float CLOUD_AERIAL_RAIN = 1.0;  // 雨の日のもやの増え方 (Mie の
 const float CLOUD_MAX_DISTANCE = CLOUD_DRAW_DISTANCE * 1000.0;
 const float CLOUD_HIGH_MAX_DISTANCE = 160000.0;
 const float CLOUD_MIN_TRANSMITTANCE = 0.02;
+const float CLOUD_STEP_SCALE_MAX = 3.0;  // 水平に近い視線で歩数を増やす倍率の上限
+const float CLOUD_SEG_NONE = 1e30;      // 区間なしの開始距離 (並べ替えで最後になる)
+const float CLOUD_SEG_NONE_TEST = 1e29;
 
 // 水滴の Mie の近似 (Jendersie & d'Eon 2023, 式 4-7)。液滴の直径 (um) から HG と Draine の混合を決める。
 // 20 um (有効半径 10 um の積雲): gHG 0.995 (回折の鋭いピーク), gD 0.59, alpha 27, wD 0.50
@@ -240,6 +247,7 @@ const float CLOUD_BILLOW_SCALE = 0.08;    // 中間スケールのこぶの周�
 const float CLOUD_BILLOW_EROSION = 0.8 * CLOUD_LOW_EROSION * CS_LOBES; // 中間スケールのこぶで削る量
 // 積雲の塔の塊: 周期 (形状ノイズの周期に対する割合。畳みの周期を割り切る 1/50。既定で 4.3 km 周期 = 塊 0.4-0.8 km) と削る量
 const float CLOUD_TURRET_SCALE = 0.4;
+const vec3 CLOUD_TURRET_NOISE_OFFSET = vec3(0.13, 0.57, 0.31);
 const float CLOUD_TURRET_EROSION = 0.5 * CS_LOBES;
 const float CLOUD_TURRET_BASE = 0.4;  // 雲底での削りの割合 (底の近くの側面も 3D の塊で区切り、2D の足跡の縦の壁にしない)
 const vec2 CLOUD_BILLOW_PROFILE = vec2(0.7, 1.5);  // こぶで削る量の雲底 / 雲頂での倍率

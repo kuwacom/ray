@@ -42,7 +42,7 @@ CloudAccum cloudMarchLow(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, 
     float segLength = seg.y - seg.x;
     float yMid = 0.5 * (CLOUD_BASE + ctx.lowTopWorld);
     // 水平に近い視線ほど層の中を長く通るので歩数を増やす (上限 3 倍)
-    float stepScale = clamp(segLength / share / ((ctx.lowTopWorld - CLOUD_BASE) * 1.5), 1.0, 3.0);
+    float stepScale = clamp(segLength / share / ((ctx.lowTopWorld - CLOUD_BASE) * 1.5), 1.0, CLOUD_STEP_SCALE_MAX);
     int steps = max(int(float(CLOUD_LOW_STEPS) * stepScale * share), 4);
     float dt = segLength / float(steps);
     float t = seg.x + dt * dither.x;
@@ -88,7 +88,7 @@ CloudAccum cloudMarchMid(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, 
     CloudAccum acc = CloudAccum(vec3(0.0), 1.0, 0.0, 0.0);
     float segLength = seg.y - seg.x;
     float yMid = 0.5 * (CLOUD_MID_BASE + CLOUD_MID_TOP);
-    float stepScale = clamp(segLength / ((CLOUD_MID_TOP - CLOUD_MID_BASE) * 2.0), 1.0, 3.0);
+    float stepScale = clamp(segLength / ((CLOUD_MID_TOP - CLOUD_MID_BASE) * 2.0), 1.0, CLOUD_STEP_SCALE_MAX);
     int steps = int(float(CLOUD_MID_STEPS) * stepScale);
     float dt = segLength / float(steps);
     float t = seg.x + dt * dither.x;
@@ -314,18 +314,18 @@ vec4 renderClouds(vec3 dir, float maxDist, vec2 dither) {
         segLowFar = vec2(segMid.y, segLow.y);
         segLow.y = segMid.y;
     }
-    float starts[4] = float[4](segLow.y > segLow.x ? segLow.x : 1e30, segMid.y > segMid.x ? segMid.x : 1e30, segHigh.y > segHigh.x ? segHigh.x : 1e30, segLowFar.y > segLowFar.x ? segLowFar.x : 1e30);
+    float starts[4] = float[4](segLow.y > segLow.x ? segLow.x : CLOUD_SEG_NONE, segMid.y > segMid.x ? segMid.x : CLOUD_SEG_NONE, segHigh.y > segHigh.x ? segHigh.x : CLOUD_SEG_NONE, segLowFar.y > segLowFar.x ? segLowFar.x : CLOUD_SEG_NONE);
     /*
      * 回数は区間のある層の数 (それより先は starts が全部 1e30 で抜ける)。定数の 4 回にするとドライバがループを展開し、
      * 各層のマーチが 4 組ずつ複製されてリンクが数秒延びる
      */
     int layerCount = 0;
-    for (int m = 0; m < 4; m++) layerCount += starts[m] < 1e29 ? 1 : 0;
+    for (int m = 0; m < 4; m++) layerCount += starts[m] < CLOUD_SEG_NONE_TEST ? 1 : 0;
     for (int k = 0; k < layerCount; k++) {
         int idx = 0;
         for (int m = 1; m < 4; m++) if (starts[m] < starts[idx]) idx = m;
-        if (starts[idx] >= 1e29 || transmittance < CLOUD_MIN_TRANSMITTANCE) break;
-        starts[idx] = 1e30;
+        if (starts[idx] >= CLOUD_SEG_NONE_TEST || transmittance < CLOUD_MIN_TRANSMITTANCE) break;
+        starts[idx] = CLOUD_SEG_NONE;
         // 低層の手前と奥 (積乱雲で分けた分) は同じ呼び出しで回す (2 か所に書くとマーチが 2 つ展開される)
         if (idx == 0 || idx == 3) {
             bool far = idx == 3;

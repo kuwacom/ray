@@ -101,8 +101,8 @@ void main() {
     }
     // 雲が受ける真上からの空の照度は彩度を落とさない。灰色にすると夕方の雲の陰が
     // 空の青紫にならず、残った橙の太陽光で茶色く濁る
-    vec3 cloudSkyUp = sh[0] * (0.282095 * 3.141593) + sh[1] * (0.488603 * 2.094395)
-                    - (sh[6] * 0.315392 + sh[8] * 0.546274) * 0.785398;
+    vec3 cloudSkyUp = sh[0] * (SH_Y0 * SH_COS_A0) + sh[1] * (SH_Y1 * SH_COS_A1)
+                    - (sh[6] * SH_Y2_ZZ + sh[8] * SH_Y2_XX_YY) * SH_COS_A2;
     frameData.skyParams[2] = vec4(max(cloudSkyUp, 0.0), 0.0);
 #else
     frameData.sunIrradiance = vec4(0.0);
@@ -115,7 +115,7 @@ void main() {
         vec3 ambient = END_AMBIENT_IRRADIANCE;
         // 一様な環境光だと影の中の上面と側面が同じ明るさで地形が平板になる。
         // 空 (上) から多く、虚空 (下) から少なく入る L1 の勾配: 上向き x END_AMBIENT_UP, 下向き x END_AMBIENT_DOWN
-        frameData.skySH[1] = vec4(ambient * (0.5 * (END_AMBIENT_UP - END_AMBIENT_DOWN)) / (0.488603 * 2.094395), 0.0);
+        frameData.skySH[1] = vec4(ambient * (0.5 * (END_AMBIENT_UP - END_AMBIENT_DOWN)) / (SH_Y1 * SH_COS_A1), 0.0);
         ambient *= 0.5 * (END_AMBIENT_UP + END_AMBIENT_DOWN);
     #else
         frameData.shadowLightIrradiance = vec4(0.0);
@@ -123,7 +123,7 @@ void main() {
         // fogColor そのままだと真紅の森などは赤一色の光になり、地面のテクスチャの色が読めない
         vec3 ambient = getNetherPalette().ambient;
     #endif
-    frameData.skySH[0] = vec4(ambient / 0.282095 / PI, 0.0);
+    frameData.skySH[0] = vec4(ambient / SH_Y0 / PI, 0.0);
     for (int k = 2; k < 9; k++) frameData.skySH[k] = vec4(0.0);
     #ifndef WORLD_END
         frameData.skySH[1] = vec4(0.0);

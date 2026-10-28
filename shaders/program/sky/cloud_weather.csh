@@ -38,6 +38,16 @@ vec2 weatherGradient(ivec2 cell, uint seed) {
     return vec2(cos(a), sin(a));
 }
 
+const float STORM_FREE_TYPE_MAX = 0.74;     // 嵐のセルの外の雲種の上限 (0.75 以上は積乱雲)
+const float CB_REGIONAL_NEAR = 9000.0;    // m: 晴れた日の積乱雲を立てない範囲の端。CB_REGIONAL_FAR で全て立てる
+const float CB_REGIONAL_FAR = 20000.0;
+const float MID_REGION_SCALE = 1.3;       // 中層・上層の地域の大きさ (低層に対する倍率)
+const float HIGH_REGION_SCALE = 1.8;
+const float MID_VARIATION_SCALE = 1.2;    // 中層・上層の地域差の強さ (低層に対する倍率)
+const float HIGH_VARIATION_SCALE = 1.3;
+const float FBM_LACUNARITY = 2.03;
+const float FBM_SHIFT = 17.1;
+
 // およそ [-1,1]
 float weatherNoise(vec2 p, uint seed) {
     ivec2 i = ivec2(floor(p));
@@ -57,7 +67,7 @@ float weatherFbm(vec2 p, int octaves, uint seed) {
     for (int i = 0; i < octaves; i++) {
         sum += amplitude * weatherNoise(p, seed + uint(i) * 101u);
         total += amplitude;
-        p = ROTATE * p * 2.03 + 17.1;
+        p = ROTATE * p * FBM_LACUNARITY + FBM_SHIFT;
         amplitude *= 0.5;
     }
     return saturate(sum / total + 0.5);
@@ -77,7 +87,7 @@ vec4 cloudWeatherTexel(vec2 world, CloudClimate c) {
     float lowCover = c.lowCover + (region - 0.5) * variation * (1.0 - 0.6 * c.rain);
     float lowType = c.lowType + (weatherFbm(pLow * 1.6 + vec2(31.7, -12.3), 3, 211u) - 0.5) * 0.4;
     // 嵐のセルの外は雄大雲まで (0.75 以上は積乱雲。対流の強い晴れの日に頭上へ積乱雲と雨脚が立った)
-    lowType = min(lowType, 0.74);
+    lowType = min(lowType, STORM_FREE_TYPE_MAX);
     // 嵐のセル (5-10 km)。雲種 0.75-1 が積乱雲で、1 が嵐の中心 (塔の太さ・オーバーシュート・降水の柱は中心ほど強い)
     float stormField = weatherFbm(pLow * 3.0 + vec2(-5.3, 8.9), 3, 307u);
     float stormStart = 1.0 - 0.45 * CLOUD_CB_COVERAGE;
@@ -89,21 +99,21 @@ vec4 cloudWeatherTexel(vec2 world, CloudClimate c) {
 #ifdef CLOUD_CB
     // 晴れた日の午後の積乱雲 (熱帯など): c.storm を嵐のセルの被覆として、場の値の高い所から順に立てる。
     // 遠くにだけ立てる (頭上に急に塔が立って雨脚が降りないように)
-    float far = smoothstep(9000.0, 20000.0, distance(world, cameraPosition.xz * CLOUD_KH));
+    float far = smoothstep(CB_REGIONAL_NEAR, CB_REGIONAL_FAR, distance(world, cameraPosition.xz * CLOUD_KH));
     float stormCover = 0.4 * c.storm * CLOUD_CB_COVERAGE;
     float regional = linearStep(1.0 - stormCover, 1.0 - stormCover + 0.1, stormField) * step(1e-3, c.storm) * far;
     lowType = mix(lowType, 1.0, regional);
     lowCover = max(lowCover, regional * 1.2);
 #else
-    lowType = min(lowType, 0.74);
+    lowType = min(lowType, STORM_FREE_TYPE_MAX);
 #endif
 
-    vec2 pMid = (world - cloudWindMid()) / (regionSize * 1.3);
-    float midCover = c.midCover + (weatherFbm(pMid, 4, 401u) - 0.5) * 1.2 * variation * (1.0 - 0.5 * c.rain);
+    vec2 pMid = (world - cloudWindMid()) / (regionSize * MID_REGION_SCALE);
+    float midCover = c.midCover + (weatherFbm(pMid, 4, 401u) - 0.5) * MID_VARIATION_SCALE * variation * (1.0 - 0.5 * c.rain);
 
     // 上層は形を別の水平の縮尺で読むので、天気図の座標をその縮尺に直して被覆を作る (風と群れが形とずれない)
-    vec2 pHigh = (world * (CLOUD_KH_HIGH / CLOUD_KH) - cloudWindHigh()) / (regionSize * 1.8);
-    float highCover = c.highCover + (weatherFbm(pHigh, 4, 503u) - 0.5) * 1.3 * variation;
+    vec2 pHigh = (world * (CLOUD_KH_HIGH / CLOUD_KH) - cloudWindHigh()) / (regionSize * HIGH_REGION_SCALE);
+    float highCover = c.highCover + (weatherFbm(pHigh, 4, 503u) - 0.5) * HIGH_VARIATION_SCALE * variation;
 
     return saturate(vec4(lowCover / CLOUD_COVER_RANGE, lowType, midCover / CLOUD_COVER_RANGE, highCover / CLOUD_COVER_RANGE));
 }

@@ -15,6 +15,7 @@ const ivec3 workGroups = ivec3(4, 4, 1);
 
 const int MS_DIRECTIONS_SQRT = 8; // 球面の方向数 = 8x8
 const int MS_STEPS = 24;
+const float RADIUS_MARGIN = 0.001; // km: 地表・大気の上端ちょうどを避ける余白
 
 void main() {
     ivec2 texel = ivec2(gl_GlobalInvocationID.xy);
@@ -22,8 +23,8 @@ void main() {
 
     vec2 unit = atmoSubUvToUnit((vec2(texel) + 0.5) / vec2(MULTISCATTER_LUT_SIZE), vec2(MULTISCATTER_LUT_SIZE));
     float muSun = unit.x * 2.0 - 1.0;
-    float r = ATMO_GROUND_RADIUS + saturate(unit.y) * (ATMO_TOP_RADIUS - ATMO_GROUND_RADIUS) + 0.001;
-    r = min(r, ATMO_TOP_RADIUS - 0.001);
+    float r = ATMO_GROUND_RADIUS + saturate(unit.y) * (ATMO_TOP_RADIUS - ATMO_GROUND_RADIUS) + RADIUS_MARGIN;
+    r = min(r, ATMO_TOP_RADIUS - RADIUS_MARGIN);
     vec3 origin = vec3(0.0, r, 0.0);
     vec3 sunDir = vec3(sqrt(max(1.0 - muSun * muSun, 0.0)), muSun, 0.0);
 
