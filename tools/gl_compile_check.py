@@ -87,7 +87,8 @@ GENERIC_LOG_RE = re.compile(r"^\s*(ERROR|WARNING):\s*\d+:(\d+):\s*(.*)$", re.I)
 IMAGE_DECL_RE = re.compile(r"\buniform\s+(?:(?:coherent|volatile|restrict|readonly|writeonly|highp|mediump|lowp)\s+)*[iu]?image\w+\s+(\w+)")
 SAMPLER_DECL_RE = re.compile(r"\buniform\s+(?:(?:highp|mediump|lowp)\s+)*[iu]?sampler\w+\s+(\w+)")
 SSBO_DECL_RE = re.compile(r"\bbuffer\s+(\w+)\s*\{")
-SHARED_DECL_RE = re.compile(r"^\s*shared\s+(\w+)\s+(\w+)\s*((?:\[[^\]]*\])*)\s*;", re.M)
+# 行頭の空白に \s を使うと、glslang -E の出力の長い空行の並びで行ごとに先まで読み直して極端に遅くなる
+SHARED_DECL_RE = re.compile(r"^[ \t]*shared\s+(\w+)\s+(\w+)\s*((?:\[[^\]]*\])*)\s*;", re.M)
 LOCAL_SIZE_RE = re.compile(r"layout\s*\(([^)]*local_size_[xyz][^)]*)\)\s*in\s*;")
 WORK_GROUPS_RE = re.compile(r"const\s+ivec3\s+workGroups\s*=\s*ivec3\s*\(([^)]*)\)")
 PROP_IF_RE = re.compile(r"^\s*#\s*(if|ifdef|ifndef|elif|else|endif)\b\s*(.*)$")
@@ -552,11 +553,17 @@ def introspect(prog: int, stages: list[str]) -> dict[str, int]:
     return usage
 
 
+# ドライバのコンパイルスレッドの既定の数。NVIDIA は重いプログラム (composite1 など) のリンクを同時に多く走らせると
+# 1 本あたりが極端に遅くなる (GTX 1070 / i9-12900KF で composite1 を 8 本同時に 151 秒、1 本なら 9.5 秒)。
+# equiv_check の既定 (1 プログラムに 5 回リンク) はスレッド 24 で 193 秒、3〜6 で 60〜67 秒だった
+DRIVER_THREADS = 4
+
+
 def enable_parallel_compile(jobs: int | None = None) -> bool:
     """
     GL_KHR_parallel_shader_compile でドライバのコンパイルスレッドを使う
-    glCompileShader がすぐ返るので、先に全部発行してから結果を順に読むと CPU コア数ぶん並列に進む
-    jobs を指定するとスレッド数を絞る (ゲーム起動中に CPU を食い合わないように)。1 なら逐次
+    glCompileShader がすぐ返るので、先に全部発行してから結果を順に読むと並列に進む
+    jobs を指定するとスレッド数をその数にする (既定は DRIVER_THREADS。ゲーム起動中に CPU を食い合わないように絞ることもできる)。1 なら逐次
     """
     if jobs == 1:
         return False
@@ -564,7 +571,7 @@ def enable_parallel_compile(jobs: int | None = None) -> bool:
         from OpenGL.GL.KHR import parallel_shader_compile as khr
         if not khr.glInitParallelShaderCompileKHR():
             return False
-        khr.glMaxShaderCompilerThreadsKHR(jobs or 0xFFFFFFFF)
+        khr.glMaxShaderCompilerThreadsKHR(jobs or DRIVER_THREADS)
         return True
     except Exception:  # noqa: BLE001 - 拡張が無ければ逐次で動かす
         GL.glGetError()
@@ -916,7 +923,7 @@ def main() -> int:
     ap.add_argument("--section", default="", help=f"プログラム名の先頭で区切る (カンマ区切り。例 {','.join(SECTIONS)})")
     ap.add_argument("--world", default="", help="ディメンションを指定 (カンマ区切り。例 world-1,world1。--full の DEFAULT 以外は既定 world0)")
     ap.add_argument("--gpu", default="", help="NVIDIA の描画 GPU を番号か名前の一部で選ぶ (例 1070。ゲームと別の GPU で回す)")
-    ap.add_argument("-j", "--jobs", type=int, help="glslang -E とドライバのコンパイルの並列数 (既定: CPU 数。1 で逐次)")
+    ap.add_argument("-j", "--jobs", type=int, help=f"glslang -E とドライバのコンパイルの並列数 (既定: glslang は CPU 数、ドライバは {DRIVER_THREADS}。1 で逐次)")
     ap.add_argument("--full", action="store_true", help="既定値 x 3 ディメンション + 全プロファイル")
     ap.add_argument("--quick", action="store_true", help="既定値 x world0 のみ (既定の動作。互換のため残す)")
     ap.add_argument("--no-cache", action="store_true", help="前回成功したものも含めて全部リンクし直す")

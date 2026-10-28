@@ -32,7 +32,6 @@ import sys
 import tarfile
 import tempfile
 import time
-import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -206,7 +205,7 @@ def main() -> int:
     ap.add_argument("--layout", action="store_true", help="バイナリの代わりに SSBO のメンバーのオフセットと間隔を比べる")
     ap.add_argument("--always-link", action="store_true", help="本文が同じプログラムもリンクして比べる (道具自体の確認用)")
     ap.add_argument("--gpu", default="", help="NVIDIA の描画 GPU を番号か名前の一部で選ぶ (例 1070)")
-    ap.add_argument("-j", "--jobs", type=int, help="ドライバのコンパイルと glslang -E の並列数 (既定: CPU 数)")
+    ap.add_argument("-j", "--jobs", type=int, help=f"ドライバのコンパイルと glslang -E の並列数 (既定: glslang は CPU 数、ドライバは {gcc.DRIVER_THREADS})")
     ap.add_argument("-v", "--verbose", action="store_true", help="SAME のプログラムも表示し、DIFF の中身を詳しく出す")
     args = ap.parse_args()
     if args.text and args.layout:
@@ -249,7 +248,8 @@ def main() -> int:
         print(f"GL: {gcc.gl_string(GL.GL_RENDERER)} / {gcc.gl_string(GL.GL_VERSION)}")
     noise = NV_NOISE_OFFSETS if win is not None and "NVIDIA" in gcc.gl_string(GL.GL_VENDOR) else ()
     linker = Linker(mode)
-    nonce = uuid.uuid4().hex[:12]
+    # 足すコメントは実行ごとに変えない。同じ基準で何度も比べる時に、基準側のリンク (足し直しを含む) がドライバのディスクキャッシュに当たる
+    nonce = "fixed"
     counts = {k: 0 for k in ("SAME", "DIFF", "ERROR", "ONLY_BASE", "ONLY_NEW")}
     pair_cache: dict[tuple[str, str], tuple[str, list[str]]] = {}
     pre_cache: dict[str, list[str]] = {}

@@ -2,7 +2,8 @@
 Iris の前処理を簡易再現して glslangValidator で全プログラムをコンパイル検証する
 
 再現している内容
-- `#include "/..."` の絶対パス解決 (shaders/ 起点, 再帰)
+- `#include "/..."` の絶対パス解決 (shaders/ 起点, 再帰)。ガード付きのファイルの 2 回目以降の include は差し込まない
+  (Iris は毎回差し込むが、前処理の後の本文は同じ。膨らんだ本文を glslang やドライバに渡すと遅い)
 - 設定 (#define / const) の値の差し替え。プロファイル (shaders.properties の profile.*) を適用可能
 - Iris が自動定義するマクロ (MC_VERSION, IS_IRIS, MC_RENDER_STAGE_*, IRIS_FEATURE_* 等) の注入
 - エラー行を元のファイル名・行番号へ戻して表示
@@ -130,6 +131,10 @@ def read_lines(path: Path) -> tuple[str, ...]:
 _EXPANDING: set[Path] = set()
 _EXPAND_LOCK = threading.RLock()
 
+GUARD_IFNDEF_RE = re.compile(r"^\s*#\s*ifndef\s+(\w+)\s*(?://.*)?$")
+COND_OPEN_RE = re.compile(r"^\s*#\s*if(?:n?def)?\b")
+COND_CLOSE_RE = re.compile(r"^\s*#\s*endif\b")
+
 
 @functools.lru_cache(maxsize=None)
 def include_target(parent: Path, target: str) -> Path:
@@ -137,30 +142,105 @@ def include_target(parent: Path, target: str) -> Path:
     return inc.resolve()
 
 
+def _outside_guard_ok(lines: tuple[str, ...]) -> bool:
+    """ガードの外の行が空行かコメントだけか (外に本文があると、2 回目以降を省くと消えてしまう)"""
+    in_block = False
+    for ln in lines:
+        s = ln.strip()
+        if in_block:
+            in_block = "*/" not in s
+            continue
+        if not s or s.startswith("//"):
+            continue
+        if s.startswith("/*"):
+            in_block = "*/" not in s[2:]
+            continue
+        return False
+    return True
+
+
 @functools.lru_cache(maxsize=None)
-def expand_file(path: Path) -> tuple[tuple[str, ...], tuple[tuple[str, int], ...]]:
-    """1 ファイルを include 込みで展開する。インクルードガードは GLSL 側で効くので、展開結果は呼び出し元に依らずファイルごとに使い回せる"""
+def include_guard(path: Path) -> str | None:
+    """
+    ### include_guard
+    ファイル全体を囲むインクルードガード (`#ifndef X` / `#define X` ... 最後の `#endif`) のマクロ名
+
+    @param path - 調べるファイル
+    @returns ガードのマクロ名。ガードが無い・外に本文がある・途中でガードの #if が閉じる場合は None
+    """
+    lines = read_lines(path)
+    idx = [i for i, ln in enumerate(lines) if ln.lstrip().startswith("#")]
+    if len(idx) < 3:
+        return None
+    m = GUARD_IFNDEF_RE.match(lines[idx[0]])
+    if not m or not re.match(rf"^\s*#\s*define\s+{m.group(1)}\b", lines[idx[1]]) or not COND_CLOSE_RE.match(lines[idx[-1]]):
+        return None
+    depth = 0
+    for i in idx[:-1]:
+        if COND_OPEN_RE.match(lines[i]):
+            depth += 1
+        elif COND_CLOSE_RE.match(lines[i]):
+            depth -= 1
+            if depth == 0:
+                return None
+    if not _outside_guard_ok(lines[:idx[0]]) or not _outside_guard_ok(lines[idx[-1] + 1:]):
+        return None
+    return m.group(1)
+
+
+def _expand_unit(path: Path, done: set[Path], unconditional: bool, out: list[str], linemap: list[tuple[str, int]]) -> None:
+    """
+    ### _expand_unit
+    1 つのプログラム (翻訳単位) の中で、ファイルを include 込みで展開する
+
+    Iris の include 展開はガードを見ずに毎回全部を差し込むので、lib が自分の依存を include すると本文が数十倍に膨らむ
+    (前処理の後はガードで同じ本文になる)。glslang やドライバに膨らんだ本文を渡すと遅いので、ガード付きのファイルの
+    2 回目以降の include は差し込まない。条件付き (#if の中) で初めて読んだファイルは、その条件が偽ならガードが立たないので、
+    条件なしで展開したファイルだけを「展開済み」にする
+
+    @param path - 展開するファイル
+    @param done - この翻訳単位で、条件なしで展開済みのガード付きファイル
+    @param unconditional - この include に至る経路がすべて条件なしか
+    @param out - 展開した行の出力先
+    @param linemap - 各行の (元ファイル, 行番号) の出力先
+    """
     if path in _EXPANDING:
         raise RuntimeError(f"include cycle: {path}")
     if not path.exists():
         raise FileNotFoundError(path)
+    guard = include_guard(path)
+    if guard and path in done:
+        return
+    if guard and unconditional:
+        done.add(path)
     _EXPANDING.add(path)
     try:
         rel = path.relative_to(SHADERS).as_posix()
-        out: list[str] = []
-        linemap: list[tuple[str, int]] = []
+        # ガードの #ifndef の中は条件なしと同じ (初めての展開ではガードは必ず真)
+        base = 1 if guard else 0
+        depth = 0
         for i, line in enumerate(read_lines(path), 1):
+            if "#" in line:
+                if COND_OPEN_RE.match(line):
+                    depth += 1
+                elif COND_CLOSE_RE.match(line):
+                    depth -= 1
             m = INCLUDE_RE.match(line) if "include" in line else None
             if m:
-                sub, sub_map = expand_file(include_target(path.parent, m.group(1)))
-                out.extend(sub)
-                linemap.extend(sub_map)
+                _expand_unit(include_target(path.parent, m.group(1)), done, unconditional and depth <= base, out, linemap)
                 continue
             out.append(line)
             linemap.append((rel, i))
-        return tuple(out), tuple(linemap)
     finally:
         _EXPANDING.discard(path)
+
+
+def expand_file(path: Path) -> tuple[tuple[str, ...], tuple[tuple[str, int], ...]]:
+    """1 ファイルを翻訳単位の起点として include 込みで展開する (ガード付きのファイルは 1 回だけ差し込む)"""
+    out: list[str] = []
+    linemap: list[tuple[str, int]] = []
+    _expand_unit(path, set(), True, out, linemap)
+    return tuple(out), tuple(linemap)
 
 
 def is_setting_line(line: str) -> bool:

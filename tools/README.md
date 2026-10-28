@@ -77,7 +77,7 @@ uv run tools/gl_compile_check.py --full --limits --report
 | `--profile NAME` | 1 つのプロファイルだけ検証します (`DEFAULT` で既定値) |
 | `--filter TEXT` | 名前に TEXT を含むものだけ検証します |
 | `--no-cache` | キャッシュを使わずに全部検証します |
-| `--jobs N` | 並列数 (既定は CPU 数) |
+| `--jobs N` | 並列数 (既定は CPU 数。ドライバのコンパイルスレッドは既定 4 で、重いプログラムのリンクを同時に多く走らせると 1 本ずつが極端に遅くなるため) |
 | `--shaders DIR` | このリポジトリの `shaders/` の代わりに DIR を検証します |
 
 `gl_compile_check.py` だけにあるオプション
