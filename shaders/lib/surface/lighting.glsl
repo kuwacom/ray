@@ -103,7 +103,7 @@ vec3 giHistoryAtPlayer(vec3 playerPos) {
  * 二次ヒット点の設置光源・手持ち光の直接光の照度 (GI・反射の照り返し用)。光源シャドウ ON の時だけ
  * ヒット点の照明が floodfill だけだと、floodfill は光源から 2-3 ブロックで急に落ちるので、たいまつ 1 本の洞窟で
  * 照らされた壁からの照り返しがほとんど無く、光源の見えない側 (壁・天井・三人称の自分の背中) が真っ黒だった
- * - 画面に映っているヒット点 (screenTexel.x >= 0): deferred2 のデノイズ済みの直接光 (colortex6, 影込み) をそのまま使う
+ * - 画面に映っているヒット点 (screenTexel.x >= 0): deferred2 のデノイズ済みの直接光 (colortex6, 影込み)
  * - 画面外: ビンで一番強い光源を 1 本だけボクセルでトレースし、その可視率をビンの全光源の影なし照度に掛ける
  *   (光源ごとに追うと GI のレイ数 x 光源数のトレースになる。壁越しの光源を影なしで足すと光が漏れる)
  * 手持ち光は影を追わず、幾何法線で光源の裏を向く面だけ除く (光源は自分の手元なので、遮られるのは大抵自分の体)
@@ -118,14 +118,17 @@ const float SECONDARY_BLOCKLIGHT_GAIN = 1.5 - 0.5 * GI_MULTI_BOUNCE;
  * handScale: 手持ち光の分に掛ける倍率。GI では handLightIndirectScale() (HAND_LIGHT_SHADOW_STRENGTH) を渡す
  * GI_MODE 2/3 では手持ち光の陰の中の明るさの半分ほどがこの GI の照り返しで、残りが getHandLightFill なので、両方に同じ倍率を掛ける
  * 反射に映る面は照り返しではなく直接見える面なので 1 を渡す
+ * nearField: 光源のすぐ周りの近距離の放射 (evalLightIrradiance) を含めるか。GI は false、反射は true
  */
-vec3 secondaryHitBlockLight(vec3 playerPos, vec3 normal, ivec2 screenTexel, float handScale) {
+vec3 secondaryHitBlockLight(vec3 playerPos, vec3 normal, ivec2 screenTexel, float handScale, bool nearField) {
 #ifdef LIGHT_SHADOWS
     vec3 E = vec3(0.0);
+    vec3 fromVoxel = playerToVoxel(playerPos + normal * TRACE_NORMAL_OFFSET);
     if (screenTexel.x >= 0) {
-        E = texelFetch(colortex6, screenTexel, 0).rgb;
+        // colortex6 は近距離の放射込み。除く時は、近距離の放射の無い影なし照度に deferred2 の可視率 (colortex7) を掛ける
+        E = nearField ? texelFetch(colortex6, screenTexel, 0).rgb
+                      : sumBinLightsUnshadowed(fromVoxel, normal, normal, false) * texelFetch(colortex7, screenTexel, 0).rgb;
     } else {
-        vec3 fromVoxel = playerToVoxel(playerPos + normal * TRACE_NORMAL_OFFSET);
         if (isInVoxelVolume(fromVoxel)) {
             int bin = lightBinIndex(ivec3(fromVoxel));
             uint n = lightBinCount(bin);
@@ -133,7 +136,7 @@ vec3 secondaryHitBlockLight(vec3 playerPos, vec3 normal, ivec2 screenTexel, floa
             float strongestW = 0.0;
             for (uint k = 0u; k < n; k++) {
                 int ci = lightBinEntry(bin, k);
-                vec3 e = evalLightIrradiance(globalLights.lights[ci], fromVoxel, normal, normal);
+                vec3 e = evalLightIrradiance(globalLights.lights[ci], fromVoxel, normal, normal, nearField);
                 E += e;
                 float w = luminance(e);
                 if (w > strongestW) { strongestW = w; strongest = ci; }
@@ -166,7 +169,7 @@ vec3 secondaryHitBlockLight(vec3 playerPos, vec3 normal, ivec2 screenTexel, floa
 
 // 反射に映る 2 次ヒット点の拡散の放射輝度。shadeSecondaryHit に設置光源・手持ち光源の直接光を足す (倍率は掛けない)
 vec3 shadeSecondaryHitReflected(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm, ivec2 screenTexel) {
-    return shadeSecondaryHit(playerPos, normal, albedo, skyLm) + albedo * RCP_PI * secondaryHitBlockLight(playerPos, normal, screenTexel, 1.0);
+    return shadeSecondaryHit(playerPos, normal, albedo, skyLm) + albedo * RCP_PI * secondaryHitBlockLight(playerPos, normal, screenTexel, 1.0, true);
 }
 
 /*
@@ -262,8 +265,13 @@ vec4 traceVoxelRadiance(vec3 originPlayer, vec3 dir, float maxDist, float skyLm,
             // 画面外の当たりは分からないので着色点の値のまま
             skyLm = unpack2x8(texelFetch(colortex2, t, 0).a).y;
             screenTexel = t;
-            emission = unpack2x8(texelFetch(colortex3, t, 0).g).y;
-            hitMaterial = readMaterialId(t);
+            // 発光は画素が当たったブロックそのものの時だけ使う。壁の手前のたいまつの炎の画素を壁の発光として拾うと、
+            // 登録した光源の判定 (hitBlock は壁) をすり抜け、たまに当たるレイだけが明るく跳ねて GI がノイズになった
+            ivec3 hitCell = ivec3(floor(hitVoxel - hitNormal * VOXEL_HIT_INSET));
+            if (all(equal(ivec3(floor(playerToVoxel(scenePlayer) - hitNormal * VOXEL_HIT_INSET)), hitCell))) {
+                emission = unpack2x8(texelFetch(colortex3, t, 0).g).y;
+                hitMaterial = readMaterialId(t);
+            }
         }
     }
     // useSceneColor = false は GI (多重反射込み)、true は反射
@@ -271,7 +279,7 @@ vec4 traceVoxelRadiance(vec3 originPlayer, vec3 dir, float maxDist, float skyLm,
         return vec4(shadeSecondaryHitReflected(hitPlayer, hitNormal, albedo, skyLm, screenTexel)
             + albedo * secondaryHitEmission(emission, hitBlock, hitMaterial), 1.0);
     }
-    vec3 E = secondaryHitBlockLight(hitPlayer, hitNormal, screenTexel, handLightIndirectScale()) * SECONDARY_BLOCKLIGHT_GAIN;
+    vec3 E = secondaryHitBlockLight(hitPlayer, hitNormal, screenTexel, handLightIndirectScale(), false) * SECONDARY_BLOCKLIGHT_GAIN;
     vec3 prev = GI_MULTI_BOUNCE > 0.0 && screenTexel.x >= 0 ? giHistoryAtPlayer(hitPlayer) : vec3(-1.0);
     return vec4(shadeSecondaryHitGi(hitPlayer, hitNormal, albedo, skyLm, prev) + albedo * RCP_PI * E
         + albedo * secondaryHitEmission(emission, hitBlock, hitMaterial), 1.0);

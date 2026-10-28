@@ -64,7 +64,7 @@ float lightFalloff(float dist, float range) {
  * 周りとあまり変わらない明るさになる。光源を見かけの半径 x LIGHT_NEAR_RADIUS_SCALE の発光面とみなし、
  * 球の面光源の形態係数 r^2 / (d^2 + r^2) で光源の周りだけを明るくする
  */
-const float LIGHT_NEAR_CONTACT = 4.5;       // 光源に接した面の係数 (1 ブロック先の lightFalloff は 0.5)
+const float LIGHT_NEAR_CONTACT = 6.0;       // 光源に接した面の係数 (1 ブロック先の lightFalloff は 0.5)
 const float LIGHT_NEAR_RADIUS_SCALE = 2.5;  // 発光面の半径 / 光源の見かけの半径 (炎や発光の照り返しで光る範囲は光源より広い)
 const float LIGHT_NEAR_REACH = 6.0;         // この距離で 0 へ落とす (ブロック)
 
@@ -81,7 +81,7 @@ float lightNearField(float dist, float radius) {
  * 面の明るさは見た目の発光で決まり、光源の明るさとレベル (遠くへの届き方) とは別なので、呼ぶ側がそれで割った係数を掛ける
  * 向きは中心への余弦。同じ平面に並ぶ面 (床に埋めた光源の隣の床) は光る面が見えないので 0 になる
  */
-const float LIGHT_BOX_CONTACT = 3.0;   // 接した面の照度 / (色 x BLOCKLIGHT_ILLUMINANCE)
+const float LIGHT_BOX_CONTACT = 3.4;   // 接した面の照度 / (色 x BLOCKLIGHT_ILLUMINANCE)
 const float LIGHT_BOX_SPREAD = 0.7;    // 形態係数の広がり h (ブロック)
 const float LIGHT_BOX_REACH = 4.0;     // この距離で 0 へ落とす (ブロック)
 

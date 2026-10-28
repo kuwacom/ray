@@ -116,8 +116,10 @@ bool isBlockBoxLight(LightInstance L, out LightDef d) {
 /*
  * 光源 L が voxelPos の面 (法線 n) に作る影なしの照度 (NdotL 込み)
  * gateNormal: この法線で地平線の下なら 0 (テクスチャ法線で照らす時に、幾何的に裏側の光源を拾わないため)
+ * nearField: 光源のすぐ周りの近距離の放射を足すか。GI の 2 次ヒットでは足さない (光源のそばの狭い面だけが急に明るく、
+ *   少ない本数のレイがそこに当たるかどうかで GI がノイズになる)
  */
-vec3 evalLightIrradiance(LightInstance L, vec3 voxelPos, vec3 n, vec3 gateNormal) {
+vec3 evalLightIrradiance(LightInstance L, vec3 voxelPos, vec3 n, vec3 gateNormal, bool nearField) {
     vec3 toL = L.posRadius.xyz - voxelPos;
     float dist = length(toL);
     if (dist >= L.posRadius.w) return vec3(0.0);
@@ -129,6 +131,7 @@ vec3 evalLightIrradiance(LightInstance L, vec3 voxelPos, vec3 n, vec3 gateNormal
     // TAA のジッターでピクセルがテクセルの境界をまたぐたびに値が飛び、床が細かくちらついた。幾何法線の NdotL に寄せる
     float ndl = mix(gate, sphereLightNdotL(n, dir, dist, radius), smoothstep(0.0, LIGHT_NORMAL_GRAZING, gate));
     float falloff = lightFalloff(dist, L.posRadius.w);
+    if (!nearField) return L.colorSize.rgb * falloff * ndl;
     // ブロック全体が光る光源は箱の面から、それ以外 (たいまつ・ランタンなど点に近い光源) は中心の点から近距離の放射を足す
     LightDef d;
     if (dist < LIGHT_BOX_REACH + 1.0 && isBlockBoxLight(L, d)) {
@@ -139,16 +142,24 @@ vec3 evalLightIrradiance(LightInstance L, vec3 voxelPos, vec3 n, vec3 gateNormal
     return L.colorSize.rgb * (falloff + lightNearField(dist, radius)) * ndl;
 }
 
+vec3 evalLightIrradiance(LightInstance L, vec3 voxelPos, vec3 n, vec3 gateNormal) {
+    return evalLightIrradiance(L, voxelPos, n, gateNormal, true);
+}
+
 // 着色点のビンの全光源の影なし照度の和 (deferred2 がフル解像度で使う)
-vec3 sumBinLightsUnshadowed(vec3 voxelPos, vec3 normal, vec3 geoNormal) {
+vec3 sumBinLightsUnshadowed(vec3 voxelPos, vec3 normal, vec3 geoNormal, bool nearField) {
     if (!isInVoxelVolume(voxelPos)) return vec3(0.0);
     int bin = lightBinIndex(ivec3(voxelPos));
     uint n = lightBinCount(bin);
     vec3 sum = vec3(0.0);
     for (uint k = 0u; k < n; k++) {
-        sum += evalLightIrradiance(lightBinLight(bin, k), voxelPos, normal, geoNormal);
+        sum += evalLightIrradiance(lightBinLight(bin, k), voxelPos, normal, geoNormal, nearField);
     }
     return sum;
+}
+
+vec3 sumBinLightsUnshadowed(vec3 voxelPos, vec3 normal, vec3 geoNormal) {
+    return sumBinLightsUnshadowed(voxelPos, normal, geoNormal, true);
 }
 
 // 光源サイズ由来の半影を作るための終点の揺らぎ半径
