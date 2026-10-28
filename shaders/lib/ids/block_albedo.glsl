@@ -9,7 +9,7 @@
 #ifndef IDS_BLOCK_ALBEDO_GLSL
 #define IDS_BLOCK_ALBEDO_GLSL
 
-#include "/lib/ids/block_ids.glsl"
+//@include "/lib/ids/block_ids.glsl"
 
 const uint BLOCK_ALBEDO_DEFAULT = 0x959595u;
 

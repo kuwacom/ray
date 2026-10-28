@@ -5,13 +5,13 @@
 #ifndef COMMON_WATER_WAVES_GLSL
 #define COMMON_WATER_WAVES_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/constants.glsl"
-#include "/lib/common/dimension.glsl"
-#include "/lib/common/math.glsl"
-#include "/lib/common/noise.glsl"
-#include "/lib/common/transforms.glsl"
-#include "/lib/common/uniforms.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/constants.glsl"
+//@include "/lib/common/dimension.glsl"
+//@include "/lib/common/math.glsl"
+//@include "/lib/common/noise.glsl"
+//@include "/lib/common/transforms.glsl"
+//@include "/lib/common/uniforms.glsl"
 
 uniform sampler3D waterWaveTex;
 // カメラのバイオームが川 (shaders.properties の smooth)。海は distantOcean を使う

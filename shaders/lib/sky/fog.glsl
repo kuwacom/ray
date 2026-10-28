@@ -14,24 +14,24 @@
 #ifndef SKY_FOG_GLSL
 #define SKY_FOG_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/color.glsl"
-#include "/lib/common/constants.glsl"
-#include "/lib/common/dimension.glsl"
-#include "/lib/common/look_presets.glsl"
-#include "/lib/common/math.glsl"
-#include "/lib/common/noise.glsl"
-#include "/lib/common/phase.glsl"
-#include "/lib/common/shading_types.glsl"
-#include "/lib/common/transforms.glsl"
-#include "/lib/common/uniforms.glsl"
-#include "/lib/sky/atmosphere.glsl"
-#include "/lib/sky/sh.glsl"
-#include "/lib/sky/sky_color.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/color.glsl"
+//@include "/lib/common/constants.glsl"
+//@include "/lib/common/dimension.glsl"
+//@include "/lib/common/look_presets.glsl"
+//@include "/lib/common/math.glsl"
+//@include "/lib/common/noise.glsl"
+//@include "/lib/common/phase.glsl"
+//@include "/lib/common/shading_types.glsl"
+//@include "/lib/common/transforms.glsl"
+//@include "/lib/common/uniforms.glsl"
+//@include "/lib/sky/atmosphere.glsl"
+//@include "/lib/sky/sh.glsl"
+//@include "/lib/sky/sky_color.glsl"
 
-#include "/lib/sky/fog_template.glsl"
-#include "/lib/sky/climate.glsl"
-#include "/lib/sky/fog_styles.glsl"
+//@include "/lib/sky/fog_template.glsl"
+//@include "/lib/sky/climate.glsl"
+//@include "/lib/sky/fog_styles.glsl"
 
 /*
  * もや: 上端のある混合層 (上端は FOG_T_HAZE_TOP、ロジスティックで柔らかく) + 上に残る薄いもや (FOG_HAZE_FREE_SHARE)

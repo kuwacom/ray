@@ -5,12 +5,12 @@
 #ifndef IDS_ID_DECODE_GLSL
 #define IDS_ID_DECODE_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/math.glsl"
-#include "/lib/ids/block_ids.glsl"
-#include "/lib/ids/entity_ids.glsl"
-#include "/lib/ids/light_ids.glsl"
-#include "/lib/ids/material_ids.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/math.glsl"
+//@include "/lib/ids/block_ids.glsl"
+//@include "/lib/ids/entity_ids.glsl"
+//@include "/lib/ids/light_ids.glsl"
+//@include "/lib/ids/material_ids.glsl"
 
 // mc_Entity.x (未登録は -1) をボクセルに格納する 12bit ID へ
 int blockIdToVoxelId(int blockId) {

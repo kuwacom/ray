@@ -6,21 +6,21 @@
 #ifndef SKY_CLOUD_CONSTANTS_GLSL
 #define SKY_CLOUD_CONSTANTS_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/color.glsl"
-#include "/lib/common/constants.glsl"
-#include "/lib/common/math.glsl"
-#include "/lib/common/noise.glsl"
-#include "/lib/common/phase.glsl"
-#include "/lib/common/transforms.glsl"
-#include "/lib/common/uniforms.glsl"
-#include "/lib/buffers/images.glsl"
-#include "/lib/buffers/frame_data.glsl"
-#include "/lib/sky/atmosphere.glsl"
-#include "/lib/sky/climate.glsl"
-#include "/lib/sky/clouds.glsl"
-#include "/lib/sky/sky_color.glsl"
-#include "/lib/sky/cloud_styles.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/color.glsl"
+//@include "/lib/common/constants.glsl"
+//@include "/lib/common/math.glsl"
+//@include "/lib/common/noise.glsl"
+//@include "/lib/common/phase.glsl"
+//@include "/lib/common/transforms.glsl"
+//@include "/lib/common/uniforms.glsl"
+//@include "/lib/buffers/images.glsl"
+//@include "/lib/buffers/frame_data.glsl"
+//@include "/lib/sky/atmosphere.glsl"
+//@include "/lib/sky/climate.glsl"
+//@include "/lib/sky/clouds.glsl"
+//@include "/lib/sky/sky_color.glsl"
+//@include "/lib/sky/cloud_styles.glsl"
 
 uniform sampler3D cloudShapeTex;
 uniform sampler3D cloudDetailTex;

@@ -6,10 +6,10 @@
 #ifndef POST_TONEMAP_GLSL
 #define POST_TONEMAP_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/color.glsl"
-#include "/lib/common/look_presets.glsl"
-#include "/lib/common/math.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/color.glsl"
+//@include "/lib/common/look_presets.glsl"
+//@include "/lib/common/math.glsl"
 
 /*
  * ASC CDL (slope / offset / power + saturation)

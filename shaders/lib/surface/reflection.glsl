@@ -10,20 +10,20 @@
 #ifndef SURFACE_REFLECTION_GLSL
 #define SURFACE_REFLECTION_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/color.glsl"
-#include "/lib/common/encoding.glsl"
-#include "/lib/common/gbuffer.glsl"
-#include "/lib/common/joint_bilateral.glsl"
-#include "/lib/common/math.glsl"
-#include "/lib/common/samplers.glsl"
-#include "/lib/common/transforms.glsl"
-#include "/lib/common/uniforms.glsl"
-#include "/lib/buffers/images.glsl"
-#include "/lib/ids/material_ids.glsl"
-#include "/lib/surface/gi.glsl"
-#include "/lib/surface/lighting.glsl"
-#include "/lib/surface/screen_trace.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/color.glsl"
+//@include "/lib/common/encoding.glsl"
+//@include "/lib/common/gbuffer.glsl"
+//@include "/lib/common/joint_bilateral.glsl"
+//@include "/lib/common/math.glsl"
+//@include "/lib/common/samplers.glsl"
+//@include "/lib/common/transforms.glsl"
+//@include "/lib/common/uniforms.glsl"
+//@include "/lib/buffers/images.glsl"
+//@include "/lib/ids/material_ids.glsl"
+//@include "/lib/surface/gi.glsl"
+//@include "/lib/surface/lighting.glsl"
+//@include "/lib/surface/screen_trace.glsl"
 
 // これより粗い面は SSR を飛ばさず空のフォールバックだけ (ほぼ拡散なので見た目が変わらない)
 const float SSR_MAX_ROUGHNESS = 0.75;

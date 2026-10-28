@@ -5,14 +5,14 @@
 #ifndef SKY_CELESTIAL_GLSL
 #define SKY_CELESTIAL_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/color.glsl"
-#include "/lib/common/constants.glsl"
-#include "/lib/common/math.glsl"
-#include "/lib/common/noise.glsl"
-#include "/lib/common/transforms.glsl"
-#include "/lib/common/uniforms.glsl"
-#include "/lib/sky/atmosphere.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/color.glsl"
+//@include "/lib/common/constants.glsl"
+//@include "/lib/common/math.glsl"
+//@include "/lib/common/noise.glsl"
+//@include "/lib/common/transforms.glsl"
+//@include "/lib/common/uniforms.glsl"
+//@include "/lib/sky/atmosphere.glsl"
 
 // 太陽と月の円盤の放射を照度から決める時の周縁減光 (I(mu) = 1 - u (1 - mu)) の係数
 const float SUN_LIMB_DARKENING = 0.6;

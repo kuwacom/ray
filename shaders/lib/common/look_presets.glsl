@@ -9,7 +9,7 @@
 #ifndef COMMON_LOOK_PRESETS_GLSL
 #define COMMON_LOOK_PRESETS_GLSL
 
-#include "/lib/settings.glsl"
+//@include "/lib/settings.glsl"
 
 #if LOOK_PRESET == 1
 /*

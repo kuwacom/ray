@@ -5,7 +5,7 @@
 #ifndef LIGHT_VOXEL_READ_GLSL
 #define LIGHT_VOXEL_READ_GLSL
 
-#include "/lib/buffers/images.glsl"
+//@include "/lib/buffers/images.glsl"
 
 int unpackVoxelBlockId(uint v) { return int(v & 0xFFFu); }
 

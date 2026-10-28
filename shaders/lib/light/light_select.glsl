@@ -10,22 +10,22 @@
 #ifndef LIGHT_LIGHT_SELECT_GLSL
 #define LIGHT_LIGHT_SELECT_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/color.glsl"
-#include "/lib/common/constants.glsl"
-#include "/lib/common/frame_offset.glsl"
-#include "/lib/common/math.glsl"
-#include "/lib/common/transforms.glsl"
-#include "/lib/common/voxel_space.glsl"
-#include "/lib/buffers/global_lights.glsl"
-#include "/lib/buffers/light_bins.glsl"
-#include "/lib/ids/id_decode.glsl"
-#include "/lib/ids/light_ids.glsl"
-#include "/lib/light/block_data.glsl"
-#include "/lib/light/light_bins.glsl"
-#include "/lib/light/trace.glsl"
-#include "/lib/light/voxel.glsl"
-#include "/lib/light/voxel_read.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/color.glsl"
+//@include "/lib/common/constants.glsl"
+//@include "/lib/common/frame_offset.glsl"
+//@include "/lib/common/math.glsl"
+//@include "/lib/common/transforms.glsl"
+//@include "/lib/common/voxel_space.glsl"
+//@include "/lib/buffers/global_lights.glsl"
+//@include "/lib/buffers/light_bins.glsl"
+//@include "/lib/ids/id_decode.glsl"
+//@include "/lib/ids/light_ids.glsl"
+//@include "/lib/light/block_data.glsl"
+//@include "/lib/light/light_bins.glsl"
+//@include "/lib/light/trace.glsl"
+//@include "/lib/light/voxel.glsl"
+//@include "/lib/light/voxel_read.glsl"
 
 // 半影用に終点を動かす半径の上限 (ブロック)。光源セルの外に出ると光源の隣の壁で遮られてしまう
 const float LIGHT_JITTER_MAX_RADIUS = 0.45;

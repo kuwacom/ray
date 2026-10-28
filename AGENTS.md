@@ -25,8 +25,8 @@ glslang は `RAY_GLSLANG`、PATH、`tools/glslang/bin/glslang.exe` の順に探�
 ## はまりやすい制約
 
 - `*.properties` は ASCII のみ。Iris は ISO-8859-1 で読むので、日本語はコメントでも前処理を壊す
-- image uniform は 1 ステージ 8 個まで (NVIDIA)。`lib/buffers/images.glsl` は opt-in なので、使う `IMG_*` だけを `common.glsl` の include 前に `#define` する
-- `lib/` と `program/` のファイルは、使う記号の定義元を自分で `#include` する (読む順番に頼らない)。ガード名はパスから決める (`lib/sky/fog.glsl` は `SKY_FOG_GLSL`)。漏れは `tools/include_deps.py` と validate_shaders.py が検出する
+- image uniform は 1 ステージ 8 個まで (NVIDIA)。`lib/buffers/images.glsl` は opt-in なので、使う `IMG_*` だけを `common.glsl` の宣言の前に `#define` する
+- `lib/` と `program/` のファイルは、使う記号の定義元を `//@include "/lib/..."` の行で宣言する (読む順番に頼らない)。lib のファイルには `#include` を書かない。コメントの中にも `#include` で始まる行を書かない (Iris は `#include` の行をコメントや `#if` の中でもガードを見ずに毎回差し込むので、lib 同士が include すると本文が数十倍に膨らみ、読み込みが遅くなる)。本体の `#include` は `uv run tools/gen_includes.py` が宣言から生成する (`BEGIN GENERATED includes` の間。手で編集しない)。lib の宣言はガードの直後にまとめ、本体の宣言は opt-in の `#define` の後にまとめる。ガード名はパスから決める (`lib/sky/fog.glsl` は `SKY_FOG_GLSL`)。宣言の漏れと生成の古さは `tools/include_deps.py` と validate_shaders.py が検出する
 - compute の `workGroups` / `workGroupsRender` はリテラルで書く (式・マクロ不可)
 - `block.properties` / `item.properties` / `entity.properties` と `lib/ids/{block,light,entity}_ids.glsl`、`lib/light/light_table_data.glsl` は `tools/gen_block_properties.py` (表は `tools/id_tables.py`) から生成する。手で編集しない。光源の追加は `id_tables.py` の `LIGHTS` に 1 行
 - 設定を足したら `lib/settings/` の該当モジュールのファイル (`gen_settings.py` も実行)、`shaders.properties` (画面と `profile.*`)、`lang/en_US.lang`、`lang/ja_JP.lang` をそろえる。漏れは validate_shaders.py が検出する

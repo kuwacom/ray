@@ -5,8 +5,8 @@
 #ifndef LIGHT_LIGHT_TABLE_DATA_GLSL
 #define LIGHT_LIGHT_TABLE_DATA_GLSL
 
-#include "/lib/light/light_def.glsl"
-#include "/lib/ids/light_ids.glsl"
+//@include "/lib/light/light_def.glsl"
+//@include "/lib/ids/light_ids.glsl"
 
 LightDef lightDefStatic(int i) {
     vec3 fire = fireSrgb();

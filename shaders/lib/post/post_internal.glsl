@@ -5,15 +5,15 @@
 #ifndef POST_POST_INTERNAL_GLSL
 #define POST_POST_INTERNAL_GLSL
 
-#include "/lib/post/post.glsl"
-#include "/lib/post/post_constants.glsl"
-#include "/lib/post/lens_presets.glsl"
-#include "/lib/post/sampling.glsl"
-#include "/lib/post/exposure.glsl"
-#include "/lib/post/camera.glsl"
-#include "/lib/post/grading.glsl"
-#include "/lib/post/color_grade.glsl"
-#include "/lib/post/bloom.glsl"
-#include "/lib/post/lens.glsl"
+//@include "/lib/post/post.glsl"
+//@include "/lib/post/post_constants.glsl"
+//@include "/lib/post/lens_presets.glsl"
+//@include "/lib/post/sampling.glsl"
+//@include "/lib/post/exposure.glsl"
+//@include "/lib/post/camera.glsl"
+//@include "/lib/post/grading.glsl"
+//@include "/lib/post/color_grade.glsl"
+//@include "/lib/post/bloom.glsl"
+//@include "/lib/post/lens.glsl"
 
 #endif

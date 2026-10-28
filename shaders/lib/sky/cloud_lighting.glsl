@@ -5,9 +5,9 @@
 #ifndef SKY_CLOUD_LIGHTING_GLSL
 #define SKY_CLOUD_LIGHTING_GLSL
 
-#include "/lib/sky/cloud_constants.glsl"
-#include "/lib/sky/cloud_weather.glsl"
-#include "/lib/sky/cloud_density.glsl"
+//@include "/lib/sky/cloud_constants.glsl"
+//@include "/lib/sky/cloud_weather.glsl"
+//@include "/lib/sky/cloud_density.glsl"
 
 // ライティング
 // 雲粒の位相 (HG + Draine の Mie 近似 + グローリー)。scale で非対称性を弱める (多重散乱のオクターブ・厚い所)

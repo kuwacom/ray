@@ -4,12 +4,37 @@
  * shadowcolor1: rg = 法線 (oct), b = スカイライト, a = 種別 (0=不透明 0.2=葉 0.5=半透明 1=水)
  * light モジュール (RSM で使う内容は surface モジュールと調整)
  */
+//@include "/lib/common/common.glsl"
+//@include "/lib/common/color.glsl"
+//@include "/lib/common/encoding.glsl"
+//@include "/lib/common/shadow_space.glsl"
+//@include "/lib/ids/block_ids.glsl"
+//@include "/lib/ids/id_decode.glsl"
+// BEGIN GENERATED includes (tools/gen_includes.py)
+#include "/lib/settings/look.glsl"
+#include "/lib/settings/light.glsl"
+#include "/lib/settings/surface.glsl"
+#include "/lib/settings/sky.glsl"
+#include "/lib/settings/post.glsl"
+#include "/lib/settings/internal.glsl"
+#include "/lib/settings/bool_refs.glsl"
+#include "/lib/settings.glsl"
+#include "/lib/common/dimension.glsl"
+#include "/lib/common/constants.glsl"
+#include "/lib/common/uniforms.glsl"
+#include "/lib/common/samplers.glsl"
+#include "/lib/common/math.glsl"
+#include "/lib/common/shading_types.glsl"
 #include "/lib/common/common.glsl"
 #include "/lib/common/color.glsl"
 #include "/lib/common/encoding.glsl"
 #include "/lib/common/shadow_space.glsl"
 #include "/lib/ids/block_ids.glsl"
+#include "/lib/ids/entity_ids.glsl"
+#include "/lib/ids/light_ids.glsl"
+#include "/lib/ids/material_ids.glsl"
 #include "/lib/ids/id_decode.glsl"
+// END GENERATED includes
 
 in vec2 texcoord;
 in vec4 glcolor;

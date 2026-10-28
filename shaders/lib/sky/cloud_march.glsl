@@ -5,10 +5,10 @@
 #ifndef SKY_CLOUD_MARCH_GLSL
 #define SKY_CLOUD_MARCH_GLSL
 
-#include "/lib/sky/cloud_constants.glsl"
-#include "/lib/sky/cloud_weather.glsl"
-#include "/lib/sky/cloud_density.glsl"
-#include "/lib/sky/cloud_lighting.glsl"
+//@include "/lib/sky/cloud_constants.glsl"
+//@include "/lib/sky/cloud_weather.glsl"
+//@include "/lib/sky/cloud_density.glsl"
+//@include "/lib/sky/cloud_lighting.glsl"
 
 // レイマーチ (ワールドの視線で歩き、サンプルを参照空間へ写す)
 struct CloudAccum {

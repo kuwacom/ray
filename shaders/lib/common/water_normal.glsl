@@ -5,13 +5,13 @@
 #ifndef COMMON_WATER_NORMAL_GLSL
 #define COMMON_WATER_NORMAL_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/constants.glsl"
-#include "/lib/common/dimension.glsl"
-#include "/lib/common/math.glsl"
-#include "/lib/common/noise.glsl"
-#include "/lib/common/uniforms.glsl"
-#include "/lib/common/water_waves.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/constants.glsl"
+//@include "/lib/common/dimension.glsl"
+//@include "/lib/common/math.glsl"
+//@include "/lib/common/noise.glsl"
+//@include "/lib/common/uniforms.glsl"
+//@include "/lib/common/water_waves.glsl"
 
 /*
  * 水たまりの照り返しのきらめき (deferred30 の puddleSpecular)

@@ -5,7 +5,7 @@
 #ifndef SKY_CLOUD_WEATHER_GLSL
 #define SKY_CLOUD_WEATHER_GLSL
 
-#include "/lib/sky/cloud_constants.glsl"
+//@include "/lib/sky/cloud_constants.glsl"
 
 // 天気図 (水平位置は参照空間)
 vec2 cloudMapCenter() { return floor(cameraPosition.xz * CLOUD_KH / CLOUD_MAP_TEXEL) * CLOUD_MAP_TEXEL; }

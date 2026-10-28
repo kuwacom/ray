@@ -341,7 +341,7 @@ uv run tools/run_scene.py --all --reload --tag v2                  # 再読み�
 
 > [!WARNING]
 > - `*.properties` には ASCII 以外の文字を書かないでください。Iris は ISO-8859-1 で読むので、コメントでも日本語が入るとファイル全体が無視されます (`validate_shaders.py` が検査します)
-> - NVIDIA のドライバでは image uniform が 1 ステージ 8 個までです。`lib/buffers/images.glsl` の宣言は opt-in なので、image に書くプログラムでは `common.glsl` を include する前に使う `IMG_*` だけを `#define` してください
+> - NVIDIA のドライバでは image uniform が 1 ステージ 8 個までです。`lib/buffers/images.glsl` の宣言は opt-in なので、image に書くプログラムでは `common.glsl` を宣言する前に使う `IMG_*` だけを `#define` してください
 
 ## パイプライン
 

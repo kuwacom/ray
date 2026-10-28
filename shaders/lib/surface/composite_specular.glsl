@@ -5,20 +5,20 @@
 #ifndef SURFACE_COMPOSITE_SPECULAR_GLSL
 #define SURFACE_COMPOSITE_SPECULAR_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/gbuffer.glsl"
-#include "/lib/common/math.glsl"
-#include "/lib/common/noise.glsl"
-#include "/lib/common/samplers.glsl"
-#include "/lib/common/shading_types.glsl"
-#include "/lib/common/transforms.glsl"
-#include "/lib/common/uniforms.glsl"
-#include "/lib/surface/brdf.glsl"
-#include "/lib/surface/gi.glsl"
-#include "/lib/surface/lighting.glsl"
-#include "/lib/surface/material.glsl"
-#include "/lib/surface/reflection.glsl"
-#include "/lib/surface/surface_lights.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/gbuffer.glsl"
+//@include "/lib/common/math.glsl"
+//@include "/lib/common/noise.glsl"
+//@include "/lib/common/samplers.glsl"
+//@include "/lib/common/shading_types.glsl"
+//@include "/lib/common/transforms.glsl"
+//@include "/lib/common/uniforms.glsl"
+//@include "/lib/surface/brdf.glsl"
+//@include "/lib/surface/gi.glsl"
+//@include "/lib/surface/lighting.glsl"
+//@include "/lib/surface/material.glsl"
+//@include "/lib/surface/reflection.glsl"
+//@include "/lib/surface/surface_lights.glsl"
 
 // 全画面クアッド (program/common/fullscreen.vsh) の UV。composite1 のような全画面の fragment パスだけが include する
 in vec2 texcoord;

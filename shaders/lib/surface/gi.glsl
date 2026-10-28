@@ -4,13 +4,13 @@
 #ifndef SURFACE_GI_GLSL
 #define SURFACE_GI_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/color.glsl"
-#include "/lib/common/dimension.glsl"
-#include "/lib/common/frame_offset.glsl"
-#include "/lib/common/look_presets.glsl"
-#include "/lib/common/math.glsl"
-#include "/lib/common/samplers.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/color.glsl"
+//@include "/lib/common/dimension.glsl"
+//@include "/lib/common/frame_offset.glsl"
+//@include "/lib/common/look_presets.glsl"
+//@include "/lib/common/math.glsl"
+//@include "/lib/common/samplers.glsl"
 
 /*
  * deferred11 のデノイズ済み結果 (colortex8)

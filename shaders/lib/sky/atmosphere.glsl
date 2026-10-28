@@ -10,14 +10,14 @@
 #ifndef SKY_ATMOSPHERE_GLSL
 #define SKY_ATMOSPHERE_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/color.glsl"
-#include "/lib/common/constants.glsl"
-#include "/lib/common/dimension.glsl"
-#include "/lib/common/math.glsl"
-#include "/lib/common/phase.glsl"
-#include "/lib/common/uniforms.glsl"
-#include "/lib/buffers/images.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/color.glsl"
+//@include "/lib/common/constants.glsl"
+//@include "/lib/common/dimension.glsl"
+//@include "/lib/common/math.glsl"
+//@include "/lib/common/phase.glsl"
+//@include "/lib/common/uniforms.glsl"
+//@include "/lib/buffers/images.glsl"
 
 const float ATMO_GROUND_RADIUS = 6360.0;  // km
 const float ATMO_TOP_RADIUS = 6460.0;     // km

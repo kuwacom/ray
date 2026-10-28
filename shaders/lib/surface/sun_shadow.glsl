@@ -17,22 +17,22 @@
 #ifndef SURFACE_SUN_SHADOW_GLSL
 #define SURFACE_SUN_SHADOW_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/color.glsl"
-#include "/lib/common/constants.glsl"
-#include "/lib/common/dimension.glsl"
-#include "/lib/common/math.glsl"
-#include "/lib/common/samplers.glsl"
-#include "/lib/common/shadow_space.glsl"
-#include "/lib/common/transforms.glsl"
-#include "/lib/common/uniforms.glsl"
-#include "/lib/common/voxel_space.glsl"
-#include "/lib/buffers/images.glsl"
-#include "/lib/ids/block_ids.glsl"
-#include "/lib/ids/id_decode.glsl"
-#include "/lib/common/shadow_volume.glsl"
-#include "/lib/light/voxel_read.glsl"
-#include "/lib/common/water.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/color.glsl"
+//@include "/lib/common/constants.glsl"
+//@include "/lib/common/dimension.glsl"
+//@include "/lib/common/math.glsl"
+//@include "/lib/common/samplers.glsl"
+//@include "/lib/common/shadow_space.glsl"
+//@include "/lib/common/transforms.glsl"
+//@include "/lib/common/uniforms.glsl"
+//@include "/lib/common/voxel_space.glsl"
+//@include "/lib/buffers/images.glsl"
+//@include "/lib/ids/block_ids.glsl"
+//@include "/lib/ids/id_decode.glsl"
+//@include "/lib/common/shadow_volume.glsl"
+//@include "/lib/light/voxel_read.glsl"
+//@include "/lib/common/water.glsl"
 
 const float SHADOW_NORMAL_OFFSET_MIN = 0.6;   // 法線オフセット (テクセル)。正面向きの面
 const float SHADOW_NORMAL_OFFSET_SLOPE = 1.4; // 法線オフセット (テクセル)。傾いた面での追加分

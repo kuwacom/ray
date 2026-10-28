@@ -11,10 +11,10 @@
 #ifndef SURFACE_BRDF_GLSL
 #define SURFACE_BRDF_GLSL
 
-#include "/lib/common/constants.glsl"
-#include "/lib/common/math.glsl"
-#include "/lib/common/shading_types.glsl"
-#include "/lib/surface/material.glsl"
+//@include "/lib/common/constants.glsl"
+//@include "/lib/common/math.glsl"
+//@include "/lib/common/shading_types.glsl"
+//@include "/lib/surface/material.glsl"
 
 // EON の粗さ。labPBR の粗さをそのまま渡すとバニラの粗い面が平板に見えるので弱める
 const float EON_ROUGHNESS_SCALE = 0.6;

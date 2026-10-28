@@ -1,7 +1,7 @@
 #ifndef SETTINGS_INTERNAL_GLSL
 #define SETTINGS_INTERNAL_GLSL
 
-#include "/lib/settings/light.glsl"
+//@include "/lib/settings/light.glsl"
 
 // Iris の定数 (設定画面には出さない)
 const float ambientOcclusionLevel = 1.0;

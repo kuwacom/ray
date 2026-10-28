@@ -5,10 +5,10 @@
 #ifndef SETTINGS_BOOL_REFS_GLSL
 #define SETTINGS_BOOL_REFS_GLSL
 
-#include "/lib/settings/light.glsl"
-#include "/lib/settings/surface.glsl"
-#include "/lib/settings/sky.glsl"
-#include "/lib/settings/post.glsl"
+//@include "/lib/settings/light.glsl"
+//@include "/lib/settings/surface.glsl"
+//@include "/lib/settings/sky.glsl"
+//@include "/lib/settings/post.glsl"
 
 #ifdef FLOODFILL
 #endif

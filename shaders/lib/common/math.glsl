@@ -1,7 +1,7 @@
 #ifndef COMMON_MATH_GLSL
 #define COMMON_MATH_GLSL
 
-#include "/lib/common/constants.glsl"
+//@include "/lib/common/constants.glsl"
 
 float saturate(float x) { return clamp(x, 0.0, 1.0); }
 vec2 saturate(vec2 x) { return clamp(x, 0.0, 1.0); }

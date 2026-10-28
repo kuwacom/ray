@@ -6,7 +6,7 @@
 #ifndef POST_POST_GLSL
 #define POST_POST_GLSL
 
-#include "/lib/post/velocity.glsl"
-#include "/lib/post/tonemap.glsl"
+//@include "/lib/post/velocity.glsl"
+//@include "/lib/post/tonemap.glsl"
 
 #endif

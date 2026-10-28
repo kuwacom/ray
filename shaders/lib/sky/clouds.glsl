@@ -24,14 +24,14 @@
 #ifndef SKY_CLOUDS_GLSL
 #define SKY_CLOUDS_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/dimension.glsl"
-#include "/lib/common/frame_offset.glsl"
-#include "/lib/common/math.glsl"
-#include "/lib/common/samplers.glsl"
-#include "/lib/common/transforms.glsl"
-#include "/lib/common/uniforms.glsl"
-#include "/lib/buffers/images.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/dimension.glsl"
+//@include "/lib/common/frame_offset.glsl"
+//@include "/lib/common/math.glsl"
+//@include "/lib/common/samplers.glsl"
+//@include "/lib/common/transforms.glsl"
+//@include "/lib/common/uniforms.glsl"
+//@include "/lib/buffers/images.glsl"
 
 const float CLOUD_RAY_FAR = 1e12; // 球との交差が無い方向の距離 (十分遠い値)
 

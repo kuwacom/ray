@@ -5,10 +5,10 @@
 #ifndef POST_GRADING_GLSL
 #define POST_GRADING_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/color.glsl"
-#include "/lib/common/constants.glsl"
-#include "/lib/post/post_constants.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/color.glsl"
+//@include "/lib/common/constants.glsl"
+//@include "/lib/post/post_constants.glsl"
 
 // 線形 sRGB (D65) <-> XYZ
 const mat3 RGB_TO_XYZ = mat3(

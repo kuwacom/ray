@@ -34,10 +34,10 @@
 #ifndef SKY_CLOUD_VOLUME_GLSL
 #define SKY_CLOUD_VOLUME_GLSL
 
-#include "/lib/sky/cloud_constants.glsl"
-#include "/lib/sky/cloud_weather.glsl"
-#include "/lib/sky/cloud_density.glsl"
-#include "/lib/sky/cloud_lighting.glsl"
-#include "/lib/sky/cloud_march.glsl"
+//@include "/lib/sky/cloud_constants.glsl"
+//@include "/lib/sky/cloud_weather.glsl"
+//@include "/lib/sky/cloud_density.glsl"
+//@include "/lib/sky/cloud_lighting.glsl"
+//@include "/lib/sky/cloud_march.glsl"
 
 #endif

@@ -7,10 +7,10 @@
 #ifndef COMMON_GBUFFER_GLSL
 #define COMMON_GBUFFER_GLSL
 
-#include "/lib/common/color.glsl"
-#include "/lib/common/encoding.glsl"
-#include "/lib/common/samplers.glsl"
-#include "/lib/common/uniforms.glsl"
+//@include "/lib/common/color.glsl"
+//@include "/lib/common/encoding.glsl"
+//@include "/lib/common/samplers.glsl"
+//@include "/lib/common/uniforms.glsl"
 
 struct GBufferData {
     vec3 albedo;      // 線形

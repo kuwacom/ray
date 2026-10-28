@@ -5,11 +5,11 @@
 #ifndef COMMON_WATER_GLINT_GLSL
 #define COMMON_WATER_GLINT_GLSL
 
-#include "/lib/common/constants.glsl"
-#include "/lib/common/math.glsl"
-#include "/lib/common/noise.glsl"
-#include "/lib/common/uniforms.glsl"
-#include "/lib/common/water_waves.glsl"
+//@include "/lib/common/constants.glsl"
+//@include "/lib/common/math.glsl"
+//@include "/lib/common/noise.glsl"
+//@include "/lib/common/uniforms.glsl"
+//@include "/lib/common/water_waves.glsl"
 
 /*
  * 太陽・月の照り返しのきらめき (sun glitter)

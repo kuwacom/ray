@@ -6,12 +6,12 @@
 #ifndef LIGHT_FLOODFILL_GLSL
 #define LIGHT_FLOODFILL_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/uniforms.glsl"
-#include "/lib/common/voxel_space.glsl"
-#include "/lib/buffers/images.glsl"
-#include "/lib/light/block_data.glsl"
-#include "/lib/light/voxel.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/uniforms.glsl"
+//@include "/lib/common/voxel_space.glsl"
+//@include "/lib/buffers/images.glsl"
+//@include "/lib/light/block_data.glsl"
+//@include "/lib/light/voxel.glsl"
 
 bool floodWritesA() { return (frameCounter & 1) == 0; }
 

@@ -8,12 +8,12 @@
 #ifndef COMMON_COMMON_GLSL
 #define COMMON_COMMON_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/dimension.glsl"
-#include "/lib/common/constants.glsl"
-#include "/lib/common/uniforms.glsl"
-#include "/lib/common/samplers.glsl"
-#include "/lib/common/math.glsl"
-#include "/lib/common/shading_types.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/dimension.glsl"
+//@include "/lib/common/constants.glsl"
+//@include "/lib/common/uniforms.glsl"
+//@include "/lib/common/samplers.glsl"
+//@include "/lib/common/math.glsl"
+//@include "/lib/common/shading_types.glsl"
 
 #endif

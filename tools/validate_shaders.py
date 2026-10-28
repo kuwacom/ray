@@ -9,7 +9,8 @@ Iris の前処理を簡易再現して glslangValidator で全プログラムを
 - エラー行を元のファイル名・行番号へ戻して表示
 
 あわせて静的チェックも行う
-- #include の漏れ (使う記号の定義元を include しているか)、include の循環、lib のガード名 (tools/include_deps.py)
+- //@include の宣言の漏れ (使う記号の定義元を宣言しているか)、宣言の循環・書き方、lib のガード名 (tools/include_deps.py)
+- 本体の #include の生成ブロックが最新か (tools/gen_includes.py)
 - プロファイル・program.enabled が参照する設定が lib/settings/ に存在するか
 - lang (en_US / ja_JP) に全設定・全画面のラベルがあるか
 - shaders.properties の screen に全設定が載っているか
@@ -46,6 +47,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import gen_block_properties  # noqa: E402
+import gen_includes  # noqa: E402
 import gen_settings  # noqa: E402
 import include_deps  # noqa: E402
 from gen_settings import CONST_RE, DEFINE_RE, Option, read_properties_logical_lines, resolve_profile  # noqa: E402
@@ -427,6 +429,7 @@ def properties_checks() -> list[str]:
 def static_checks(options: dict[str, Option], profiles: dict[str, list[str]]) -> list[str]:
     problems: list[str] = properties_checks()
     problems += include_deps.Tree(SHADERS).problems()
+    problems += gen_includes.check(SHADERS)
     problems += gen_settings.check(SHADERS)
     problems += gen_settings.definition_problems(SHADERS)
     problems += gen_block_properties.check(SHADERS)

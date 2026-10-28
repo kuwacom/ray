@@ -1,7 +1,7 @@
 #ifndef COMMON_PHASE_GLSL
 #define COMMON_PHASE_GLSL
 
-#include "/lib/common/constants.glsl"
+//@include "/lib/common/constants.glsl"
 
 // 位相関数 (立体角で正規化した公知の式)
 float phaseRayleigh(float cosTheta) {

@@ -5,16 +5,16 @@
 #ifndef POST_LENS_FLARE_GLSL
 #define POST_LENS_FLARE_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/color.glsl"
-#include "/lib/common/constants.glsl"
-#include "/lib/common/math.glsl"
-#include "/lib/common/uniforms.glsl"
-#include "/lib/post/camera.glsl"
-#include "/lib/post/lens_ghosts.glsl"
-#include "/lib/post/lens_optics.glsl"
-#include "/lib/post/lens_presets.glsl"
-#include "/lib/post/post_constants.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/color.glsl"
+//@include "/lib/common/constants.glsl"
+//@include "/lib/common/math.glsl"
+//@include "/lib/common/uniforms.glsl"
+//@include "/lib/post/camera.glsl"
+//@include "/lib/post/lens_ghosts.glsl"
+//@include "/lib/post/lens_optics.glsl"
+//@include "/lib/post/lens_presets.glsl"
+//@include "/lib/post/post_constants.glsl"
 
 uniform sampler2D lensStarburstTex;
 uniform sampler2D lensDirtTex;

@@ -5,8 +5,8 @@
 #ifndef SKY_CLOUD_DENSITY_GLSL
 #define SKY_CLOUD_DENSITY_GLSL
 
-#include "/lib/sky/cloud_constants.glsl"
-#include "/lib/sky/cloud_weather.glsl"
+//@include "/lib/sky/cloud_constants.glsl"
+//@include "/lib/sky/cloud_weather.glsl"
 
 // 密度
 struct CloudColumn {

@@ -5,14 +5,14 @@
 #ifndef COMMON_SHADOW_VOLUME_GLSL
 #define COMMON_SHADOW_VOLUME_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/color.glsl"
-#include "/lib/common/dimension.glsl"
-#include "/lib/common/samplers.glsl"
-#include "/lib/common/shadow_space.glsl"
-#include "/lib/common/transforms.glsl"
-#include "/lib/common/uniforms.glsl"
-#include "/lib/common/water.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/color.glsl"
+//@include "/lib/common/dimension.glsl"
+//@include "/lib/common/samplers.glsl"
+//@include "/lib/common/shadow_space.glsl"
+//@include "/lib/common/transforms.glsl"
+//@include "/lib/common/uniforms.glsl"
+//@include "/lib/common/water.glsl"
 
 float shadowDepthPerBlock() { return abs(shadowProjection[2][2]) * SHADOW_DEPTH_SCALE * 0.5; }
 

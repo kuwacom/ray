@@ -9,7 +9,7 @@
 #ifndef POST_LENS_GLSL
 #define POST_LENS_GLSL
 
-#include "/lib/post/lens_optics.glsl"
-#include "/lib/post/lens_flare.glsl"
+//@include "/lib/post/lens_optics.glsl"
+//@include "/lib/post/lens_flare.glsl"
 
 #endif

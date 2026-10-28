@@ -12,11 +12,11 @@
 #ifndef POST_COLOR_GRADE_GLSL
 #define POST_COLOR_GRADE_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/color.glsl"
-#include "/lib/common/look_presets.glsl"
-#include "/lib/common/math.glsl"
-#include "/lib/post/post_constants.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/color.glsl"
+//@include "/lib/common/look_presets.glsl"
+//@include "/lib/common/math.glsl"
+//@include "/lib/post/post_constants.glsl"
 
 // 実効値
 const float G_TINT = GRADE_TINT + LKG_TINT;

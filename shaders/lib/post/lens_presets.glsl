@@ -9,7 +9,7 @@
 #ifndef POST_LENS_PRESETS_GLSL
 #define POST_LENS_PRESETS_GLSL
 
-#include "/lib/settings.glsl"
+//@include "/lib/settings.glsl"
 
 #if LENS_PRESET == 1
 /*

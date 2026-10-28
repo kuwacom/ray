@@ -6,7 +6,7 @@
 #ifndef SKY_SH_GLSL
 #define SKY_SH_GLSL
 
-#include "/lib/buffers/frame_data.glsl"
+//@include "/lib/buffers/frame_data.glsl"
 
 // 球面調和関数 (2 次まで) の基底の係数と、クランプ余弦の畳み込みの係数 (バンドごと)
 const float SH_Y0 = 0.282095;

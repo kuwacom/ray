@@ -8,13 +8,13 @@
 #ifndef SETTINGS_GLSL
 #define SETTINGS_GLSL
 
-#include "/lib/settings/look.glsl"
-#include "/lib/settings/light.glsl"
-#include "/lib/settings/surface.glsl"
-#include "/lib/settings/sky.glsl"
-#include "/lib/settings/post.glsl"
-#include "/lib/settings/internal.glsl"
-#include "/lib/settings/bool_refs.glsl"
+//@include "/lib/settings/look.glsl"
+//@include "/lib/settings/light.glsl"
+//@include "/lib/settings/surface.glsl"
+//@include "/lib/settings/sky.glsl"
+//@include "/lib/settings/post.glsl"
+//@include "/lib/settings/internal.glsl"
+//@include "/lib/settings/bool_refs.glsl"
 
 #define RAY_VERSION 1 // [1] 画面には lang の value.RAY_VERSION.1 (v0.1.0-alpha)
 

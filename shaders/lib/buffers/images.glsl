@@ -6,9 +6,9 @@
  * NVIDIA は 1 ステージで宣言できる image uniform が 8 個まで (GL_MAX_*_IMAGE_UNIFORMS, 未使用でも宣言数で数える)、
  * Iris も 1 プログラムに割り当てられる image unit が GL_MAX_IMAGE_UNITS (= 8) まで。
  * 全 image を共通ヘッダで宣言すると全プログラムがコンパイルエラーになるので、
- * 各プログラムは common.glsl を include する前に必要な IMG_* だけを #define する
+ * 各プログラムは common.glsl を宣言する前に必要な IMG_* だけを #define する
  *   例: #define IMG_VOXEL_BLOCK
- *       #include "/lib/common/common.glsl"
+ *       //@include "/lib/common/common.glsl"
  * sampler (読み取り専用) は宣言しても未使用ならドライバが除去するので常に宣言する
  * tools/gl_compile_check.py が宣言数とアクティブ数を実機の上限と比べる
  */

@@ -17,12 +17,12 @@
 #ifndef LIGHT_ENTITY_TRI_GLSL
 #define LIGHT_ENTITY_TRI_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/math.glsl"
-#include "/lib/common/samplers.glsl"
-#include "/lib/common/voxel_space.glsl"
-#include "/lib/buffers/entity_tris.glsl"
-#include "/lib/light/floodfill.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/math.glsl"
+//@include "/lib/common/samplers.glsl"
+//@include "/lib/common/voxel_space.glsl"
+//@include "/lib/buffers/entity_tris.glsl"
+//@include "/lib/light/floodfill.glsl"
 
 const uint ENTITY_TRI_CAPACITY = uint(min(LIGHT_ENTITY_TRIANGLES, ENTITY_TRI_MAX));
 // プレイヤー 1 人分 (外側レイヤー・防具・手持ち・エリトラ込み) に足りる量。ENTITY_TRI_GROUP の倍数

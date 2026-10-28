@@ -6,11 +6,11 @@
 #ifndef SURFACE_SURFACE_GLSL
 #define SURFACE_SURFACE_GLSL
 
-#include "/lib/surface/material.glsl"
-#include "/lib/surface/brdf.glsl"
-#include "/lib/surface/gi.glsl"
-#include "/lib/common/water.glsl"
-#include "/lib/surface/sun_shadow.glsl"
-#include "/lib/surface/waving.glsl"
+//@include "/lib/surface/material.glsl"
+//@include "/lib/surface/brdf.glsl"
+//@include "/lib/surface/gi.glsl"
+//@include "/lib/common/water.glsl"
+//@include "/lib/surface/sun_shadow.glsl"
+//@include "/lib/surface/waving.glsl"
 
 #endif

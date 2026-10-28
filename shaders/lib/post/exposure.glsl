@@ -7,7 +7,7 @@
 #ifndef POST_EXPOSURE_GLSL
 #define POST_EXPOSURE_GLSL
 
-#include "/lib/post/post_constants.glsl"
+//@include "/lib/post/post_constants.glsl"
 
 const float EXPOSURE_INIT_MARKER = 271.828;
 const float EXPOSURE_ISO = 100.0;

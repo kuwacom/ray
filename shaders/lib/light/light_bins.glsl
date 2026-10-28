@@ -7,8 +7,8 @@
 #ifndef LIGHT_LIGHT_BINS_GLSL
 #define LIGHT_LIGHT_BINS_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/buffers/light_bins.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/buffers/light_bins.glsl"
 
 const int GLOBAL_LIGHTS_MAX = LIGHT_MAX_COUNT; // 1 フレームに登録できる光源インスタンス数
 

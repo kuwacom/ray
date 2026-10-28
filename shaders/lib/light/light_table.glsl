@@ -6,14 +6,14 @@
 #ifndef LIGHT_LIGHT_TABLE_GLSL
 #define LIGHT_LIGHT_TABLE_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/color.glsl"
-#include "/lib/common/constants.glsl"
-#include "/lib/common/math.glsl"
-#include "/lib/buffers/block_data.glsl"
-#include "/lib/ids/block_ids.glsl"
-#include "/lib/light/light_def.glsl"
-#include "/lib/light/light_table_data.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/color.glsl"
+//@include "/lib/common/constants.glsl"
+//@include "/lib/common/math.glsl"
+//@include "/lib/buffers/block_data.glsl"
+//@include "/lib/ids/block_ids.glsl"
+//@include "/lib/light/light_def.glsl"
+//@include "/lib/light/light_table_data.glsl"
 
 // 部分形状の遮蔽 AABB (index = ブロック ID - 300)。box1 は min > max で無効
 uvec4 packShape(vec3 min0, vec3 max0, vec3 min1, vec3 max1) {

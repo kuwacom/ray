@@ -10,9 +10,48 @@
  * フォーカス距離は FrameData.focusDistance (composite25 が前フレームに平滑化して書いた値)
  * post モジュール (lib/post)
  */
+//@include "/lib/common/common.glsl"
+//@include "/lib/buffers/frame_data.glsl"
+//@include "/lib/post/post_internal.glsl"
+// BEGIN GENERATED includes (tools/gen_includes.py)
+#include "/lib/settings/look.glsl"
+#include "/lib/settings/light.glsl"
+#include "/lib/settings/surface.glsl"
+#include "/lib/settings/sky.glsl"
+#include "/lib/settings/post.glsl"
+#include "/lib/settings/internal.glsl"
+#include "/lib/settings/bool_refs.glsl"
+#include "/lib/settings.glsl"
+#include "/lib/common/dimension.glsl"
+#include "/lib/common/constants.glsl"
+#include "/lib/common/uniforms.glsl"
+#include "/lib/common/samplers.glsl"
+#include "/lib/common/math.glsl"
+#include "/lib/common/shading_types.glsl"
 #include "/lib/common/common.glsl"
 #include "/lib/buffers/frame_data.glsl"
+#include "/lib/common/jitter.glsl"
+#include "/lib/common/transforms.glsl"
+#include "/lib/post/velocity.glsl"
+#include "/lib/common/color.glsl"
+#include "/lib/common/look_presets.glsl"
+#include "/lib/post/tonemap.glsl"
+#include "/lib/post/post.glsl"
+#include "/lib/post/post_constants.glsl"
+#include "/lib/post/lens_presets.glsl"
+#include "/lib/post/sampling.glsl"
+#include "/lib/post/exposure.glsl"
+#include "/lib/post/camera.glsl"
+#include "/lib/post/grading.glsl"
+#include "/lib/post/color_grade.glsl"
+#include "/lib/post/bloom.glsl"
+#include "/lib/common/noise.glsl"
+#include "/lib/post/lens_optics.glsl"
+#include "/lib/post/lens_ghosts.glsl"
+#include "/lib/post/lens_flare.glsl"
+#include "/lib/post/lens.glsl"
 #include "/lib/post/post_internal.glsl"
+// END GENERATED includes
 
 const bool colortex0MipmapEnabled = true;
 

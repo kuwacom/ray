@@ -5,7 +5,7 @@
 #ifndef COMMON_JOINT_BILATERAL_GLSL
 #define COMMON_JOINT_BILATERAL_GLSL
 
-#include "/lib/common/math.glsl"
+//@include "/lib/common/math.glsl"
 
 // tolerance: 基準の深度に応じた許容 (大きいほど深度差を許す)
 float bilateralDepthWeight(float depth, float refDepth, float tolerance) {

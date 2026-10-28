@@ -8,9 +8,9 @@
 #ifndef SURFACE_WAVING_GLSL
 #define SURFACE_WAVING_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/uniforms.glsl"
-#include "/lib/ids/block_ids.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/uniforms.glsl"
+//@include "/lib/ids/block_ids.glsl"
 
 const float WIND_SPEED = 1.0;
 const float WAVE_AMP_SHORT = 0.11;      // 草花の先端

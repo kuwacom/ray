@@ -8,22 +8,22 @@
 #ifndef SURFACE_SURFACE_LIGHTS_GLSL
 #define SURFACE_SURFACE_LIGHTS_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/constants.glsl"
-#include "/lib/common/look_presets.glsl"
-#include "/lib/common/math.glsl"
-#include "/lib/common/shading_types.glsl"
-#include "/lib/common/shadow_volume.glsl"
-#include "/lib/common/transforms.glsl"
-#include "/lib/common/uniforms.glsl"
-#include "/lib/common/voxel_space.glsl"
-#include "/lib/light/blocklight.glsl"
-#include "/lib/light/floodfill.glsl"
-#include "/lib/light/hand_light.glsl"
-#include "/lib/sky/clouds.glsl"
-#include "/lib/sky/sky_color.glsl"
-#include "/lib/surface/gi.glsl"
-#include "/lib/surface/sun_shadow.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/constants.glsl"
+//@include "/lib/common/look_presets.glsl"
+//@include "/lib/common/math.glsl"
+//@include "/lib/common/shading_types.glsl"
+//@include "/lib/common/shadow_volume.glsl"
+//@include "/lib/common/transforms.glsl"
+//@include "/lib/common/uniforms.glsl"
+//@include "/lib/common/voxel_space.glsl"
+//@include "/lib/light/blocklight.glsl"
+//@include "/lib/light/floodfill.glsl"
+//@include "/lib/light/hand_light.glsl"
+//@include "/lib/sky/clouds.glsl"
+//@include "/lib/sky/sky_color.glsl"
+//@include "/lib/surface/gi.glsl"
+//@include "/lib/surface/sun_shadow.glsl"
 
 // 太陽の影の取り方 (どれか 1 つ)
 // 影マップの外の扱い: SHADOW_MAP_FALLBACK だけスカイライトで日向を推定する。半透明の面と 2 次ヒットは軽さのため 1 (日向) にするので、

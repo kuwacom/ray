@@ -1,8 +1,8 @@
 #ifndef COMMON_COLOR_GLSL
 #define COMMON_COLOR_GLSL
 
-#include "/lib/common/constants.glsl"
-#include "/lib/common/math.glsl"
+//@include "/lib/common/constants.glsl"
+//@include "/lib/common/math.glsl"
 
 // シーンの作業色空間は線形 Rec.709 (sRGB 原色)
 

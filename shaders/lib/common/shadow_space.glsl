@@ -5,8 +5,8 @@
 #ifndef COMMON_SHADOW_SPACE_GLSL
 #define COMMON_SHADOW_SPACE_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/uniforms.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/uniforms.glsl"
 
 // 中心付近ほど解像度を割く歪み。1 に近いほど中心に集中する
 const float SHADOW_DISTORT_FACTOR = 0.85;

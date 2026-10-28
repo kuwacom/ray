@@ -60,7 +60,7 @@ shaders/
   lang/en_US.lang  lang/ja_JP.lang
   textures/                                 blue_noise.png, lens_dirt.png, cloud_*.dat, lens_starburst.dat, water_waves.dat (+ .mcmeta)
   textures/look/                            user_lut.png (ユーザーの LUT、恒等), split_tone.dat, film.dat, portra.dat, ektar.dat, vision3_500t.dat, velvia.dat, provia.dat, eterna.dat (同梱の LUT) (+ .mcmeta)
-  lib/settings.glsl                         設定の入口 (lib/settings/ のファイルを include する)
+  lib/settings.glsl                         設定の入口 (lib/settings/ のファイルを宣言する)
   lib/settings/*                            全設定の定義 (look / light / surface / sky / post のモジュールごと)、導出値 (internal)、ブールの参照 (bool_refs、gen_settings.py が生成)
   lib/common/*   lib/buffers/*   lib/ids/*  共通基盤
   lib/light/*                               light モジュール
@@ -179,7 +179,7 @@ VOXEL_SIZE = VOXEL_VOLUME に応じて 128x64x128 / 192x96x192 / 256x128x256 / 3
 
 NVIDIA は 1 ステージで宣言できる image uniform が 8 個まで (`GL_MAX_*_IMAGE_UNIFORMS` = 8、未使用でも宣言数で数えて `C7624` でリンク失敗)。
 Iris も 1 プログラムに割り当てる image unit が `GL_MAX_IMAGE_UNITS` (= 8) まで。そのため `lib/buffers/images.glsl` は image を `#ifdef IMG_*` で囲み、
-各プログラムが `common.glsl` を include する前に書く image だけを `#define` する (sampler 側は `#ifdef` で囲まず常に宣言している)。
+各プログラムが `common.glsl` を宣言 (`//@include`) する前に書く image だけを `#define` する (sampler 側は `#ifdef` で囲まず常に宣言している)。
 image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrainVertex` = IMG_VOXEL_BLOCK, `voxelizeEntityTriangle` = IMG_VOXEL_ENTITY, `injectEntityLight` = IMG_VOXEL_EMIT)。
 
 | マクロ | image | 定義しているプログラム |
@@ -199,12 +199,12 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 
 ### SSBO (正本は `lib/buffers/` の binding ごとのファイル)
 
-- 1 binding = 1 ファイルで、ファイル名はアクセサ名 (`frame_data.glsl`, `block_data.glsl`, `global_lights.glsl`, `light_bins.glsl`, `entity_tris.glsl`)。使うファイルだけが include し、使わないプログラムは宣言しない (NVIDIA は使っていない宣言もリンクで扱うので、宣言が減るとコンパイルが速くなる)。レイアウトは宣言するプログラムの間で同じでなければならない (Iris の仕様)。`tools/equiv_check.py --layout` で前後のオフセットを比べられる
-- 既定は `readonly`。書くプログラムは最初の include の前に `SSBO_<名前>_WRITE` を定義する (下の表の「書く」)。書く関数 (`entityAccAdd`・`injectEntityLight`・`storeEntityTriangle` など) は同じマクロで囲み、書かないプログラムには入らない。`readonly` のブロックに書くとコンパイルエラーになるので、定義の漏れは検証で見つかる
+- 1 binding = 1 ファイルで、ファイル名はアクセサ名 (`frame_data.glsl`, `block_data.glsl`, `global_lights.glsl`, `light_bins.glsl`, `entity_tris.glsl`)。使うファイルだけが宣言し、使わないプログラムは宣言しない (NVIDIA は使っていない宣言もリンクで扱うので、宣言が減るとコンパイルが速くなる)。レイアウトは宣言するプログラムの間で同じでなければならない (Iris の仕様)。`tools/equiv_check.py --layout` で前後のオフセットを比べられる
+- 既定は `readonly`。書くプログラムは最初の宣言の前に `SSBO_<名前>_WRITE` を定義する (下の表の「書く」)。書く関数 (`entityAccAdd`・`injectEntityLight`・`storeEntityTriangle` など) は同じマクロで囲み、書かないプログラムには入らない。`readonly` のブロックに書くとコンパイルエラーになるので、定義の漏れは検証で見つかる
 
 - 各ブロックの最後の配列は大きさなし (`[]`) で宣言し、確保量は shaders.properties の `bufferObject.N` で決める。NVIDIA のリンクは、使っていなくても宣言された固定長の配列の要素数に比例して時間がかかり (`binLights` が 266 万要素あった時は main が空のプログラムでも vs+fs で 7-10 秒)、全プログラムに入るので読み込み全体が数倍になる
 - 大きさなしの配列の要素数は宣言の行の注記 `// 要素数: <定数>` に書き、添字の上限もその定数で見る (`.length()` は使わない)。`tools/gl_compile_check.py` が注記を読み、配列の先頭 + 要素の間隔 x 要素数が `bufferObject.N` に収まるかをプログラムごとに確かめる
-- `lib/buffers/` には設定の値を入れない (宣言を読む全プログラムで、設定の値が前処理後の本文に残ると、その設定を変えるたびにドライバのキャッシュが外れる)。設定で変わる大きさ (`GLOBAL_LIGHTS_MAX`, `LIGHT_BIN_CAPACITY` / `STRIDE` / `STRIDE_ALLOC` / `GRID`, `LIGHT_BIN_KEYS_ALLOC`) は `lib/light/light_bins.glsl` に置き、`lib/light/light.glsl` を include するプログラム (world0 で 23 個) だけが読む。LIGHT_BIN_LIGHTS・LIGHT_MAX_COUNT・LIGHT_CULL_MODE を変えた時に作り直すのはこの 23 個 (前は 53 個全部)。VOXEL_VOLUME は `lib/common/voxel_space.glsl` の `VOXEL_SIZE` が全プログラムに入るので、まだ全部作り直しになる
+- `lib/buffers/` には設定の値を入れない (宣言を読む全プログラムで、設定の値が前処理後の本文に残ると、その設定を変えるたびにドライバのキャッシュが外れる)。設定で変わる大きさ (`GLOBAL_LIGHTS_MAX`, `LIGHT_BIN_CAPACITY` / `STRIDE` / `STRIDE_ALLOC` / `GRID`, `LIGHT_BIN_KEYS_ALLOC`) は `lib/light/light_bins.glsl` に置き、`lib/light/light.glsl` を宣言するプログラム (world0 で 23 個) だけが読む。LIGHT_BIN_LIGHTS・LIGHT_MAX_COUNT・LIGHT_CULL_MODE を変えた時に作り直すのはこの 23 個 (前は 53 個全部)。VOXEL_VOLUME は `lib/common/voxel_space.glsl` の `VOXEL_SIZE` が全プログラムに入るので、まだ全部作り直しになる
 - ブロックの途中の配列 (`albedo`, `lights`, `binCount`, `entityAcc`, `groupBounds`, `clusterBounds`) は固定長のまま。合わせても 1 プログラム 0.4 秒程度で、並べ替えるとレイアウトが変わるので動かしていない
 
 | binding | 名前 (アクセサ) | ファイル | サイズ | 内容 | 書くプログラム (`SSBO_<名前>_WRITE`) |
@@ -585,7 +585,7 @@ struct LightSample {
 LightSample noLight();
 ```
 
-light モジュールが提供 (`#include "/lib/light/light.glsl"`):
+light モジュールが提供 (`//@include "/lib/light/light.glsl"`):
 
 | 関数 | 呼ぶ側 | 内容 |
 |---|---|---|
@@ -604,7 +604,7 @@ light モジュールが提供 (`#include "/lib/light/light.glsl"`):
 | `bool traceVoxelRay(vec3 originVoxel, vec3 dir, float maxDist, out vec3 hitVoxel, out vec3 hitNormal, out int hitBlockId)` | surface (GI_MODE=3, REFLECTIONS=3) | 最初に当たる固体ボクセル |
 | `LightDef getLightDef(int index)` ほか `block_data.glsl` の関数 | 全員 (読み取り) | 光源テーブル |
 
-sky モジュールが提供 (`#include "/lib/sky/sky.glsl"`):
+sky モジュールが提供 (`//@include "/lib/sky/sky.glsl"`):
 
 | 関数 | 呼ぶ側 | 内容 |
 |---|---|---|
@@ -618,7 +618,7 @@ sky モジュールが提供 (`#include "/lib/sky/sky.glsl"`):
 | `float getBorderFog(vec3 playerPos)` / `vec3 applyForwardFog(vec3 color, vec3 playerPos)` | 前方シェーディング (パーティクル等) | composite11 と同じモデルのフォグ |
 | `vec3 shEvalIrradiance(vec3 n)` | (内部) | SH 評価 |
 
-surface モジュールが提供 (`#include "/lib/surface/surface.glsl"`):
+surface モジュールが提供 (`//@include "/lib/surface/surface.glsl"`):
 
 | 関数 | 呼ぶ側 | 内容 |
 |---|---|---|
@@ -647,7 +647,7 @@ surface モジュールが提供 (`#include "/lib/surface/surface.glsl"`):
 | 最低限の環境光と暗視 (`minAmbientIrradiance`) | ○ | ○ | - | ○ |
 | 発光 | ○ | ネザーポータル・発光エンティティ | - | GI のレイが拾う。登録した光源は直接光が数えるので除き、登録していない発光 (溶岩・テクスチャの発光) を足す |
 
-post モジュールが提供 (`#include "/lib/post/post.glsl"`):
+post モジュールが提供 (`//@include "/lib/post/post.glsl"`):
 
 | 関数 | 呼ぶ側 | 内容 |
 |---|---|---|
@@ -656,7 +656,7 @@ post モジュールが提供 (`#include "/lib/post/post.glsl"`):
 | `vec3 tonemap(vec3 x)` | post, デバッグ表示 | トーンマップ |
 | `float getExposure()` (`lib/common/exposure.glsl`) | 全員 | FrameData.exposure |
 
-共通基盤: `lib/common/*` (座標変換・ボクセル空間・影空間・ノイズ・ブルーノイズ・色空間・数学・G バッファ pack/unpack・ジッター・水面 (`water.glsl`)・影マップの 1 点の読み取り (`shadow_volume.glsl`)・露出 (`exposure.glsl`)・時間方向の蓄積の共通部 (`temporal.glsl`)・深度/法線の重み (`joint_bilateral.glsl`)・低解像度のジッターの並び (`frame_offset.glsl`)), `lib/buffers/*`, `lib/ids/*`。`common.glsl` 自体は核 (settings・dimension・constants・uniforms・samplers・math・shading_types) だけを読み、ほかは使うファイルが自分で include する (SSBO と images も)。
+共通基盤: `lib/common/*` (座標変換・ボクセル空間・影空間・ノイズ・ブルーノイズ・色空間・数学・G バッファ pack/unpack・ジッター・水面 (`water.glsl`)・影マップの 1 点の読み取り (`shadow_volume.glsl`)・露出 (`exposure.glsl`)・時間方向の蓄積の共通部 (`temporal.glsl`)・深度/法線の重み (`joint_bilateral.glsl`)・低解像度のジッターの並び (`frame_offset.glsl`)), `lib/buffers/*`, `lib/ids/*`。`common.glsl` 自体は核 (settings・dimension・constants・uniforms・samplers・math・shading_types) だけを読み、ほかは使うファイルが自分で宣言する (SSBO と images も)。
 
 ### バッファの読み書き権
 
@@ -705,7 +705,7 @@ post モジュールが提供 (`#include "/lib/post/post.glsl"`):
 - ブールは機能の名前だけ (`_ENABLED` などを付けない)。強さは `X_STRENGTH`、方式の選択は `_MODE`、品質の段は `_QUALITY`、解像度の分母は `_RES`、数は `_COUNT` / `_SAMPLES` / `_STEPS`
 - 関数は lowerCamelCase。モジュールの内部の関数は機能の接頭辞 + 名詞 (`cloudLowDensity`)。動詞は `fetch` (texelFetch)、`sample` (補間あり)、`read` (符号化したデータの復号)、`eval` (光や BRDF の式)、`apply` (色を変えて返す)、`trace` (レイを辿る)、`is` / `has` (bool)、`aToB` (座標空間の変換)。前フレームは `Previous`。`get` は新しい関数に付けない
 - 型は PascalCase。ファイルスコープの定数は UPPER_SNAKE で、接頭辞は同じ機能の関数・ファイルと同じ語。確保量は `_ALLOC`、上限は `_MAX`
-- ファイルは snake_case。include ガードはパスから決める
+- ファイルは snake_case。include ガードはパスから決める。lib は依存を `//@include` の宣言だけで書き、本体の `#include` は `tools/gen_includes.py` が宣言の閉包を依存が先の順に 1 回ずつ並べて生成する (Iris は `#include` をガードを見ずに毎回差し込むので、lib 同士の include は本文を膨らませる)
 
 保存した設定との互換のため、次の名前は規約に合わないまま使う
 

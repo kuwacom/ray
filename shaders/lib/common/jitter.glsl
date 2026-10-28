@@ -5,8 +5,8 @@
 #ifndef COMMON_JITTER_GLSL
 #define COMMON_JITTER_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/uniforms.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/uniforms.glsl"
 
 const int TAA_JITTER_PERIOD = 16;
 

@@ -8,12 +8,12 @@
 #ifndef LIGHT_LIGHT_DEF_GLSL
 #define LIGHT_LIGHT_DEF_GLSL
 
-#include "/lib/settings.glsl"
-#include "/lib/common/color.glsl"
-#include "/lib/common/constants.glsl"
-#include "/lib/common/math.glsl"
-#include "/lib/buffers/block_data.glsl"
-#include "/lib/ids/light_ids.glsl"
+//@include "/lib/settings.glsl"
+//@include "/lib/common/color.glsl"
+//@include "/lib/common/constants.glsl"
+//@include "/lib/common/math.glsl"
+//@include "/lib/buffers/block_data.glsl"
+//@include "/lib/ids/light_ids.glsl"
 
 // 炎の色。BLOCKLIGHT_WARMTH で中性からバニラ寄りの暖色まで動かす
 // 黒体で 0 = 約 4300K, 0.25 = 約 3800K, 0.5 = 約 3300K。AgX は明るい所の彩度を落とすので、

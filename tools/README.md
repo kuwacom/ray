@@ -27,6 +27,7 @@ uv sync
 | スクリプト | 生成するもの |
 |---|---|
 | `gen_wrappers.py` | `shaders/world0`, `world-1`, `world1` のラッパー (ディメンションと本体のマクロを定義して、本体を直接 include するだけ)。プログラムと本体の対応は `gen_wrappers.py` の表にあり、追加・削除・変更したときに実行します。`--check` で過不足と本文の一致の確認だけもできます |
+| `gen_includes.py` | 本体 (`shaders/program/`) の `#include` を、本体と lib の `//@include` の宣言から生成します (本体の `BEGIN GENERATED includes` と `END GENERATED includes` の間)。lib を足したり依存を変えたりしたときに実行します。`--check` で生成が最新かの確認だけもできます |
 | `gen_block_properties.py` | `shaders/block.properties`、`item.properties`、`entity.properties`、ID の定数 `shaders/lib/ids/{block,light,entity}_ids.glsl`、ブロックの平均の色の表 `block_albedo.glsl`、光源の表のデータ `shaders/lib/light/light_table_data.glsl`。光源・エンティティ・ID の定数の表は `id_tables.py`、光源でないブロックの表はこのスクリプトの中にあります。光源の追加は `id_tables.py` の `LIGHTS` に 1 行足すだけです。表に無いブロックは `block_colors.json` の色ごとに 2000 番台の ID にまとめます。`--check` で生成物が最新かの確認だけもできます (`validate_shaders.py` も確認します) |
 | `gen_settings.py` | `shaders/lib/settings/bool_refs.glsl` (Iris がブールの設定を認識するための参照) と、`shaders/shaders.properties` の `sliders` (`BEGIN GENERATED sliders` と `END GENERATED sliders` の間。値がすべて数値で 4 個以上の設定がスライダーになり、例外は `gen_settings.py` の `NOT_SLIDER` / `FORCE_SLIDER`)、プロファイルで値の変わる設定の表 (`docs/architecture.md` の `BEGIN GENERATED settings` と `END GENERATED settings` の間)、全設定の一覧 `docs/settings.md`。設定の解析は `validate_shaders.py` と `shader_options.py` もここを使います。設定を追加・削除したときに実行します。`--check` で生成物が最新かの確認だけもできます |
 | `gen_block_colors.py <client.jar>` | `tools/block_colors.json` (ブロックごとの平均の色)。Minecraft のクライアント jar のブロックモデルとテクスチャを読むだけで、jar は変更しません。バージョンを上げたときに実行し、続けて `gen_block_properties.py` を実行します |
@@ -41,8 +42,8 @@ uv sync
 
 | スクリプト | 内容 |
 |---|---|
-| `validate_shaders.py` | Iris の前処理 (include の展開、設定値の差し替え、Iris が注入するマクロ) を再現して glslang でコンパイルし、エラーを元ファイルの行番号で表示します。プロファイルの値、「高」プロファイルと既定値の一致、設定画面と lang の過不足、`*.properties` が ASCII だけか、`#include` の漏れ・循環・ガード名、も確認します |
-| `include_deps.py` | `shaders/lib` と `shaders/program` の各ファイルが使う記号 (関数・const・struct・uniform・SSBO・マクロ) の定義元を、そのファイルの `#include` から辿れるかを調べます。`-v` でファイルごとの不足を表示します。validate_shaders.py からも呼ばれます |
+| `validate_shaders.py` | Iris の前処理 (include の展開、設定値の差し替え、Iris が注入するマクロ) を再現して glslang でコンパイルし、エラーを元ファイルの行番号で表示します。プロファイルの値、「高」プロファイルと既定値の一致、設定画面と lang の過不足、`*.properties` が ASCII だけか、`//@include` の宣言の漏れ・循環・ガード名と `gen_includes.py` の生成が最新か、も確認します |
+| `include_deps.py` | `shaders/lib` と `shaders/program` の各ファイルが使う記号 (関数・const・struct・uniform・SSBO・マクロ) の定義元を、そのファイルの `//@include` の宣言から辿れるかを調べます。lib に `#include` の行がないこと、本体の `#include` が生成ブロックの中にだけあることなど、宣言の書き方も確認します。`-v` でファイルごとの不足を表示します。validate_shaders.py からも呼ばれます |
 | `gl_compile_check.py` | 同じ前処理の結果を、見えないウィンドウの OpenGL 4.6 compatibility コンテキストで手元の GPU ドライバに compile + link させます。glslang では出ないドライバ固有のエラーと、image / sampler / SSBO / shared メモリの使用数が上限を超えていないかを調べます |
 | `equiv_check.py` | 2 つのコミット (または作業ツリー) のシェーダーをドライバにリンクさせ、バイナリが同じかを比べます。リファクタで計算が変わっていないかを、ゲームを使わずに確かめます |
 | `pixdiff.py` | 2 枚の撮影の画素の差 (平均・p99・最大・4/255 を超える画素の割合・平均色の差) を出します |

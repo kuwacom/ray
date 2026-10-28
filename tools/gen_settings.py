@@ -1,7 +1,7 @@
 """
 設定の解析と生成物の管理
 
-設定の正本は shaders/lib/settings.glsl が include する lib/settings/*.glsl の #define / const の行そのもの
+設定の正本は shaders/lib/settings.glsl が宣言する lib/settings/*.glsl の #define / const の行そのもの
 Iris はこの行を直接読むので、手で書く部分と生成する部分を分けている
 - lib/settings/bool_refs.glsl: 全ブールの空の #ifdef (Iris は #ifdef / #ifndef で参照されないブールを設定として認識しない)
 - shaders.properties の sliders: BEGIN / END GENERATED sliders の間 (スライダーにする設定の一覧)
@@ -25,7 +25,7 @@ SHADERS = ROOT / "shaders"
 
 DEFINE_RE = re.compile(r"^(\s*)(//\s*)?#define\s+([A-Za-z_]\w*)(?:\s+([^\s/]+))?\s*(//.*)?$")
 CONST_RE = re.compile(r"^(\s*)const\s+(int|float|bool)\s+(\w+)\s*=\s*([^;]+);\s*(//.*)?$")
-SETTINGS_INCLUDE_RE = re.compile(r'^\s*#\s*include\s+"(/lib/settings/[^"]+)"')
+SETTINGS_INCLUDE_RE = re.compile(r'^\s*//@include\s+"(/lib/settings/[^"]+)"')
 
 BOOL_REFS = "lib/settings/bool_refs.glsl"
 PROPERTIES = "shaders.properties"
@@ -66,7 +66,7 @@ class Option:
 
 
 def settings_files(shaders: Path = SHADERS) -> list[Path]:
-    """入口の settings.glsl と、そこから include する lib/settings/ の定義ファイルを読む順に返す (生成物の bool_refs は含めない)"""
+    """入口の settings.glsl と、そこで宣言する lib/settings/ の定義ファイルを読む順に返す (生成物の bool_refs は含めない)"""
     entry = shaders / "lib" / "settings.glsl"
     files = [entry]
     for line in entry.read_text(encoding="utf-8").splitlines():
@@ -194,7 +194,7 @@ def render_bool_refs(opts: dict[str, Option], shaders: Path = SHADERS) -> str:
     out = [BOOL_REFS_HEADER.rstrip("\n"), "#ifndef SETTINGS_BOOL_REFS_GLSL", "#define SETTINGS_BOOL_REFS_GLSL", ""]
     for rel in order[1:]:
         if any(o.file == rel for o in bools):
-            out.append(f'#include "/{rel}"')
+            out.append(f'//@include "/{rel}"')
     out.append("")
     for o in bools:
         out += [f"#ifdef {o.name}", "#endif"]

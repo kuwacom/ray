@@ -6,11 +6,11 @@
 #ifndef SKY_SKY_GLSL
 #define SKY_SKY_GLSL
 
-#include "/lib/sky/sh.glsl"
-#include "/lib/sky/atmosphere.glsl"
-#include "/lib/sky/celestial.glsl"
-#include "/lib/sky/sky_color.glsl"
-#include "/lib/sky/clouds.glsl"
-#include "/lib/sky/fog.glsl"
+//@include "/lib/sky/sh.glsl"
+//@include "/lib/sky/atmosphere.glsl"
+//@include "/lib/sky/celestial.glsl"
+//@include "/lib/sky/sky_color.glsl"
+//@include "/lib/sky/clouds.glsl"
+//@include "/lib/sky/fog.glsl"
 
 #endif
