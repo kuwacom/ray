@@ -111,14 +111,43 @@ const float LIGHT_NORMAL_GRAZING = 0.35;
 /*
  * ブロック全体が光る光源 (グロウストーン・シーランタン・光る鉱物ブロックなど) の面からの近距離の放射
  * 中心の点からの近距離の放射では、ブロックの隣の床や壁が根元ほど明るくならない (根元は中心から 0.7 ブロック離れている)。
- * 着色点から見える面 (外向きの法線が着色点を向き、隣のセルが不透明でない面) ごとに、面の中心を面積 1 の面光源として
- * 形態係数の近似 cos_e cos_r A / (pi d^2 + A) を足す。面の向き (cos_e) を入れないと、並べた光るブロックの根元に
- * 隣のブロックの色が混ざって色が薄くなる。同じ平面に並ぶ面 (床に埋めた光源の隣の床) は cos_e = 0 で光らない
+ * 着色点から見える面 (外向きの法線が着色点を向き、隣のセルが不透明でない面) ごとに、正方形の面光源の形態係数を
+ * 多角形の解析式 (Lambert の式) で足す。面の中心の 1 点で近似すると、接地面の境目の真上では面の中心を見込む角が 0 になり、
+ * 面の中央から丸く広がる点の光に見えた。面全体を積分するので、境目に近いほど明るく、境目に沿って一様に明るい
+ * 面の向きで決まるので、並べた光るブロックの根元に隣のブロックの色は混ざらない。同じ平面に並ぶ面 (床に埋めた光源の隣の床) は光らない
  * 面の明るさは見た目の発光で決まり、光源の明るさとレベル (遠くへの届き方) とは別なので、呼ぶ側がそれで割った係数を掛ける
  */
-const float LIGHT_BOX_RADIANCE = 10.0;  // 形態係数 1 の時の照度 / (色 x BLOCKLIGHT_ILLUMINANCE)
+const float LIGHT_BOX_RADIANCE = 4.5;   // 形態係数 1 の時の照度 / (色 x BLOCKLIGHT_ILLUMINANCE)
 const float LIGHT_BOX_REACH = 4.0;      // 箱からこの距離で 0 へ落とす (ブロック)
 const float LIGHT_BOX_COLOR_POWER = 1.5;
+
+/*
+ * 着色点 (原点、法線 n) から見た多角形 (頂点は着色点からの相対位置) の形態係数
+ * F = 1 / (2 pi) |sum_i angle(v_i, v_i+1) * dot(n, normalize(cross(v_i, v_i+1)))|
+ * 着色点の地平線より下の部分は先に切り取る (切り取らないと地平線の下の部分が負の寄与になる)
+ */
+float quadFormFactor(vec3 q[4], vec3 n) {
+    vec3 p[5];
+    int count = 0;
+    for (int i = 0; i < 4; i++) {
+        vec3 a = q[i];
+        vec3 b = q[(i + 1) % 4];
+        float da = dot(n, a);
+        float db = dot(n, b);
+        if (da >= 0.0) p[count++] = a;
+        if ((da >= 0.0) != (db >= 0.0)) p[count++] = a + (b - a) * (da / (da - db));
+    }
+    if (count < 3) return 0.0;
+    float sum = 0.0;
+    for (int i = 0; i < count; i++) {
+        vec3 a = normalize(p[i]);
+        vec3 b = normalize(p[(i + 1) % count]);
+        vec3 c = cross(a, b);
+        float l = length(c);
+        if (l > 1e-6) sum += acos(clamp(dot(a, b), -1.0, 1.0)) * dot(n, c / l);
+    }
+    return abs(sum) * (0.5 / PI);
+}
 
 float lightBoxNearField(vec3 voxelPos, vec3 boxCenter, vec3 n) {
     vec3 rel = voxelPos - boxCenter;
@@ -128,17 +157,22 @@ float lightBoxNearField(vec3 voxelPos, vec3 boxCenter, vec3 n) {
     float sum = 0.0;
     for (int axis = 0; axis < 3; axis++) {
         float side = rel[axis] >= 0.0 ? 1.0 : -1.0;
-        vec3 v = rel;
-        v[axis] -= 0.5 * side;
-        float d2 = dot(v, v);
-        float invD = inversesqrt(max(d2, 1e-6));
-        float cosE = v[axis] * side * invD;
-        if (cosE <= 0.0) continue;
+        // 着色点が面の平面の外側にある時だけ見える
+        if (abs(rel[axis]) <= 0.5) continue;
         ivec3 nb = cell;
         nb[axis] += int(side);
         if (isVoxelOpaque(fetchVoxelBlockId(nb))) continue;
-        float cosR = saturate(-dot(n, v) * invD);
-        sum += cosE * cosR / (PI * d2 + 1.0);
+        int b = (axis + 1) % 3;
+        int c = (axis + 2) % 3;
+        vec3 q[4];
+        for (int k = 0; k < 4; k++) {
+            vec3 o = vec3(0.0);
+            o[axis] = 0.5 * side;
+            o[b] = (k == 1 || k == 2) ? 0.5 : -0.5;
+            o[c] = k >= 2 ? 0.5 : -0.5;
+            q[k] = o - rel;
+        }
+        sum += quadFormFactor(q, n);
     }
     float w = 1.0 - s / LIGHT_BOX_REACH;
     return LIGHT_BOX_RADIANCE * sum * (w * w);
@@ -171,21 +205,44 @@ vec3 evalLightIrradiance(LightInstance L, vec3 voxelPos, vec3 n, vec3 gateNormal
     float ndl = mix(gate, sphereLightNdotL(n, dir, dist, radius), smoothstep(0.0, LIGHT_NORMAL_GRAZING, gate));
     float falloff = lightFalloff(dist, L.posRadius.w);
     if (!nearField) return L.colorSize.rgb * falloff * ndl;
-    // ブロック全体が光る光源は箱の面から、それ以外 (たいまつ・ランタンなど点に近い光源) は中心の点から近距離の放射を足す
+    // 点に近い光源 (たいまつ・ランタンなど) は中心の点から近距離の放射を足す。ブロック全体が光る光源の面からの分は
+    // 影を掛けずに足すので lightBoxIrradiance で別に求める
     LightDef d;
     int voxelId;
-    if (dist < LIGHT_BOX_REACH + 1.0 && isBlockBoxLight(L, d, voxelId)) {
-        // 面の明るさは光源の明るさとレベルによらない (光る鉱物ブロックは遠くへは弱く届くが、面は他の発光ブロックと同じに光る)
-        float lightLum = luminance(d.color.rgb);
-        float power = luminance(L.colorSize.rgb) / max(lightLum, EPS) * 15.0 / max(d.color.a * d.params.z, EPS);
-        // 面の色はブロックのテクスチャの色 (光源の表の色より鮮やかで、ブロックごとの色が根元に出る)。明るさは表の色に合わせる
-        // 発光は明るい画素ほど強い (gbuffers の発光の推定) ので、平均色を 1.5 乗して明るく鮮やかな画素の色に寄せる
-        vec3 albedo = pow(getBlockAlbedo(voxelId), vec3(LIGHT_BOX_COLOR_POWER));
-        vec3 faceColor = albedo * (lightLum / max(luminance(albedo), EPS));
-        return L.colorSize.rgb * falloff * ndl
-            + faceColor * (power * lightBoxNearField(voxelPos, floor(L.posRadius.xyz) + 0.5, gateNormal));
-    }
+    if (dist < LIGHT_BOX_REACH + 1.0 && isBlockBoxLight(L, d, voxelId)) return L.colorSize.rgb * falloff * ndl;
     return L.colorSize.rgb * (falloff + lightNearField(dist, radius)) * ndl;
+}
+
+/*
+ * ブロック全体が光る光源の面からの近距離の照度 (影を掛けない)
+ * 光源の影は中心の点へのトレース (と接触影) なので、根元の床から中心へ向かうと光るブロック自身の面に当たって影になり、
+ * 接地面の境目ほど暗くなった。光る面は見える面だけを数えている (lightBoxNearField) ので、影は掛けない
+ */
+vec3 lightBoxIrradiance(LightInstance L, vec3 voxelPos, vec3 gateNormal) {
+    if (distance(L.posRadius.xyz, voxelPos) >= LIGHT_BOX_REACH + 1.0) return vec3(0.0);
+    LightDef d;
+    int voxelId;
+    if (!isBlockBoxLight(L, d, voxelId)) return vec3(0.0);
+    // 面の明るさは光源の明るさとレベルによらない (光る鉱物ブロックは遠くへは弱く届くが、面は他の発光ブロックと同じに光る)
+    float lightLum = luminance(d.color.rgb);
+    float power = luminance(L.colorSize.rgb) / max(lightLum, EPS) * 15.0 / max(d.color.a * d.params.z, EPS);
+    // 面の色はブロックのテクスチャの色 (光源の表の色より鮮やかで、ブロックごとの色が根元に出る)。明るさは表の色に合わせる
+    // 発光は明るい画素ほど強い (gbuffers の発光の推定) ので、平均色を 1.5 乗して明るく鮮やかな画素の色に寄せる
+    vec3 albedo = pow(getBlockAlbedo(voxelId), vec3(LIGHT_BOX_COLOR_POWER));
+    vec3 faceColor = albedo * (lightLum / max(luminance(albedo), EPS));
+    return faceColor * (power * lightBoxNearField(voxelPos, floor(L.posRadius.xyz) + 0.5, gateNormal));
+}
+
+// 着色点のビンの全光源の、ブロック全体が光る面からの近距離の照度の和 (影なし)
+vec3 sumBinBoxIrradiance(vec3 voxelPos, vec3 geoNormal) {
+    if (!isInVoxelVolume(voxelPos)) return vec3(0.0);
+    int bin = lightBinIndex(ivec3(voxelPos));
+    uint n = lightBinCount(bin);
+    vec3 sum = vec3(0.0);
+    for (uint k = 0u; k < n; k++) {
+        sum += lightBoxIrradiance(lightBinLight(bin, k), voxelPos, geoNormal);
+    }
+    return sum;
 }
 
 vec3 evalLightIrradiance(LightInstance L, vec3 voxelPos, vec3 n, vec3 gateNormal) {

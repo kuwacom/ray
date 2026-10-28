@@ -89,7 +89,7 @@ vec3 getBlockLightForwardEntity(vec3 playerPos, vec3 geoNormal, vec3 normal, flo
             if (dist >= L.posRadius.w) continue;
             // 半影の揺らぎは入れない (この経路はデノイズも TAA の速度も無いので、ノイズがそのまま残る)
             vec3 vis = traceVisibilityEx(fromVoxel, L.posRadius.xyz, flags, 0.5, 0.0, 0.0);
-            direct += evalLightIrradiance(L, fromVoxel, normal, geoNormal) * vis;
+            direct += evalLightIrradiance(L, fromVoxel, normal, geoNormal) * vis + lightBoxIrradiance(L, fromVoxel, geoNormal);
             bounce += L.colorSize.rgb * lightFalloff(dist, L.posRadius.w) * vis;
             traced++;
         }

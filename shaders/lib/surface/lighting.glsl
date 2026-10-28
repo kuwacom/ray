@@ -145,6 +145,7 @@ vec3 secondaryHitBlockLight(vec3 playerPos, vec3 normal, ivec2 screenTexel, floa
                 uint flags = blockLightTraceFlags() & ~(TRACE_ENTITIES | TRACE_PLAYER);
                 E *= luminance(traceVisibilityEx(fromVoxel, globalLights.lights[strongest].posRadius.xyz, flags, 0.5, 0.0, 0.0));
             }
+            if (nearField) E += sumBinBoxIrradiance(fromVoxel, normal);
         }
     }
     #ifdef HAND_LIGHT
