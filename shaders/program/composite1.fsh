@@ -1,6 +1,6 @@
 /*
- * composite1: 半透明の合成 (屈折・水中の吸収・反射を適用して colortex4 を colortex0 に重ねる) と、その後のフォグ / VL の適用 (lib/sky/scene_fog.glsl)
- * surface モジュール (lib/surface)。フォグの適用は sky モジュール
+ * composite1: 半透明の合成 (屈折・水中の吸収・反射を適用して colortex4 を colortex0 に重ねる)
+ * surface モジュール (lib/surface)
  *
  * 不透明面: 環境光の鏡面 (反射バッファ or 空) x 方向アルベド x 鏡面遮蔽 を足す
  * 水面: 屈折 (WATER_REFRACTION 1 = 屈折方向に水深分進めて投影 + 深度検証, 2 = 屈折方向のレイマーチ)
@@ -8,7 +8,7 @@
  *       D = 屈折のまま、画面に無い屈折先はボクセルで辿る (水底が浅く見える)
  *       屈折した経路長で Jerlov の吸収と内散乱 / 厳密フレネル (水中からは全反射とスネルの窓) / 反射 / 太陽の鏡面 / 岸の泡
  *       側面 (滝・水槽): 水の厚みはボクセルで水を出る所まで / 出る面で空気へもう一度屈折 / 滝の気泡の白さと着水点の泡
- *       水中から見上げた水面より上は空気なので吸収しない (カメラと水面の間の水中フォグは sky の applySceneFog)
+ *       水中から見上げた水面より上は空気なので吸収しない (カメラと水面の間の水中フォグは sky の composite11)
  * ガラス等: 透過分 (1 - a) に透過色 (block_data の tints) と (1 - F) を掛け、前方で照らした拡散 (colortex4) と反射を足す
  *       平らな板ガラスは光線が平行にずれるだけなので屈折させない。厚い氷・スライムだけ少し歪める
  * それ以外 (パーティクル・手持ちの半透明・雨): 乗算済みアルファでそのまま重ねる
@@ -18,7 +18,6 @@
 #include "/lib/surface/surface.glsl"
 #include "/lib/sky/sky.glsl"
 #include "/lib/light/light.glsl"
-#include "/lib/sky/scene_fog.glsl"
 #include "/lib/surface/screen_trace.glsl"
 #include "/lib/surface/lighting.glsl"
 #include "/lib/surface/reflection.glsl"
@@ -477,7 +476,8 @@ vec3 foamRadiance(vec3 surfPlayer, vec3 n, vec2 lm, vec3 sunVis, SurfaceLights h
     return vec3(FOAM_ALBEDO) * RCP_PI * E;
 }
 
-vec4 compositeTranslucent(ivec2 texel) {
+void main() {
+    ivec2 texel = ivec2(gl_FragCoord.xy);
     vec4 sceneIn = texelFetch(colortex0, texel, 0);
     vec3 scene = sceneIn.rgb;
     vec4 translucent = texelFetch(colortex4, texel, 0);
@@ -498,7 +498,8 @@ vec4 compositeTranslucent(ivec2 texel) {
         vec3 result = color * (1.0 - translucent.a) + translucent.rgb;
         // 水たまりの輝点 (deferred30 が a = 1 + 割合で渡す) の割合を、足した鏡面と重なった半透明の分だけ直して渡す
         float sceneGlint = saturate(sceneIn.a - 1.0) * luminance(scene);
-        return vec4(result, 1.0 + saturate(sceneGlint * (1.0 - translucent.a) / max(luminance(result), 1e-6)));
+        outColor = vec4(result, 1.0 + saturate(sceneGlint * (1.0 - translucent.a) / max(luminance(result), 1e-6)));
+        return;
     }
 
     vec3 surfView = screenToView(vec3(texcoord, d0));
@@ -791,16 +792,12 @@ vec4 compositeTranslucent(ivec2 texel) {
         // 前方で照らした拡散 (translucent.rgb) は鏡面で反射する F の分を除く (太陽の鏡面を足すので、その分だけ明るくならないように)
         color = behind * transmit * (1.0 - F) + translucent.rgb * (1.0 - F) + refl * F
             + sunSpecular(N, V, 0.04, glassAlpha, glassSunVis) + localLightSpecular(GL, N, V, 0.04, glassAlpha);
-        return vec4(color, 1.0);
+        outColor = vec4(color, 1.0);
+        return;
     }
 
     // 水の上に重なった物 (WATER_TEXTURE の水テクスチャ・パーティクル・雨) を重ねる
     vec3 result = color * (1.0 - translucent.a) + translucent.rgb;
     float glintShare = saturate(glintLum * (1.0 - translucent.a) / max(luminance(result), 1e-6));
-    return vec4(result, 1.0 + glintShare);
-}
-
-void main() {
-    ivec2 texel = ivec2(gl_FragCoord.xy);
-    outColor = applySceneFog(compositeTranslucent(texel), texel, texcoord);
+    outColor = vec4(result, 1.0 + glintShare);
 }

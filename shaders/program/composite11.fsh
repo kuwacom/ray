@@ -1,25 +1,21 @@
 /*
- * フォグ / VL の適用 (sky モジュール, composite1 が半透明の合成の後に呼ぶ)
- * colortex12 (または fogHistorySampler) をバイラテラルにアップサンプルして、合成済みの色に掛ける
+ * composite11: フォグ / VL の適用 (colortex12 をバイラテラルにアップサンプルして colortex0 に合成)
  * 順番 (遠い方から): 地形 -> 空中遠近 -> 描画距離端のフォグ -> 手前の雲 (雲より上にいる時) -> カメラ側の媒質 (高さフォグ / 水 / 溶岩 / 粉雪)
  * -> 手持ち光源が霧を照らす光 (点光源の内散乱を解析積分) -> 盲目・暗闇
+ * sky モジュール (lib/sky)
  */
-#ifndef SKY_SCENE_FOG_GLSL
-#define SKY_SCENE_FOG_GLSL
-
-#include "/lib/settings.glsl"
-#include "/lib/common/color.glsl"
-#include "/lib/common/math.glsl"
-#include "/lib/common/samplers.glsl"
-#include "/lib/common/transforms.glsl"
-#include "/lib/common/uniforms.glsl"
-#include "/lib/common/constants.glsl"
+#include "/lib/common/common.glsl"
 #include "/lib/buffers/block_data.glsl"
 #include "/lib/common/gbuffer.glsl"
 #include "/lib/common/phase.glsl"
 #include "/lib/common/water.glsl"
 #include "/lib/sky/sky.glsl"
 #include "/lib/light/light.glsl"
+
+in vec2 texcoord;
+
+/* RENDERTARGETS: 0 */
+layout(location = 0) out vec4 outColor;
 
 // アップサンプルの深度の重み (相対深度差に対する鋭さ)
 const float VL_UPSAMPLE_DEPTH_SHARPNESS = 20.0;
@@ -109,14 +105,12 @@ vec3 handLightGlow(vec3 dir, float dist, vec3 scatterCoeff, bool inWater) {
     return glow * scatterCoeff * PHASE_ISOTROPIC;
 }
 
-/*
- * sceneIn: 半透明まで合成した色 (rgb) と輝点の符号化 (a)
- * 返り値の a は輝点の割合 (1 + 割合) / 溶岩の発光の割合 (-割合) / 0
- */
-vec4 applySceneFog(vec4 sceneIn, ivec2 texel, vec2 uv) {
+void main() {
+    ivec2 texel = ivec2(gl_FragCoord.xy);
+    vec4 sceneIn = texelFetch(colortex0, texel, 0);
     vec3 color = sceneIn.rgb;
     /*
-     * 水面の輝点 (半透明の合成 (composite1) が a = 1 + 輝度の割合で渡す)。TAA (composite20) が近傍の箱で潰さず後から足すので、
+     * 水面の輝点 (composite1 が a = 1 + 輝度の割合で書く)。TAA (composite20) が近傍の箱で潰さず後から足すので、
      * フォグで減る分 (透過率) を掛けた輝度を追い、最後に割合へ戻して渡す
      */
     float glint = saturate(sceneIn.a - 1.0) * luminance(color);
@@ -129,7 +123,7 @@ vec4 applySceneFog(vec4 sceneIn, ivec2 texel, vec2 uv) {
     float depth = texelFetch(depthtex0, texel, 0).r;
     bool isSky = depth >= 1.0;
     float fixedDepth = isSky ? 1.0 : fixHandDepth(depth);
-    vec3 playerPos = screenToPlayer(vec3(uv, fixedDepth));
+    vec3 playerPos = screenToPlayer(vec3(texcoord, fixedDepth));
     vec3 dir = normalize(playerPos);
     float dist = isSky ? fogRenderDistance() : length(playerPos);
 
@@ -207,7 +201,5 @@ vec4 applySceneFog(vec4 sceneIn, ivec2 texel, vec2 uv) {
     }
 
     float share = saturate(glint / max(luminance(color), 1e-6));
-    return vec4(color, lavaGlow ? -share : (share > 0.0 ? 1.0 + share : 0.0));
+    outColor = vec4(color, lavaGlow ? -share : (share > 0.0 ? 1.0 + share : 0.0));
 }
-
-#endif

@@ -97,6 +97,7 @@ PROGRAMS: dict[str, list[str] | dict[str, Body | None]] = {
     # composite
     "composite": ["csh"],
     "composite1": fullscreen("fsh", "csh_a"),
+    "composite11": fullscreen("fsh"),
     "composite20": fullscreen("fsh"),
     "composite21": fullscreen("fsh"),
     "composite22": fullscreen("fsh"),
