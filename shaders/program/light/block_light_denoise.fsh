@@ -44,12 +44,15 @@ const float CLIP_MIN_WIDTH = 0.05;
 // 履歴の深度の許容 (再投影の遮蔽判定)
 const float HISTORY_DEPTH_REL = 0.05;
 const float HISTORY_DEPTH_ABS = 0.1;
+const float SAFE_RATIO_BIAS = 0.02;      // safeRatio の下地の強さ (輝度に対する比)
+const float WEIGHT_MIN = 1e-4;
+const float HISTORY_MIN_WEIGHT = 0.05;
 
 // 比の安定化: 輝度の比を下地にして、ある色成分の U がほぼ 0 でも発散しない
 vec3 safeRatio(vec3 s, vec3 u) {
     float lu = luminance(u);
     float lr = luminance(s) / max(lu, 1e-8);
-    float k = 0.02 * lu + 1e-7;
+    float k = SAFE_RATIO_BIAS * lu + 1e-7;
     return saturate((s + k * lr) / (u + k));
 }
 
@@ -116,7 +119,7 @@ void main() {
         w *= bilateralNormalWeight(n, geoNormal, NORMAL_POWER);
         vec3 r = safeRatio(raw.rgb, u);
         if (d2 < nearestD) { nearestD = d2; nearestRatio = r; }
-        if (w < 1e-4) continue;
+        if (w < WEIGHT_MIN) continue;
         sumS += raw.rgb * w;
         sumU += u * w;
         if (luminance(u) > 0.0) {
@@ -126,7 +129,7 @@ void main() {
         }
     }
     ratio = luminance(sumU) > 0.0 ? safeRatio(sumS, sumU) : nearestRatio;
-    if (wStat > 1e-4) {
+    if (wStat > WEIGHT_MIN) {
         mean = m1 / wStat;
         sigma = momentSigma(m2, mean, wStat);
     } else {
@@ -157,7 +160,7 @@ void main() {
             hist += h.rgb * w;
             hw += w;
         }
-        if (hw > 0.05) {
+        if (hw > HISTORY_MIN_WEIGHT) {
             hist /= hw;
             vec3 width = max(sigma * CLIP_GAMMA, vec3(CLIP_MIN_WIDTH));
             hist = clamp(hist, mean - width, mean + width);

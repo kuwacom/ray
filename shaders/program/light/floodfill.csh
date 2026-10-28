@@ -216,7 +216,7 @@ void main() {
         vec3 p = playerToVoxel(lightningBoltPosition.xyz + vec3(0.0, LIGHTNING_HEIGHT, 0.0));
         if (isInVoxelVolume(p)) {
             LightDef d = getLightDef(LIGHT_ENTITY_LIGHTNING);
-            registerLight(p, lightRange(d, 15.0) * LIGHTNING_RANGE_MUL, lightEmission(d, 15.0), luminance(lightEmission(d, 15.0)), d.shape.w, false);
+            registerLight(p, lightRange(d, LIGHT_LEVEL_MAX) * LIGHTNING_RANGE_MUL, lightEmission(d, LIGHT_LEVEL_MAX), luminance(lightEmission(d, LIGHT_LEVEL_MAX)), d.shape.w, false);
         }
     }
 #endif

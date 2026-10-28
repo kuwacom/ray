@@ -41,6 +41,8 @@ const float TRACE_NORMAL_OFFSET = 0.05;
 const float TRACE_ENTITY_SKIP_START = 0.3;
 const float TRACE_ENTITY_SKIP_START_ENTITY = 0.75; // 着色点がエンティティの表面の時
 const float TRACE_ENTITY_SKIP_END = 0.75;
+const float TRACE_STEPS_PER_BLOCK = 1.8;
+const int TRACE_STEPS_CAP = 512;
 
 // 設定から既定のフラグを作る (設置光源用)
 uint blockLightTraceFlags() {
@@ -264,7 +266,7 @@ bool traceVoxelRay(vec3 originVoxel, vec3 dir, float maxDist, out vec3 hitVoxel,
     vec3 rdInv = vec3(stepDir) * tDelta;
     vec3 fr = originVoxel - vec3(cell);
     vec3 tMax = mix(fr, 1.0 - fr, vec3(greaterThan(stepDir, ivec3(0)))) * tDelta;
-    int maxSteps = min(int(maxDist * 1.8) + 2, 512);
+    int maxSteps = min(int(maxDist * TRACE_STEPS_PER_BLOCK) + 2, TRACE_STEPS_CAP);
 
     for (int i = 0; i < maxSteps; i++) {
         float tEnter = minOf(tMax);
@@ -310,13 +312,19 @@ bool traceVoxelRay(vec3 originVoxel, vec3 dir, float maxDist, out vec3 hitVoxel,
  */
 const float SS_SHADOW_THICKNESS = 0.35;     // 遮蔽物の厚みの想定 (ブロック, 距離に比例して増やす)
 const float SS_SHADOW_THICKNESS_DIST = 0.02;
+const float SS_SHADOW_MIN_LENGTH = 0.05;
+const float SS_SHADOW_OFFSET = 0.01;      // 開始点の押し出し (ブロック)。距離に比例した分を足す
+const float SS_SHADOW_OFFSET_DIST = 0.003;
+const float SS_SHADOW_BIAS = 0.02;        // 自己遮蔽を避ける深度の差の最小値。距離に比例した分を足す
+const float SS_SHADOW_BIAS_DIST = 0.002;
+const float SS_SHADOW_FADE_START = 0.75;
 
 float lightContactShadow(vec3 playerPos, vec3 geoNormal, vec3 toLight, float maxDist, int steps, float dither) {
-    if (maxDist <= 0.05) return 1.0;
+    if (maxDist <= SS_SHADOW_MIN_LENGTH) return 1.0;
     vec3 startView = playerToView(playerPos);
     float startDist = -startView.z;
     // 遠いほど深度の精度が落ちるので押し出しを増やす
-    startView += playerToViewDir(geoNormal) * (0.01 + 0.003 * startDist);
+    startView += playerToViewDir(geoNormal) * (SS_SHADOW_OFFSET + SS_SHADOW_OFFSET_DIST * startDist);
     vec3 dirView = playerToViewDir(toLight);
     float rayLen = maxDist;
     // near 面の手前で止める (カメラに向かうレイ)
@@ -335,11 +343,11 @@ float lightContactShadow(vec3 playerPos, vec3 geoNormal, vec3 toLight, float max
         float sceneDist = -screenToView(vec3(sp.xy, d)).z;
         float rayDist = -p.z;
         float diff = rayDist - sceneDist;
-        float bias = 0.02 + 0.002 * rayDist;
+        float bias = SS_SHADOW_BIAS + SS_SHADOW_BIAS_DIST * rayDist;
         float thickness = SS_SHADOW_THICKNESS + SS_SHADOW_THICKNESS_DIST * rayDist;
         if (diff > bias && diff < thickness) {
             // レイの終わり近くの遮蔽は弱めて、打ち切り位置の境界を目立たなくする
-            return smoothstep(0.75, 1.0, x);
+            return smoothstep(SS_SHADOW_FADE_START, 1.0, x);
         }
     }
     return 1.0;

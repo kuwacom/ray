@@ -225,7 +225,7 @@ vec3 lightBoxIrradiance(LightInstance L, vec3 voxelPos, vec3 gateNormal) {
     if (!isBlockBoxLight(L, d, voxelId)) return vec3(0.0);
     // 面の明るさは光源の明るさとレベルによらない (光る鉱物ブロックは遠くへは弱く届くが、面は他の発光ブロックと同じに光る)
     float lightLum = luminance(d.color.rgb);
-    float power = luminance(L.colorSize.rgb) / max(lightLum, EPS) * 15.0 / max(d.color.a * d.params.z, EPS);
+    float power = luminance(L.colorSize.rgb) / max(lightLum, EPS) * LIGHT_LEVEL_MAX / max(d.color.a * d.params.z, EPS);
     // 面の色はブロックのテクスチャの色 (光源の表の色より鮮やかで、ブロックごとの色が根元に出る)。明るさは表の色に合わせる
     // 発光は明るい画素ほど強い (gbuffers の発光の推定) ので、平均色を 1.5 乗して明るく鮮やかな画素の色に寄せる
     vec3 albedo = pow(getBlockAlbedo(voxelId), vec3(LIGHT_BOX_COLOR_POWER));
@@ -273,13 +273,14 @@ float lightJitterRadius(LightInstance L) {
 // 光源の体 (エンティティ光源) で自分を遮らないよう、光源側でエンティティ占有を無視する距離
 // 三角形方式の基礎値。ボクセルの 0.75 のままだと光源の脇に立ったプレイヤーの頭等が影から抜け落ちる
 const float LIGHT_ENTITY_SKIP_TRI_BASE = 0.15;
+const float LIGHT_ENTITY_SKIP_BASE = 0.25; // ボクセル方式の基礎値
 
 float lightEntitySkip(LightInstance L) {
 #ifdef ENTITY_TRI_OCCLUSION
     // たいまつ (半径 0.08) で 0.31、発光・燃焼エンティティ (半径 0.4) で体の大半を覆う 0.95
     return L.colorSize.a * 2.0 + LIGHT_ENTITY_SKIP_TRI_BASE;
 #else
-    return max(TRACE_ENTITY_SKIP_END, L.colorSize.a * 2.0 + 0.25);
+    return max(TRACE_ENTITY_SKIP_END, L.colorSize.a * 2.0 + LIGHT_ENTITY_SKIP_BASE);
 #endif
 }
 
@@ -310,7 +311,8 @@ ivec2 traceNearestLow(ivec2 texel, int frame) {
 }
 
 // 鏡面用の代表光源インデックスを fp16 に正確に入れる (fp16 は ±2048 までの整数が正確)
-float encodeLightIndex(int i) { return float(i) - 2047.0; }
-int decodeLightIndex(float v) { return int(round(v + 2047.0)); }
+const float LIGHT_INDEX_BIAS = 2047.0;
+float encodeLightIndex(int i) { return float(i) - LIGHT_INDEX_BIAS; }
+int decodeLightIndex(float v) { return int(round(v + LIGHT_INDEX_BIAS)); }
 
 #endif

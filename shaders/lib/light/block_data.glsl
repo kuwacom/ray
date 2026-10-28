@@ -32,11 +32,11 @@ float resolveLightLevel(LightDef d, float attributeLevel) {
 
 // 光源 1 つの放射の強さ (LightInstance.colorSize.rgb に入れる値)
 vec3 lightEmission(LightDef d, float level) {
-    return d.color.rgb * d.color.a * (level / 15.0) * BLOCKLIGHT_ILLUMINANCE * BLOCKLIGHT_BRIGHTNESS;
+    return d.color.rgb * d.color.a * (level / LIGHT_LEVEL_MAX) * BLOCKLIGHT_ILLUMINANCE * BLOCKLIGHT_BRIGHTNESS;
 }
 
 // 到達半径 (ブロック)。レベルに比例
-float lightRange(LightDef d, float level) { return d.params.x * level / 15.0; }
+float lightRange(LightDef d, float level) { return d.params.x * level / LIGHT_LEVEL_MAX; }
 
 /*
  * 距離減衰の 1 次・2 次の係数 (1 / (1 + a d + b d^2))
@@ -86,6 +86,11 @@ float sphereLightNdotL(vec3 n, vec3 dir, float dist, float radius) {
 // フリッカーの速さ (1 秒あたりの揺らぎ数) と最大の暗くなり幅
 const float FLICKER_SPEED = 6.0;
 const float FLICKER_DEPTH = 0.3;
+// 光源ごとの位相のずらし幅、2 オクターブ目の周波数倍率と重み
+const float FLICKER_SEED_PHASE = 0.37;
+const float FLICKER_OCTAVE_FREQ = 2.3;
+const float FLICKER_WEIGHT_0 = 0.65;
+const float FLICKER_WEIGHT_1 = 0.35;
 
 /*
  * 炎系光源の明るさの揺らぎ倍率 (1 以下)。seed は光源ごとに固定の値 (ワールドのセル座標等)
@@ -95,7 +100,7 @@ float lightFlicker(float amount, uvec3 seed) {
 #ifdef LIGHT_FLICKER
     if (amount <= 0.0) return 1.0;
     uint h = pcg3d(seed).x;
-    float t = frameTimeCounter * FLICKER_SPEED + float(h & 1023u) * 0.37;
+    float t = frameTimeCounter * FLICKER_SPEED + float(h & 1023u) * FLICKER_SEED_PHASE;
     float n = 0.0;
     for (int o = 0; o < 2; o++) {
         float i = floor(t);
@@ -104,8 +109,8 @@ float lightFlicker(float amount, uvec3 seed) {
         uint base = h + uint(o) * 7919u;
         float a = hash1(base + uint(int(i) & 0xFFFF));
         float b = hash1(base + uint((int(i) + 1) & 0xFFFF));
-        n += mix(a, b, f) * (o == 0 ? 0.65 : 0.35);
-        t *= 2.3;
+        n += mix(a, b, f) * (o == 0 ? FLICKER_WEIGHT_0 : FLICKER_WEIGHT_1);
+        t *= FLICKER_OCTAVE_FREQ;
     }
     return 1.0 - amount * FLICKER_DEPTH * n;
 #else

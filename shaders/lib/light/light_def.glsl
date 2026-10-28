@@ -28,6 +28,7 @@ const vec3 LAVA_SRGB = vec3(1.00, 0.45, 0.15);
 // 鉱物ブロックを光源にした時の明るさと光レベル (到達半径は 15 x レベル / 15 ブロック)
 const float DECOR_LIGHT_BRIGHTNESS = 0.5;
 const float DECOR_LIGHT_LEVEL = 7.0;
+const float LIGHT_RANGE_MAX = 15.0; // レベル最大の光源の到達半径 (ブロック)
 
 vec3 fireSrgb() { return mix(FIRE_NEUTRAL_SRGB, FIRE_WARM_SRGB, BLOCKLIGHT_WARMTH); }
 
@@ -47,7 +48,7 @@ LightDef makeLight(vec3 srgb, float brightness, float level, float sourceSize, v
     vec3 c = srgbToLinear(srgb);
     d.color = vec4(c / max(maxOf(c), EPS), brightness);
     d.shape = vec4(center, sourceSize);
-    d.params = vec4(15.0, flicker, level, 0.0);
+    d.params = vec4(LIGHT_RANGE_MAX, flicker, level, 0.0);
     d.info = uvec4(flags, 0u, 0u, 0u);
     return d;
 }

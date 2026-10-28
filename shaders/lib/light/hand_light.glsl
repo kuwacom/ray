@@ -40,6 +40,10 @@ const float HAND_SS_LENGTH = 4.0;
 const int HAND_SS_STEPS = 12;
 // 一人称で手そのもの (カメラの直近) を受光面とみなす距離。ここでは影を計算しない
 const float HAND_SELF_DIST = 0.9;
+const float HAND_BACKFACE_COS = -0.2;  // 光源に背を向けた面の影を計算しない cos の下限
+const float HAND_SS_END_MARGIN = 0.4;  // 画面空間の影を光源の手前で止める距離 (ブロック)
+const float HAND_DISK_PHASE_SCALE = 7.31;
+const float HAND_DISK_PHASE_OFFSET = 0.27;
 // 三人称で手の光源から自分の体の遮蔽を無視する距離 (ブロック)。腕は外し、胴 (手から 0.1-0.7) の奥側で遮る
 // サブセル (0.5 ブロック) は実際の胴より太いので、短くすると影が実物より大きくなる
 const float HAND_THIRD_PERSON_SELF_SKIP = 0.45;
@@ -122,7 +126,7 @@ LightSample evalHandLight(bool mainHand, vec3 playerPos, vec3 geoNormal, float d
 
     // 一人称の手そのものはカメラの直近なので影を計算しない (自分の腕で遮ってしまう)
     bool isSelf = firstPersonCamera && length(playerPos) < HAND_SELF_DIST;
-    if (isSelf || dot(geoNormal, s.direction) <= -0.2) return s;
+    if (isSelf || dot(geoNormal, s.direction) <= HAND_BACKFACE_COS) return s;
 
 #ifdef HAND_LIGHT_RAYS
     vec3 fromVoxel = playerToVoxel(playerPos + geoNormal * TRACE_NORMAL_OFFSET);
@@ -131,7 +135,7 @@ LightSample evalHandLight(bool mainHand, vec3 playerPos, vec3 geoNormal, float d
         float radius = min(d.shape.w * LIGHT_SOURCE_SIZE * LIGHT_SOURCE_SIZE_SCALE, LIGHT_JITTER_MAX_RADIUS);
         mat3 tbn = tbnFromNormal(s.direction);
         float a = (dither + (mainHand ? 0.0 : 0.5)) * TAU;
-        vec2 disk = sqrt(fract(dither * 7.31 + 0.27)) * vec2(cos(a), sin(a)) * radius;
+        vec2 disk = sqrt(fract(dither * HAND_DISK_PHASE_SCALE + HAND_DISK_PHASE_OFFSET)) * vec2(cos(a), sin(a)) * radius;
         uint flags = blockLightTraceFlags();
         float skipEnd = TRACE_ENTITY_SKIP_END;
         vec3 jitter = tbn[0] * disk.x + tbn[1] * disk.y;
@@ -162,7 +166,7 @@ LightSample evalHandLight(bool mainHand, vec3 playerPos, vec3 geoNormal, float d
 #ifdef HAND_LIGHT_SS_SHADOWS
     if (maxOf(s.irradiance) > 0.0) {
         // 光源の直前 (手・たいまつ自身の形) までで止める
-        float len = min(dist - 0.4, HAND_SS_LENGTH);
+        float len = min(dist - HAND_SS_END_MARGIN, HAND_SS_LENGTH);
         s.irradiance *= lightContactShadow(playerPos, geoNormal, s.direction, len, HAND_SS_STEPS, dither);
     }
 #endif

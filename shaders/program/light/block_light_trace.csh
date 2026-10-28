@@ -40,6 +40,7 @@ layout(local_size_x = 8, local_size_y = 8) in;
 // 接触影を付ける光源数 (寄与の大きい順)。全光源に付けると EXTREME で重くなり過ぎる
 const int CONTACT_SHADOW_LIGHTS = LIGHT_CONTACT_SHADOW_COUNT;
 const float LIGHT_CONTACT_LENGTH = 1.25;
+const float DITHER_STEP = 0.618034;
 const int LIGHT_CONTACT_STEPS = 8;
 
 /*
@@ -144,7 +145,7 @@ void main() {
         for (int j = 0; j < DET_COUNT; j++) {
             if (topIdx[j] < 0) break;
             vec2 xi = fract(bn.xy + r2Sequence(j));
-            float dither = fract(bn.z + 0.618034 * float(j));
+            float dither = fract(bn.z + DITHER_STEP * float(j));
             vec3 vis = traceBlockLight(topIdx[j], fromVoxel, playerPos, geoNormal, flags, skipStart, xi, dither, j < CONTACT_SHADOW_LIGHTS);
             shadowed += topE[j] * vis;
             unshadowed += topE[j];

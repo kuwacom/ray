@@ -137,7 +137,7 @@ void injectLightAt(vec3 playerPos, int index, float level) {
     vec3 voxelPos = playerToVoxel(playerPos);
     ivec3 cell = ivec3(floor(voxelPos));
     if (!isInVoxelVolume(cell)) return;
-    uint key = (uint(clamp(level, 0.0, 15.0) + 0.5) << 8u) | uint(index);
+    uint key = (uint(clamp(level, 0.0, LIGHT_LEVEL_MAX) + 0.5) << 8u) | uint(index);
     imageAtomicMax(voxelEmitImg, cell, key);
     entityAccAdd(cell, voxelPos - vec3(cell));
 }

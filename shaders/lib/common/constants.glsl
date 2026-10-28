@@ -20,6 +20,7 @@ const float BLOCKLIGHT_ILLUMINANCE = 2.5; // 光源レベル 15 の光源から 
 const float EMISSION_LUMINANCE = 4.0;     // 発光テクスチャ (emission=1) の輝度
 const float MIN_AMBIENT = 0.004;          // 洞窟の最低限の可視光 (真っ暗を避ける)
 const float NIGHT_VISION_AMBIENT = 0.6;
+const float LIGHT_LEVEL_MAX = 15.0;       // バニラの光源レベルの最大値
 
 // 深度がこれ未満なら手持ちアイテム (Iris は手を near 寄りの深度で描く)
 const float HAND_DEPTH_THRESHOLD = 0.56;
