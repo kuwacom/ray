@@ -329,6 +329,10 @@ const int SUN_CONTACT_STEPS = 12;
 const float SUN_CONTACT_LENGTH = 0.35;      // 近距離のマーチ長 (ブロック)
 const float SUN_CONTACT_LENGTH_SCALE = 0.012; // 距離に比例して伸ばす (遠景の小物の影を拾う)
 const float SUN_CONTACT_THICKNESS = 0.15;   // 遮蔽物として扱う厚み (ブロック)
+const float SUN_CONTACT_OFFSET = 0.01;      // 始点の押し出し (ブロック)。画素の大きさ / NoV を足す
+const float SUN_CONTACT_THICKNESS_DIST = 0.01; // 厚みの距離に比例する分
+const float SUN_CONTACT_BIAS = 0.01;        // 自分の面に当たらないための深度の余裕。距離に比例した分を足す
+const float SUN_CONTACT_BIAS_DIST = 0.002;
 const float SUN_CONTACT_MIN_NOV = 0.1;      // 押し出しの 1/NoV の上限 (真横から見た面で押し出しすぎない)
 
 float sunContactShadow(vec3 viewPos, vec3 geoNormalView, vec3 lightView, float dither) {
@@ -342,8 +346,8 @@ float sunContactShadow(vec3 viewPos, vec3 geoNormalView, vec3 lightView, float d
      */
     float pixelSize = dist * 2.0 / (gbufferProjection[1][1] * viewSize().y);
     float NoV = max(dot(geoNormalView, -viewPos / max(dist, 1e-4)), SUN_CONTACT_MIN_NOV);
-    vec3 p = viewPos + geoNormalView * (0.01 + pixelSize / NoV) + stepVec * dither;
-    float thickness = SUN_CONTACT_THICKNESS + dist * 0.01;
+    vec3 p = viewPos + geoNormalView * (SUN_CONTACT_OFFSET + pixelSize / NoV) + stepVec * dither;
+    float thickness = SUN_CONTACT_THICKNESS + dist * SUN_CONTACT_THICKNESS_DIST;
     for (int i = 0; i < SUN_CONTACT_STEPS; i++) {
         p += stepVec;
         if (p.z > -near) break;
@@ -353,7 +357,7 @@ float sunContactShadow(vec3 viewPos, vec3 geoNormalView, vec3 lightView, float d
         if (isHandDepth(d)) continue;
         float delta = -p.z - linearizeDepth(d);
         // 自分の面に当たらないよう、深度の精度分の余裕を取る
-        if (delta > 0.002 * dist + 0.01 && delta < thickness) return 0.0;
+        if (delta > SUN_CONTACT_BIAS_DIST * dist + SUN_CONTACT_BIAS && delta < thickness) return 0.0;
     }
     return 1.0;
 }

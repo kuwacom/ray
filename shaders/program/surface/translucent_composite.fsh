@@ -29,6 +29,7 @@
 layout(location = 0) out vec4 outColor;
 
 const float GLASS_IOR = 1.5;
+const float GLASS_F0 = 0.04;
 const float ICE_IOR = 1.31;
 const float THICK_TRANSLUCENT_REFRACTION = 0.02; // 氷・スライムの屈折の UV オフセット
 const float GLASS_TINT_STRENGTH = 0.65;        // 透過色の濃さ (1 で tints 表そのまま)
@@ -281,8 +282,8 @@ void main() {
             float sunAlpha = sqrt(sqr(WATER_ROUGHNESS) + unresolvedVar);
             // 上向きの水面は照り返しの一部を輝点にする。輝点の傾きの分布は画素より細かい波の全部 (表面張力波を含む)
             float g = N.y > 0.5 ? WATER_GLINT * WATER_GLINT_POINT_SHARE : 0.0;
-            color += sunSpecular(N, V, 0.02, sunAlpha, sunSpecVis) * (1.0 - g);
-            color += localLightSpecular(WL, N, V, 0.02, sunAlpha);
+            color += sunSpecular(N, V, WATER_F0, sunAlpha, sunSpecVis) * (1.0 - g);
+            color += localLightSpecular(WL, N, V, WATER_F0, sunAlpha);
             if (g > 0.0) {
                 float glintVar = unresolvedVar + sea.microVar * (1.0 - WATER_MICRO_ROUGHNESS);
                 vec4 glint = sunGlint(surfPlayer, N, V, glintVar, sunSpecVis, dist, NoVGeo);
@@ -348,7 +349,7 @@ void main() {
         float glassAlpha = max(roughness * roughness, WATER_ROUGHNESS);
         // 前方で照らした拡散 (translucent.rgb) は鏡面で反射する F の分を除く (太陽の鏡面を足すので、その分だけ明るくならないように)
         color = behind * transmit * (1.0 - F) + translucent.rgb * (1.0 - F) + refl * F
-            + sunSpecular(N, V, 0.04, glassAlpha, glassSunVis) + localLightSpecular(GL, N, V, 0.04, glassAlpha);
+            + sunSpecular(N, V, GLASS_F0, glassAlpha, glassSunVis) + localLightSpecular(GL, N, V, GLASS_F0, glassAlpha);
         outColor = vec4(color, 1.0);
         return;
     }

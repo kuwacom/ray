@@ -31,6 +31,14 @@ const float MIN_ROUGHNESS = 0.002;
 // 誘電体の F0 の下限 (水 0.02 より小さい実物質はほぼ無いので、0 指定のテクスチャもここに寄せる)
 const float MIN_DIELECTRIC_F0 = 0.02;
 
+const float LABPBR_BYTE_SCALE = 255.0;
+const int LABPBR_METAL_FIRST = 230;  // green の 230-237 が金属 8 種、238 以上は金属のアルベドを使う
+const int LABPBR_METAL_LAST = 237;
+const float LABPBR_POROSITY_MAX = 64.0;  // blue は 0-64 が porosity、65 以上が SSS
+const float LABPBR_SSS_MIN = 65.0;
+const float LABPBR_SSS_RANGE = 190.0;
+const float LABPBR_EMISSION_MAX = 254.0;  // alpha の 255 は発光の指定なし
+
 const int METAL_NONE = 0;
 const int METAL_ALBEDO = 9;
 
@@ -64,9 +72,9 @@ vec3 conductorF0(vec3 n, vec3 k) {
 
 // labPBR の green 値 (生値 [0,1]) -> 金属 ID
 int labPbrMetalId(float f0Raw) {
-    int v = int(round(f0Raw * 255.0));
-    if (v < 230) return METAL_NONE;
-    if (v <= 237) return v - 229;
+    int v = int(round(f0Raw * LABPBR_BYTE_SCALE));
+    if (v < LABPBR_METAL_FIRST) return METAL_NONE;
+    if (v <= LABPBR_METAL_LAST) return v - (LABPBR_METAL_FIRST - 1);
     return METAL_ALBEDO;
 }
 
@@ -140,11 +148,11 @@ SurfaceParams decodeLabPbr(vec4 spec, vec4 normalTex) {
     SurfaceParams p;
     p.smoothness = spec.r;
     p.f0 = spec.g;
-    float b = spec.b * 255.0;
-    p.porosity = b <= 64.5 ? saturate(b / 64.0) : 0.0;
-    p.sss = b > 64.5 ? saturate((b - 65.0) / 190.0) : 0.0;
-    float e = spec.a * 255.0;
-    p.emission = e < 254.5 ? e / 254.0 : 0.0;
+    float b = spec.b * LABPBR_BYTE_SCALE;
+    p.porosity = b <= LABPBR_POROSITY_MAX + 0.5 ? saturate(b / LABPBR_POROSITY_MAX) : 0.0;
+    p.sss = b > LABPBR_POROSITY_MAX + 0.5 ? saturate((b - LABPBR_SSS_MIN) / LABPBR_SSS_RANGE) : 0.0;
+    float e = spec.a * LABPBR_BYTE_SCALE;
+    p.emission = e < LABPBR_EMISSION_MAX + 0.5 ? e / LABPBR_EMISSION_MAX : 0.0;
     p.ao = normalTex.b;
     p.height = normalTex.a;
     return p;

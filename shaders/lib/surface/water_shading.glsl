@@ -34,6 +34,7 @@
 const float WATER_REFRACT_MAX_DISTANCE = 8.0;  // 屈折先を探す最大距離 (ブロック)
 const int WATER_REFRACT_STEPS = 16;
 const float WATER_SKY_PATH = 64.0;             // 屈折先が空 (描画距離の外) の時に仮定する水の経路長
+const float WATER_F0 = 0.02;                   // 水の垂直入射の反射率
 const float WATER_ROUGHNESS = 0.02;            // 太陽の鏡面の alpha (波の法線が細部を受け持つ)
 const float WATER_MULTI_SCATTER = 2.0;         // 内散乱の多重散乱分の持ち上げ
 // 上から見た水の内散乱は、水面から入った光が視線側 (上) へ戻る後方散乱だけ。海の粒子の位相関数は前方に強く尖っていて
@@ -87,14 +88,14 @@ const float WATER_GLINT_POINT_SHARE = 0.85;
  */
 vec4 sunGlint(vec3 surfPlayer, vec3 N, vec3 V, float slopeVar, vec3 sunVis, float dist, float NoVGeo) {
     LightSample sun = unshadowedSun();
-    vec3 lobe = sunSpecular(N, V, 0.02, sqrt(sqr(WATER_ROUGHNESS) + slopeVar), sunVis);
+    vec3 lobe = sunSpecular(N, V, WATER_F0, sqrt(sqr(WATER_ROUGHNESS) + slopeVar), sunVis);
     if (maxOf(lobe) <= 0.0) return vec4(0.0);
     float pixelWorld = dist * 2.0 / (gbufferProjection[1][1] * viewSize().y);
     vec2 gl = waterSunGlint(surfPlayer.xz + cameraPosition.xz, N, V, sun.direction, slopeVar, sun.angularSize, pixelWorld, NoVGeo);
     vec3 point = lobe * gl.y;
     // 1 枚の面が映す明るさは太陽の円盤の鏡像まで (GGX の裾と正規分布の裾の違いで出る極端な値を抑える)
     vec3 H = normalize(V + sun.direction);
-    vec3 mirror = sun.irradiance * sunVis * fresnelSchlick(vec3(0.02), dot(V, H)) / (PI * sqr(sun.angularSize));
+    vec3 mirror = sun.irradiance * sunVis * fresnelSchlick(vec3(WATER_F0), dot(V, H)) / (PI * sqr(sun.angularSize));
     point = min(point, mirror);
     return vec4(lobe * (gl.x - gl.y) + point, luminance(point));
 }
@@ -299,7 +300,7 @@ vec4 sampleWaterReflection(ivec2 texel, float dist, out float skyWeight) {
             decodeTranslucentData(texelFetch(colortex5, src, 0), n, lm, mat);
             if (mat != MAT_WATER) continue;
             vec2 delta = abs(vec2(src - texel)) * 0.5;
-            float w = max(1.0 - delta.x, 0.05) * max(1.0 - delta.y, 0.05) * bilateralDepthWeight(r.a, dist, dist * 0.02 + 0.05);
+            float w = max(1.0 - delta.x, REFL_UPSAMPLE_MIN_WEIGHT) * max(1.0 - delta.y, REFL_UPSAMPLE_MIN_WEIGHT) * bilateralDepthWeight(r.a, dist, dist * REFL_UPSAMPLE_DEPTH_REL + REFL_UPSAMPLE_DEPTH_ABS);
             if (sky) skyWeight += w;
             else sum += r.rgb * w;
             wsum += w;

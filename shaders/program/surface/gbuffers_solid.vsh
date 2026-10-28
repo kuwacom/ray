@@ -33,6 +33,8 @@ out vec2 tileMid;
 out vec2 tileHalf;
 flat out int blockId;
 
+const float MID_UV_FIXED_SCALE = 32768.0;
+
 void main() {
     texcoord = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy;
     lmcoord = saturate(((gl_TextureMatrix[1] * gl_MultiTexCoord1).xy - 1.0 / 32.0) * 32.0 / 30.0);
@@ -49,7 +51,7 @@ void main() {
      * 範囲外の値はビット列として解釈し直す。正しい値 (0-1) が来る版ではそのまま使う
      */
     vec2 midUv = mc_midTexCoord;
-    if (any(greaterThan(midUv, vec2(2.0)))) midUv = uintBitsToFloat(uvec2(midUv * 32768.0)) / 32768.0;
+    if (any(greaterThan(midUv, vec2(2.0)))) midUv = uintBitsToFloat(uvec2(midUv * MID_UV_FIXED_SCALE)) / MID_UV_FIXED_SCALE;
     tileMid = midUv;
     tileHalf = abs(texcoord - midUv);
 #else
