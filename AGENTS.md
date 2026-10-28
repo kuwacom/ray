@@ -30,6 +30,7 @@ glslang は `RAY_GLSLANG`、PATH、`tools/glslang/bin/glslang.exe` の順に探�
 - compute の `workGroups` / `workGroupsRender` はリテラルで書く (式・マクロ不可)
 - `block.properties` / `item.properties` / `entity.properties` と `lib/ids/{block,light,entity}_ids.glsl`、`lib/light/light_table_data.glsl` は `tools/gen_block_properties.py` (表は `tools/id_tables.py`) から生成する。手で編集しない。光源の追加は `id_tables.py` の `LIGHTS` に 1 行
 - 設定を足したら `lib/settings/` の該当モジュールのファイル (`gen_settings.py` も実行)、`shaders.properties` (画面と `profile.*`)、`lang/en_US.lang`、`lang/ja_JP.lang` をそろえる。漏れは validate_shaders.py が検出する
+- 設定・関数・定数の名前は docs/architecture.md の「命名」に従う。保存済みの設定の名前と番号は変えない
 - バッファ・ID の割り当てを変えたら docs/architecture.md の表も直す。設定の表 (architecture.md の設定とプリセット、docs/settings.md) は `gen_settings.py` が生成する
 
 ## コードの書き方

@@ -204,7 +204,7 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 
 - 各ブロックの最後の配列は大きさなし (`[]`) で宣言し、確保量は shaders.properties の `bufferObject.N` で決める。NVIDIA のリンクは、使っていなくても宣言された固定長の配列の要素数に比例して時間がかかり (`binLights` が 266 万要素あった時は main が空のプログラムでも vs+fs で 7-10 秒)、全プログラムに入るので読み込み全体が数倍になる
 - 大きさなしの配列の要素数は宣言の行の注記 `// 要素数: <定数>` に書き、添字の上限もその定数で見る (`.length()` は使わない)。`tools/gl_compile_check.py` が注記を読み、配列の先頭 + 要素の間隔 x 要素数が `bufferObject.N` に収まるかをプログラムごとに確かめる
-- `lib/buffers/` には設定の値を入れない (宣言を読む全プログラムで、設定の値が前処理後の本文に残ると、その設定を変えるたびにドライバのキャッシュが外れる)。設定で変わる大きさ (`MAX_GLOBAL_LIGHTS`, `LIGHT_BIN_CAPACITY` / `STRIDE` / `STRIDE_ALLOC` / `GRID`, `LIGHT_BIN_KEYS_ALLOC`) は `lib/light/light_bins.glsl` に置き、`lib/light/light.glsl` を include するプログラム (world0 で 23 個) だけが読む。LIGHT_BIN_LIGHTS・LIGHT_MAX_COUNT・LIGHT_CULL_MODE を変えた時に作り直すのはこの 23 個 (前は 53 個全部)。VOXEL_VOLUME は `lib/common/voxel_space.glsl` の `VOXEL_SIZE` が全プログラムに入るので、まだ全部作り直しになる
+- `lib/buffers/` には設定の値を入れない (宣言を読む全プログラムで、設定の値が前処理後の本文に残ると、その設定を変えるたびにドライバのキャッシュが外れる)。設定で変わる大きさ (`GLOBAL_LIGHTS_MAX`, `LIGHT_BIN_CAPACITY` / `STRIDE` / `STRIDE_ALLOC` / `GRID`, `LIGHT_BIN_KEYS_ALLOC`) は `lib/light/light_bins.glsl` に置き、`lib/light/light.glsl` を include するプログラム (world0 で 23 個) だけが読む。LIGHT_BIN_LIGHTS・LIGHT_MAX_COUNT・LIGHT_CULL_MODE を変えた時に作り直すのはこの 23 個 (前は 53 個全部)。VOXEL_VOLUME は `lib/common/voxel_space.glsl` の `VOXEL_SIZE` が全プログラムに入るので、まだ全部作り直しになる
 - ブロックの途中の配列 (`albedo`, `lights`, `binCount`, `entityAcc`, `groupBounds`, `clusterBounds`) は固定長のまま。合わせても 1 プログラム 0.4 秒程度で、並べ替えるとレイアウトが変わるので動かしていない
 
 | binding | 名前 (アクセサ) | ファイル | サイズ | 内容 | 書くプログラム (`SSBO_<名前>_WRITE`) |
@@ -600,7 +600,7 @@ light モジュールが提供 (`#include "/lib/light/light.glsl"`):
 | `vec3 getHandLightPosition(bool mainHand)` | sky (composite11 の手持ち光源のフォグ) | 手持ち光源の player 空間位置 |
 | `vec3 sampleFloodfill(vec3 playerPos, vec3 normal)` / `vec3 sampleFloodfillVolume(vec3 playerPos)` / `float floodCoverage(vec3 playerPos)` | surface (GI), sky | floodfill 照度 |
 | `vec3 sampleBlockLightVolume(vec3 playerPos)` | sky (FOG_BLOCKLIGHT) | 体積内の点のブロックライト |
-| `vec3 traceVisibility(vec3 fromVoxel, vec3 toVoxel, uint flags, float dither)` | light 内部, surface (RSM の補助等) | 2 点間の色付き透過率。flags = TRACE_ENTITIES / TRACE_PLAYER / TRACE_TINT / TRACE_SHAPES |
+| `vec3 traceVisibility(vec3 fromVoxel, vec3 toVoxel, uint flags, float dither, float entSkipStart, float entSkipEnd)` | light 内部, surface (lighting の最強の光源) | 2 点間の色付き透過率。flags = TRACE_ENTITIES / TRACE_PLAYER / TRACE_TINT / TRACE_SHAPES |
 | `bool traceVoxelRay(vec3 originVoxel, vec3 dir, float maxDist, out vec3 hitVoxel, out vec3 hitNormal, out int hitBlockId)` | surface (GI_MODE=3, REFLECTIONS=3) | 最初に当たる固体ボクセル |
 | `LightDef getLightDef(int index)` ほか `block_data.glsl` の関数 | 全員 (読み取り) | 光源テーブル |
 
@@ -694,6 +694,32 @@ post モジュールが提供 (`#include "/lib/post/post.glsl"`):
 - 重い機能は `#ifdef` で丸ごと外す。プログラム単位は shaders.properties の `program.enabled`
 - compute の `workGroups` / `workGroupsRender` はリテラルで書く (式・マクロは不可。`#if` で分岐)。validate_shaders.py が検査する
 - 他のシェーダーパックのコードは持ち込まない。手法を参考にした場合は CREDITS.md に出典を書く
+
+### 命名
+
+保存した設定 (設定の名前・値・プリセットの番号) は変えない。次の規約は新しく足す名前に使う
+
+- 設定の接頭辞は機能のまとまり (`LIGHT_`、`CLOUD_`、`FOG_`、`LENS_`、`GRADE_`、`LOOK_` など)。既にあるまとまりはその接頭辞を使う
+- プリセットは `<まとまり>_PRESET`。0 = カスタム、1 = 既定、新しいプリセットは末尾に足し、番号は並べ替えない
+- カスタムの値は `<プリセットの名前から _PRESET を除いたもの>_C_<名前>`。プリセットが 0 の時だけ読み、既定値はプリセット 1 の値にそろえる。画面は `<まとまり>_CUSTOM`
+- ブールは機能の名前だけ (`_ENABLED` などを付けない)。強さは `X_STRENGTH`、方式の選択は `_MODE`、品質の段は `_QUALITY`、解像度の分母は `_RES`、数は `_COUNT` / `_SAMPLES` / `_STEPS`
+- 関数は lowerCamelCase。モジュールの内部の関数は機能の接頭辞 + 名詞 (`cloudLowDensity`)。動詞は `fetch` (texelFetch)、`sample` (補間あり)、`read` (符号化したデータの復号)、`eval` (光や BRDF の式)、`apply` (色を変えて返す)、`trace` (レイを辿る)、`is` / `has` (bool)、`aToB` (座標空間の変換)。前フレームは `Previous`。`get` は新しい関数に付けない
+- 型は PascalCase。ファイルスコープの定数は UPPER_SNAKE で、接頭辞は同じ機能の関数・ファイルと同じ語。確保量は `_ALLOC`、上限は `_MAX`
+- ファイルは snake_case。include ガードはパスから決める
+
+保存した設定との互換のため、次の名前は規約に合わないまま使う
+
+| 名前 | 規約との違い |
+|---|---|
+| `CLOUD_S_*` / `CLOUD_C_*` / `FOG_C_*` | `CLOUD_STYLE` / `CLOUD_REGION_PRESET` / `FOG_STYLE` と `FOG_HEIGHT_PRESET` のカスタムの値 |
+| `CLOUD_ALTITUDE` などの雲の高さ、`FOG_MIST_ALTITUDE`、`DOF_APERTURE_BLADES` | カスタムの時だけ使う値で `_C_` なし |
+| `FOG_STYLE`、`CLOUD_HEIGHT_PRESET`、`FOG_HEIGHT_PRESET`、`CLOUD_REGION_PRESET` | カスタムの番号が末尾 (3 / 3 / 3 / 5) で、`FOG_HEIGHT_PRESET` の既定は 4 |
+| `CLOUD_STYLE`、`FOG_STYLE`、`SUN_MOON_STYLE` | `_STYLE` のプリセット・方式 |
+| `PBR_FORMAT`、`CLOUD_S_SHAPE`、`LENS_FISHEYE_FIT`、`LENS_C_PROJECTION`、`CLOUDS`、`REFLECTIONS`、`WATER_REFRACTION` | 方式の選択で `_MODE` なし |
+| `LIGHT_BIN_LIGHTS`、`LIGHT_ENTITY_TRIANGLES`、`CLOUD_MULTISCATTER` | 数で `_COUNT` なし |
+| `GRADE_*_SAT` | `_SATURATION` の略 |
+| `VIGNETTE`、`FILM_GRAIN`、`BLOOM_FOG` | 強さで接尾辞なし |
+| 画面の名前 (`*_SCREEN`、`*_OPTIONS`) | 混在 |
 
 ### 検証
 
