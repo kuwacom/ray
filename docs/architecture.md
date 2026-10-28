@@ -569,7 +569,7 @@ DEBUG_VIEW の値 (0-12) と表示内容の対応は `shaders/lang/ja_JP.lang` /
 - 表面の光 (light / sky の関数) は surface の `gatherSurfaceLights` が呼ぶ。deferred30・半透明・composite1・二次ヒットは light / sky の照度の関数を直接呼ばない
 - `program/surface/gbuffers_solid.vsh` から `injectEntityLight`、`program/surface/gbuffers_*` から `encodeVelocity` を呼び出す (関数本体は light / post モジュール)
 - 本体のファイル名は役割名で、Iris のプログラム名との対応は `tools/gen_wrappers.py` の `BODIES` にある (例: composite1 は `program/surface/translucent_composite.fsh`)
-- 大きな処理は 600 行以下を目安にファイルを分ける。体積雲は `lib/sky/cloud_volume.glsl` が `cloud_constants` / `cloud_weather` / `cloud_density` / `cloud_lighting` / `cloud_march` を読む。半透明の合成の水と鏡面は `lib/surface/water_shading.glsl` と `composite_specular.glsl`
+- 大きな処理は 600 行以下を目安にファイルを分ける。体積雲は `lib/sky/cloud_volume.glsl` が `cloud_constants` / `cloud_weather` / `cloud_density` / `cloud_lighting` / `cloud_march` を読む。半透明の合成の水と鏡面は `lib/surface/water_shading.glsl` と `composite_specular.glsl`。水面の `lib/common/water.glsl` は `water_waves` / `water_glint` / `water_normal`、レンズの `lib/post/lens.glsl` は `lens_optics` / `lens_flare` を読む。`lib/post/lens_presets.glsl` はレンズごとの値を 1 つの `#if` の連なりで持つ表なので分けない
 - 各モジュールの補助ファイルはそのモジュールのディレクトリに置く (例: DDA は `lib/light/trace.glsl`)
 
 ### モジュール間インターフェース
@@ -630,7 +630,7 @@ surface モジュールが提供 (`#include "/lib/surface/surface.glsl"`):
 | `vec3 sampleShadowVolume(vec3 playerPos)` (`lib/common/shadow_volume.glsl`) | sky (VL), light (floodfill のスカイライト等) | 1 タップの色付き影 |
 | `vec4 getIndirectLight(ivec2 texel)` | surface | rgb 間接光, a AO |
 | `vec3 applyWaving(vec3 playerPos, int blockId, bool isTopVertex, float skyLight)` | gbuffers, shadow.vsh (light) | 植物の揺れ (影と一致させる) |
-| `vec3 getWaterNormal(vec3 worldPos, vec3 geoNormal)` (`lib/common/water.glsl`) | surface, sky (水中の光芒等) | 水面の法線 |
+| `vec3 getWaterNormal(vec3 worldPos, vec3 geoNormal)` (`lib/common/water_normal.glsl`) | surface, sky (水中の光芒等) | 水面の法線 |
 
 表面の光の集め方 (`gatherSurfaceLights`)。呼ぶ側は使う取り方と項を const で書き、省く項をコメントに残す:
 
