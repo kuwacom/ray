@@ -143,8 +143,8 @@ vec4 marchAirFog(vec3 dir, float endDist, float dither, float farVisibility) {
     FogLighting fl = fogLightingSetup(dir);
     float outdoor = 1.0 - getCaveFactor();
 #ifdef CAVE_LEAK_PREVENTION
-    // 影マップの外では遮蔽が分からないので、目の位置の空の見え方で光芒を抑える
-    float farSunVisibility = outdoor * farVisibility;
+    // 影マップの外では遮蔽が分からないので、目の位置の空の見え方と太陽の見え方で光芒を抑える
+    float farSunVisibility = outdoor * farSunShade(dir) * farVisibility;
 #else
     float farSunVisibility = farVisibility;
 #endif

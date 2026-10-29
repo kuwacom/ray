@@ -329,6 +329,8 @@ const float LENS_LIGHT_ANGULAR_RADIUS = 0.0093;
 const float LENS_VIS_DISC_SCALE = 1.3;
 const float LENS_VIS_SPEED = 12.0;
 const float LENS_VIS_OFFSCREEN = 0.25;
+// 画面の外の光源に目の位置の影マップの判定を掛け始める幅 (UV)。端をまたぐ時にフレアが跳ばないよう、この幅で混ぜる
+const float LENS_VIS_EYE_FADE = 0.05;
 // フィルムグレインの振幅 (sRGB) は設定 FILM_GRAIN。既定はデジカメのセンサーノイズ程度の微弱な値
 
 #endif

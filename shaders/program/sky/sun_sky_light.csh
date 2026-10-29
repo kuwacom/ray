@@ -7,11 +7,15 @@
  * skyParams の使い方 (sky モジュールの自由領域)
  *   [0] rgb = 雲の高度での光源照度, a = +1 なら光源は太陽 / -1 なら月
  *   [1] x = 前フレームの worldTime, y = 履歴が有効な連続フレーム数 (0 = 時刻が飛んだのでリセット), zw = 予備
+ *   [3] x = 目の位置の太陽の見え方 (今フレーム), y = 目の周り 3 ブロックの平均 (平滑化済み), zw = 予備
  * sky モジュール (lib/sky)
  */
 // このプログラムで書く SSBO (lib/buffers。ほかのプログラムでは readonly)
 #define SSBO_FRAME_DATA_WRITE
 //@include "/lib/common/common.glsl"
+//@include "/lib/common/math.glsl"
+//@include "/lib/common/shadow_space.glsl"
+//@include "/lib/common/shadow_volume.glsl"
 //@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/sky/sky.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
@@ -30,14 +34,20 @@
 #include "/lib/common/math.glsl"
 #include "/lib/common/shading_types.glsl"
 #include "/lib/common/common.glsl"
+#include "/lib/common/shadow_space.glsl"
+#include "/lib/common/color.glsl"
+#include "/lib/common/transforms.glsl"
+#include "/lib/common/noise.glsl"
+#include "/lib/common/water_waves.glsl"
+#include "/lib/common/water_glint.glsl"
+#include "/lib/common/water_normal.glsl"
+#include "/lib/common/water.glsl"
+#include "/lib/common/shadow_volume.glsl"
 #include "/lib/buffers/frame_data.glsl"
 #include "/lib/sky/sh.glsl"
-#include "/lib/common/color.glsl"
 #include "/lib/common/phase.glsl"
 #include "/lib/buffers/images.glsl"
 #include "/lib/sky/atmosphere.glsl"
-#include "/lib/common/noise.glsl"
-#include "/lib/common/transforms.glsl"
 #include "/lib/sky/celestial.glsl"
 #include "/lib/common/look_presets.glsl"
 #include "/lib/sky/sky_color.glsl"
@@ -74,6 +84,45 @@ const int SH_SAMPLES = 128;
 const float RAIN_DIRECT_DIMMING = 0.6;
 // worldTime がこれ以上飛んだら時間方向の履歴を捨てる (/time set 等)
 const int WORLD_TIME_JUMP = 40;
+// 目の位置の太陽の見え方 (影マップ)。画面の外の太陽や、影マップより遠い霧の遮る物が分からない所の手がかりにする
+const int EYE_SUN_TAPS = 16;
+// 光源側へずらす距離 (ブロック)。自分の頭の影 (shadowPlayer) を拾わない
+const float EYE_SUN_OFFSET = 1.0;
+// フレア用: 光に垂直な円盤の半径 (ブロック)
+const float EYE_SUN_RADIUS = 0.5;
+// 霧用: 広く平均して、柵や細い木の影で光芒が点滅しないようにする。縦は狭く
+// (低い太陽で縦にも広げると円盤の下側が足元の地面に埋まり、開けた所でも見え方が下がる)
+const float EYE_SUN_AREA_RADIUS = 3.0;
+const float EYE_SUN_AREA_HEIGHT = 1.0;
+// 深度の余裕 (ブロック)
+const float EYE_SUN_BIAS = 0.1;
+// 霧用の平滑化 (1/秒)
+const float EYE_SUN_SPEED = 4.0;
+// カメラがこれ以上飛んだら平滑化の履歴を捨てる (ブロック)
+const float EYE_SUN_RESET_DISTANCE = 16.0;
+
+#ifdef HAS_SKY
+// 目から光源側へ EYE_SUN_OFFSET の点の周り (光に垂直な、横 radius 縦 height の楕円) が、影マップで光に見えている割合
+float eyeSunVisibility(float radius, float height) {
+    vec3 L = getShadowLightDir();
+    // 横軸は水平 (光がほぼ真上なら適当な軸)
+    vec3 right = abs(L.y) > 0.99 ? vec3(1.0, 0.0, 0.0) : normalize(cross(vec3(0.0, 1.0, 0.0), L));
+    vec3 up = cross(L, right);
+    float sum = 0.0;
+    for (int i = 0; i < EYE_SUN_TAPS; i++) {
+        vec2 d = vogelDisk(i, EYE_SUN_TAPS, 0.0) * vec2(radius, height);
+        vec3 p = L * EYE_SUN_OFFSET + right * d.x + up * d.y;
+        vec3 s = playerToShadowScreen(p);
+        // 影マップの範囲外は遮る物が分からないので見えるとする
+        if (any(lessThan(s, vec3(0.0))) || any(greaterThan(s, vec3(1.0)))) {
+            sum += 1.0;
+        } else {
+            sum += step(s.z - EYE_SUN_BIAS * shadowDepthPerBlock(), texture(shadowtex1, s.xy).r);
+        }
+    }
+    return sum / float(EYE_SUN_TAPS);
+}
+#endif
 
 void main() {
     // 時間方向の履歴の有効性 (雲・VL の蓄積が古い時刻の絵を引きずらないように)
@@ -139,11 +188,19 @@ void main() {
     vec3 cloudSkyUp = sh[0] * (SH_Y0 * SH_COS_A0) + sh[1] * (SH_Y1 * SH_COS_A1)
                     - (sh[6] * SH_Y2_ZZ + sh[8] * SH_Y2_XX_YY) * SH_COS_A2;
     frameData.skyParams[2] = vec4(max(cloudSkyUp, 0.0), 0.0);
+
+    float eyeNow = eyeSunVisibility(EYE_SUN_RADIUS, EYE_SUN_RADIUS);
+    float eyeArea = eyeSunVisibility(EYE_SUN_AREA_RADIUS, EYE_SUN_AREA_HEIGHT);
+    float eyePrev = frameData.skyParams[3].y;
+    bool eyeReset = historyFrames < 1.5 || isnan(eyePrev) || isinf(eyePrev) || distance(cameraPosition, previousCameraPosition) > EYE_SUN_RESET_DISTANCE;
+    float eyeSmooth = eyeReset ? eyeArea : mix(eyePrev, eyeArea, 1.0 - exp(-EYE_SUN_SPEED * clamp(frameTime, 0.0, 0.5)));
+    frameData.skyParams[3] = vec4(eyeNow, eyeSmooth, 0.0, 0.0);
 #else
     frameData.sunIrradiance = vec4(0.0);
     frameData.moonIrradiance = vec4(0.0);
     frameData.skyParams[0] = vec4(0.0);
     frameData.skyParams[2] = vec4(0.0);
+    frameData.skyParams[3] = vec4(1.0, 1.0, 0.0, 0.0);
     #ifdef WORLD_END
         // エンドは影マップがあるので、淡い紫の平行光で立体感を出す
         frameData.shadowLightIrradiance = vec4(END_LIGHT_IRRADIANCE, 0.0);

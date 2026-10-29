@@ -92,6 +92,10 @@ uint flareVisibilityTap(uint index) {
     if (outside >= LENS_VIS_OFFSCREEN) return 0u;
     if (texelFetch(depthtex0, ivec2(clamped * viewSize()), 0).r < 1.0) return 0u;
     float vis = 1.0 - smoothstep(0.0, LENS_VIS_OFFSCREEN, outside);
+#ifdef HAS_SUN_SHADOWS
+    // 画面の外の太陽は端の画素しか見えない (洞窟の口や尾根の上の空が写っていても太陽は隠れている) ので、目の位置の影マップの判定を使う
+    vis *= mix(1.0, saturate(frameData.skyParams[3].x), smoothstep(0.0, LENS_VIS_EYE_FADE, outside));
+#endif
     if (outside <= 0.0) {
         // SH の DC 項 x Y00 = 空の平均放射 (ルックの空の環境光の強さは空の明るさではないので外す)
         float skyLum = luminance(frameData.skySH[0].rgb) * (0.282095 / LK_SKY_AMBIENT);

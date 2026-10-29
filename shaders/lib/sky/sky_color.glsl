@@ -203,6 +203,22 @@ float getCaveFactor() {
 #endif
 }
 
+/*
+ * 太陽の方向の遠い霧の光り方を、目の周りの太陽の見え方 (prepare が影マップから求める) で抑える割合。影マップの範囲より遠い区間用
+ * 屋外 (スカイライト 9 以上) と画面空間の判定だけでは、山の陰や洞窟の口でも遠い霧が太陽の色で光る
+ * 太陽から外れた方向 (cos -0.17 = 100 度より外) は抑えず、遠景のもやを残す
+ */
+const float FAR_SUN_SHADE_COS_OFF = -0.17;
+const float FAR_SUN_SHADE_COS_ON = 0.5;
+// 目の周りの見え方がこの範囲で 1 -> 0 に落ちる。柱・柵・細い木で一部が遮られただけでは抑えず、半分以上が遮られた時に効かせる
+const float FAR_SUN_SHADE_VISIBLE_MIN = 0.1;
+const float FAR_SUN_SHADE_VISIBLE_FULL = 0.7;
+float farSunShade(vec3 dir) {
+    float toward = smoothstep(FAR_SUN_SHADE_COS_OFF, FAR_SUN_SHADE_COS_ON, dot(dir, getShadowLightDir()));
+    float visible = smoothstep(FAR_SUN_SHADE_VISIBLE_MIN, FAR_SUN_SHADE_VISIBLE_FULL, frameData.skyParams[3].y);
+    return mix(1.0, visible, toward);
+}
+
 // 雨で曇った空へ寄せる (雲の無い LUT を灰色の曇天に近づける)
 vec3 skyApplyOvercast(vec3 radiance) {
     float overcast = rainStrength;

@@ -242,7 +242,12 @@ void main() {
         vec4 fog = upsampleVolumetrics(texel, linearizeDepth(fixedDepth));
 #else
         float outdoor = 1.0 - getCaveFactor();
-        vec4 fog = fogAnalyticSegment(dir, 0.0, dist, fogLightingSetup(dir), outdoor, max(outdoor, 0.05));
+    #ifdef CAVE_LEAK_PREVENTION
+        float sunVisibility = outdoor * farSunShade(dir);
+    #else
+        float sunVisibility = outdoor;
+    #endif
+        vec4 fog = fogAnalyticSegment(dir, 0.0, dist, fogLightingSetup(dir), sunVisibility, max(outdoor, 0.05));
 #endif
         color = color * fog.a + fog.rgb;
         glint *= fog.a;
