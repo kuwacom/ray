@@ -77,6 +77,7 @@ const float WATER_REFRACT_D_DISTANCE = 32.0;    // 屈折先を探す最大距�
 const float WATER_REFRACT_D_MATCH = 0.6;        // 画面の点が屈折した光線からこれ以内なら同じ屈折先 (ブロック, 距離 1 あたり 1% を足す)
 const float WATER_REFRACT_D_REF_RADIUS = 6.0;   // ボクセルの色の基準にする水底の平均を取る半径 (画素)
 const float WATER_REFRACT_D_REF_MATCH = 2.0;    // 基準の平均に入れる水底の点の、まっすぐ見た水底からの距離 (ブロック)
+const vec2 WATER_REFRACT_D_TONE_CLAMP = vec2(0.5, 2.0); // 表の色に掛ける明るさの補正の範囲
 // 照り返しのうち輝点に回す割合の上限 (WATER_GLINT = 1 の時)。残りは滑らかなローブのまま光の道の下地の淡い光にする
 const float WATER_GLINT_POINT_SHARE = 0.85;
 
@@ -132,10 +133,9 @@ float waterRefractScreenWeight(vec2 uv, vec2 tuv) {
 /*
  * 方式 D: 上から見た水面の屈折先をボクセルで辿る (画面外・手前の物の陰の水底)
  * 当たりが画面に映っていればその色。映っていなければ、面に沿って整数ブロックずらした同じブロックの同じ面の画面の色を借りる
- * (borrowVoxelFaceColor)。それも無ければ、ボクセル反射と同じ照明の近似 (太陽の影の 1 タップ・雲影・floodfill・空,
- * shadeSecondaryHit) で照らす。ボクセルにはテクスチャの模様が無いので、この画素からまっすぐ見た水底 (画面に映っている同じ水の底)
- * の周りの平均の色を、照明の近似の比 (当たり / まっすぐ見た水底) で明るさと向きの分だけ直して使う
- * (一定のアルベドで照らすと、砂の水底で画面の像との境に色と明るさの段が出た。借りられない時はブロックの平均の色の表を使う)
+ * (borrowVoxelFaceColor)。それも無ければ、ボクセル反射と同じ照明の近似 (太陽の影の 1 タップ・雲影・floodfill・空, shadeSecondaryHit)
+ * でブロックの平均の色の表を照らす。表の色は、この画素からまっすぐ見た水底の周りの平均との明るさの比で、画面の像との段を消す
+ * (まっすぐ見た水底の像そのものを使うと、屈折先が画面に無い所が屈折していない像になる)
  * 戻り値 false = ボクセルの範囲外で分からない。true で何にも当たらなければ深い水 (pathLen = WATER_SKY_PATH, 色は 0)
  */
 bool waterRefractVoxel(vec3 surfPlayer, vec3 dir, vec3 floorPlayer, float d1, float skyLm, out vec3 color, out float pathLen) {
@@ -167,9 +167,14 @@ bool waterRefractVoxel(vec3 surfPlayer, vec3 dir, vec3 floorPlayer, float d1, fl
 
     vec3 voxelColor;
     bool hasRef = borrowVoxelFaceColor(hitPlayer, hitNormal, hitBlock, skyLm, true, voxelColor);
+    if (!hasRef) {
+        // まっすぐ見た水底の像をそのまま使うと、屈折先が画面に無い所が屈折していない像になった
+        // 像は明るさの基準にだけ使い、色はブロックの表の色を照らして作る (模様は写さない)
+        voxelColor = shadeSecondaryHitReflected(hitPlayer, hitNormal, getBlockAlbedo(hitBlock, hitNormal), skyLm, ivec2(-1));
+    }
     if (!hasRef && d1 < 1.0 && floorPlayer.y < surfPlayer.y) {
         GBufferData g = readGBuffer(ivec2(gl_FragCoord.xy));
-        // 周りの水底の平均 (テクスチャの細部を落とす。画面の像との境で模様が二重に見えないように)
+        // 周りの水底の平均 (模様を落とした明るさの基準)
         vec2 r = WATER_REFRACT_D_REF_RADIUS / viewSize();
         float matchDist = WATER_REFRACT_D_REF_MATCH + length(floorPlayer) * 0.02;
         vec3 sum = vec3(0.0);
@@ -182,15 +187,16 @@ bool waterRefractVoxel(vec3 surfPlayer, vec3 dir, vec3 floorPlayer, float d1, fl
             sum += texture(colortex0, uv).rgb;
             n += 1.0;
         }
-        vec3 Eref = shadeSecondaryHit(floorPlayer, g.geoNormal, vec3(1.0), g.lightmap.y);
-        if (n > 0.0 && luminance(Eref) > 1e-6) {
-            vec3 Ehit = shadeSecondaryHit(hitPlayer, hitNormal, vec3(1.0), g.lightmap.y);
-            // 明るさだけ直す (色ごとの比にすると、色付きの影の 1 タップの差で当たりの所々が青く染まった)
-            voxelColor = sum / n * clamp(luminance(Ehit) / luminance(Eref), 0.0, 4.0);
-            hasRef = true;
+        // 水底のセルのブロック (表の色の基準)
+        ivec3 floorCell = ivec3(floor(playerToVoxel(floorPlayer - g.geoNormal * VOXEL_HIT_INSET)));
+        int floorBlock = isInVoxelVolume(floorCell) ? fetchVoxelBlockId(floorCell) : hitBlock;
+        vec3 Efloor = shadeSecondaryHitReflected(floorPlayer, g.geoNormal, getBlockAlbedo(floorBlock, g.geoNormal), g.lightmap.y, ivec2(-1));
+        if (n > 0.0 && luminance(Efloor) > 1e-6) {
+            // 輝度の比だけ (色ごとの比にすると影の 1 タップの色の差で染まる)。表の色と画面の像の明るさの段を消す
+            float tone = clamp(luminance(sum / n) / luminance(Efloor), WATER_REFRACT_D_TONE_CLAMP.x, WATER_REFRACT_D_TONE_CLAMP.y);
+            voxelColor *= tone;
         }
     }
-    if (!hasRef) voxelColor = shadeSecondaryHitReflected(hitPlayer, hitNormal, getBlockAlbedo(hitBlock, hitNormal), skyLm, ivec2(-1));
     color = mix(voxelColor, screenColor, wS);
     return true;
 }
