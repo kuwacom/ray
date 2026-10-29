@@ -11,7 +11,9 @@
  * post モジュール (lib/post)
  */
 //@include "/lib/common/common.glsl"
+//@include "/lib/common/gbuffer.glsl"
 //@include "/lib/buffers/frame_data.glsl"
+//@include "/lib/ids/material_ids.glsl"
 //@include "/lib/post/post_internal.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
@@ -29,11 +31,14 @@
 #include "/lib/common/math.glsl"
 #include "/lib/common/shading_types.glsl"
 #include "/lib/common/common.glsl"
+#include "/lib/common/color.glsl"
+#include "/lib/common/encoding.glsl"
+#include "/lib/common/gbuffer.glsl"
 #include "/lib/buffers/frame_data.glsl"
+#include "/lib/ids/material_ids.glsl"
 #include "/lib/common/jitter.glsl"
 #include "/lib/common/transforms.glsl"
 #include "/lib/post/velocity.glsl"
-#include "/lib/common/color.glsl"
 #include "/lib/common/look_presets.glsl"
 #include "/lib/post/tonemap.glsl"
 #include "/lib/post/post.glsl"
@@ -85,12 +90,27 @@ float dofDistance(float depth) {
     return depth >= 1.0 ? far * 4.0 : linearizeDepth(depth);
 }
 
+/*
+ * ボケの計算に使う深度。水中から見た水面は水の外の景色を映す窓なので、面そのもの (数ブロック先) の深度で数えると
+ * 水の外の遠景が手前の物としてすべてぼける。面の向こうの深度 (depthtex2) で数える
+ * オートフォーカス (exposure_autofocus.csh) も水中では水面を焦点に入れず、同じ深度を見る
+ */
+float dofDepth(ivec2 sourceTexel, float depth0) {
+    if (isEyeInWater == 0 || isHandDepth(depth0)) return depth0;
+    vec3 n;
+    vec2 lm;
+    int mat;
+    decodeTranslucentData(texelFetch(colortex5, sourceTexel, 0), n, lm, mat);
+    return mat == MAT_WATER ? texelFetch(depthtex2, sourceTexel, 0).r : depth0;
+}
+
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
     vec4 centerRaw = texelFetch(colortex0, texel, 0);
     vec2 uv = (vec2(texel) + 0.5) * texelSize();
     // 歪曲・魚眼を TAA で組み立てた時は colortex0 が出力の座標なので、深度は元画像の位置で読む (lib/post/lens.glsl)
-    float depth0 = texelFetch(depthtex0, LENS_WARP_TAA ? postSourceTexel(uv) : texel, 0).r;
+    ivec2 sourceTexel = LENS_WARP_TAA ? postSourceTexel(uv) : texel;
+    float depth0 = texelFetch(depthtex0, sourceTexel, 0).r;
     if (isHandDepth(depth0)) {
         outColor = centerRaw;
         return;
@@ -128,7 +148,7 @@ void main() {
     const vec2 fieldCoc = vec2(0.0);
 #endif
     float cocBias = 0.5 * (fieldCoc.x + fieldCoc.y);
-    float dist0 = dofDistance(depth0);
+    float dist0 = dofDistance(dofDepth(sourceTexel, depth0));
     float objectCoc0 = circleOfConfusion(dist0, focus) * cocMag;
     float cocSigned0 = clamp(objectCoc0 + cocBias, -maxRadius, maxRadius);
 
@@ -156,9 +176,10 @@ void main() {
             float a = (float(i) + 0.5 * float(ring)) * (TAU / 8.0);
             vec2 p = uv + vec2(cos(a), sin(a)) * reach * texelSize();
             if (any(lessThan(p, vec2(0.0))) || any(greaterThan(p, vec2(1.0)))) continue;
-            float d = texelFetch(depthtex0, postSourceTexel(p), 0).r;
+            ivec2 ringTexel = postSourceTexel(p);
+            float d = texelFetch(depthtex0, ringTexel, 0).r;
             if (isHandDepth(d)) continue;
-            float dist = dofDistance(d);
+            float dist = dofDistance(dofDepth(ringTexel, d));
             if (dist >= dist0) continue;
             float c = -clamp(circleOfConfusion(dist, focus) * cocMag + cocBias, -maxRadius, maxRadius);
             if (c > reach * 0.5) nearCoc = max(nearCoc, c);
@@ -257,9 +278,10 @@ void main() {
         vec2 uvS = uv + o * radius * texelSize();
         if (any(lessThan(uvS, vec2(0.0))) || any(greaterThan(uvS, vec2(1.0)))) continue;
 
-        float depthS = texelFetch(depthtex0, postSourceTexel(uvS), 0).r;
+        ivec2 sampleTexel = postSourceTexel(uvS);
+        float depthS = texelFetch(depthtex0, sampleTexel, 0).r;
         if (isHandDepth(depthS)) continue;
-        float distS = dofDistance(depthS);
+        float distS = dofDistance(dofDepth(sampleTexel, depthS));
         float cocSignedS = clamp(circleOfConfusion(distS, focus) * cocMag + cocBias, -maxRadius, maxRadius);
         float cocS = abs(cocSignedS);
         vec3 cocS3 = abs(cocSignedS + lca);
