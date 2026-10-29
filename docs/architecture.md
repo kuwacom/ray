@@ -106,7 +106,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 18 | deferred20.vsh/fsh | sky | 体積雲レイマーチ (低解像度 + チェッカーボード) | weather, skyView | colortex10 (左上 1/CLOUD_RES) | 画面 (範囲外は早期終了) | CLOUDS>=2, world0 |
 | 19 | deferred21.vsh/fsh | sky | 雲の時間アップスケール | colortex10, 履歴 | colortex11 | 画面 | 同上 |
 | 20 | deferred30.vsh/fsh | surface | 不透明シェーディング (全モジュールの光を合成) + 空の描画 | G バッファ, colortex6/8/11, SSBO0 | colortex0 | 画面 | 常時 |
-| 21 | gbuffers_water / hand_water / particles_translucent / weather | surface (weather は sky) | 半透明の前方シェーディング | アトラス, 影, flood | colortex4 (乗算済み), colortex5 | 画面 | 常時 |
+| 21 | gbuffers_water / hand_water / particles_translucent / weather / clouds | surface (weather・clouds は sky) | 半透明の前方シェーディング (clouds は CLOUDS=1 のバニラの雲。deferred の後に描かれるので前方で色を決め、colortex4 だけに書く) | アトラス, 影, flood | colortex4 (乗算済み), colortex5 | 画面 | 常時 |
 | 22 | composite.csh | surface | 反射 (SSR / ラフ / ボクセル補完) | colortex0/2/3/5, voxel | reflectionImg | local 8², 0.5 | REFLECTIONS>0 |
 | 23 | composite1_a.csh | sky | VL / 高さフォグのレイマーチ (影マップ空間 + floodfill + 雲影) | 影マップ, flood, cloudShadow | colorimg12 (左上 1/VL_RES), fogHistoryImg | local 8², 1/VL_RES | VL |
 | 24 | composite1.vsh/fsh | surface | 半透明合成 (屈折・水中吸収・反射) | colortex0/4/5, reflectionImg | colortex0 | 画面 | 常時 |
@@ -306,7 +306,7 @@ TNT・クリーパーは `LIGHT_FLAG_ENTITY_FLASH` で `entityColor.a` (点滅) 
 
 ### マテリアル ID (G バッファ 8bit, `lib/ids/material_ids.glsl`)
 
-0 空 / 1 地形 / 2 植物 / 3 葉 / 4 発光ブロック / 5 金属 / 6 光沢 / 7 雪 / 8 溶岩 / 9 水中植物 / 10 水 / 11 ガラス / 12 色付きガラス / 13 氷 / 14 スライム・ハチミツ / 15 ネザーポータル / 16 その他半透明 / 20 エンティティ / 21 プレイヤー / 22 ドロップアイテム / 23 発光エンティティ / 24 ブロックエンティティ / 25 ビーコンの光線 / 26 雷 / 30 手 / 31 光る物を持った手 / 40 パーティクル / 41 天候 / 42 バニラの雲 / 43 線など。
+0 空 / 1 地形 / 2 植物 / 3 葉 / 4 発光ブロック / 5 金属 / 6 光沢 / 7 雪 / 8 溶岩 / 9 水中植物 / 10 水 / 11 ガラス / 12 色付きガラス / 13 氷 / 14 スライム・ハチミツ / 15 ネザーポータル / 16 その他半透明 / 20 エンティティ / 21 プレイヤー / 22 ドロップアイテム / 23 発光エンティティ / 24 ブロックエンティティ / 25 ビーコンの光線 / 26 雷 / 30 手 / 31 光る物を持った手 / 40 パーティクル / 41 天候 / 42 バニラの雲 (予約。前方シェーディングなので G バッファには書かない) / 43 線など。
 gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.glsl) により変換し、deferred 以降はマテリアル ID だけを見る。
 
 ---
