@@ -58,12 +58,18 @@ const int LENS_SCREEN_GHOST_COUNT = GHOST_S.length() < LENS_SCREEN_GHOST_LIMIT ?
 vec3 lensGhosts(vec2 yTan, vec2 lightTan, float fNumber, float pxTan) {
     float rStop = 0.5 / fNumber * GHOST_KA_MAIN;
     float rFront = max(GHOST_FRONT_RADIUS, 0.55 / LP_F_OPEN);
+#ifdef LENS_GHOST_TUNED
+    rFront *= LP_GHOST_FRONT_SCALE;
+#endif
 
     vec3 wSum = vec3(0.0);
     for (int k = 0; k < LENS_SPECTRAL_SAMPLES; k++) wSum += wavelengthToRgb(lensWavelength(k, LENS_SPECTRAL_SAMPLES));
 
     vec3 sum = vec3(0.0);
     for (int g = 0; g < LENS_GHOST_COUNT; g++) {
+#ifdef LENS_GHOST_TUNED
+        if (((LP_GHOST_MASK >> g) & 1) == 0) continue;
+#endif
         // 550nm で外接円を求め、画素が入らないゴーストは飛ばす (大半の画素は 0-2 個しか当たらない)
         float s = GHOST_S[g].y;
         float a = ghostScaleClamp(GHOST_A[g].y);
@@ -111,7 +117,11 @@ vec3 lensGhosts(vec2 yTan, vec2 lightTan, float fNumber, float pxTan) {
             sum += wavelengthToRgb(l) * (inside * ring * energy);
         }
     }
-    return sum / max(wSum, 1e-6) * (4.0 * fNumber * fNumber / PI);
+    vec3 c = sum / max(wSum, 1e-6) * (4.0 * fNumber * fNumber / PI);
+#ifdef LENS_GHOST_TUNED
+    c = mix(vec3(luminance(c)), c, LP_GHOST_SATURATION);
+#endif
+    return c;
 }
 
 /*

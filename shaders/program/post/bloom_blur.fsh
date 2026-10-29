@@ -142,6 +142,9 @@ vec3 screenFlare(vec2 uv) {
     // 輝度はゴーストの写像で面積が S^2 倍に広がる分だけ下がる (反射率 R / S^2)
     if (LP_SCREEN_GHOSTS > 0.0) {
         for (int g = 0; g < LENS_SCREEN_GHOST_COUNT; g++) {
+#ifdef LENS_GHOST_TUNED
+            if (((LP_GHOST_MASK >> g) & 1) == 0) continue;
+#endif
             float radiusPx = abs(GHOST_A[g].y) * rEp / tanHalf.y * viewHeight * 0.5;
             // タイルのぼけ (約 1.5 テクセル) がゴーストの大きさになるレベル
             int level = clamp(int(log2(max(radiusPx / 1.5, 1.0)) + 0.5), 2, BLOOM_LEVELS - 1);
@@ -154,7 +157,11 @@ vec3 screenFlare(vec2 uv) {
              * 色はコートの反射色を半分だけ残す (マルチコートは緑と赤の差が 40 倍あり、そのままだと純色の円になる)
              */
             vec3 refl = vec3(ghostReflectance(g, 650.0), ghostReflectance(g, 550.0), ghostReflectance(g, 450.0));
+#ifdef LENS_GHOST_TUNED
+            refl = mix(vec3(dot(refl, vec3(1.0 / 3.0))), refl, LENS_SCREEN_GHOST_SATURATION * LP_GHOST_SATURATION);
+#else
             refl = mix(vec3(dot(refl, vec3(1.0 / 3.0))), refl, LENS_SCREEN_GHOST_SATURATION);
+#endif
             for (int c = 0; c < 3; c++) {
                 // 縮小率の小さいゴーストは画面全体の光を 1 点に集めて白い塊になるので、集光を抑える
                 float sc = abs(s[c]) < 0.05 ? (s[c] < 0.0 ? -0.05 : 0.05) : s[c];

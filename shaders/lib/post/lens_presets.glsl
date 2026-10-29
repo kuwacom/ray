@@ -14,18 +14,26 @@
 #if LENS_PRESET == 1
 /*
  * 現代の大口径単焦点 (50mm F1.8 級, マルチコート, 丸い 9 枚羽根)
- * 収差はほぼ補正済み。既定なので控えめ (ゴーストは太陽を入れた時に淡く出る程度)
+ * 収差はほぼ補正済み。既定なので控えめ (ゴーストは小さく淡いものを数本、軽い光条)
  */
 #define LENS_GHOST_TABLE 3
 #define LENS_BLADES 9
+// ゴーストの絞り込み (他のプリセットは表のゴーストを全部、そのままの色と大きさで描く)
+#define LENS_GHOST_TUNED
+// 使うゴーストの番号 (ビット)。小さく淡いものを太陽の内側と反対側に 5 本 (2, 3, 5, 8, 11)。点に集まる 0 と画面の 1/5 を超える円は外す
+const int LP_GHOST_MASK = 0x92C;
+// ゴーストの色の残す割合 (マルチコートの表は青と赤が緑の数十倍で、そのままだと濃い紫の円になる)
+const float LP_GHOST_SATURATION = 0.06;
+// 前玉の縁の倍率。現代の 50mm はゴーストが欠けるのは画面の隅の近くだけ
+const float LP_GHOST_FRONT_SCALE = 2.2;
 const float LP_F_OPEN = 1.8;
 const float LP_BLADE_ROUNDNESS = 0.6;
-const float LP_GHOSTS = 2.0;
+const float LP_GHOSTS = 1.8;
 const float LP_SCREEN_GHOSTS = 1.0;
-const float LP_STARBURST = 0.9;
+const float LP_STARBURST = 0.75;
 const float LP_STAR_SIZE = 1.0;
 const float LP_HALO = 0.08;
-const float LP_DIRT = 0.15;
+const float LP_DIRT = 0.05;
 const float LP_DIRT_CONTRAST = 0.5;
 const float LP_VEILING_GLARE = 0.3;
 const float LP_STREAK = 0.0;
@@ -44,7 +52,7 @@ const float LP_HALATION = 0.0;
 const float LP_BOKEH_RIM = 0.0;
 const float LP_SA_RIM = 0.0;
 const float LP_YELLOWING = 0.0;
-const float LP_RINGING = 0.15;
+const float LP_RINGING = 0.0;
 
 #elif LENS_PRESET == 2
 /*
