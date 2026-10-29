@@ -247,6 +247,12 @@ option.PUDDLE_SIZE=Puddle Size
 option.PUDDLE_SIZE.comment=At 1.0 a puddle spans about 2-10 blocks
 option.PUDDLE_RIPPLES=Puddle Ripples
 option.PUDDLE_RIPPLES.comment=Strength of the raindrop ripples on puddles
+option.RAIN_WET_HALFLIFE=Wetting Time
+option.RAIN_WET_HALFLIFE.comment=Seconds after rain starts until the ground is half wet. Rain clouds and fog build up at the same pace
+suffix.RAIN_WET_HALFLIFE= s
+option.RAIN_DRY_HALFLIFE=Drying Time
+option.RAIN_DRY_HALFLIFE.comment=Seconds after rain stops until the ground is half dry. Puddles, rain clouds and fog clear at the same pace
+suffix.RAIN_DRY_HALFLIFE= s
 option.EMISSION_STRENGTH=Emission Strength
 option.LAVA_BRIGHTNESS=Lava Brightness
 option.LAVA_BRIGHTNESS.comment=How bright lava itself looks on screen. Higher values shift it from orange toward yellow. Does not change the light it casts. 0 = no extra brightening (darker orange)

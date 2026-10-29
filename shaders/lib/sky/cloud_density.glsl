@@ -360,7 +360,7 @@ float cloudLowDensityCumulus(CloudContext ctx, CloudColumn col, vec2 rel, float 
     // (一様に厚いと、風下の空一面が暗い灰色の天井になった)
     water *= mix(1.0, mix(CLOUD_CB_WATER, 0.08 + 0.7 * stormCore, ice), wCb);
 #endif
-    // 雨天の濃さの倍率も見た目と同じ範囲で移す (雨上がりの wetness が残る間に、層積雲の切れ端まで濃い白い欠片にならないように)
+    // 雨天の濃さの倍率も見た目と同じ範囲で移す (雨上がりの rainWetness が残る間に、層積雲の切れ端まで濃い白い欠片にならないように)
     float density = d * water * rainMottle * mix(1.0, ctx.densityScale, smoothstep(CLOUD_RAIN_DENSITY.x, CLOUD_RAIN_DENSITY.y, ctx.rain));
     // 光源方向は芯の実測の消散係数で陰を見積もっているので (CLOUD_LIGHT_OD_SCALE)、視線の濃さがそれを超えた分だけ濃くする
     density *= mix(lightPath ? max(CS_DENSITY / CLOUD_STYLE_LIGHT_SIGMA_RATIO, 1.0) : CS_DENSITY, 1.0, rainLook);
@@ -416,7 +416,7 @@ float cloudMidDensity(CloudContext ctx, float cover, vec2 rel, float altitude, b
     float h = (altitude - CLOUD_R_MID_BASE) / CLOUD_R_MID_DEPTH;
     if (h <= 0.0 || h >= 1.0) return 0.0;
     vec2 q = rel + ctx.midOrigin;
-    // 雨の前後に増える中層は一様な高層雲として広げる (雨上がりの wetness が残る間に高積雲の粒のまま増やすと、
+    // 雨の前後に増える中層は一様な高層雲として広げる (雨上がりの rainWetness が残る間に高積雲の粒のまま増やすと、
     // 低層の雲の周りに縁のくっきりした白い欠片が散らばって見えた)
     float stratus = max(smoothstep(0.6, 1.0, cover), linearStep(CLOUD_MID_RAIN_VEIL.x, CLOUD_MID_RAIN_VEIL.y, ctx.rainLight));
     vec4 n = texture(cloudNoiseTex, q / CLOUD_MID_PERIOD);
@@ -448,7 +448,7 @@ float cloudMidDensity(CloudContext ctx, float cover, vec2 rel, float altitude, b
     d = smoothstep(0.0, CLOUD_MID_EDGE_WIDTH, d);
     // 小さな粒・群れの縁の粒ほど水量が少なく透ける (一様に濃いと、輪郭のはっきりした白い小片が貼り付いたように見えた)
     float thin = mix(CLOUD_MID_GRAIN_THIN, 1.0, smoothstep(0.1, 0.8, grain));
-    // 雨天の濃さの倍率は高層雲と本降りの時だけ。雨上がりの wetness が残る間 (雨天度 0.1-0.4) に被覆が増えた高積雲の粒まで
+    // 雨天の濃さの倍率は高層雲と本降りの時だけ。雨上がりの rainWetness が残る間 (雨天度 0.1-0.4) に被覆が増えた高積雲の粒まで
     // 濃くすると、低層の雲の周りに縁のくっきりした白い欠片が散らばった
     float rainScale = mix(1.0, ctx.densityScale, max(stratus, smoothstep(CLOUD_HAZE_RAIN.x, CLOUD_HAZE_RAIN.y, ctx.rain)));
     return d * mix(thin, 0.45, stratus) * rainScale;

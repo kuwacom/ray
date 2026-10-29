@@ -100,7 +100,7 @@ uniform float sunAngle;
 uniform float shadowAngle;
 uniform int moonPhase;
 uniform float rainStrength;
-uniform float wetness;
+uniform float rainWetness; // 雨の濡れ (shaders.properties のカスタム uniform。Iris の wetness は乾く側の半減期を変えられないので使わない)
 uniform float thunderStrength;
 uniform vec4 lightningBoltPosition;
 uniform int worldTime;

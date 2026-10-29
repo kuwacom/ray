@@ -292,7 +292,7 @@ const float CLOUD_HAZE_DENSITY = 0.15 * CLOUD_EDGE_HAZE * CS_HAZE;
 const float CLOUD_HAZE_SWELL = 0.7;
 const float CLOUD_HAZE_FALLOFF = 1.75; // もやが外へ消える曲線の指数 (大きいほど輪郭の近くに寄る)
 // 雨天度 (CloudContext.rain) のこの範囲で、晴天の積雲の見た目 (もや・芯の上限・濃さ) から雨雲の見た目へなめらかに移す。
-// 0-0.4 で一気に移すと、雨上がりの wetness が残る間 (雨天度 0.1-0.4) に小さな雲だけが濃く縁のくっきりした白い欠片になる
+// 0-0.4 で一気に移すと、雨上がりの rainWetness が残る間 (雨天度 0.1-0.4) に小さな雲だけが濃く縁のくっきりした白い欠片になる
 const vec2 CLOUD_HAZE_RAIN = vec2(0.15, 0.75);
 // 雨天の濃さの倍率 (CloudContext.densityScale) を効かせ始める雨天度の範囲
 const vec2 CLOUD_RAIN_DENSITY = vec2(0.0, 0.5);

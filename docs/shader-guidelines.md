@@ -94,7 +94,7 @@ Ray のシェーダーを書くときに、読み込み (Iris の前処理とド
 - `IRIS_FEATURE_<名前>` のマクロは、`iris.features.optional` に書いた機能だけに付く。`required` に書いた機能 (Ray の SSBO・CUSTOM_IMAGES・COMPUTE_SHADERS) には付かないので、`#ifdef IRIS_FEATURE_SSBO` は常に偽
 - ディメンションを表すマクロは Iris には無い。Ray のラッパーが定義する
 - 頂点属性 (`mc_Entity`、`mc_midTexCoord`、`at_tangent`、`at_midBlock`) は、使うと Sodium の地形の頂点の形式が大きくなる。使わない属性は宣言しない
-- `const float drynessHalflife` は、Iris 1.11.4 では `wetnessHalflife` の値を上書きし、乾く側の半減期は Iris の既定 (200) のまま変わらない
+- `const float drynessHalflife` は、Iris 1.11.4 では `wetnessHalflife` の値を上書きし、乾く側の半減期は Iris の既定 (200) のまま変わらない。Ray は `wetness` を使わず、カスタム uniform の `smooth(id, 値, 上がりの半減期, 下がりの半減期)` で濡れを作る (`rainWetness`)。`smooth` の半減期も 0.1 秒単位で、最初の値は平滑化せずにそのまま使う
 
 ## 資源の上限
 

@@ -159,7 +159,7 @@ ivec2 vlLowResSize() { return (ivec2(viewWidth, viewHeight) + VL_RES - 1) / VL_R
 ivec2 vlSampleTexel(ivec2 lowTexel) { return min(lowTexel * VL_RES + VL_RES / 2, ivec2(viewWidth, viewHeight) - 1); }
 bool vlWritesColortex12() { return (frameCounter & 1) == 0; }
 
-float fogRainFactor() { return max(rainStrength, wetness * 0.4); }
+float fogRainFactor() { return max(rainStrength, rainWetness * 0.4); }
 
 /*
  * フォグを積む描画距離 R (空の画素はここまで積み、景色の成分の写像もこれで決まる)
@@ -240,7 +240,7 @@ FogMedium fogMedium() {
     float dayMist = rising > 0.5 ? FOG_GROUND_DAWN * (1.0 - smoothstep(0.0, FOG_GROUND_BURN_OFF, sinceSunrise)) : FOG_GROUND_EVENING * FS_GROUND_EVENING * lowSun;
     float ground = mix(dayMist, mix(FOG_GROUND_NIGHT * FS_GROUND_NIGHT, FOG_GROUND_DAWN, dawn), night);
     // 放射霧は晴れて湿った夜にでき、雨の後の朝は濃い
-    ground *= mix(0.25, 1.5, humidity) * (1.0 + 0.5 * climateClearDay()) * (1.0 + 0.5 * wetness);
+    ground *= mix(0.25, 1.5, humidity) * (1.0 + 0.5 * climateClearDay()) * (1.0 + 0.5 * rainWetness);
     ground += FOG_GROUND_RAIN * rain;
     m.mist = ground * FOG_GROUND_PEAK * LOOK_FOG_DENSITY * region.z * biome.z * FS_GROUND;
 #else

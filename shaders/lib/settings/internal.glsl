@@ -7,10 +7,8 @@
 const float ambientOcclusionLevel = 1.0;
 const float eyeBrightnessHalflife = 4.0;
 const float centerDepthHalflife = 0.6;
-// 濡れの半減期 (Iris は 0.1 秒単位)。300 (30 秒) では雨が 1 分降っても水たまりがほとんど出ないので短くする
-// 濡れは 10 秒で半分 (1 分でほぼ全面)、乾きは 30 秒で半分 (雨上がりもしばらく濡れて雲が残る)
-const float wetnessHalflife = 100.0;
-const float drynessHalflife = 300.0;
+// wetnessHalflife / drynessHalflife は書かない。Iris の wetness は使わず、濡れは rainWetness (shaders.properties) が設定 RAIN_WET_HALFLIFE / RAIN_DRY_HALFLIFE で平滑化する
+// Iris 1.11 は drynessHalflife を濡れる側に代入するので、乾く側の半減期を const で変えられない
 const int noiseTextureResolution = 256;
 
 // reversed shadow culling の非カリング半径。ボクセル体積の水平半径に合わせる

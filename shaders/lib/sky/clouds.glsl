@@ -299,7 +299,7 @@ float getCloudShadow(vec3 playerPos) {
     float below = 1.0 - smoothstep(CLOUD_BASE, CLOUD_BASE + 0.5 * CLOUD_DEPTH, worldY);
     // マップの外は天気からの平均の透過率にする。雨の日に 1 (日なた) へ戻すと、遠くの霧の光の筋がマップの四角い範囲の外だけ
     // 明るくなり、雷雨の空に直線の縁の白い面が出た
-    float outside = 1.0 - CLOUD_SHADOW_RAIN_OUTSIDE * max(rainStrength, wetness);
+    float outside = 1.0 - CLOUD_SHADOW_RAIN_OUTSIDE * max(rainStrength, rainWetness);
     float transmittance = mix(outside, texture(cloudShadowSampler, uv).r, edge.x * edge.y);
     return mix(1.0, transmittance, strength * below);
 #else

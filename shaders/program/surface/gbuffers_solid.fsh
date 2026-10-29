@@ -100,7 +100,7 @@ const float PUDDLE_NOISE_SIGMA = 0.129;  // puddleNoise の標準偏差 (割合 
 const float PUDDLE_EDGE = 0.05;          // 水たまりの縁のぼかし幅 (ノイズの値)
 const float PUDDLE_FRINGE = 0.08;        // 水たまりの周りの湿った帯の幅 (ノイズの値)
 const float PUDDLE_FRINGE_SOAK = 0.4;
-const vec2 PUDDLE_GROWTH = vec2(0.3, 0.95); // wetness (半減期 10 秒) がこの範囲で水たまりが育つ。実測で降り始めの 20 秒ほどで出始めて 45-60 秒で揃い、止んで 60-90 秒で消える
+const vec2 PUDDLE_GROWTH = vec2(0.3, 0.95); // rainWetness がこの範囲で水たまりが育つ。既定の半減期 (濡れ 30 秒 / 乾き 40 秒) では降り始めの 15 秒ほどで出始めて 2 分ほどで揃い、止んで 70 秒ほどで消える
 const vec2 PUDDLE_SKYLIGHT = vec2(0.93, 0.965); // スカイライト 15 (0.97) だけ。屋根の下 (14 = 0.91) には溜めない
 const float PUDDLE_FRINGE_GLOSS = 0.8;
 const float PUDDLE_SMOOTHNESS = 0.99;     // 鏡面 (0.93 は MIRROR_ROUGHNESS ぎりぎりで、8 bit の量子化で VNDF 側に落ちる画素があった)
@@ -366,14 +366,14 @@ void main() {
     float puddle = 0.0;
     float wetAmount = 0.0;
 #if defined RAIN_PUDDLES && defined HAS_SKY && defined GBUF_TERRAIN
-    if (wetness > 0.001 && biome_precipitation == 1 && !isPlant) {
+    if (rainWetness > 0.001 && biome_precipitation == 1 && !isPlant) {
         float exposure = smoothstep(0.88, 0.97, lmcoord.y);
-        wetAmount = wetness * exposure;
+        wetAmount = rainWetness * exposure;
         if (wetAmount > 0.0) {
             vec3 worldPos = playerPos + cameraPosition;
             float wetStrength = saturate(wetAmount * RAIN_WETNESS);
             // 水たまりは真上が空の所 (スカイライト 15) の上向きの面だけ。葉・溶岩の上には溜めない
-            float growth = smoothstep(PUDDLE_GROWTH.x, PUDDLE_GROWTH.y, wetness);
+            float growth = smoothstep(PUDDLE_GROWTH.x, PUDDLE_GROWTH.y, rainWetness);
             float puddleArea = smoothstep(0.7, 0.95, geoN.y) * smoothstep(PUDDLE_SKYLIGHT.x, PUDDLE_SKYLIGHT.y, lmcoord.y) * growth;
             if (materialId == MAT_LEAVES || materialId == MAT_LAVA) puddleArea = 0.0;
             float fringe = 0.0;

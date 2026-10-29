@@ -25,7 +25,7 @@ vec4 cloudMapFetch(vec2 rel) {
     vec4 map = mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
     vec2 edge = abs(p - (CLOUD_MAP_RES * 0.5 - 0.5)) / (CLOUD_MAP_RES * 0.5);
     // 端の外は晴れにするが、雨の日は一面の雨雲のまま (0 にすると地平線の手前に陽の当たる雲と直線の縁の晴れ間が出た)
-    vec3 edgeFill = vec3(0.9, 0.85, 0.3) * max(rainStrength, wetness);
+    vec3 edgeFill = vec3(0.9, 0.85, 0.3) * max(rainStrength, rainWetness);
     map.rba = mix(map.rba, edgeFill, smoothstep(0.85, 0.99, max(edge.x, edge.y)));
     return map;
 }
@@ -97,10 +97,10 @@ CloudClimate cloudClimate() {
     float highMoisture = climateDayRandom(53u);
     // 日射による対流は 14 時ごろ最大、明け方に最小 (worldTime 8000 = 14 時)
     float diurnal = 0.5 + 0.5 * cos(TAU * (float(worldTime) - 8000.0) / 24000.0);
-    // wetness は雨の後もしばらく残るので、雨上がりの雲がゆっくり晴れる
-    // 降り始めは rainStrength (約 5 秒で 1) で半分だけ曇らせ、残りは wetness (半減期 10 秒) で数十秒かけて覆う
+    // rainWetness は雨の後もしばらく残るので、雨上がりの雲がゆっくり晴れる
+    // 降り始めは rainStrength (約 5 秒で 1) で半分だけ曇らせ、残りは rainWetness (既定の半減期 30 秒) で 1-2 分かけて覆う
     // (rainStrength のままだと数秒で空が一気に雨雲に変わった)
-    c.rain = max(0.5 * rainStrength, wetness * mix(0.6, 1.0, rainStrength));
+    c.rain = max(0.5 * rainStrength, rainWetness * mix(0.6, 1.0, rainStrength));
     // 雲の中の光 (曇天の色・拡散) と中層・上層のベールは降り始めから早めに切り替える: 低い雲が覆う前に上空の高層雲が陽射しを弱める。
     // 被覆と同じ遅さだと、降り始めの 10 秒ほどは暗い雲に白く陽の当たる縁が残った劇的な空になった
     c.rainLight = max(c.rain, 0.85 * rainStrength);
