@@ -1,22 +1,33 @@
 """
-ディメンション別ラッパー (shaders/world0, world-1, world1) を生成する
+ディメンション別ラッパー (shaders/world0, world-1, world1) と、shaders.properties の program.*.enabled を生成する
 
 ラッパーは `#version` + ディメンション define + 本体ごとのマクロ + `/program/<本体>` の include だけのファイル。
 プログラムと本体、本体に渡すマクロの対応は PROGRAMS と BODIES の表で持つ。
 本体は shaders/program/<モジュール>/ に 1 セットだけ置く (BSL / Bliss 方式)。
 
+設定で止めるプログラムは DISABLED の表で持ち、shaders.properties の `BEGIN GENERATED program enables` と
+`END GENERATED program enables` の間に、ディメンションごとのフォルダ付きの名前 (`program.world0/composite1_a.enabled`) で書く。
+Iris はプログラムをフォルダ付きの名前で引くので、ディメンションは WORLDS から展開する。
+properties は ASCII のみ (Iris は ISO-8859-1 で読む)。
+
 使い方:
-    uv run tools/gen_wrappers.py            # 足りないラッパーだけ作る
-    uv run tools/gen_wrappers.py --force    # 全部作り直す
-    uv run tools/gen_wrappers.py --check    # 本体の欠落・ラッパーの過不足・本文の不一致を報告するだけ
+    uv run tools/gen_wrappers.py            # 足りないラッパーと properties の生成ブロックを書く
+    uv run tools/gen_wrappers.py --force    # ラッパーを全部作り直す
+    uv run tools/gen_wrappers.py --check    # 本体の欠落・ラッパーの過不足・本文の不一致・properties の古さを報告するだけ
 """
 
 from __future__ import annotations
 
 import argparse
+import re
 import sys
+from dataclasses import dataclass
+from pathlib import Path
 
+import gen_settings
+from lib import generated
 from lib.paths import SHADERS
+from lib.properties import PROPERTIES
 
 # ディメンションフォルダ -> 定義するマクロ
 WORLDS = {
@@ -191,45 +202,139 @@ def expected_wrappers() -> dict[str, Body]:
     return {f: b for n in PROGRAMS for f, b in stage_bodies(n).items()}
 
 
+@dataclass(frozen=True)
+class Disable:
+    """
+    ### Disable
+    設定で止めるプログラム。condition (properties の `#if` の行。None なら常に) が真のとき、
+    worlds のディメンションで programs (Iris のプログラム名。拡張子なし、compute の接尾辞付きは `composite1_a`) を無効にする
+    """
+
+    programs: tuple[str, ...]
+    condition: str | None = None
+    worlds: tuple[str, ...] = tuple(WORLDS)
+    comment: str = ""
+
+
+# shaders.properties の program.*.enabled = false。並びはそのまま出力に写す (ディメンション -> プログラムの順)
+DISABLED: list[Disable] = [
+    Disable(("deferred1", "deferred2"), "#ifndef LIGHT_SHADOWS"),
+    Disable(("deferred10", "deferred11"), "#if GI_MODE == 0 && AO_MODE == 0"),
+    Disable(("deferred20", "deferred21", "prepare2"), "#if CLOUDS < 2", ("world0",)),
+    Disable(("setup1", "setup2", "prepare1", "prepare2", "deferred20", "deferred21"), None, ("world-1", "world1"),
+            "Dimensions without a sky skip the atmosphere LUTs and clouds"),
+    Disable(("setup1", "setup2", "prepare1"), "#if ATMOSPHERE_MODE == 0", ("world0",)),
+    Disable(("composite",), "#if REFLECTIONS == 0"),
+    Disable(("composite1_a",), "#ifndef VL"),
+    Disable(("composite20",), "#ifndef TAA"),
+    Disable(("composite21",), "#ifndef MOTION_BLUR"),
+    Disable(("composite22",), "#ifndef DOF"),
+    Disable(("composite23", "composite24"), "#ifndef BLOOM"),
+]
+
+ENABLES_BEGIN = "# BEGIN GENERATED program enables (tools/gen_wrappers.py)"
+ENABLES_END = "# END GENERATED program enables"
+
+
+def program_names() -> set[str]:
+    """Iris のプログラム名 (拡張子なし) の一覧"""
+    return {Path(f).stem for f in expected_wrappers()}
+
+
+def render_enables() -> str:
+    groups = []
+    for d in DISABLED:
+        lines = [f"# {d.comment}"] if d.comment else []
+        if d.condition:
+            lines.append(d.condition)
+        lines += [f"program.{w}/{p}.enabled = false" for w in d.worlds for p in d.programs]
+        if d.condition:
+            lines.append("#endif")
+        groups.append("\n".join(lines))
+    text = "\n\n".join(groups)
+    if not text.isascii():
+        raise ValueError("DISABLED に ASCII 以外の文字がある (properties は ASCII のみ)")
+    return text
+
+
+def enables_problems(shaders: Path) -> list[str]:
+    """DISABLED の名前の誤り (存在しないプログラム・ディメンション・設定)"""
+    problems = []
+    names = program_names()
+    settings = gen_settings.parse_settings(shaders)
+    for d in DISABLED:
+        problems += [f"DISABLED: 未定義のプログラム {p}" for p in d.programs if p not in names]
+        problems += [f"DISABLED: 未定義のディメンション {w}" for w in d.worlds if w not in WORLDS]
+        cond = d.condition.split(None, 1)[1] if d.condition else ""
+        for ident in re.findall(r"[A-Za-z_]\w*", cond):
+            if ident not in settings and ident != "defined":
+                problems.append(f"DISABLED: 条件 {d.condition} の {ident} が設定にない")
+    return problems
+
+
+def generated_properties(shaders: Path = SHADERS) -> dict[Path, str]:
+    """shaders.properties の program.*.enabled の生成ブロックだけを差し替えた全文 (改行は LF)"""
+    props = shaders / PROPERTIES
+    text = generated.replace_block(props.read_bytes().decode("utf-8"), ENABLES_BEGIN, ENABLES_END, render_enables(), PROPERTIES)
+    return {props: text.replace("\r\n", "\n")}
+
+
+def check(shaders: Path = SHADERS) -> list[str]:
+    """本体の欠落・ラッパーの過不足と不一致・properties の古さ (extra は報告するだけで数えない)"""
+    wrappers = expected_wrappers()
+    problems = enables_problems(shaders)
+    for path in sorted({b[0] for b in wrappers.values()}):
+        if not (shaders / "program" / path).exists():
+            problems.append(f"[missing body] program/{path}")
+    for world, define in WORLDS.items():
+        wdir = shaders / world
+        for f, body in wrappers.items():
+            path = wdir / f
+            if not path.exists():
+                problems.append(f"[missing wrapper] {world}/{f}")
+            elif path.read_bytes().decode("utf-8") != wrapper_text(f, define, body):
+                problems.append(f"[mismatch wrapper] {world}/{f}")
+        if wdir.exists():
+            for p in wdir.iterdir():
+                if p.name not in wrappers:
+                    print(f"[extra wrapper] {world}/{p.name}")
+    return problems + generated.check(generated_properties, shaders, "gen_wrappers.py")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
 
-    wrappers = expected_wrappers()
-    problems = 0
+    if args.check:
+        problems = check()
+        for p in problems:
+            print(p)
+        print("OK" if not problems else f"{len(problems)} problem(s)")
+        return 1 if problems else 0
 
+    wrappers = expected_wrappers()
+    problems = enables_problems(SHADERS)
     for path in sorted({b[0] for b in wrappers.values()}):
         if not (SHADERS / "program" / path).exists():
-            print(f"[missing body] program/{path}")
-            problems += 1
-
+            problems.append(f"[missing body] program/{path}")
+    for p in problems:
+        print(p)
     for world, define in WORLDS.items():
         wdir = SHADERS / world
-        if not args.check:
-            wdir.mkdir(parents=True, exist_ok=True)
+        wdir.mkdir(parents=True, exist_ok=True)
         for f, body in wrappers.items():
             path = wdir / f
             text = wrapper_text(f, define, body)
-            if args.check:
-                if not path.exists():
-                    print(f"[missing wrapper] {world}/{f}")
-                    problems += 1
-                elif path.read_bytes().decode("utf-8") != text:
-                    print(f"[mismatch wrapper] {world}/{f}")
-                    problems += 1
-                continue
             if path.exists() and not args.force and path.read_bytes().decode("utf-8") == text:
                 continue
             path.write_text(text, encoding="utf-8", newline="\n")
-        if wdir.exists():
-            for p in wdir.iterdir():
-                if p.name not in wrappers:
-                    print(f"[extra wrapper] {world}/{p.name}")
-
-    if args.check:
-        print("OK" if problems == 0 else f"{problems} problem(s)")
+        for p in wdir.iterdir():
+            if p.name not in wrappers:
+                print(f"[extra wrapper] {world}/{p.name}")
+    if not problems:
+        generated.write(generated_properties(SHADERS), SHADERS)
     return 1 if problems else 0
 
 

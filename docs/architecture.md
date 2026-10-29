@@ -44,7 +44,7 @@ README.md / CREDITS.md / LICENSE / AGENTS.md / .gitignore
 pyproject.toml / uv.lock / .python-version     tools 用の Python 環境 (uv)
 docs/architecture.md
 tools/
-  gen_wrappers.py                           ディメンション別ラッパーの生成 (プログラム一覧と、プログラムごとの本体・マクロの正本)
+  gen_wrappers.py                           ディメンション別ラッパーと shaders.properties の program.*.enabled の生成 (プログラム一覧、プログラムごとの本体・マクロ、設定で止めるプログラムの正本)
   gen_block_properties.py, id_tables.py     ID の定数・block / item / entity.properties・光源の表のデータの生成 (正本)
   gen_blue_noise.py / gen_cloud_noise.py / gen_water_waves.py / gen_lens_textures.py
                                             shaders/textures/ のテクスチャの生成
@@ -691,7 +691,7 @@ post モジュールが提供 (`//@include "/lib/post/post.glsl"`):
 
 - マジックナンバーは定数化
 - 設定は `lib/settings/` にしかない
-- 重い機能は `#ifdef` で丸ごと外す。プログラム単位は shaders.properties の `program.enabled`
+- 重い機能は `#ifdef` で丸ごと外す。プログラム単位は shaders.properties の `program.<world>/<pass>.enabled` (`tools/gen_wrappers.py` の `DISABLED` の表から生成する。止める条件は表に 1 行足す)
 - compute の `workGroups` / `workGroupsRender` はリテラルで書く (式・マクロは不可。`#if` で分岐)。validate_shaders.py が検査する
 - 他のシェーダーパックのコードは持ち込まない。手法を参考にした場合は CREDITS.md に出典を書く
 
@@ -731,11 +731,11 @@ uv run tools/validate_shaders.py --full      # 既定値 x 3 ディメンショ�
 uv run tools/gl_compile_check.py             # 実機ドライバで compile + link
 uv run tools/gl_compile_check.py --full      # 同上を既定値 x 3 ディメンション + 全プロファイル
 # キャッシュ (tools/.cache/) を無視するのは --no-cache
-uv run tools/gen_wrappers.py --check         # プログラム本体とラッパーの対応
+uv run tools/gen_wrappers.py --check         # プログラム本体とラッパー、program.*.enabled の生成の対応
 ```
 
 validate_shaders.py は include 展開・設定差し替え・Iris マクロ注入をしてからコンパイルし、エラーを元ファイルの行番号で表示する。
-静的チェック: プロファイルの値の妥当性、HIGH = 既定値、screen と lang の網羅、workGroups のリテラル性、`*.properties` が ASCII だけか、block/item の状態値にカンマ区切りが無いか。
+静的チェック: プロファイルの値の妥当性、HIGH = 既定値、screen と lang の網羅、workGroups のリテラル性、`*.properties` が ASCII だけか、block/item の状態値にカンマ区切りが無いか、ラッパーと `program.*.enabled` の生成が最新か。
 
 gl_compile_check.py は同じ前処理結果を不可視ウィンドウの OpenGL 4.6 compatibility コンテキストで実際にコンパイル・リンクする (glfw + PyOpenGL)。
 glslang が通しても実ドライバで落ちるもの (NVIDIA の image uniform 8 個制限 `C7624`、予約語 `packed` 等) を検出し、info log を元ファイルの行番号で表示する。
