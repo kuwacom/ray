@@ -396,7 +396,8 @@ void main() {
             sp.smoothness = mix(sp.smoothness, PUDDLE_SMOOTHNESS, puddle);
             if (labPbrMetalId(sp.f0) == METAL_NONE) sp.f0 = mix(sp.f0, PUDDLE_F0, puddle);
             if (puddle > 0.0) {
-                vec2 ripple = rainRipples(worldPos.xz, rainStrength * PUDDLE_RIPPLES);
+                float footprint = waterFootprint(length(playerPos), abs(dot(geoN, -viewDirPlayer)));
+                vec2 ripple = rainRipples(worldPos.xz, rainStrength * PUDDLE_RIPPLES) + puddleWaveGradient(worldPos.xz, footprint);
                 vec3 puddleNormal = normalize(vec3(-ripple.x, 1.0, -ripple.y));
                 // 縁の半分から内側は自動法線の凹凸を残さない (映り込みがテクセルごとに散ってマットに見えた)
                 normal = normalize(mix(normal, puddleNormal, saturate(puddle * 2.0)));

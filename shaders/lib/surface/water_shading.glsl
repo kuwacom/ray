@@ -8,6 +8,7 @@
 //@include "/lib/settings.glsl"
 //@include "/lib/common/color.glsl"
 //@include "/lib/common/constants.glsl"
+//@include "/lib/common/exposure.glsl"
 //@include "/lib/common/gbuffer.glsl"
 //@include "/lib/common/joint_bilateral.glsl"
 //@include "/lib/common/math.glsl"

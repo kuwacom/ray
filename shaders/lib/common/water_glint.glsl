@@ -25,6 +25,22 @@ const float GLINT_LIFETIME = 0.25;                // 1 つの輝点の寿命 (�
 const vec2 GLINT_SMOOTH_LAMBDA = vec2(1.5, 6.0);  // 画素の中の輝点の期待個数がこの範囲で滑らかなローブへ移す (遠くの光の道)
 const int GLINT_MAX_COUNT = 4;                    // 1 セル 1 組の輝点の最大数
 
+// 近くの水面では画素の中の期待個数が小さく、照り返しのほとんどが数画素の丸い点になって目立った。近いほど滑らかなローブへ戻す
+const vec2 GLINT_NEAR_RANGE = vec2(4.0, 24.0);   // この距離 (ブロック) で輝点の割合を GLINT_NEAR_SHARE -> 1 倍にする
+const float GLINT_NEAR_SHARE = 0.3;
+float glintNearFade(float dist) {
+    return mix(GLINT_NEAR_SHARE, 1.0, smoothstep(GLINT_NEAR_RANGE.x, GLINT_NEAR_RANGE.y, dist));
+}
+
+/*
+ * 照り返しの芯や映り込んだ光源が白く飛んでいる所では点を出さない (白い面の中の点がブルームと光条の起点になって浮いた)
+ * 露出後の輝度で測る (AgX の白は露出後 1.3 前後)。露出は頂点シェーダーや影のパスも読むここでは持たず、呼ぶ側が渡す
+ */
+const vec2 GLINT_WHITE_RANGE = vec2(0.4, 1.0);
+float glintWhiteKeep(float exposedLum) {
+    return 1.0 - smoothstep(GLINT_WHITE_RANGE.x, GLINT_WHITE_RANGE.y, exposedLum);
+}
+
 // 1 セル 1 組の輝点の核の和 (面積あたりの密度)。p は水平面の位置, rho は輝点の半径
 float waterGlintCell(ivec2 cell, uint seed, float lambda, vec2 p, float cellSize, float rho) {
     uvec2 c = uvec2(cell + 32768);

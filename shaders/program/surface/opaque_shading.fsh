@@ -149,6 +149,8 @@ vec4 puddleSpecular(Material m, vec3 N, vec3 V, LightSample L, vec3 playerPos, v
     float pixelWorld = dist * 2.0 / (gbufferProjection[1][1] * viewSize().y);
     float NoVGeo = abs(dot(V, geoNormal));
     vec3 H = normalize(V + L.direction);
+    // 照り返しの芯が白く飛んでいる所は点にしない (白い面の中の点がブルームと光条の起点になる)
+    share *= glintWhiteKeep(luminance(lobe) * getExposure());
     /*
      * waterSunGlint の円盤の面積は、光源の立体角を半ベクトルへ写す 1 / (4 VoH) を省いている。低い太陽を見る水たまり (VoH 0.1-0.3)
      * では光源を映す面の数が数分の一になり、点が少なく、1 点が下の上限で切られて照り返しの明るさの大半が消えていた
@@ -208,7 +210,7 @@ void main() {
     readSurfaceExtra(texel, pomShadow, puddle);
     // 水たまりの照り返しを輝点に分ける割合と傾きの分散。縁の半分から内側を水面とみなす (solid.fsh の法線の混ぜ方と同じ)
     float puddleWeight = hand ? 0.0 : saturate(puddle * 2.0);
-    float glintShare = WATER_GLINT * PUDDLE_GLINT_POINT_SHARE * puddleWeight;
+    float glintShare = WATER_GLINT * PUDDLE_GLINT_POINT_SHARE * puddleWeight * glintNearFade(length(playerPos));
     float glintVar = puddleSlopeVar() * puddleWeight;
     float glintLum = 0.0;
 

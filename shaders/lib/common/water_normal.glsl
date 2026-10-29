@@ -22,11 +22,38 @@
 const float PUDDLE_WIND_SHELTER = 0.1;       // 地面の水たまりに当たる風 (WATER_WIND_SPEED に対する割合)
 const float PUDDLE_FETCH = 0.25;             // 水たまりに立つ一番長い波 (m)
 const float PUDDLE_RAIN_SLOPE_VAR = 0.002;   // 本降りの雨粒の跳ねと画素より細かい波紋の傾きの分散 (PUDDLE_RIPPLES = 1)
-const float PUDDLE_GLINT_POINT_SHARE = 0.85; // 照り返しのうち輝点に回す割合 (WATER_GLINT = 1 の時)
+// 水たまりは凪いだ鏡なので、海と同じ割合の点は多すぎた
+const float PUDDLE_GLINT_POINT_SHARE = 0.5;  // 照り返しのうち輝点に回す割合 (WATER_GLINT = 1 の時)
 
 float puddleSlopeVar() {
     float wind = waterSlopeDensity(WATER_WIND_SPEED * PUDDLE_WIND_SHELTER) * log(PUDDLE_FETCH / WATER_CAPILLARY_WAVELENGTH) * WATER_RIPPLES;
     return wind + PUDDLE_RAIN_SLOPE_VAR * rainStrength * PUDDLE_RIPPLES;
+}
+
+/*
+ * 水たまりのごく小さな波。吹送距離が水たまりの大きさしか無いので、水の波のテクスチャの短い 2 層だけを小さな傾きで足す
+ * 傾きは反射の向きを 1 度ほど揺らすだけで、映り込みの輪郭がわずかに揺れる程度 (水面のような波模様は出さない)
+ * 海の状態 (waterSeaState) は地形の全画素で呼ぶには重いので使わない
+ */
+const float PUDDLE_WAVE_SLOPE = 0.008;     // 層ごとの傾きの RMS
+const float PUDDLE_WAVE_RAIN_GAIN = 1.5;   // 降っている間の倍率 (雨の風)
+const int PUDDLE_WAVE_FIRST_LAYER = WATER_LAYERS - 2;
+
+// footprint: 画素の大きさ (ブロック)。画素より細かい層は足さない (遠くの水たまりが砂目にならないように)
+vec2 puddleWaveGradient(vec2 xz, float footprint) {
+#ifdef WATER_WAVES
+    float amp = PUDDLE_WAVE_SLOPE * WATER_RIPPLES * mix(1.0, PUDDLE_WAVE_RAIN_GAIN, rainStrength);
+    float t = frameTimeCounter;
+    vec2 g = vec2(0.0);
+    for (int i = PUDDLE_WAVE_FIRST_LAYER; i < WATER_LAYERS; i++) {
+        float r = waterLayerResolved(i, footprint);
+        if (r <= 0.0) break;
+        g += waterLayer(xz, i, amp * r, t).yz;
+    }
+    return g;
+#else
+    return vec2(0.0);
+#endif
 }
 
 /*

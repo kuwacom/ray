@@ -103,6 +103,7 @@
 #include "/lib/surface/lighting.glsl"
 #include "/lib/surface/reflection.glsl"
 #include "/lib/surface/composite_specular.glsl"
+#include "/lib/common/exposure.glsl"
 #include "/lib/surface/water_shading.glsl"
 // END GENERATED includes
 
@@ -133,10 +134,12 @@ void main() {
     bool hasSurface = d0 < d1 && !isHandDepth(d0) && (matT == MAT_WATER || isReflectiveTranslucent(matT));
     if (!hasSurface) {
         vec3 color = scene;
-        if (d1 < 1.0) color += opaqueEnvSpecular(texel, d1);
+        vec3 env = d1 < 1.0 ? opaqueEnvSpecular(texel, d1) : vec3(0.0);
+        color += env;
         vec3 result = color * (1.0 - translucent.a) + translucent.rgb;
         // 水たまりの輝点 (deferred30 が a = 1 + 割合で渡す) の割合を、足した鏡面と重なった半透明の分だけ直して渡す
-        float sceneGlint = saturate(sceneIn.a - 1.0) * luminance(scene);
+        // 映り込んだ光源が白く飛んでいる所では割合を下げ、TAA に通して潰す (白い面の中の点がブルームの起点になる。エネルギーは残る)
+        float sceneGlint = saturate(sceneIn.a - 1.0) * luminance(scene) * glintWhiteKeep(luminance(env) * getExposure());
         outColor = vec4(result, 1.0 + saturate(sceneGlint * (1.0 - translucent.a) / max(luminance(result), 1e-6)));
         return;
     }
@@ -363,14 +366,16 @@ void main() {
         color = behind * (1.0 - F) + refl * F;
         if (!below) {
             float sunAlpha = sqrt(sqr(WATER_ROUGHNESS) + unresolvedVar);
+            vec3 sunLobe = sunSpecular(N, V, WATER_F0, sunAlpha, sunSpecVis);
+            color += sunLobe + localLightSpecular(WL, N, V, WATER_F0, sunAlpha);
             // 上向きの水面は照り返しの一部を輝点にする。輝点の傾きの分布は画素より細かい波の全部 (表面張力波を含む)
-            float g = N.y > 0.5 ? WATER_GLINT * WATER_GLINT_POINT_SHARE : 0.0;
-            color += sunSpecular(N, V, WATER_F0, sunAlpha, sunSpecVis) * (1.0 - g);
-            color += localLightSpecular(WL, N, V, WATER_F0, sunAlpha);
+            // 近いほど、また滑らかに足した明るさ (映った光源を含む) が白く飛んでいるほど割合を下げる (点を足す前の明るさで測る)
+            float g = N.y > 0.5 ? WATER_GLINT * WATER_GLINT_POINT_SHARE * glintNearFade(dist) : 0.0;
+            g *= glintWhiteKeep(luminance(color) * getExposure());
             if (g > 0.0) {
                 float glintVar = unresolvedVar + sea.microVar * (1.0 - WATER_MICRO_ROUGHNESS);
                 vec4 glint = sunGlint(surfPlayer, N, V, glintVar, sunSpecVis, dist, NoVGeo);
-                color += glint.rgb * g;
+                color += (glint.rgb - sunLobe) * g;
                 glintLum = glint.a * g;
             }
 
