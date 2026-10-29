@@ -53,8 +53,6 @@ const int BLOCK_STAINED_GLASS_PANE = 230; // 230-245 (同順)
 
 const int BLOCK_SLAB_BOTTOM = 300;
 const int BLOCK_SLAB_TOP = 301;
-const int BLOCK_STAIRS_BOTTOM = 302;
-const int BLOCK_STAIRS_TOP = 303;
 const int BLOCK_FENCE = 304;
 const int BLOCK_WALL = 305;
 const int BLOCK_PANE_BARS = 306;
@@ -63,6 +61,8 @@ const int BLOCK_SNOW_LAYER = 308;       // 積もった雪 1 層 (高さ 1/8)
 const int BLOCK_DOOR_CLOSED = 309;      // 閉じたドア・トラップドア (薄いが光は遮る)
 const int BLOCK_SNOW_LAYER_2 = 310;     // 310-316 = 積もった雪 2-8 層 (層の数 = ID - 308)
 const int BLOCK_SNOW_LAYER_8 = 316;
+const int BLOCK_STAIRS_FIRST = 320;     // 320-335 = 階段 (向き x 上下 x 外角の 16 通り。形は lib/light/light_table.glsl)
+const int BLOCK_STAIRS_LAST = 335;
 
 const int BLOCK_LIGHT_BASE = 1000;      // 1001-1255 が光源
 

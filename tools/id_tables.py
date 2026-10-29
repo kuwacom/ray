@@ -30,6 +30,8 @@ LIGHT_ENTITY_LAST = 255
 ENTITY_LIGHT_ID_BASE = 5100   # エンティティ ID = 5100 + (光源インデックス - 192)
 COLOR_BAND_FIRST = 2000       # 色の付いた固体の ID 帯 (ボクセルには 12bit しか入らない)
 COLOR_BAND_LAST = 4095
+STAIRS_FIRST = 320            # 階段の ID 帯 320-335 (向き x 上下 x 外角の 16 通り)
+STAIRS_LAST = 335
 
 
 def with_state(blocks: list[str], state: str) -> list[str]:
@@ -271,8 +273,6 @@ BLOCK_CONSTS: list[tuple] = [
     ("raw", ""),
     ("const", 0, "BLOCK_SLAB_BOTTOM", 300, "", True),
     ("const", 0, "BLOCK_SLAB_TOP", 301, "", True),
-    ("const", 0, "BLOCK_STAIRS_BOTTOM", 302, "", True),
-    ("const", 0, "BLOCK_STAIRS_TOP", 303, "", True),
     ("const", 0, "BLOCK_FENCE", 304, "", True),
     ("const", 0, "BLOCK_WALL", 305, "", True),
     ("const", 0, "BLOCK_PANE_BARS", 306, "", True),
@@ -281,6 +281,8 @@ BLOCK_CONSTS: list[tuple] = [
     ("const", 40, "BLOCK_DOOR_CLOSED", 309, "閉じたドア・トラップドア (薄いが光は遮る)", True),
     ("const", 40, "BLOCK_SNOW_LAYER_2", 310, "310-316 = 積もった雪 2-8 層 (層の数 = ID - 308)", True),
     ("const", 40, "BLOCK_SNOW_LAYER_8", 316, "", True),
+    ("const", 40, "BLOCK_STAIRS_FIRST", STAIRS_FIRST, "320-335 = 階段 (向き x 上下 x 外角の 16 通り。形は lib/light/light_table.glsl)", True),
+    ("const", 40, "BLOCK_STAIRS_LAST", STAIRS_LAST, "", True),
     ("raw", ""),
     ("const", 40, "BLOCK_LIGHT_BASE", LIGHT_ID_BASE, "1001-1255 が光源", False),
     ("raw", ""),

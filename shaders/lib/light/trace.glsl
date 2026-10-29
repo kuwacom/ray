@@ -64,7 +64,7 @@ uint blockLightTraceFlags() {
 
 // 部分形状のうち、形状判定なしでも完全なブロックとして遮るもの (階段は 3/4 が埋まっている)
 bool isShapeOccluderWithoutTrace(int voxelId) {
-    return voxelId == BLOCK_STAIRS_BOTTOM || voxelId == BLOCK_STAIRS_TOP || voxelId == BLOCK_DOOR_CLOSED;
+    return (voxelId >= BLOCK_STAIRS_FIRST && voxelId <= BLOCK_STAIRS_LAST) || voxelId == BLOCK_DOOR_CLOSED;
 }
 
 // 部分形状の AABB (最大 2 個) とレイ区間 [tEnter, tLeave] の交差。ro はセルローカルの原点

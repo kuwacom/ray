@@ -24,7 +24,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from id_tables import (  # noqa: E402
     BLOCK_CONSTS, COLOR_BAND_FIRST, COLOR_BAND_LAST, COLORS, COPPER_PREFIX, ENTITIES, ENTITY_LIGHT_ID_BASE, LIGHT_BLOCK_LAST,
-    LIGHT_ENTITY_FIRST, LIGHT_ENTITY_LAST, LIGHT_ID_BASE, LIGHT_ITEM_FIRST, LIGHT_ITEM_LAST, LIGHTS, Light, with_state,
+    LIGHT_ENTITY_FIRST, LIGHT_ENTITY_LAST, LIGHT_ID_BASE, LIGHT_ITEM_FIRST, LIGHT_ITEM_LAST, LIGHTS, Light, STAIRS_FIRST, with_state,
 )
 from lib.color import linear_to_srgb, srgb_to_linear  # noqa: E402
 from lib.generated import check as generated_check  # noqa: E402
@@ -67,6 +67,30 @@ def wood_prefixed(suffix: str, woods=WOODS) -> list[str]:
 
 def colored(suffix: str) -> list[str]:
     return [f"{c}_{suffix}" for c in COLORS]
+
+
+STAIR_FACINGS = ["north", "east", "south", "west"]  # 時計回り (上から見て)
+STAIR_SHAPES = ["straight", "inner_left", "inner_right", "outer_left", "outer_right"]
+
+
+def stair_slot(facing: str, shape: str) -> int:
+    """0-3 = 直線 (段のある側 N/E/S/W)、4-7 = 外角 (段のある 1/4 が NW/NE/SE/SW)"""
+    f = STAIR_FACINGS.index(facing)
+    # 内角は段が 3/4 で、遮蔽の箱 2 個 (lib/light/light_table.glsl) に収まらないので同じ向きの直線で近似する (遮りすぎない側)
+    if shape in ("straight", "inner_left", "inner_right"):
+        return f
+    # facing=north の外角は left = 北西、right = 北東。向きを時計回りに 1 つ回すと象限も 1 つ回る
+    return 4 + (f + (0 if shape == "outer_left" else 1)) % 4
+
+
+def stair_entries() -> list[tuple[int, str, list[str]]]:
+    out = []
+    for h, half in enumerate(["bottom", "top"]):
+        for slot in range(8):
+            names = [f"{b}_stairs:half={half}:facing={f}:shape={s}"
+                     for b in SLAB_STAIR_BASES for f in STAIR_FACINGS for s in STAIR_SHAPES if stair_slot(f, s) == slot]
+            out.append((STAIRS_FIRST + h * 8 + slot, f"stairs ({half}, shape {slot})", names))
+    return out
 
 
 # 光源でないブロックの表。光源 (ID 1001-1255) は id_tables.py の LIGHTS
@@ -141,8 +165,6 @@ BLOCKS: list[tuple[int, str, list[str]]] = [
 
     (300, "bottom slabs", with_state([f"{b}_slab" for b in SLAB_STAIR_BASES + SLAB_ONLY], "type=bottom")),
     (301, "top slabs", with_state([f"{b}_slab" for b in SLAB_STAIR_BASES + SLAB_ONLY], "type=top")),
-    (302, "stairs (bottom)", with_state([f"{b}_stairs" for b in SLAB_STAIR_BASES], "half=bottom")),
-    (303, "stairs (top)", with_state([f"{b}_stairs" for b in SLAB_STAIR_BASES], "half=top")),
     (304, "fences", [*wood_prefixed("fence", [w for w in WOODS]), "nether_brick_fence"]),
     (305, "walls", [f"{b}_wall" for b in WALL_BASES]),
     (306, "bars (panes other than glass)", ["iron_bars", *[f"{p}copper_bars" for p in COPPER_PREFIX], *[f"waxed_{p}copper_bars" for p in COPPER_PREFIX]]),
@@ -152,6 +174,7 @@ BLOCKS: list[tuple[int, str, list[str]]] = [
     (309, "closed doors / trapdoors", [*with_state([f"{w}_door" for w in DOOR_TRAPDOOR], "open=false"),
                                  *with_state([f"{w}_trapdoor" for w in DOOR_TRAPDOOR], "open=false")]),
     *[(308 + k, f"snow layers ({k})", [f"snow:layers={k}"]) for k in range(2, 9)],
+    *stair_entries(),
 ]
 
 

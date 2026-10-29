@@ -20,6 +20,24 @@ uvec4 packShape(vec3 min0, vec3 max0, vec3 min1, vec3 max1) {
     return uvec4(packUnorm4x8(vec4(min0, 0.0)), packUnorm4x8(vec4(max0, 0.0)), packUnorm4x8(vec4(min1, 0.0)), packUnorm4x8(vec4(max1, 0.0)));
 }
 
+/*
+ * 階段: ハーフ + 段 (上向きの階段は段が下)。並びは tools/gen_block_properties.py の stair_slot
+ * 内角は箱 2 個に収まらないので、同じ向きの直線の ID に入っている
+ * xy = xz の最小, zw = 最大 (北 = -z、東 = +x)。0-3 = 直線 (段が北・東・南・西の半分)、4-7 = 外角 (段が北西・北東・南東・南西の 1/4)
+ */
+const vec4 STAIR_STEP_XZ[8] = vec4[8](
+    vec4(0.0, 0.0, 1.0, 0.5), vec4(0.5, 0.0, 1.0, 1.0), vec4(0.0, 0.5, 1.0, 1.0), vec4(0.0, 0.0, 0.5, 1.0),
+    vec4(0.0, 0.0, 0.5, 0.5), vec4(0.5, 0.0, 1.0, 0.5), vec4(0.5, 0.5, 1.0, 1.0), vec4(0.0, 0.5, 0.5, 1.0)
+);
+
+uvec4 stairShape(int k) {
+    bool top = k >= 8;
+    vec4 s = STAIR_STEP_XZ[k & 7];
+    float slabY = top ? 0.5 : 0.0;
+    float stepY = top ? 0.0 : 0.5;
+    return packShape(vec3(0.0, slabY, 0.0), vec3(1.0, slabY + 0.5, 1.0), vec3(s.x, stepY, s.y), vec3(s.z, stepY + 0.5, s.w));
+}
+
 uvec4 shapeStatic(int i) {
     const vec3 NO_MIN = vec3(1.0), NO_MAX = vec3(0.0);
     /*
@@ -31,12 +49,10 @@ uvec4 shapeStatic(int i) {
     if (i >= BLOCK_SNOW_LAYER_2 - 300 && i <= BLOCK_SNOW_LAYER_8 - 300) {
         return packShape(vec3(0.0), vec3(1.0, float(i + 300 - BLOCK_SNOW_LAYER) / 8.0, 1.0), NO_MIN, NO_MAX);
     }
+    if (i >= BLOCK_STAIRS_FIRST - 300 && i <= BLOCK_STAIRS_LAST - 300) return stairShape(i - (BLOCK_STAIRS_FIRST - 300));
     switch (i) {
         case BLOCK_SLAB_BOTTOM - 300:   return packShape(vec3(0.0), vec3(1.0, 0.5, 1.0), NO_MIN, NO_MAX);
         case BLOCK_SLAB_TOP - 300:      return packShape(vec3(0.0, 0.5, 0.0), vec3(1.0), NO_MIN, NO_MAX);
-        // 階段は向きの状態を ID に持たないのでハーフブロックで近似
-        case BLOCK_STAIRS_BOTTOM - 300: return packShape(vec3(0.0), vec3(1.0, 0.5, 1.0), NO_MIN, NO_MAX);
-        case BLOCK_STAIRS_TOP - 300:    return packShape(vec3(0.0, 0.5, 0.0), vec3(1.0), NO_MIN, NO_MAX);
         case BLOCK_FENCE - 300:         return packShape(vec3(0.375, 0.0, 0.375), vec3(0.625, 1.0, 0.625), NO_MIN, NO_MAX);
         case BLOCK_WALL - 300:          return packShape(vec3(0.25, 0.0, 0.25), vec3(0.75, 1.0, 0.75), NO_MIN, NO_MAX);
         case BLOCK_PANE_BARS - 300:     return packShape(vec3(0.4375, 0.0, 0.4375), vec3(0.5625, 1.0, 0.5625), NO_MIN, NO_MAX);
