@@ -145,7 +145,9 @@ void main() {
     vec3 surfPlayer = viewToPlayer(surfView);
     float dist = length(surfPlayer);
     vec3 V = -surfPlayer / max(dist, 1e-4);
-    vec3 N = dot(nT, V) < 0.0 ? -nT : nT;
+    // 水の波の法線はかすめ角で視線の裏を向くことがあり、そのまま表裏を決めると画素ごとに反射が水の上下へ入れ替わる。水の表裏は面の向きで決める
+    vec3 faceRef = matT != MAT_WATER ? nT : abs(nT.y) >= 0.5 ? vec3(0.0, sign(nT.y), 0.0) : waterSideFaceNormal(nT);
+    vec3 N = dot(faceRef, V) < 0.0 ? -nT : nT;
     float NoV = saturate(dot(N, V));
     vec3 floorPlayer = screenToPlayer(vec3(texcoord, d1));
     vec3 color;

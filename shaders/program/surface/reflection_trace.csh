@@ -136,7 +136,13 @@ void main() {
     vec3 N;
     vec3 Ng;
     if (s.translucent) {
-        N = dot(s.normal, V) < 0.0 ? -s.normal : s.normal;
+        // 水の波の法線はかすめ角で視線の裏を向くので、表裏は面の向きで決める (composite1 と揃える。ガラスなどの法線は幾何法線)
+        vec3 faceRef = s.normal;
+        if (s.materialId == MAT_WATER) {
+            faceRef = abs(s.normal.y) >= 0.5 ? vec3(0.0, sign(s.normal.y), 0.0)
+                : abs(s.normal.x) > abs(s.normal.z) ? vec3(sign(s.normal.x), 0.0, 0.0) : vec3(0.0, 0.0, sign(s.normal.z));
+        }
+        N = dot(faceRef, V) < 0.0 ? -s.normal : s.normal;
         Ng = N;
     } else {
         // 不透明面で裏を向くのはテクスチャ法線だけ。反転すると反射が面の中へ向かい自分自身を映すので、視線側へ倒す
