@@ -208,8 +208,14 @@ void main() {
         glint *= 1.0 - borderFog;
 #if CLOUDS >= 2 && defined HAS_SKY
         // 雲の下面より上にいる時だけ、地形の手前の雲を重ねる (deferred20 は地形までの区間だけを積分している)
-        if (cameraPosition.y > CLOUD_BASE) {
+        if (cameraPosition.y > cloudLowestBase()) {
             vec4 clouds = getCloudLayer(texel);
+            // 半透明が手前にある画素の雲は奥の地形 (空) まで積分してあるので、半透明までの分だけに割り引く
+            float depthOpaque = texelFetch(depthtex1, texel, 0).r;
+            if (depth < depthOpaque) {
+                float backDist = depthOpaque >= 1.0 ? CLOUD_RAY_FAR : length(screenToPlayer(vec3(texcoord, fixHandDepth(depthOpaque))));
+                clouds = cloudFrontPart(clouds, dir, dist, backDist);
+            }
             color = color * clouds.a + clouds.rgb;
             glint *= clouds.a;
         }

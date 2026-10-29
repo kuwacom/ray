@@ -283,7 +283,7 @@ vec4 renderClouds(vec3 dir, float maxDist, vec2 dither) {
     CloudLighting l = cloudLightingSetup(dir, ctx.rainLight);
     vec3 skyColor = getSkyRadiance(dir);
     float y0 = cameraPosition.y;
-    float farLimit = min(maxDist, CLOUD_MAX_DISTANCE / CLOUD_KH);
+    float farLimit = min(maxDist, CLOUD_MAX_DISTANCE_WORLD);
 
     vec2 segLow = cloudLayerSegment(y0, dir.y, CLOUD_BASE, ctx.lowTopWorld);
     segLow.y = min(segLow.y, farLimit);

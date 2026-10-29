@@ -80,7 +80,7 @@ void main() {
     float maxDist = depth >= 1.0 ? 1e9 : length(screenToPlayer(vec3(uv, fixHandDepth(depth))));
 
     // 雲の層にかからない視線 (雲の下から地形を見る等) はマーチしない
-    if (maxDist < 1e8 && cameraPosition.y < CLOUD_BASE && maxDist < CLOUD_BASE - cameraPosition.y) {
+    if (maxDist < 1e8 && cameraPosition.y < cloudLowestBase() && maxDist < cloudLowestBase() - cameraPosition.y) {
         outClouds = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }

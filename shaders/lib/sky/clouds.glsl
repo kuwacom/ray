@@ -268,6 +268,34 @@ vec4 getCloudLayer(ivec2 texel) {
 #endif
 }
 
+// 雲を描く最大距離 (ワールド)。deferred20 のマーチの打ち切りと、半透明の手前の分の見積もりで共有する
+const float CLOUD_MAX_DISTANCE_WORLD = CLOUD_DRAW_DISTANCE * 1000.0 / CLOUD_KH;
+const float CLOUD_FRONT_MIN_T = 1e-4; // pow(0, f) を避ける下限
+const float CLOUD_FRONT_EPS = 1e-4;   // 透過率が 1 に近いときの散乱の比の分母の下限
+
+// 最初に通る雲の層の区間 (半透明の手前の分を見積もる基準)
+vec2 cloudPrimarySegment(float y0, float dy) { return cloudLayerSegment(y0, dy, CLOUD_BASE, CLOUD_TOP); }
+
+// 視線が雲の層の下面より上にあるかを見るための高さ
+float cloudLowestBase() { return CLOUD_BASE; }
+
+/*
+ * 半透明 (deferred の後に描くエンティティ・水・ガラス) が手前にある画素の雲を、カメラから半透明までの分に割り引く
+ * deferred20 は半透明の深度を知らずに奥の不透明面 (空なら描画距離) まで積分しているので、そのまま重ねると半透明の物の手前に奥の雲がかかる
+ * 雲の層を通る長さの比で光学的深さを分ける (区間の中の濃さは一様とみなす)
+ * frontDist: 半透明までの距離, backDist: 奥の不透明面までの距離 (空は CLOUD_RAY_FAR)
+ */
+vec4 cloudFrontPart(vec4 clouds, vec3 dir, float frontDist, float backDist) {
+    vec2 seg = cloudPrimarySegment(cameraPosition.y, dir.y);
+    float back = min(backDist, CLOUD_MAX_DISTANCE_WORLD);
+    float total = max(min(seg.y, back) - seg.x, 0.0);
+    float front = max(min(seg.y, frontDist) - seg.x, 0.0);
+    float f = total > 0.0 ? saturate(front / total) : 0.0;
+    float t = pow(max(clouds.a, CLOUD_FRONT_MIN_T), f);
+    float s = clouds.a < 1.0 - CLOUD_FRONT_EPS ? (1.0 - t) / (1.0 - clouds.a) : f;
+    return vec4(clouds.rgb * s, t);
+}
+
 // 雲影マップの中心 (ワールド xz)。テクセル単位に丸めて、カメラが動いても影がちらつかないようにする
 vec2 cloudShadowMapOrigin(vec3 lightDir) {
     float ly = max(lightDir.y, CLOUD_SHADOW_MIN_LIGHT_Y);
