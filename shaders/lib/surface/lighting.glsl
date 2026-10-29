@@ -31,6 +31,7 @@
 //@include "/lib/light/light_select.glsl"
 //@include "/lib/light/trace.glsl"
 //@include "/lib/light/voxel.glsl"
+//@include "/lib/light/voxel_read.glsl"
 //@include "/lib/surface/gi.glsl"
 //@include "/lib/surface/sun_shadow.glsl"
 //@include "/lib/surface/surface_lights.glsl"
@@ -224,7 +225,6 @@ vec3 skyReflectionFallback(vec3 dir, float skyLm, float perceptualRoughness) {
  * ヒット点が画面に映っていればその色 (照明済みのシーン色) を使い、無ければ代わりのアルベドで照らす
  * 戻り値 a = 1 ならヒット
  */
-const float VOXEL_TRACE_SCREEN_MATCH = 0.6; // 画面の深度とヒット点の距離がこれ以下なら同じ面とみなす (ブロック)
 const float VOXEL_RAY_OFFSET = 0.05;        // 面から法線方向に浮かせる量 (ブロック)
 const float VOXEL_RAY_OFFSET_DIST = 0.01;   // 距離 1 ブロックあたりの追加量 (深度から復元した位置とジッターの誤差が距離に比例するため)
 const float VOXEL_RAY_FACE_EPS = 0.01;      // 固体セルから押し出した時の面からの距離 (ブロック)
@@ -245,6 +245,70 @@ vec3 voxelRayOrigin(vec3 playerPos, vec3 geoNormal) {
     return voxelToPlayer(v);
 }
 
+/*
+ * 画面の画素が当たりと同じ面か。同じ向きで同じ平面の上にあれば、投影したその画素は当たりの点そのもの
+ * 距離だけで見ると、底面の当たりがカメラから見える側面や手前のブロックの色を借り、面の中で別の面の模様と一色が混ざった
+ * texel と scenePlayer を返す。false なら画面に映っていない (画面外・手前に隠れている・別の面)
+ */
+const float VOXEL_SCREEN_NORMAL_COS = 0.9;   // 画面の幾何法線と当たりの面の法線の cos の下限
+const float VOXEL_SCREEN_PLANE_ABS = 0.08;   // 当たりの平面からの距離の許容 (ブロック)。土の道・耕地の 1/16 低い上面を含める
+const float VOXEL_SCREEN_PLANE_REL = 0.004;  // 距離 1 ブロックあたりの追加 (深度の精度)
+
+bool voxelHitOnScreen(vec3 hitPlayer, vec3 hitNormal, out ivec2 texel, out vec3 scenePlayer) {
+    texel = ivec2(-1);
+    scenePlayer = vec3(0.0);
+    vec3 s = viewToScreen(playerToView(hitPlayer));
+    if (any(lessThanEqual(s.xy, vec2(0.0))) || any(greaterThanEqual(s.xy, vec2(1.0))) || s.z <= 0.0 || s.z >= 1.0) return false;
+    texel = ivec2(s.xy * viewSize());
+    float d = texelFetch(depthtex1, texel, 0).r;
+    if (d >= 1.0 || isHandDepth(d)) return false;
+    scenePlayer = screenToPlayer(vec3(s.xy, d));
+    vec3 sceneGeo = octDecode(unpack2x8(texelFetch(colortex2, texel, 0).b));
+    if (dot(sceneGeo, hitNormal) < VOXEL_SCREEN_NORMAL_COS) return false;
+    return abs(dot(scenePlayer - hitPlayer, hitNormal)) < VOXEL_SCREEN_PLANE_ABS + VOXEL_SCREEN_PLANE_REL * length(hitPlayer);
+}
+
+/*
+ * 当たりから面に沿って整数ブロックずらした点 (同じブロック・同じ面・同じテクスチャの位置) が画面に映っていればその色を、
+ * 照明の近似の比 (当たり / 借りた点) で明るさだけ直して返す。ブロックのテクスチャはブロックごとに繰り返すので、
+ * 画面に映る同じ面の模様と境目が揃ったまま続く (周りの平均だとぼけた帯になった)
+ * カメラから遠ざかる向きにずらす (手前の物に隠れた面は、奥ほど画面に映っている)
+ * 明るさの比は輝度だけで取る (色ごとの比にすると、色付きの影の 1 タップの差で所々が染まった)
+ * throughWater: 水越しに映っている点だけ借りる (岸の草ブロックの側面の縁など、水面より上の色を水底に借りない)
+ * 借りた色は画面の発光込みなので、発光は足さない
+ */
+const int VOXEL_BORROW_TRIES = 6;
+const vec2 VOXEL_BORROW_RATIO_CLAMP = vec2(0.0, 4.0);
+
+bool borrowVoxelFaceColor(vec3 hitPlayer, vec3 hitNormal, int hitBlock, float skyLm, bool throughWater, out vec3 color) {
+    color = vec3(0.0);
+    vec3 nAbs = abs(hitNormal);
+    ivec2 tAxes = nAbs.x > 0.5 ? ivec2(2, 1) : nAbs.y > 0.5 ? ivec2(0, 2) : ivec2(0, 1);
+    if (abs(hitPlayer[tAxes.y]) > abs(hitPlayer[tAxes.x])) tAxes = tAxes.yx;
+    vec3 awaySign = vec3(sign(hitPlayer.x), -sign(hitPlayer.y), sign(hitPlayer.z));
+    // 試す順: 主軸 +1, +2 / 副軸 +1, -1 / 主軸 +3, -1
+    for (int k = 0; k < VOXEL_BORROW_TRIES; k++) {
+        int axis = (k == 2 || k == 3) ? tAxes.y : tAxes.x;
+        float steps = k == 0 ? 1.0 : k == 1 ? 2.0 : k == 2 ? 1.0 : k == 3 ? -1.0 : k == 4 ? 3.0 : -1.0;
+        vec3 q = hitPlayer;
+        q[axis] += awaySign[axis] * steps;
+        ivec3 qCell = ivec3(floor(playerToVoxel(q - hitNormal * 0.5)));
+        if (!isInVoxelVolume(qCell) || fetchVoxelBlockId(qCell) != hitBlock) continue;
+        ivec3 outside = ivec3(floor(playerToVoxel(q + hitNormal * 0.5)));
+        if (!isInVoxelVolume(outside) || isVoxelOpaque(fetchVoxelBlockId(outside))) continue;
+        ivec2 qt;
+        vec3 qScene;
+        if (!voxelHitOnScreen(q, hitNormal, qt, qScene)) continue;
+        if (throughWater && texelFetch(depthtex0, qt, 0).r >= texelFetch(depthtex1, qt, 0).r) continue;
+        vec3 Eq = shadeSecondaryHit(q, hitNormal, vec3(1.0), skyLm);
+        if (luminance(Eq) <= 1e-6) continue;
+        vec3 Ehit = shadeSecondaryHit(hitPlayer, hitNormal, vec3(1.0), skyLm);
+        color = texelFetch(colortex0, qt, 0).rgb * clamp(luminance(Ehit) / luminance(Eq), VOXEL_BORROW_RATIO_CLAMP.x, VOXEL_BORROW_RATIO_CLAMP.y);
+        return true;
+    }
+    return false;
+}
+
 vec4 traceVoxelRadiance(vec3 originPlayer, vec3 dir, float maxDist, float skyLm, bool useSceneColor) {
     vec3 hitVoxel, hitNormal;
     int hitBlock;
@@ -254,26 +318,25 @@ vec4 traceVoxelRadiance(vec3 originPlayer, vec3 dir, float maxDist, float skyLm,
     ivec2 screenTexel = ivec2(-1);
     float emission = getBlockLightIndex(hitBlock) == LIGHT_LAVA ? LAVA_HIT_EMISSION : 0.0;
     int hitMaterial = MAT_TERRAIN;
-    vec3 s = viewToScreen(playerToView(hitPlayer));
-    if (all(greaterThan(s.xy, vec2(0.0))) && all(lessThan(s.xy, vec2(1.0))) && s.z > 0.0 && s.z < 1.0) {
-        ivec2 t = ivec2(s.xy * viewSize());
-        float d = texelFetch(depthtex1, t, 0).r;
-        vec3 scenePlayer = screenToPlayer(vec3(s.xy, d));
-        if (distance(scenePlayer, hitPlayer) < VOXEL_TRACE_SCREEN_MATCH) {
-            if (useSceneColor) return vec4(texelFetch(colortex0, t, 0).rgb, 1.0);
-            albedo = srgbToLinear(texelFetch(colortex1, t, 0).rgb);
-            // 空の光は当たった面のスカイライトで絞る (着色点のスカイライトだと、明るい屋外から洞窟の奥の壁に当たったレイが空に照らされる)。
-            // 画面外の当たりは分からないので着色点の値のまま
-            skyLm = unpack2x8(texelFetch(colortex2, t, 0).a).y;
-            screenTexel = t;
-            // 発光は画素が当たったブロックそのものの時だけ使う。壁の手前のたいまつの炎の画素を壁の発光として拾うと、
-            // 登録した光源の判定 (hitBlock は壁) をすり抜け、たまに当たるレイだけが明るく跳ねて GI がノイズになった
-            ivec3 hitCell = ivec3(floor(hitVoxel - hitNormal * VOXEL_HIT_INSET));
-            if (all(equal(ivec3(floor(playerToVoxel(scenePlayer) - hitNormal * VOXEL_HIT_INSET)), hitCell))) {
-                emission = unpack2x8(texelFetch(colortex3, t, 0).g).y;
-                hitMaterial = readMaterialId(t);
-            }
+    ivec2 t;
+    vec3 scenePlayer;
+    if (voxelHitOnScreen(hitPlayer, hitNormal, t, scenePlayer)) {
+        if (useSceneColor) return vec4(texelFetch(colortex0, t, 0).rgb, 1.0);
+        albedo = srgbToLinear(texelFetch(colortex1, t, 0).rgb);
+        // 空の光は当たった面のスカイライトで絞る (着色点のスカイライトだと、明るい屋外から洞窟の奥の壁に当たったレイが空に照らされる)。
+        // 画面外の当たりは分からないので着色点の値のまま
+        skyLm = unpack2x8(texelFetch(colortex2, t, 0).a).y;
+        screenTexel = t;
+        // 発光は画素が当たったブロックそのものの時だけ使う。壁の手前のたいまつの炎の画素を壁の発光として拾うと、
+        // 登録した光源の判定 (hitBlock は壁) をすり抜け、たまに当たるレイだけが明るく跳ねて GI がノイズになった
+        ivec3 hitCell = ivec3(floor(hitVoxel - hitNormal * VOXEL_HIT_INSET));
+        if (all(equal(ivec3(floor(playerToVoxel(scenePlayer) - hitNormal * VOXEL_HIT_INSET)), hitCell))) {
+            emission = unpack2x8(texelFetch(colortex3, t, 0).g).y;
+            hitMaterial = readMaterialId(t);
         }
+    } else if (useSceneColor) {
+        vec3 borrowed;
+        if (borrowVoxelFaceColor(hitPlayer, hitNormal, hitBlock, skyLm, false, borrowed)) return vec4(borrowed, 1.0);
     }
     // useSceneColor = false は GI (多重反射込み)、true は反射
     if (useSceneColor) {

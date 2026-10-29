@@ -75,8 +75,6 @@ const float WATER_REFRACT_EDGE = 0.002;
 const float WATER_REFRACT_D_BLEND = 0.08;
 const float WATER_REFRACT_D_DISTANCE = 32.0;    // 屈折先を探す最大距離 (ブロック)。澄んだ水でも 32 で青の透過は 4 割台まで落ちる
 const float WATER_REFRACT_D_MATCH = 0.6;        // 画面の点が屈折した光線からこれ以内なら同じ屈折先 (ブロック, 距離 1 あたり 1% を足す)
-const int WATER_REFRACT_D_BORROW_TRIES = 4;     // 色を借りる隣のブロックを探す回数 (奥へ 1, 2 / 横へ 1 / 奥へ 3)
-const float WATER_REFRACT_D_BORROW_MATCH = 0.3; // 借りる点が画面の深度の点とこれ以内なら映っている (ブロック, 距離 1 あたり 1% を足す)
 const float WATER_REFRACT_D_REF_RADIUS = 6.0;   // ボクセルの色の基準にする水底の平均を取る半径 (画素)
 const float WATER_REFRACT_D_REF_MATCH = 2.0;    // 基準の平均に入れる水底の点の、まっすぐ見た水底からの距離 (ブロック)
 // 照り返しのうち輝点に回す割合の上限 (WATER_GLINT = 1 の時)。残りは滑らかなローブのまま光の道の下地の淡い光にする
@@ -133,7 +131,8 @@ float waterRefractScreenWeight(vec2 uv, vec2 tuv) {
 
 /*
  * 方式 D: 上から見た水面の屈折先をボクセルで辿る (画面外・手前の物の陰の水底)
- * 当たりが画面に映っていればその色。映っていなければ、ボクセル反射と同じ照明の近似 (太陽の影の 1 タップ・雲影・floodfill・空,
+ * 当たりが画面に映っていればその色。映っていなければ、面に沿って整数ブロックずらした同じブロックの同じ面の画面の色を借りる
+ * (borrowVoxelFaceColor)。それも無ければ、ボクセル反射と同じ照明の近似 (太陽の影の 1 タップ・雲影・floodfill・空,
  * shadeSecondaryHit) で照らす。ボクセルにはテクスチャの模様が無いので、この画素からまっすぐ見た水底 (画面に映っている同じ水の底)
  * の周りの平均の色を、照明の近似の比 (当たり / まっすぐ見た水底) で明るさと向きの分だけ直して使う
  * (一定のアルベドで照らすと、砂の水底で画面の像との境に色と明るさの段が出た。借りられない時はブロックの平均の色の表を使う)
@@ -155,14 +154,11 @@ bool waterRefractVoxel(vec3 surfPlayer, vec3 dir, vec3 floorPlayer, float d1, fl
 
     vec3 screenColor = vec3(0.0);
     float wS = 0.0;
-    vec3 hitView = playerToView(hitPlayer);
-    vec3 s = viewToScreen(hitView);
-    if (hitView.z < 0.0 && all(greaterThan(s.xy, vec2(0.0))) && all(lessThan(s.xy, vec2(1.0)))) {
-        float d = texture(depthtex1, s.xy).r;
-        if (!isHandDepth(d) && distance(screenToPlayer(vec3(s.xy, d)), hitPlayer) < VOXEL_TRACE_SCREEN_MATCH) {
-            screenColor = texture(colortex0, s.xy).rgb;
-            wS = waterRefractScreenWeight(texcoord, s.xy);
-        }
+    ivec2 hitTexel;
+    vec3 hitScene;
+    if (voxelHitOnScreen(hitPlayer, hitNormal, hitTexel, hitScene)) {
+        screenColor = texelFetch(colortex0, hitTexel, 0).rgb;
+        wS = waterRefractScreenWeight(texcoord, (vec2(hitTexel) + 0.5) / viewSize());
     }
     if (wS >= 1.0) {
         color = screenColor;
@@ -170,37 +166,7 @@ bool waterRefractVoxel(vec3 surfPlayer, vec3 dir, vec3 floorPlayer, float d1, fl
     }
 
     vec3 voxelColor;
-    bool hasRef = false;
-    /*
-     * ブロックのテクスチャはブロックごとに繰り返すので、当たりから面に沿って整数ブロックずらした点 (同じブロックの同じ位置) が
-     * 画面に映っていればその色を借りる。水底の模様とブロックの境目が画面の像と揃ったまま続く (周りの平均だとぼけた帯になった)
-     * カメラから遠ざかる向きにずらす (手前の岸に隠れた水底は、奥ほど画面に映っている)
-     */
-    vec3 nAbs = abs(hitNormal);
-    ivec2 tAxes = nAbs.x > 0.5 ? ivec2(2, 1) : nAbs.y > 0.5 ? ivec2(0, 2) : ivec2(0, 1);
-    if (abs(hitPlayer[tAxes.y]) > abs(hitPlayer[tAxes.x])) tAxes = tAxes.yx;
-    vec3 awaySign = vec3(sign(hitPlayer.x), -sign(hitPlayer.y), sign(hitPlayer.z));
-    for (int k = 0; k < WATER_REFRACT_D_BORROW_TRIES && !hasRef; k++) {
-        int axis = k == 2 ? tAxes.y : tAxes.x;
-        float steps = k == 2 ? 1.0 : float(k < 2 ? k + 1 : k);
-        vec3 offset = vec3(0.0);
-        offset[axis] = awaySign[axis] * steps;
-        vec3 q = hitPlayer + offset;
-        ivec3 qCell = ivec3(floor(playerToVoxel(q - hitNormal * 0.5)));
-        if (!isInVoxelVolume(qCell) || unpackVoxelBlockId(readVoxelBlock(qCell)) != hitBlock) continue;
-        vec3 qView = playerToView(q);
-        vec3 qs = viewToScreen(qView);
-        if (qView.z >= 0.0 || any(lessThan(qs.xy, vec2(0.0))) || any(greaterThan(qs.xy, vec2(1.0)))) continue;
-        float dq = texture(depthtex1, qs.xy).r;
-        // 水越しに映っている点だけ (岸の草ブロックの側面の縁など、水面より上の色を水底に借りない)
-        if (texture(depthtex0, qs.xy).r >= dq) continue;
-        if (isHandDepth(dq) || distance(screenToPlayer(vec3(qs.xy, dq)), q) > WATER_REFRACT_D_BORROW_MATCH * (1.0 + length(q) * 0.01)) continue;
-        vec3 Eq = shadeSecondaryHit(q, hitNormal, vec3(1.0), skyLm);
-        if (luminance(Eq) <= 1e-6) continue;
-        vec3 Ehit = shadeSecondaryHit(hitPlayer, hitNormal, vec3(1.0), skyLm);
-        voxelColor = texture(colortex0, qs.xy).rgb * clamp(luminance(Ehit) / luminance(Eq), 0.0, 4.0);
-        hasRef = true;
-    }
+    bool hasRef = borrowVoxelFaceColor(hitPlayer, hitNormal, hitBlock, skyLm, true, voxelColor);
     if (!hasRef && d1 < 1.0 && floorPlayer.y < surfPlayer.y) {
         GBufferData g = readGBuffer(ivec2(gl_FragCoord.xy));
         // 周りの水底の平均 (テクスチャの細部を落とす。画面の像との境で模様が二重に見えないように)
