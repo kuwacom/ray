@@ -368,9 +368,16 @@ float fogPhaseHaze(float cosTheta) {
          / (1.0 + FS_PHASE_W2 + FS_PHASE_W3);
 }
 
-// 霧は粒が大きく前方に鋭い。後方散乱を少し混ぜる (Nostalgia の fogMistPhase と同じ構成)
-float fogPhaseMist(float cosTheta) {
-    return mix(phaseCS(cosTheta, FS_MIST_G), phaseHG(cosTheta, -0.25), 0.19);
+/*
+ * 霧粒の位相: 前方に鋭い Draine の山に、粒の間の多重散乱で方向の均された分を (1 + cos^2) の対称な裾で足す
+ * 係数は霧の前方の輝き (太陽の周り 15 度) を重く見た対数の差の当てはめで決めた (FS_MIST_G 0.75-0.88 で共通)
+ */
+const float FOG_DROPLET_G_SCALE = 1.01;
+const float FOG_DROPLET_ALPHA = 4.5;
+const float FOG_DROPLET_SPREAD = 0.27;
+
+float fogPhaseDroplet(float cosTheta) {
+    return mix(phaseDraine(cosTheta, FS_MIST_G * FOG_DROPLET_G_SCALE, FOG_DROPLET_ALPHA), phaseRayleigh(cosTheta), FOG_DROPLET_SPREAD);
 }
 
 #if defined HAS_SKY
@@ -417,7 +424,7 @@ FogLighting fogLightingSetup(vec3 dir) {
     float cosTheta = dot(dir, celestial.direction);
     f.light = celestial.irradiance;
     f.phaseHaze = fogPhaseHaze(cosTheta);
-    f.phaseMist = fogPhaseMist(cosTheta);
+    f.phaseMist = fogPhaseDroplet(cosTheta);
 #if defined HAS_SKY
     // 上半球 (空) と下半球 (地面の照り返し) から等方に入る光: (E_up + E_down) / 2pi
     vec3 skyUp = shEvalIrradiance(vec3(0.0, 1.0, 0.0));

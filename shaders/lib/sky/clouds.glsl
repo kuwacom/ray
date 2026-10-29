@@ -43,7 +43,7 @@ const float CLOUD_RAY_FAR = 1e12; // 球との交差が無い方向の距離 (�
     // シュークリームのようにもっこりと背の高い雲にするため 4.5 km (背丈が幅と同じくらいの雲を混ぜる)
     const float CLOUD_R_DEPTH = 4500.0;
 #else
-    // CLOUDS=2 (2D 押し出しの薄い層, Nostalgia 方式)
+    // CLOUDS=2 (2D 押し出しの薄い層)
     const float CLOUD_R_BASE = 1500.0;
     const float CLOUD_R_DEPTH = 290.0;
 #endif

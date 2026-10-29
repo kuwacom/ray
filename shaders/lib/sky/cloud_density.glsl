@@ -128,6 +128,22 @@ float cloudSlabDensity(CloudColumn col, vec2 q, float altitude, out float cloudH
 }
 #endif
 
+#if CLOUDS != 3
+/*
+ * 2D 押し出しの断面: 平らな芯の高さの区間の外を超楕円の角で丸める (縁の薄い所ほど上下から細って、枕のような断面になる)
+ * 区間と指数は、被覆 0.5 で高さの 0.06〜0.92 に雲が残り、被覆 0.1 で 0.16〜0.77 まで細る値
+ */
+const float CLOUD2D_CORE_LOW = 0.22;
+const float CLOUD2D_CORE_HIGH = 0.69;
+const float CLOUD2D_ROUND_POW = 1.45; // 2 で円の角、1 で斜めの面取り
+
+float cloud2dShoulder(float h) {
+    float s = h < CLOUD2D_CORE_LOW ? (CLOUD2D_CORE_LOW - h) / CLOUD2D_CORE_LOW
+                                   : max(h - CLOUD2D_CORE_HIGH, 0.0) / (1.0 - CLOUD2D_CORE_HIGH);
+    return 1.0 - pow(1.0 - pow(saturate(s), CLOUD2D_ROUND_POW), 1.0 / CLOUD2D_ROUND_POW);
+}
+#endif
+
 /*
  * 低層の密度 [0,1] (消散係数 = CLOUD_LOW_SIGMA x 密度)
  * rel: カメラ基準の水平位置 (参照 m), altitude: 参照高度 (m)
@@ -367,13 +383,11 @@ float cloudLowDensityCumulus(CloudContext ctx, CloudColumn col, vec2 rel, float 
     if (fractus > density) { cloudHeight = fractusHeight; return fractus; }
     return density;
 #else
-    // 2D 押し出し (Nostalgia 方式): 平面の被覆をそのまま縦に伸ばし、上下の縁だけ立方で削る
+    // 2D 押し出し: 平面の被覆をそのまま縦に伸ばし、断面を角の丸い箱にする
     vec4 cells = texture(cloudNoiseTex, q / CLOUD_CELL_PERIOD);
     float footprint = linearStep(1.0 - col.cover, 1.0 - col.cover + CLOUD_COVER_SOFTNESS, cells.r);
-    float erodeLow = pow(1.0 - linearStep(0.0, 0.3, h), 3.0);
-    float erodeHigh = pow(linearStep(0.6, 1.0, h), 3.0);
     cloudHeight = h;
-    float d = footprint - erodeLow - erodeHigh;
+    float d = footprint - cloud2dShoulder(h);
     if (detail > 0.0) d -= (1.0 - texture(cloudNoiseTex, q / (CLOUD_CELL_PERIOD / 12.0)).a) * 0.2 * detail;
     return saturate(d * 2.5) * ctx.densityScale;
 #endif
