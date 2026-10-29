@@ -105,7 +105,8 @@ uniform float thunderStrength;
 uniform vec4 lightningBoltPosition;
 uniform int worldTime;
 uniform int worldDay;
-uniform float cloudHeight;
+uniform float cloudHeight; // バニラの雲の下面の基準の y (雲の無いディメンションは NaN)
+uniform float cloudTime;   // バニラの雲の x 方向のずれ (ブロック。ゲームの時刻から作られ、時間を止めると止まる)
 uniform bool hasSkylight;
 uniform bool hasCeiling;
 uniform int bedrockLevel;

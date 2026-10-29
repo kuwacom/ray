@@ -32,6 +32,7 @@
 //@include "/lib/common/transforms.glsl"
 //@include "/lib/common/uniforms.glsl"
 //@include "/lib/buffers/images.glsl"
+//@include "/lib/sky/cloud_styles.glsl"
 
 const float CLOUD_RAY_FAR = 1e12; // 球との交差が無い方向の距離 (十分遠い値)
 
@@ -273,11 +274,43 @@ const float CLOUD_MAX_DISTANCE_WORLD = CLOUD_DRAW_DISTANCE * 1000.0 / CLOUD_KH;
 const float CLOUD_FRONT_MIN_T = 1e-4; // pow(0, f) を避ける下限
 const float CLOUD_FRONT_EPS = 1e-4;   // 透過率が 1 に近いときの散乱の比の分母の下限
 
-// 最初に通る雲の層の区間 (半透明の手前の分を見積もる基準)
-vec2 cloudPrimarySegment(float y0, float dy) { return cloudLayerSegment(y0, dy, CLOUD_BASE, CLOUD_TOP); }
+#ifdef CLOUD_VANILLA_SHAPE
+// バニラの雲の寸法 (ブロック)。格子の 1 マスと厚みと、Iris の cloudHeight から下面までの差
+const float VANILLA_CLOUD_CELL = 12.0;
+const float VANILLA_CLOUD_THICKNESS = 4.0;
+const float VANILLA_CLOUD_Y_OFFSET = 0.33;
+// この距離 (ブロック) で空へ溶かし切る。テクスチャは 3072 ブロックで一周するので、繰り返しを見せない
+const float VANILLA_CLOUD_FAR = 2048.0;
 
-// 視線が雲の層の下面より上にあるかを見るための高さ
-float cloudLowestBase() { return CLOUD_BASE; }
+float vanillaCloudBottom() { return cloudHeight + VANILLA_CLOUD_Y_OFFSET; }
+
+// 平らな板 [bottom, bottom + 厚み] との交差 (バニラの雲は平面なので曲率は付けない)。無ければ x >= y
+vec2 vanillaCloudSegment(float y0, float dy, float far) {
+    float bottom = vanillaCloudBottom();
+    float top = bottom + VANILLA_CLOUD_THICKNESS;
+    if (abs(dy) < 1e-5) return (y0 > bottom && y0 < top) ? vec2(0.0, far) : vec2(1.0, 0.0);
+    vec2 t = (vec2(bottom, top) - y0) / dy;
+    return vec2(max(min(t.x, t.y), 0.0), min(max(t.x, t.y), far));
+}
+#endif
+
+// 最初に通る雲の層の区間 (半透明の手前の分を見積もる基準)
+vec2 cloudPrimarySegment(float y0, float dy) {
+#ifdef CLOUD_VANILLA_SHAPE
+    return vanillaCloudSegment(y0, dy, VANILLA_CLOUD_FAR);
+#else
+    return cloudLayerSegment(y0, dy, CLOUD_BASE, CLOUD_TOP);
+#endif
+}
+
+// 視線が雲の層の下面より上にあるかを見るための高さ (uniform を使うので const にしない)
+float cloudLowestBase() {
+#ifdef CLOUD_VANILLA_SHAPE
+    return min(CLOUD_BASE, vanillaCloudBottom());
+#else
+    return CLOUD_BASE;
+#endif
+}
 
 /*
  * 半透明 (deferred の後に描くエンティティ・水・ガラス) が手前にある画素の雲を、カメラから半透明までの分に割り引く

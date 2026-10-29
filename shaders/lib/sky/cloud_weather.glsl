@@ -127,7 +127,9 @@ CloudClimate cloudClimate() {
 #ifndef CLOUD_CB
     c.storm = 0.0;
 #endif
-    if (CS_SLAB == 1) c.storm = 0.0;
+#ifdef CLOUD_VANILLA_SHAPE
+    c.storm = 0.0;
+#endif
     return c;
 }
 
@@ -172,11 +174,6 @@ CloudContext cloudContextSetup(CloudClimate climate) {
 #endif
     ctx.lowTop = ctx.storm > 1e-3 ? CLOUD_R_CB_TOP : CLOUD_R_TOP;
     ctx.lowTopWorld = ctx.storm > 1e-3 ? CLOUD_CB_TOP : CLOUD_TOP;
-    // 板の雲は板の厚みだけを歩く (積雲の層の厚み全体に歩数を割ると、板を数歩でしか読めない)
-    if (CS_SLAB == 1 && ctx.rain <= 0.0) {
-        ctx.lowTop = CLOUD_R_BASE + CS_SLAB_DEPTH;
-        ctx.lowTopWorld = CLOUD_WORLD_Y(ctx.lowTop);
-    }
     ctx.cameraAltitude = cloudRefAltitude(cameraPosition.y);
     ctx.seaAltitude = cloudRefAltitude(SKY_SEA_LEVEL);
     return ctx;

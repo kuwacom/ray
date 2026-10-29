@@ -24,7 +24,7 @@
 | 大気の物理モデル | Bruneton, "A Qualitative and Quantitative Evaluation of 8 Clear Sky Models", TVCG 2017 | lib/sky/atmosphere.glsl |
 | 体積雲の散乱 (多重散乱近似) | Wrenninge et al., "Oz: The Great and Volumetric", SIGGRAPH 2013 Talks | lib/sky/cloud_lighting.glsl |
 | 積雲のこぶの陰影 (不透明な芯・光源方向の近くの光学的深さで多重散乱も落とす・塊の中は削らず境目だけ深く削る浸食) | Bliss Shaders (X0nk) の雲の見え方と考え方を参考に独自実装 (コードは不使用) | lib/sky/cloud_density.glsl, cloud_lighting.glsl |
-| 角の丸い平らな板の雲 (雲の形 Nostalgia 風) | Nostalgia (RRe36) のバニラの雲を押し出した見え方を参考に独自実装 (コードは不使用) | lib/sky/cloud_density.glsl |
+| バニラの形の雲 (雲の形 バニラの形) | Nostalgia (RRe36) の雲の見え方を参考に独自実装 (コードは不使用) | lib/sky/cloud_vanilla.glsl |
 | 空中遠近 (消散と内散乱を組にし、遠景を地平線の空へ収束させる) | Koschmieder, "Theorie der horizontalen Sichtweite", Beiträge zur Physik der freien Atmosphäre, 1924 | lib/sky/fog.glsl |
 | 高さフォグの閉形式の光学的深さ | Quilez, "fog" (iquilezles.org) の指数の積分の考え方。上端のロジスティックの積分は独自に導出 | lib/sky/fog.glsl |
 | 遠方区間の画面空間の光芒 | Mitchell, "Volumetric Light Scattering as a Post-Process", GPU Gems 3, 2007 | lib/sky/volumetrics.glsl |

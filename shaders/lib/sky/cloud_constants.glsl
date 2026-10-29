@@ -224,15 +224,6 @@ const vec3 CLOUD_FRACTUS_STRETCH = abs(CLOUD_WIND_DIR.x) >= abs(CLOUD_WIND_DIR.y
 // (0.45 で空を覆う筋、0.225 でほぼ無し) ので、CLOUD_FRACTUS は被覆には弱く (0.75 + 0.25 x)、濃さに 1 以下で効かせる
 const float CLOUD_FRACTUS_COVER = 0.38;
 const float CLOUD_FRACTUS_AMOUNT = CLOUD_FRACTUS * CS_FRACTUS;
-// 板の雲 (CS_SLAB): 格子の大きさ (雲の大きさの設定に合わせる)、被覆のノイズの混ぜ方 (大きなセル, 細かいセル)、
-// 縁の丸め (輪郭で上下から削る量)、輪郭の柔らかさ
-const float CLOUD_SLAB_GRID = CS_SLAB_GRID * CLOUD_SCALE_FACTOR * CLOUD_LOW_SCALE * CS_SIZE;
-const vec2 CLOUD_SLAB_MIX = vec2(0.6, 0.4);
-const float CLOUD_SLAB_NOISE_FREQ = 4.0; // 被覆のノイズを読む細かさ (1 では塊が数 km の大きな板になる)
-const float CLOUD_SLAB_CORNER = 0.2;      // 角の丸みの幅 (マスの割合)
-const float CLOUD_SLAB_LIGHT_REACH = 100.0; // m: 光源方向の陰を見る長さ (横からの低い光で板の奥まで陰にせず、夕方の板を日の色に染める)
-const float CLOUD_SLAB_ROUND = 0.3;
-const float CLOUD_SLAB_SOFTNESS = 0.1;
 const vec2 CLOUD_FRACTUS_GROUP = vec2(0.48, 0.68);       // 群れを置く fbm の範囲 (高いほどまばら)
 const vec2 CLOUD_FRACTUS_DENSITY = vec2(0.05, 0.25);      // 群れの中の濃さのばらつき (積雲の芯に対する割合)
 const float CLOUD_AC_BASE = 0.2;          // 中層の中での高積雲の底 (相対高度)
@@ -393,6 +384,7 @@ const float CLOUD_BOTTOM_REACH = 0.6;    // この高さで 1 に戻る
     const int CLOUD_SKY_STEPS = 2;
     const int CLOUD_HIGH_STEPS = 3;
     const int CLOUD_SHAFT_STEPS = 6;
+    const int VANILLA_CLOUD_STEPS = 16;
 #elif CLOUD_QUALITY == 1
     const int CLOUD_LOW_STEPS = 36;
     const int CLOUD_MID_STEPS = 12;
@@ -400,6 +392,7 @@ const float CLOUD_BOTTOM_REACH = 0.6;    // この高さで 1 に戻る
     const int CLOUD_SKY_STEPS = 2;
     const int CLOUD_HIGH_STEPS = 3;
     const int CLOUD_SHAFT_STEPS = 8;
+    const int VANILLA_CLOUD_STEPS = 24;
 #elif CLOUD_QUALITY == 2
     const int CLOUD_LOW_STEPS = 48;
     const int CLOUD_MID_STEPS = 16;
@@ -407,6 +400,7 @@ const float CLOUD_BOTTOM_REACH = 0.6;    // この高さで 1 に戻る
     const int CLOUD_SKY_STEPS = 2;
     const int CLOUD_HIGH_STEPS = 4;
     const int CLOUD_SHAFT_STEPS = 10;
+    const int VANILLA_CLOUD_STEPS = 32;
 #else
     const int CLOUD_LOW_STEPS = 64;
     const int CLOUD_MID_STEPS = 24;
@@ -414,6 +408,7 @@ const float CLOUD_BOTTOM_REACH = 0.6;    // この高さで 1 に戻る
     const int CLOUD_SKY_STEPS = 3;
     const int CLOUD_HIGH_STEPS = 6;
     const int CLOUD_SHAFT_STEPS = 12;
+    const int VANILLA_CLOUD_STEPS = 48;
 #endif
 const int CLOUD_MID_LIGHT_STEPS = CLOUD_QUALITY >= 2 ? 4 : 3;
 

@@ -46,6 +46,7 @@
 #include "/lib/common/look_presets.glsl"
 #include "/lib/sky/sky_color.glsl"
 #include "/lib/common/frame_offset.glsl"
+#include "/lib/sky/cloud_styles.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/sky/fog_template.glsl"
 #include "/lib/sky/climate.glsl"

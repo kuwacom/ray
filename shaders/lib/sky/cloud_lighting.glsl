@@ -123,7 +123,7 @@ float cloudLowLightOD(CloudContext ctx, CloudColumn col, vec2 rel, float altitud
     for (int i = 0; i < CLOUD_LIGHT_STEPS; i++) {
         float sampleT = t + stepLength * dither;
         float a = altitude + lightDir.y * sampleT;
-        if (a > ctx.lowTop || a < CLOUD_R_BASE || (CS_SLAB == 1 && ctx.lowTop < CLOUD_R_TOP && t > CLOUD_SLAB_LIGHT_REACH)) break;
+        if (a > ctx.lowTop || a < CLOUD_R_BASE) break;
         od += cloudLowDensity(ctx, col, rel + lightDir.xz * sampleT, a, i < 2, true) * stepLength;
         t += stepLength;
         stepLength *= 2.0;

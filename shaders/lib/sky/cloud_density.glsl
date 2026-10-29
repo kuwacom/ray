@@ -7,6 +7,7 @@
 
 //@include "/lib/sky/cloud_constants.glsl"
 //@include "/lib/sky/cloud_weather.glsl"
+//@include "/lib/sky/cloud_vanilla.glsl"
 
 // 密度
 struct CloudColumn {
@@ -96,37 +97,6 @@ float cloudCumulonimbusShape(float core, vec2 rel, float hc, vec4 cells, float s
 float cloudLobeErosion(float n, float body) {
     return mix(1.0 - n, pow(1.0 - n, CLOUD_LOBE_SHARPNESS) * CLOUD_LOBE_SHARP_GAIN, body);
 }
-
-#if CLOUDS == 3
-/*
- * 角の丸い平らな板の雲 (CS_SLAB)。CLOUD_SLAB_GRID の格子のマスごとに被覆で雲の有無を決め、隣のマスと
- * なめらかな重みで補間してから切る。角が丸くなり、つながったマスは 1 枚の板になる。
- * 輪郭の近く (補間の値が小さい所) ほど板を上下から薄くして、縁を枕のように丸める
- * q: 低層のノイズ座標 (参照 m), cloudHeight: 板の中の高さ (底 0 / 頂 1)
- */
-float cloudSlabDensity(CloudColumn col, vec2 q, float altitude, out float cloudHeight) {
-    float hv = (altitude - CLOUD_R_BASE) / CS_SLAB_DEPTH;
-    cloudHeight = saturate(hv);
-    if (hv <= 0.0 || hv >= 1.0) return 0.0;
-    vec2 g = q / CLOUD_SLAB_GRID - 0.5;
-    vec2 i = floor(g);
-    vec2 f = g - i;
-    // マスの中心で読む (マスの中は一定)。大きなセルと細かいセルを混ぜ、マス数個から十数個の不揃いな塊にする
-    float scale = CLOUD_SLAB_GRID / CLOUD_CELL_PERIOD * CLOUD_SLAB_NOISE_FREQ;
-    float threshold = 1.0 - col.cover;
-    vec4 n00 = textureLod(cloudNoiseTex, (i + vec2(0.5, 0.5)) * scale, 0.0);
-    vec4 n10 = textureLod(cloudNoiseTex, (i + vec2(1.5, 0.5)) * scale, 0.0);
-    vec4 n01 = textureLod(cloudNoiseTex, (i + vec2(0.5, 1.5)) * scale, 0.0);
-    vec4 n11 = textureLod(cloudNoiseTex, (i + vec2(1.5, 1.5)) * scale, 0.0);
-    vec4 o = step(vec4(threshold), vec4(n00.b, n10.b, n01.b, n11.b) * CLOUD_SLAB_MIX.x + vec4(n00.a, n10.a, n01.a, n11.a) * CLOUD_SLAB_MIX.y);
-    // マスの境目の近くだけで移す (辺はまっすぐ、角だけ丸い)
-    vec2 u = smoothstep(0.5 - CLOUD_SLAB_CORNER, 0.5 + CLOUD_SLAB_CORNER, f);
-    float v = mix(mix(o.x, o.y, u.x), mix(o.z, o.w, u.x), u.y);
-    float z = abs(hv * 2.0 - 1.0);
-    float field = v - CLOUD_SLAB_ROUND * z * z * z;
-    return linearStep(0.5, 0.5 + CLOUD_SLAB_SOFTNESS, field);
-}
-#endif
 
 #if CLOUDS != 3
 /*
@@ -394,20 +364,15 @@ float cloudLowDensityCumulus(CloudContext ctx, CloudColumn col, vec2 rel, float 
 }
 
 float cloudLowDensity(CloudContext ctx, CloudColumn col, vec2 rel, float altitude, float detail, bool lightPath, out float cloudHeight) {
-#if CLOUDS == 3
-    if (CS_SLAB == 1) {
-        // 板の雲は晴天だけ。降り始めのうちに積雲の形 (乱層雲・積乱雲) へ移す (板と雨雲が重なる間が長いと、板の明るい筋が雨雲に残る)
-        float rainLook = smoothstep(0.0, CLOUD_HAZE_RAIN.x, ctx.rain);
-        float slabHeight;
-        float slab = rainLook < 1.0 ? cloudSlabDensity(col, rel + ctx.lowOrigin, altitude, slabHeight)
-                   * (lightPath ? max(CS_DENSITY / CLOUD_STYLE_LIGHT_SIGMA_RATIO, 1.0) : CS_DENSITY) : 0.0;
-        if (rainLook <= 0.0) { cloudHeight = slabHeight; return slab; }
-        float d = cloudLowDensityCumulus(ctx, col, rel, altitude, detail, lightPath, cloudHeight);
-        if (rainLook < 1.0) cloudHeight = mix(slabHeight, cloudHeight, rainLook);
-        return mix(slab, d, rainLook);
-    }
-#endif
+#ifdef CLOUD_VANILLA_SHAPE
+    // 晴天の低層はバニラの形の雲 (cloud_vanilla.glsl) が担う。降り始めのうちに積雲の形 (乱層雲・積乱雲) へ移す
+    // (バニラの形の雲と雨雲が重なる間が長いと、バニラの形の明るい筋が雨雲に残る)
+    float rainLook = cloudVanillaRainLook(ctx.rain);
+    if (rainLook <= 0.0) { cloudHeight = 0.5; return 0.0; }
+    return cloudLowDensityCumulus(ctx, col, rel, altitude, detail, lightPath, cloudHeight) * rainLook;
+#else
     return cloudLowDensityCumulus(ctx, col, rel, altitude, detail, lightPath, cloudHeight);
+#endif
 }
 
 // 距離 t (参照 m) の縁の浸食の LOD [0,1]: 0.5-1 で細かいオクターブ、0-0.5 で主オクターブを消していく

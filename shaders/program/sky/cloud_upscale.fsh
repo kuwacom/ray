@@ -38,6 +38,7 @@
 #include "/lib/common/look_presets.glsl"
 #include "/lib/sky/sky_color.glsl"
 #include "/lib/common/frame_offset.glsl"
+#include "/lib/sky/cloud_styles.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/sky/fog_template.glsl"
 #include "/lib/sky/climate.glsl"
@@ -69,7 +70,7 @@ vec4 fetchLowRes(ivec2 q) {
 
 // 雲の再投影距離。層を通らない (雲の無い) 方向は無限遠として回転だけで戻す
 vec2 cloudPreviousUv(vec3 dir) {
-    vec2 seg = cloudLayerSegment(cameraPosition.y, dir.y, CLOUD_BASE, CLOUD_TOP);
+    vec2 seg = cloudPrimarySegment(cameraPosition.y, dir.y);
     if (seg.y > seg.x) {
         float dist = min(seg.x + 0.3 * (seg.y - seg.x), 30000.0 / CLOUD_KH);
         return playerToPreviousScreen(dir * dist).xy;
