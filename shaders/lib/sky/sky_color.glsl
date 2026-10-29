@@ -23,8 +23,11 @@
 
 // 月光の色。物理的には太陽光とほぼ同じだが、夜の視覚 (プルキンエ効果) に寄せて青に振る
 const vec3 MOON_TINT = vec3(0.72, 0.84, 1.0);
-// 新月でも真っ暗にしない下限 (地球照・星明かり分)
-const float MOON_PHASE_MIN_LIGHT = 0.08;
+/*
+ * 月の照り返しの満ち欠けの曲線の冪。球のランバート体の位相関数のままだと半月で満月の 0.32 だが、
+ * 実際の月は表土の後方散乱 (衝効果) で半月は満月の 1 割前後まで落ちる。差を出しつつ半月で真っ暗にしない間を取る
+ */
+const float MOON_PHASE_EXPONENT = 1.5;
 // 曇天 (雨) で空が灰色に寄る量と暗くなる量
 const float SKY_OVERCAST_DESATURATE = 0.85;
 const float SKY_OVERCAST_DARKEN = 0.55;
@@ -131,11 +134,13 @@ vec3 lookSunTint() {
     return t / luminance(t);
 }
 
-// 球状のランバート体の位相関数 (満月 = 1)。月の照り返しが位相でどれだけ減るか
+// 月の照り返しが満ち欠けでどれだけ減るか (満月 = 1、新月 = 0)
+// 新月の夜の明るさは向きのない空の底 (SKY_NIGHT_FLOOR・大気光・星) と MIN_AMBIENT が受け持つ。
+// ここに下限を残すと、新月でも月の方向から平行光が来て、影・光芒・フレアが出る
 float moonPhaseFactor() {
     float a = moonPhaseAngle();
     float lambert = ((PI - a) * cos(a) + sin(a)) * RCP_PI;
-    return mix(MOON_PHASE_MIN_LIGHT, 1.0, saturate(lambert));
+    return pow(saturate(lambert), MOON_PHASE_EXPONENT);
 }
 
 vec3 getMoonIlluminanceFull() { return MOON_ILLUMINANCE * MOON_BRIGHTNESS * MOON_TINT; }
