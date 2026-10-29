@@ -13,6 +13,8 @@
 #define DOF_FOCUS_MODE 0 // [0 1 2] 0=オート 1=マニュアル 2=オート+オフセット
 #define DOF_MANUAL_FOCUS 8.0 // [0.1 0.15 0.2 0.3 0.5 0.75 1.0 2.0 4.0 6.0 8.0 10.0 16.0 32.0 64.0 128.0 256.0 512.0]
 #define DOF_FOCUS_SPEED 2.5 // [0.1 0.25 0.5 1.0 1.5 2.0 2.5 3.0 5.0 10.0 15.0 20.0]
+//#define DOF_FOCUS_GLASS // オートフォーカスがガラス・氷に合う
+#define DOF_FOCUS_WATER // オートフォーカスが水面に合う
 #define MOTION_BLUR
 #define MOTION_BLUR_STRENGTH 1.0 // [0.1 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0]
 #define VIGNETTE 0.3 // [0.0 0.1 0.2 0.3 0.4 0.5 0.75 1.0 1.5 2.0]

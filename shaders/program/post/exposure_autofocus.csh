@@ -5,7 +5,7 @@
  * - 順応は EV のまま指数補間。明るい場面へは EXPOSURE_SPEED_BRIGHT、暗い場面へは EXPOSURE_SPEED_DARK
  * - 適用 EV は完全補正にせず (EXPOSURE_CURVE)、EXPOSURE_MIN_EV .. MAX_EV で止める (夜と洞窟は暗いまま残る)
  *   屋外の夜だけは止めた後に暗さに応じて明るく写す (EXPOSURE_NIGHT_*)
- * - フォーカス: 手を含まない深度 (depthtex2) の画面中央 9 点の中央値を log 空間で平滑化
+ * - フォーカス: 手を含まない深度 (depthtex2) の画面中央 9 点の中央値を log 空間で平滑化。水面・ガラス・氷は設定で焦点に入れる
  * DoF (composite22) はこのパスより前に走るので、1 フレーム前のフォーカスを使う
  * post モジュール (lib/post)
  */
@@ -14,7 +14,10 @@
 //@include "/lib/common/common.glsl"
 //@include "/lib/common/gbuffer.glsl"
 //@include "/lib/buffers/frame_data.glsl"
+//@include "/lib/ids/block_ids.glsl"
 //@include "/lib/ids/material_ids.glsl"
+//@include "/lib/common/voxel_space.glsl"
+//@include "/lib/light/voxel_read.glsl"
 //@include "/lib/post/post_internal.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
@@ -36,7 +39,11 @@
 #include "/lib/common/encoding.glsl"
 #include "/lib/common/gbuffer.glsl"
 #include "/lib/buffers/frame_data.glsl"
+#include "/lib/ids/block_ids.glsl"
 #include "/lib/ids/material_ids.glsl"
+#include "/lib/common/voxel_space.glsl"
+#include "/lib/buffers/images.glsl"
+#include "/lib/light/voxel_read.glsl"
 #include "/lib/common/jitter.glsl"
 #include "/lib/common/transforms.glsl"
 #include "/lib/post/velocity.glsl"
@@ -176,16 +183,53 @@ float applyEnvironmentExposure(float appliedEv, float ev) {
 }
 
 /*
- * 水面越しは水面に合わせる。depthtex2 は半透明を含まないので、海を見ると水底 (数十ブロック先) に合い、
- * 手前の水面と映り込みが前ボケになってつやの無いぼやけた面に見える。ガラス越しは奥に合わせる
- * 半透明の経路で描くエンティティ (プレイヤーのスキン・マネキン・旗等) も depthtex2 に無いので、そちらにも合わせる
- * (三人称やフリーカメラで自分の体を見ると、奥の地面に合って体がぼけていた)。光の柱・雷は透けて見えるので除く
- * 水中から見上げた水面は奥に合わせたいので、水面だけは水の外にいる時に限る
+ * 半透明の面は、見えている物の表面として焦点に入れる (depthtex2 は半透明を含まないので、入れないと奥に合う)
+ * - 水面 (DOF_FOCUS_WATER): 海を見ると水底 (数十ブロック先) に合い、手前の水面と映り込みが前ボケになって
+ *   つやの無いぼやけた面に見える。水中から見上げた水面は奥に合わせたいので、水の外にいる時に限る
+ * - ガラス・氷など形のある物 (DOF_FOCUS_GLASS): 窓越しの景色はぼける
+ * - 半透明の経路で描くエンティティ (プレイヤーのスキン・マネキン・旗等) は常に。三人称やフリーカメラで自分の体を見ると、
+ *   奥の地面に合って体がぼけていた。光の柱・雷は透けて見えるので除く
  */
 bool isFocusTranslucent(int mat) {
+#ifdef DOF_FOCUS_WATER
     if (mat == MAT_WATER) return isEyeInWater == 0;
+#endif
+#ifdef DOF_FOCUS_GLASS
+    if (mat == MAT_GLASS || mat == MAT_STAINED_GLASS || mat == MAT_ICE || mat == MAT_SLIME_HONEY) return true;
+#endif
     return isEntityMaterial(mat) && mat != MAT_BEACON_BEAM && mat != MAT_LIGHTNING;
 }
+
+#ifdef DOF_FOCUS_GLASS
+/*
+ * 透明なガラス (cutout の BLOCK_GLASS・BLOCK_GLASS_PANE) は透明なテクセルが depthtex2 に入らず、枠の画素しか深度に残らない
+ * ので、カメラから dir へ maxDist までのボクセルを辿って最初のガラスのセルまでの距離を返す (無ければ -1)
+ * 板ガラスは繋がり方で形が変わるので、セルの中心を通る面で近似する (誤差は半ブロック以内)
+ */
+const float FOCUS_GLASS_MAX_DIST = 48.0; // これより遠いガラスは奥とボケの差がほとんど無い
+const int FOCUS_GLASS_MAX_STEPS = 96;
+
+float focusClearGlassDistance(vec3 dir, float maxDist) {
+    vec3 origin = playerToVoxel(vec3(0.0));
+    ivec3 cell = ivec3(floor(origin));
+    ivec3 stepDir = ivec3(greaterThanEqual(dir, vec3(0.0))) * 2 - 1;
+    vec3 tDelta = 1.0 / max(abs(dir), vec3(1e-7));
+    vec3 fr = origin - vec3(cell);
+    vec3 tMax = mix(fr, 1.0 - fr, vec3(greaterThan(stepDir, ivec3(0)))) * tDelta;
+    for (int i = 0; i < FOCUS_GLASS_MAX_STEPS; i++) {
+        float tEnter = minOf(tMax);
+        if (tEnter >= maxDist) break;
+        if (tMax.x == tEnter) { cell.x += stepDir.x; tMax.x += tDelta.x; }
+        else if (tMax.y == tEnter) { cell.y += stepDir.y; tMax.y += tDelta.y; }
+        else { cell.z += stepDir.z; tMax.z += tDelta.z; }
+        if (!isInVoxelVolume(cell)) break;
+        int id = fetchVoxelBlockId(cell);
+        if (id == BLOCK_GLASS) return tEnter;
+        if (id == BLOCK_GLASS_PANE) return clamp(dot(vec3(cell) + 0.5 - origin, dir), tEnter, minOf(tMax));
+    }
+    return -1.0;
+}
+#endif
 
 float focusTapDistance(vec2 uv) {
     ivec2 p = ivec2(uv * viewSize());
@@ -198,7 +242,16 @@ float focusTapDistance(vec2 uv) {
         decodeTranslucentData(texelFetch(colortex5, p, 0), n, lm, mat);
         if (isFocusTranslucent(mat)) d = d0;
     }
-    return d >= 1.0 ? far : linearizeDepth(d);
+    float dist = d >= 1.0 ? far : linearizeDepth(d);
+#ifdef DOF_FOCUS_GLASS
+    // 視線の向きと、奥行き (線形深度) に対する視線方向の長さの比。どの深度でも向きは同じなので中間の深度で取る
+    vec3 viewRay = screenToPlayer(vec3(uv, 0.5));
+    vec3 dir = normalize(viewRay);
+    float cosForward = linearizeDepth(0.5) / length(viewRay);
+    float glass = focusClearGlassDistance(dir, min(dist / cosForward, FOCUS_GLASS_MAX_DIST));
+    if (glass >= 0.0) dist = min(dist, glass * cosForward);
+#endif
+    return dist;
 }
 
 float updateFocus(float dt) {

@@ -112,6 +112,10 @@
 #endif
 #ifdef DOF
 #endif
+#ifdef DOF_FOCUS_GLASS
+#endif
+#ifdef DOF_FOCUS_WATER
+#endif
 #ifdef MOTION_BLUR
 #endif
 #ifdef LENS_FLARE

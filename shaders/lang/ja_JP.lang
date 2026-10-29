@@ -586,6 +586,10 @@ option.DOF_MANUAL_FOCUS=マニュアルフォーカス距離
 suffix.DOF_MANUAL_FOCUS= m
 option.DOF_MANUAL_FOCUS.comment=マニュアル時の焦点距離。オート + オフセットでは 8 m を基準にした倍率としてオートフォーカスの距離に掛ける
 option.DOF_FOCUS_SPEED=オートフォーカスの速さ
+option.DOF_FOCUS_GLASS=ガラスにピントを合わせる
+option.DOF_FOCUS_GLASS.comment=オートフォーカスがガラス・色付きガラス・氷・スライム・ハチミツの表面に合う。OFF では手前の透明な物を無視して奥に合う。ON にすると、窓越しの景色がぼける。ガラスの探索にボクセルを使うので、近くのガラスだけ (約 48 ブロック以内) が対象
+option.DOF_FOCUS_WATER=水面にピントを合わせる
+option.DOF_FOCUS_WATER.comment=水の外から水面を見たとき、オートフォーカスが水面に合う。OFF では水面を通して水底や奥に合い、手前の水面と映り込みがぼける。水中から見るときは常に奥に合う
 option.MOTION_BLUR=モーションブラー
 option.MOTION_BLUR_STRENGTH=モーションブラーの強さ
 # レンズ

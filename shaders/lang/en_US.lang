@@ -586,6 +586,10 @@ option.DOF_MANUAL_FOCUS=Manual Focus Distance
 suffix.DOF_MANUAL_FOCUS= m
 option.DOF_MANUAL_FOCUS.comment=Focus distance in manual mode. In Auto + Offset it scales the autofocus distance (8 m = no change)
 option.DOF_FOCUS_SPEED=Autofocus Speed
+option.DOF_FOCUS_GLASS=Focus on Glass
+option.DOF_FOCUS_GLASS.comment=Autofocus lands on the surface of glass, stained glass, ice, slime and honey. OFF ignores clear things in front and focuses on what is behind. ON blurs the view through a window. Clear glass is found through the voxels, so only glass within about 48 blocks counts
+option.DOF_FOCUS_WATER=Focus on Water Surface
+option.DOF_FOCUS_WATER.comment=Autofocus lands on the water surface when seen from outside the water. OFF focuses through the surface on the bottom or what is behind, so the surface and its reflections blur. Seen from underwater it always focuses behind
 option.MOTION_BLUR=Motion Blur
 option.MOTION_BLUR_STRENGTH=Motion Blur Strength
 # Lens
