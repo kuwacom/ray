@@ -47,6 +47,7 @@ uv sync
 | `gl_compile_check.py` | 同じ前処理の結果を、見えないウィンドウの OpenGL 4.6 compatibility コンテキストで手元の GPU ドライバに compile + link させます。glslang では出ないドライバ固有のエラーと、image / sampler / SSBO / shared メモリの使用数が上限を超えていないかを調べます |
 | `equiv_check.py` | 2 つのコミット (または作業ツリー) のシェーダーをドライバにリンクさせ、バイナリが同じかを比べます。リファクタで計算が変わっていないかを、ゲームを使わずに確かめます |
 | `pixdiff.py` | 2 枚の撮影の画素の差 (平均・p99・最大・4/255 を超える画素の割合・平均色の差) を出します |
+| `pass_preview.py` | 全画面の fragment パスと compute パスを手元の GPU で 1 回ずつ実行して、出力を PNG と npy に保存します。下の「パスを 1 つだけ描く」 |
 
 `tools/lib/` はスクリプト共通の部品です (リポジトリの場所 `paths.py`、sRGB の変換 `color.py`、PNG と .mcmeta の書き出し `textures.py`、生成物の書き込みと `--check` `generated.py`、shaders.properties の読み取りと `#if` の評価 `properties.py`)。スクリプトを足すときは、同じ処理を書き直さずここを使ってください
 
@@ -112,6 +113,23 @@ uv run tools/equiv_check.py --base HEAD~1 --new HEAD -v
 - バイナリには本文のハッシュなど、意味が同じでも変わるバイトがあります。基準の本文に違うコメントを足してリンクし直し、変わった位置を比べる対象から外します。コメント・関数名・未使用の関数や定数だけの変更は SAME、式や定数の値の変更は DIFF になります
 - 並べ替えなどで意味が同じでもバイナリが変わることがあります。DIFF になったら、撮影して `pixdiff.py` で比べます
 - 比べるのは同じ GPU とドライバの中だけです。`--filter`、`--profile`、`--world` で絞れます
+
+## パスを 1 つだけ描く
+
+`pass_preview.py` は、シェーダーを変えた直後に、そのパスだけを手元で動かして確かめます。ゲームの撮影の代わりではありません。入力はダミー (灰色の画像、0 の SSBO、既定の uniform) なので、見たい入力は `--tex` と `--u` で渡します
+
+```powershell
+uv run tools/pass_preview.py composite22 --gpu 1070 --tex colortex0=shot.png --tex depthtex0=depth.npy
+uv run tools/pass_preview.py setup1 setup2 prepare prepare1 --gpu 1070 --save skyViewImg --set CLOUDS=0
+uv run tools/pass_preview.py my_pass.fsh --size 1920x1080 --u rainStrength=1 --frames 8 --out out/x
+```
+
+- パスは `composite22` のような world0 の名前、`world-1/final` のようなフォルダ付きの名前、または `.fsh` / `.csh` のファイルです。複数を渡すと順に実行し、出力 (`/* RENDERTARGETS */` の colortexN と image) を後のパスが読みます。shaders/ の外の試験用ファイルでも `#include "/lib/..."` を使えます
+- `shaders.properties` の `image.*` と `customTexture.*` を現在の設定で読み、image の形式と大きさ、sampler 名、ノイズなどのテクスチャの実物をそのまま使います。compute の dispatch は `workGroups` / `workGroupsRender` と local size から決めます
+- 渡していない入力 (灰色にしたテクスチャと、値を決めていない uniform) は実行後に一覧で表示します
+- `--tex` は `.png` と、高さ x 幅 x チャンネルの `.npy` を受け付けます。`--frames N` は全パスを N 回繰り返して `frameCounter` を進めます。`--profile` と `--set NAME=VALUE` で設定を変えます
+- 結果は `tools/.cache/pass_preview/<最後のパス>_<名前>.png` (線形の値を sRGB にしたもの。`--ev` で露出) と `.npy` (生の float) に保存し、最小・平均・最大を表示します。`--save` で保存するテクスチャを選びます
+- gbuffers と shadow は頂点を与えないので描けません
 
 ## ルックの LUT
 

@@ -220,7 +220,10 @@ def _expand_unit(path: Path, done: set[Path], unconditional: bool, out: list[str
         done.add(path)
     _EXPANDING.add(path)
     try:
-        rel = path.relative_to(SHADERS).as_posix()
+        try:
+            rel = path.relative_to(SHADERS).as_posix()
+        except ValueError:
+            rel = path.name  # shaders/ の外の試験用ファイル (tools/pass_preview.py に渡したもの)
         # ガードの #ifndef の中は条件なしと同じ (初めての展開ではガードは必ず真)
         base = 1 if guard else 0
         depth = 0

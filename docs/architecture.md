@@ -52,6 +52,8 @@ tools/
   gen_look_lut.py, look_luts/*.json         ルックの LUT (textures/look/) の生成・.cube や PNG ストリップとの変換・確認
   validate_shaders.py                       Iris 前処理の簡易再現 + glslangValidator 検証 + 静的チェック
   gl_compile_check.py                       同じ前処理結果を実機の GL ドライバで compile + link、上限値との比較
+  pass_preview.py                           パス 1 つ (または順に複数) を実機で描いて・dispatch して画像と数値で保存する
+  lib/                                      スクリプト共通の部品 (リポジトリの場所、sRGB、PNG の書き出し、生成物の書き込み・確認、shaders.properties の読み取り)
   mc.py / run_scene.py / shader_options.py  ゲーム内デバッグのクライアント・定点シーン撮影・Iris の設定の読み書き
   minescript/ray_agent.py, ray_steps.py     ゲーム内に常駐して手順を実行する Minescript スクリプト
   scenes.example.json                       定点シーンの雛形
