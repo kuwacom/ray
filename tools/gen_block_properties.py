@@ -17,7 +17,6 @@ ID と光源の表から、シェーダー側の ID の定数・properties・光
 
 from __future__ import annotations
 
-import argparse
 import json
 import sys
 from pathlib import Path
@@ -27,9 +26,11 @@ from id_tables import (  # noqa: E402
     BLOCK_CONSTS, COLOR_BAND_FIRST, COLOR_BAND_LAST, COLORS, COPPER_PREFIX, ENTITIES, ENTITY_LIGHT_ID_BASE, LIGHT_BLOCK_LAST,
     LIGHT_ENTITY_FIRST, LIGHT_ENTITY_LAST, LIGHT_ID_BASE, LIGHT_ITEM_FIRST, LIGHT_ITEM_LAST, LIGHTS, Light, with_state,
 )
+from lib.color import linear_to_srgb, srgb_to_linear  # noqa: E402
+from lib.generated import check as generated_check  # noqa: E402
+from lib.generated import cli  # noqa: E402
+from lib.paths import ROOT, SHADERS  # noqa: E402
 
-ROOT = Path(__file__).resolve().parent.parent
-SHADERS = ROOT / "shaders"
 BLOCK_COLORS = ROOT / "tools" / "block_colors.json"
 
 # この刻み (sRGB 8bit) で同じになる色は 1 つの ID にまとめる。照り返しの色にはこれで十分
@@ -179,19 +180,10 @@ def render(kind: str, entries: list[tuple[int, str, list[str]]]) -> str:
     return text
 
 
-def srgb_to_linear(c: float) -> float:
-    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
-
-
-def linear_to_srgb(c: float) -> float:
-    c = min(max(c, 0.0), 1.0)
-    return c * 12.92 if c <= 0.0031308 else 1.055 * c ** (1.0 / 2.4) - 0.055
-
-
 def mean_srgb(colors: list[list[int]]) -> tuple[int, int, int]:
     """線形で平均してから sRGB 8bit へ (反射率の平均なので線形で取る)"""
     lin = [sum(srgb_to_linear(c[i] / 255.0) for c in colors) / len(colors) for i in range(3)]
-    return tuple(int(round(linear_to_srgb(x) * 255.0)) for x in lin)
+    return tuple(int(round(linear_to_srgb(x, 1.0) * 255.0)) for x in lin)
 
 
 Rgb = tuple[int, int, int]
@@ -580,35 +572,12 @@ def generated(shaders: Path = SHADERS) -> dict[Path, str]:
     }
 
 
-def read_normalized(path: Path) -> str | None:
-    return path.read_bytes().decode("utf-8").replace("\r\n", "\n") if path.exists() else None
-
-
 def check(shaders: Path = SHADERS) -> list[str]:
-    problems = []
-    for path, text in generated(shaders).items():
-        if read_normalized(path) != text:
-            problems.append(f"生成物が古い: {path.relative_to(shaders.parent).as_posix()} (uv run tools/gen_block_properties.py で再生成する)")
-    return problems
+    return generated_check(generated, shaders, "gen_block_properties.py")
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--check", action="store_true", help="書かずに、生成物が最新か確認する")
-    ap.add_argument("--shaders", type=Path, default=SHADERS, help="対象のシェーダーのフォルダ")
-    args = ap.parse_args()
-    shaders = args.shaders.resolve()
-    if args.check:
-        problems = check(shaders)
-        for p in problems:
-            print(p)
-        return 1 if problems else 0
-    for path, text in generated(shaders).items():
-        if read_normalized(path) != text:
-            nl = "\r\n" if path.exists() and b"\r\n" in path.read_bytes() else "\n"
-            path.write_bytes(text.replace("\n", nl).encode("utf-8"))
-            print(f"書き込み: {path.relative_to(shaders.parent).as_posix()}")
-    return 0
+    return cli(generated, "gen_block_properties.py")
 
 
 if __name__ == "__main__":

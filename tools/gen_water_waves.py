@@ -21,11 +21,11 @@ Tessendorf (2001) の FFT 海面を 1 枚の周期タイルに焼く。シェー
 from __future__ import annotations
 
 import math
-from pathlib import Path
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parent.parent
+from lib.paths import ROOT
+
 OUT_DIR = ROOT / "shaders" / "textures"
 SEED = 20261021
 SIZE = 128

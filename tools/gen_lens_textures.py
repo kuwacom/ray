@@ -12,14 +12,12 @@
 """
 from __future__ import annotations
 
-import json
-import struct
-import zlib
-from pathlib import Path
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parent.parent
+from lib.paths import ROOT
+from lib.textures import write_mcmeta, write_png
+
 TEX = ROOT / "shaders" / "textures"
 
 BLADES = (0, 5, 6, 7, 8, 9, 10, 13)
@@ -132,23 +130,6 @@ def bake_starburst_tile(blades: int, rng: np.random.Generator) -> np.ndarray:
         acc *= scale * scale / len(copies)
         out += acc[..., None] * weights[li][None, None, :]
     return out / peak
-
-
-def write_png(path: Path, rgba: np.ndarray) -> None:
-    h, w, _ = rgba.shape
-    raw = b"".join(b"\x00" + rgba[y].astype(np.uint8).tobytes() for y in range(h))
-
-    def chunk(tag: bytes, data: bytes) -> bytes:
-        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
-
-    png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0))
-    png += chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b"")
-    path.write_bytes(png)
-
-
-def write_mcmeta(path: Path, blur: bool, clamp: bool) -> None:
-    path.with_name(path.name + ".mcmeta").write_text(
-        json.dumps({"texture": {"blur": blur, "clamp": clamp}}, indent=2) + "\n", encoding="utf-8")
 
 
 def gen_starburst() -> None:

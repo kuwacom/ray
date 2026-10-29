@@ -48,6 +48,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import validate_shaders as vs  # noqa: E402 - 同じディレクトリの前処理を再利用する
+from lib.properties import disabled_programs, preprocess_properties  # noqa: E402
 
 try:
     import glfw
@@ -91,7 +92,6 @@ SSBO_DECL_RE = re.compile(r"\bbuffer\s+(\w+)\s*\{")
 SHARED_DECL_RE = re.compile(r"^[ \t]*shared\s+(\w+)\s+(\w+)\s*((?:\[[^\]]*\])*)\s*;", re.M)
 LOCAL_SIZE_RE = re.compile(r"layout\s*\(([^)]*local_size_[xyz][^)]*)\)\s*in\s*;")
 WORK_GROUPS_RE = re.compile(r"const\s+ivec3\s+workGroups\s*=\s*ivec3\s*\(([^)]*)\)")
-PROP_IF_RE = re.compile(r"^\s*#\s*(if|ifdef|ifndef|elif|else|endif)\b\s*(.*)$")
 
 SCALAR_BYTES = {"float": 4, "int": 4, "uint": 4, "bool": 4, "double": 8,
                 "vec2": 8, "ivec2": 8, "uvec2": 8, "vec3": 12, "ivec3": 12, "uvec3": 12,
@@ -284,64 +284,6 @@ def effective_macros(overrides: dict[str, str | bool], options: dict[str, vs.Opt
         else:
             macros[name] = str(val).rstrip("f") if re.fullmatch(r"-?[\d.]+f?", str(val)) else str(val)
     return macros
-
-
-def eval_pp_expr(expr: str, macros: dict[str, str]) -> bool:
-    expr = expr.split("//")[0]
-    expr = re.sub(r"\bdefined\s*\(\s*(\w+)\s*\)", lambda m: "1" if m.group(1) in macros else "0", expr)
-    expr = re.sub(r"\bdefined\s+(\w+)", lambda m: "1" if m.group(1) in macros else "0", expr)
-    expr = re.sub(r"\b[A-Za-z_]\w*\b", lambda m: macros.get(m.group(0), "0") or "1", expr)
-    expr = expr.replace("&&", " and ").replace("||", " or ")
-    expr = re.sub(r"!(?!=)", " not ", expr)
-    try:
-        return bool(eval(expr, {"__builtins__": {}}, {}))  # noqa: S307 - 自前の properties の式だけを評価する
-    except Exception:  # noqa: BLE001
-        print(f"[warn] properties の式を評価できない: {expr}")
-        return False
-
-
-def preprocess_properties(macros: dict[str, str]) -> list[str]:
-    """#if を解決した shaders.properties の論理行"""
-    out: list[str] = []
-    stack: list[tuple[bool, bool]] = []  # (この分岐が有効, いずれかの分岐を既に採った)
-    active = True
-    for line in vs.read_properties_logical_lines(vs.PROPERTIES):
-        m = PROP_IF_RE.match(line)
-        if m:
-            kind, arg = m.group(1), m.group(2).strip()
-            if kind in ("if", "ifdef", "ifndef"):
-                if kind == "if":
-                    cond = eval_pp_expr(arg, macros)
-                elif kind == "ifdef":
-                    cond = arg.split()[0] in macros
-                else:
-                    cond = arg.split()[0] not in macros
-                stack.append((active, active and cond))
-                active = active and cond
-            elif kind == "elif":
-                parent, taken = stack[-1]
-                cond = parent and not taken and eval_pp_expr(arg, macros)
-                stack[-1] = (parent, taken or cond)
-                active = cond
-            elif kind == "else":
-                parent, taken = stack[-1]
-                active = parent and not taken
-                stack[-1] = (parent, True)
-            else:
-                active = stack.pop()[0]
-            continue
-        if active:
-            out.append(line)
-    return out
-
-
-def disabled_programs(prop_lines: list[str]) -> set[str]:
-    result: set[str] = set()
-    for line in prop_lines:
-        m = re.match(r"^\s*program\.(\S+)\.enabled\s*=\s*(\S+)", line)
-        if m and m.group(2).lower() == "false":
-            result.add(m.group(1))
-    return result
 
 
 # 前処理 (glslang -E) と宣言数
@@ -892,7 +834,7 @@ def time_programs(configs: list[tuple[str, dict, list[str]]], options: dict[str,
     count = failed = 0
     t_all = time.perf_counter()
     for cfg_name, ov, worlds in configs:
-        disabled = disabled_programs(preprocess_properties(effective_macros(ov, options)))
+        disabled = disabled_programs(preprocess_properties(vs.PROPERTIES, effective_macros(ov, options)))
         for world in worlds:
             for pname, files in collect_programs(world, flt, sections).items():
                 prog_key = f"{world}/{pname.removesuffix('.csh')}"
@@ -993,7 +935,7 @@ def main() -> int:
     try:
         for cfg_name, ov, worlds in configs:
             macros = effective_macros(ov, options)
-            prop_lines = preprocess_properties(macros)
+            prop_lines = preprocess_properties(vs.PROPERTIES, macros)
             disabled = disabled_programs(prop_lines)
             buffer_sizes = buffer_object_sizes(prop_lines)
             for p in check_properties(prop_lines, limits):

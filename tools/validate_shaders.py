@@ -50,10 +50,11 @@ import gen_block_properties  # noqa: E402
 import gen_includes  # noqa: E402
 import gen_settings  # noqa: E402
 import include_deps  # noqa: E402
-from gen_settings import CONST_RE, DEFINE_RE, Option, read_properties_logical_lines, resolve_profile  # noqa: E402
+from gen_settings import CONST_RE, DEFINE_RE, Option  # noqa: E402
+from lib.paths import ROOT, SHADERS  # noqa: E402
+from lib.properties import read_properties_logical_lines, resolve_profile  # noqa: E402
 
-ROOT = Path(__file__).resolve().parent.parent
-SHADERS = ROOT / "shaders"
+
 PROPERTIES = SHADERS / "shaders.properties"
 LANG_FILES = [SHADERS / "lang" / "en_US.lang", SHADERS / "lang" / "ja_JP.lang"]
 WORLDS = ["world0", "world-1", "world1"]

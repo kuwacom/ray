@@ -15,10 +15,8 @@ from __future__ import annotations
 
 import argparse
 import sys
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-SHADERS = ROOT / "shaders"
+from lib.paths import SHADERS
 
 # ディメンションフォルダ -> 定義するマクロ
 WORLDS = {

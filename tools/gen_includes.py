@@ -19,13 +19,14 @@ Iris は #include の行を、#if の中でも include ガードを見ずに毎�
 
 from __future__ import annotations
 
-import argparse
 import re
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-SHADERS = ROOT / "shaders"
+from lib.generated import check as generated_check
+from lib.generated import cli
+from lib.paths import SHADERS
+
 EXTS = {".glsl", ".vsh", ".fsh", ".csh", ".gsh"}
 
 BEGIN = "// BEGIN GENERATED includes (tools/gen_includes.py)"
@@ -161,36 +162,11 @@ def generated(shaders: Path = SHADERS) -> dict[Path, str]:
 
 
 def check(shaders: Path = SHADERS) -> list[str]:
-    try:
-        expected = generated(shaders)
-    except ValueError as e:
-        return [str(e)]
-    return [f"生成ブロックが古い: {p.relative_to(shaders.parent).as_posix()} (uv run tools/gen_includes.py で再生成する)"
-            for p, text in expected.items() if "\n".join(read_lines(p)) != text]
+    return generated_check(generated, shaders, "gen_includes.py", "生成ブロックが古い")
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--check", action="store_true", help="書かずに、生成ブロックが最新か確認する")
-    ap.add_argument("--shaders", type=Path, default=SHADERS, help="対象のシェーダーのフォルダ")
-    args = ap.parse_args()
-    shaders = args.shaders.resolve()
-    if args.check:
-        problems = check(shaders)
-        for p in problems:
-            print(p)
-        return 1 if problems else 0
-    try:
-        expected = generated(shaders)
-    except ValueError as e:
-        print(e)
-        return 1
-    for path, text in expected.items():
-        if "\n".join(read_lines(path)) != text:
-            nl = "\r\n" if b"\r\n" in path.read_bytes() else "\n"
-            path.write_bytes(text.replace("\n", nl).encode("utf-8"))
-            print(f"書き込み: {path.relative_to(shaders.parent).as_posix()}")
-    return 0
+    return cli(generated, "gen_includes.py", "生成ブロックが古い")
 
 
 if __name__ == "__main__":

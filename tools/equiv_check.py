@@ -99,7 +99,7 @@ def programs(tree: Tree, cfg: str, world: str, flt: str) -> dict[str, list[gcc.S
         ov = vs.resolve_profile(cfg, tree.profiles)
     else:
         return None
-    disabled = gcc.disabled_programs(gcc.preprocess_properties(gcc.effective_macros(ov, tree.options)))
+    disabled = gcc.disabled_programs(gcc.preprocess_properties(vs.PROPERTIES, gcc.effective_macros(ov, tree.options)))
     out: dict[str, list[gcc.StageSource]] = {}
     for pname, files in gcc.collect_programs(world, flt).items():
         if f"{world}/{pname.removesuffix('.csh')}" in disabled:

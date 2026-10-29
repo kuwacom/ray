@@ -20,7 +20,9 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-ROOT = Path(__file__).resolve().parent.parent
+from lib.color import linear_to_srgb, srgb_to_linear
+from lib.paths import ROOT
+
 OUT = ROOT / "tools" / "block_colors.json"
 
 # tintindex の付いた面に掛ける色 (sRGB)。バイオームで変わる草・葉は平原の値を代表にする
@@ -44,15 +46,6 @@ PARTICLE_ONLY = {"water": WATER_TINT, "bubble_column": WATER_TINT, "lava": None}
 ALPHA_CUTOFF = 0.1
 # 上面の色がこれ (sRGB 8bit のどれかの成分の差) 以上違う時だけ "top" に書く
 TOP_COLOR_MIN_DIFF = 8
-
-
-def srgb_to_linear(c: np.ndarray) -> np.ndarray:
-    return np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
-
-
-def linear_to_srgb(c: np.ndarray) -> np.ndarray:
-    c = np.clip(c, 0.0, 1.0)
-    return np.where(c <= 0.0031308, c * 12.92, 1.055 * c ** (1.0 / 2.4) - 0.055)
 
 
 class Assets:
@@ -190,11 +183,11 @@ def main() -> None:
             rgb = average_model(assets, model, tint)
             if rgb is None:
                 continue
-        colors[name] = [int(round(x)) for x in linear_to_srgb(rgb) * 255.0]
+        colors[name] = [int(round(x)) for x in linear_to_srgb(rgb, 1.0) * 255.0]
         if name not in PARTICLE_ONLY:
             top = average_model(assets, model, tint, {"up"})
             if top is not None:
-                top8 = [int(round(x)) for x in linear_to_srgb(top) * 255.0]
+                top8 = [int(round(x)) for x in linear_to_srgb(top, 1.0) * 255.0]
                 if max(abs(a - b) for a, b in zip(top8, colors[name])) >= TOP_COLOR_MIN_DIFF:
                     tops[name] = top8
     # 差分が読めるように 1 ブロック 1 行で書く

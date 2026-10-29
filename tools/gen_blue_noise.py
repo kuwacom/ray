@@ -7,13 +7,11 @@ Ulichney 1993 の void-and-cluster 法を自前実装したもの。トーラス
 
 from __future__ import annotations
 
-import struct
-import zlib
-from pathlib import Path
-
 import numpy as np
 
-ROOT = Path(__file__).resolve().parent.parent
+from lib.paths import ROOT
+from lib.textures import write_png
+
 OUT = ROOT / "shaders" / "textures" / "blue_noise.png"
 SIZE = 128
 SIGMA = 1.9
@@ -74,19 +72,6 @@ def void_and_cluster(n: int, seed: int) -> np.ndarray:
         rank[void] = r
 
     return (rank.reshape(n, n) * 256 // (n * n)).astype(np.uint8)
-
-
-def write_png(path: Path, rgba: np.ndarray) -> None:
-    h, w, _ = rgba.shape
-    raw = b"".join(b"\x00" + rgba[y].tobytes() for y in range(h))
-
-    def chunk(tag: bytes, data: bytes) -> bytes:
-        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
-
-    png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0))
-    png += chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b"")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(png)
 
 
 def main() -> None:

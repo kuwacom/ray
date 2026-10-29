@@ -21,11 +21,11 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from pathlib import Path
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parent.parent
+from lib.paths import ROOT
+
 OUT = ROOT / "shaders" / "lib" / "post" / "lens_ghosts.glsl"
 
 INF = float("inf")
@@ -587,6 +587,8 @@ def main() -> None:
     out.append(" */")
     out.append("#ifndef POST_LENS_GHOSTS_GLSL")
     out.append("#define POST_LENS_GHOSTS_GLSL")
+    out.append("")
+    out.append('//@include "/lib/post/lens_presets.glsl"')
     out.append("")
     out.append(f"const int GHOST_TABLE_SIZE = {GHOSTS_PER_TABLE};")
     first = True

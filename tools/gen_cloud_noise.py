@@ -15,11 +15,11 @@
 from __future__ import annotations
 
 import itertools
-from pathlib import Path
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parent.parent
+from lib.paths import ROOT
+
 OUT_DIR = ROOT / "shaders" / "textures"
 SEED = 20261019
 # raw テクスチャはバイリニア + 繰り返しで読む (Iris の raw の既定は clamp なので mcmeta で上書きする)

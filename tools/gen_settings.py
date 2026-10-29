@@ -14,21 +14,21 @@ Iris はこの行を直接読むので、手で書く部分と生成する部分
 
 from __future__ import annotations
 
-import argparse
 import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-SHADERS = ROOT / "shaders"
+from lib.generated import check as generated_check
+from lib.generated import cli, replace_block
+from lib.paths import SHADERS
+from lib.properties import PROPERTIES, parse_profiles, resolve_profile
 
 DEFINE_RE = re.compile(r"^(\s*)(//\s*)?#define\s+([A-Za-z_]\w*)(?:\s+([^\s/]+))?\s*(//.*)?$")
 CONST_RE = re.compile(r"^(\s*)const\s+(int|float|bool)\s+(\w+)\s*=\s*([^;]+);\s*(//.*)?$")
 SETTINGS_INCLUDE_RE = re.compile(r'^\s*//@include\s+"(/lib/settings/[^"]+)"')
 
 BOOL_REFS = "lib/settings/bool_refs.glsl"
-PROPERTIES = "shaders.properties"
 SLIDERS_BEGIN = "# BEGIN GENERATED sliders (tools/gen_settings.py)"
 SLIDERS_END = "# END GENERATED sliders"
 ARCHITECTURE = "architecture.md"
@@ -74,56 +74,6 @@ def settings_files(shaders: Path = SHADERS) -> list[Path]:
         if m and m.group(1).lstrip("/") != BOOL_REFS:
             files.append(shaders / m.group(1).lstrip("/"))
     return files
-
-
-def read_properties_logical_lines(path: Path) -> list[str]:
-    """`\\` の行継続を結合した論理行のリスト"""
-    lines: list[str] = []
-    buf = ""
-    for raw in path.read_text(encoding="utf-8").splitlines():
-        s = raw.rstrip()
-        if s.endswith("\\"):
-            buf += s[:-1] + " "
-            continue
-        lines.append(buf + s)
-        buf = ""
-    if buf:
-        lines.append(buf)
-    return lines
-
-
-def parse_profiles(shaders: Path = SHADERS) -> dict[str, list[str]]:
-    """shaders.properties の profile.* を宣言順に返す"""
-    profiles: dict[str, list[str]] = {}
-    path = shaders / PROPERTIES
-    if not path.exists():
-        return profiles
-    for line in read_properties_logical_lines(path):
-        m = re.match(r"^\s*profile\.(\w+)\s*=\s*(.*)$", line)
-        if m:
-            profiles[m.group(1)] = m.group(2).split()
-    return profiles
-
-
-def resolve_profile(name: str, profiles: dict[str, list[str]], seen: set[str] | None = None) -> dict[str, str | bool]:
-    seen = seen or set()
-    if name in seen:
-        raise ValueError(f"profile cycle: {name}")
-    seen.add(name)
-    result: dict[str, str | bool] = {}
-    for tok in profiles[name]:
-        if tok.startswith("profile."):
-            result.update(resolve_profile(tok[len("profile."):], profiles, seen))
-        elif tok.startswith("!program."):
-            continue
-        elif tok.startswith("!"):
-            result[tok[1:]] = False
-        elif "=" in tok or ":" in tok:
-            k, v = re.split(r"[=:]", tok, maxsplit=1)
-            result[k] = v
-        else:
-            result[tok] = True
-    return result
 
 
 def definitions(shaders: Path = SHADERS) -> list[Option]:
@@ -214,16 +164,6 @@ def render_sliders(opts: dict[str, Option], shaders: Path = SHADERS) -> str:
     return "\n".join(lines)
 
 
-def replace_block(text: str, begin: str, end: str, block: str, where: str) -> str:
-    """マーカーの間だけを差し替える。改行は元のファイルに合わせる。マーカーが 1 組でなければ例外"""
-    if text.count(begin) != 1 or text.count(end) != 1 or text.index(begin) > text.index(end):
-        raise ValueError(f"{where}: {begin} と {end} が 1 組だけ必要")
-    nl = "\r\n" if "\r\n" in text else "\n"
-    head, rest = text.split(begin)
-    tail = rest.split(end)[1]
-    return head + begin + nl + block.replace("\n", nl) + nl + end + tail
-
-
 def resolved_profiles(shaders: Path) -> dict[str, dict[str, str | bool]]:
     profiles = parse_profiles(shaders)
     return {name: resolve_profile(name, profiles) for name in profiles}
@@ -300,44 +240,12 @@ def generated(shaders: Path = SHADERS) -> dict[Path, str]:
     return out
 
 
-def read_normalized(path: Path) -> str | None:
-    return path.read_bytes().decode("utf-8").replace("\r\n", "\n") if path.exists() else None
-
-
 def check(shaders: Path = SHADERS) -> list[str]:
-    problems = []
-    try:
-        expected = generated(shaders)
-    except ValueError as e:
-        return [str(e)]
-    for path, text in expected.items():
-        if read_normalized(path) != text:
-            problems.append(f"生成物が古い: {path.relative_to(shaders.parent).as_posix()} (uv run tools/gen_settings.py で再生成する)")
-    return problems
+    return generated_check(generated, shaders, "gen_settings.py")
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--check", action="store_true", help="書かずに、生成物が最新か確認する")
-    ap.add_argument("--shaders", type=Path, default=SHADERS, help="対象のシェーダーのフォルダ")
-    args = ap.parse_args()
-    shaders = args.shaders.resolve()
-    if args.check:
-        problems = check(shaders)
-        for p in problems:
-            print(p)
-        return 1 if problems else 0
-    try:
-        expected = generated(shaders)
-    except ValueError as e:
-        print(e)
-        return 1
-    for path, text in expected.items():
-        if read_normalized(path) != text:
-            nl = "\r\n" if path.exists() and b"\r\n" in path.read_bytes() else "\n"
-            path.write_bytes(text.replace("\n", nl).encode("utf-8"))
-            print(f"書き込み: {path.relative_to(shaders.parent).as_posix()}")
-    return 0
+    return cli(generated, "gen_settings.py")
 
 
 if __name__ == "__main__":

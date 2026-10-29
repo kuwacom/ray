@@ -29,8 +29,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import gen_includes  # noqa: E402
 
-ROOT = Path(__file__).resolve().parent.parent
-SHADERS = ROOT / "shaders"
+from lib.paths import SHADERS  # noqa: E402
+
 EXTS = {".glsl", ".vsh", ".fsh", ".csh", ".gsh"}
 
 INCLUDE_LINE_RE = re.compile(r'^[ \t]*#[ \t]*include\b')

@@ -31,26 +31,19 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-ROOT = Path(__file__).resolve().parent.parent
+from lib.color import linear_to_srgb, srgb_to_linear
+from lib.paths import ROOT
+from lib.textures import write_mcmeta
+
 LOOK_DIR = ROOT / "shaders" / "textures" / "look"
 PARAMS_DIR = Path(__file__).resolve().parent / "look_luts"
 DAT_SIZE = 33
 STRIP_SIZE = 32
 # 同梱の 3D LUT: shaders.properties の LOOK_LUT の番号と同じ並び (2 から)
 BUNDLED = ("split_tone", "film", "portra", "ektar", "vision3_500t", "velvia", "provia", "eterna")
-MCMETA = {"texture": {"blur": True, "clamp": True}}
 
 
-# 色の変換 (sRGB の区分曲線, Oklab)
-def srgb_to_linear(c: np.ndarray) -> np.ndarray:
-    return np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
-
-
-def linear_to_srgb(c: np.ndarray) -> np.ndarray:
-    c = np.clip(c, 0.0, None)
-    return np.where(c <= 0.0031308, c * 12.92, 1.055 * np.power(c, 1.0 / 2.4) - 0.055)
-
-
+# 色の変換 (sRGB の区分曲線は lib/color.py, Oklab)
 M1 = np.array([[0.4122214708, 0.5363325363, 0.0514459929],
                [0.2119034982, 0.6806995451, 0.1073969566],
                [0.0883024619, 0.2817188376, 0.6299787005]])
@@ -173,10 +166,6 @@ def write_cube(lut: np.ndarray, path: Path, title: str) -> None:
     lines = [f'TITLE "{title}"', f"LUT_3D_SIZE {n}", "DOMAIN_MIN 0.0 0.0 0.0", "DOMAIN_MAX 1.0 1.0 1.0"]
     lines += [f"{r:.6f} {g:.6f} {b:.6f}" for r, g, b in lut.reshape(-1, 3)]
     path.write_text("\n".join(lines) + "\n", encoding="ascii")
-
-
-def write_mcmeta(path: Path) -> None:
-    path.with_name(path.name + ".mcmeta").write_text(json.dumps(MCMETA, indent=2) + "\n", encoding="ascii")
 
 
 def read_any(path: Path) -> np.ndarray:
