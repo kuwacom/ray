@@ -151,6 +151,29 @@ def set_fov(value) -> int:
     return get_fov()
 
 
+def set_cloud_status(value) -> str:
+    """
+    ### set_cloud_status
+    バニラの雲の表示 (OFF / FAST / FANCY) を実行時だけ切り替える。options.txt は保存しない
+    CLOUDS=1 でバニラの雲を描いて、体積雲の位置合わせの基準にする
+
+    @param value - "off" / "fast" / "fancy"。"restore" で変更前へ戻す
+    @returns 変更後の値
+    """
+    with JavaScope() as j:
+        options, options_cls = j.options()
+        inst = j.call(options, options_cls, "cloudStatus")
+        inst_cls = j.cls("net.minecraft.client.OptionInstance")
+        status_cls = j.cls("net.minecraft.client.CloudStatus")
+        if value == "restore":
+            if "cloud_status" not in SAVED:
+                return m.java_to_string(j.call(inst, inst_cls, "get"))
+            value = SAVED.pop("cloud_status")
+        else:
+            SAVED.setdefault("cloud_status", m.java_to_string(j.call(inst, inst_cls, "get")))
+        j.call(inst, inst_cls, "set", j.field(0, status_cls, str(value).upper()))
+        return m.java_to_string(j.call(inst, inst_cls, "get"))
+
 def get_hud() -> bool:
     with JavaScope() as j:
         options, options_cls = j.options()
@@ -254,6 +277,9 @@ def run_step(step: dict):
     if "reload_shaders" in step:
         reload_shaders()
         return None
+    if "cloud_status" in step:
+        # 例: {"cloud_status": "fancy"} バニラの雲を出す。"restore" で戻す
+        return set_cloud_status(step["cloud_status"])
     if "shader_pack" in step:
         # 例: {"shader_pack": "iterationT 3.2.0.zip"} 比較用に一時的に切り替える。"restore" で iris.properties のパック (Ray) に戻す
         if step["shader_pack"] == "restore":
