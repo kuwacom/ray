@@ -7,7 +7,8 @@
  * skyParams の使い方 (sky モジュールの自由領域)
  *   [0] rgb = 雲の高度での光源照度, a = +1 なら光源は太陽 / -1 なら月
  *   [1] x = 前フレームの worldTime, y = 履歴が有効な連続フレーム数 (0 = 時刻が飛んだのでリセット), zw = 予備
- *   [3] x = 目の位置の太陽の見え方 (今フレーム), y = 目の周り 3 ブロックの平均 (平滑化済み), zw = 予備
+ *   [3] x = 目の位置の太陽の見え方 (今フレーム), y = 目の周り 3 ブロックの平均 (平滑化済み), z = 太陽が影マップの範囲より遠い地形に隠れている割合
+ *       (post の composite25 が書く。ここでは触らない), w = 予備
  * sky モジュール (lib/sky)
  */
 // このプログラムで書く SSBO (lib/buffers。ほかのプログラムでは readonly)
@@ -195,13 +196,13 @@ void main() {
     float eyePrev = frameData.skyParams[3].y;
     bool eyeReset = historyFrames < 1.5 || isnan(eyePrev) || isinf(eyePrev) || distance(cameraPosition, previousCameraPosition) > EYE_SUN_RESET_DISTANCE;
     float eyeSmooth = eyeReset ? eyeArea : mix(eyePrev, eyeArea, 1.0 - exp(-EYE_SUN_SPEED * clamp(frameTime, 0.0, 0.5)));
-    frameData.skyParams[3] = vec4(eyeNow, eyeSmooth, 0.0, 0.0);
+    frameData.skyParams[3].xy = vec2(eyeNow, eyeSmooth);
 #else
     frameData.sunIrradiance = vec4(0.0);
     frameData.moonIrradiance = vec4(0.0);
     frameData.skyParams[0] = vec4(0.0);
     frameData.skyParams[2] = vec4(0.0);
-    frameData.skyParams[3] = vec4(1.0, 1.0, 0.0, 0.0);
+    frameData.skyParams[3].xy = vec2(1.0);
     #ifdef WORLD_END
         // エンドは影マップがあるので、淡い紫の平行光で立体感を出す
         frameData.shadowLightIrradiance = vec4(END_LIGHT_IRRADIANCE, 0.0);

@@ -141,9 +141,9 @@ void main() {
     #else
             float farStart = min(dist, fogRenderDistance());
     #endif
-            float farVisibility = vlFarScreenVisibility(dir, farStart, dist, blueNoise(texel).b);
+            vec2 farVisibility = vlFarScreenVisibility(dir, farStart, dist, blueNoise(texel).b);
 #else
-            float farVisibility = 1.0;
+            vec2 farVisibility = vec2(farSunHiddenShade(dir));
 #endif
             raw = marchAirFog(dir, dist, dither, farVisibility);
         }

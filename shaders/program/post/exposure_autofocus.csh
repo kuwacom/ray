@@ -76,6 +76,42 @@ const float FOCUS_TAP_SPACING = 0.012;
 
 shared uint sharedHistogram[256];
 
+#ifdef HAS_SKY
+const uint VIS_SCALE = 1024u;
+shared uint sharedVisible;
+shared uint sharedFarHidden;
+
+// 光源 (昼は太陽, 夜は月) の円盤内の index 番目の点。画面の端へ寄せた座標と、画面の外へのはみ出し (UV) を返す。光源が後ろなら false
+bool lightDiscTap(uint index, out vec2 clamped, out float outside) {
+    clamped = vec2(0.0);
+    outside = 0.0;
+    if (shadowLightPosition.z >= 0.0) return false;
+    vec2 lightUv = viewToScreen(shadowLightPosition).xy;
+    float radius = LENS_VIS_DISC_SCALE * LENS_LIGHT_ANGULAR_RADIUS * gbufferProjection[1][1] * 0.5;
+    radius = max(radius, 1.5 / viewHeight);
+    vec2 p = lightUv + vogelDisk(int(index), 256, 0.0) * radius * vec2(1.0 / aspectRatio, 1.0);
+    clamped = clamp(p, vec2(0.5) / viewSize(), vec2(1.0) - vec2(0.5) / viewSize());
+    outside = length(p - clamped);
+    return true;
+}
+
+/*
+ * 光源の円盤の 1 点が、影マップの範囲より遠い地形に隠れているか (霧の光を抑える用。FrameData.skyParams[3].z)
+ * 範囲内の遮蔽物は影マップが見るので数えない。画面の外は端の画素で見て、離れるほど信用しない (隠れていないとする)
+ */
+uint farHiddenTap(uint index) {
+    vec2 clamped;
+    float outside;
+    if (!lightDiscTap(index, clamped, outside) || outside >= LENS_VIS_OFFSCREEN) return 0u;
+    float depth = texelFetch(depthtex0, ivec2(clamped * viewSize()), 0).r;
+    if (depth >= 1.0 || isHandDepth(depth)) return 0u;
+#ifdef HAS_SUN_SHADOWS
+    if (linearizeDepth(depth) < shadowDistance) return 0u;
+#endif
+    return uint((1.0 - smoothstep(0.0, LENS_VIS_OFFSCREEN, outside)) * float(VIS_SCALE) + 0.5);
+}
+#endif
+
 #if defined LENS_FLARE && defined HAS_SKY
 /*
  * レンズフレアの光源 (昼は太陽, 夜は月) の見え具合 -> FrameData.postParams[2].x (平滑化済み), .y (今フレーム)
@@ -85,17 +121,10 @@ shared uint sharedHistogram[256];
  * - 画面の外: 一番近い画面端の画素で判定し、外へ離れるほど弱める (画面のすぐ外の太陽からもフレアは出る)
  * 1 画素ごとに final で判定していたのをここへ移し、時間方向にも平滑化してちらつきを抑える
  */
-const uint VIS_SCALE = 1024u;
-shared uint sharedVisible;
-
 uint flareVisibilityTap(uint index) {
-    if (shadowLightPosition.z >= 0.0) return 0u;
-    vec2 lightUv = viewToScreen(shadowLightPosition).xy;
-    float radius = LENS_VIS_DISC_SCALE * LENS_LIGHT_ANGULAR_RADIUS * gbufferProjection[1][1] * 0.5;
-    radius = max(radius, 1.5 / viewHeight);
-    vec2 p = lightUv + vogelDisk(int(index), 256, 0.0) * radius * vec2(1.0 / aspectRatio, 1.0);
-    vec2 clamped = clamp(p, vec2(0.5) / viewSize(), vec2(1.0) - vec2(0.5) / viewSize());
-    float outside = length(p - clamped);
+    vec2 clamped;
+    float outside;
+    if (!lightDiscTap(index, clamped, outside)) return 0u;
     if (outside >= LENS_VIS_OFFSCREEN) return 0u;
     if (texelFetch(depthtex0, ivec2(clamped * viewSize()), 0).r < 1.0) return 0u;
     float vis = 1.0 - smoothstep(0.0, LENS_VIS_OFFSCREEN, outside);
@@ -292,12 +321,18 @@ float updateFocus(float dt) {
 void main() {
     uint index = gl_LocalInvocationIndex;
     sharedHistogram[index] = 0u;
-#if defined LENS_FLARE && defined HAS_SKY
-    if (index == 0u) sharedVisible = 0u;
+#ifdef HAS_SKY
+    if (index == 0u) {
+        sharedVisible = 0u;
+        sharedFarHidden = 0u;
+    }
 #endif
     barrier();
-#if defined LENS_FLARE && defined HAS_SKY
+#ifdef HAS_SKY
+    #ifdef LENS_FLARE
     atomicAdd(sharedVisible, flareVisibilityTap(index));
+    #endif
+    atomicAdd(sharedFarHidden, farHiddenTap(index));
 #endif
 
 #if EXPOSURE_MODE != 0
@@ -359,6 +394,12 @@ void main() {
 
     frameData.focusDistance = updateFocus(dt);
 
+#ifdef HAS_SKY
+    float hiddenNow = float(sharedFarHidden) / float(VIS_SCALE * 256u);
+    float hiddenPrev = frameData.skyParams[3].z;
+    if (!initialized || isnan(hiddenPrev) || isinf(hiddenPrev)) hiddenPrev = hiddenNow;
+    frameData.skyParams[3].z = mix(hiddenPrev, hiddenNow, 1.0 - exp(-LENS_VIS_SPEED * dt));
+#endif
 #if defined LENS_FLARE && defined HAS_SKY
     float visNow = float(sharedVisible) / float(VIS_SCALE * 256u) * (1.0 - 0.85 * rainStrength);
     float visPrev = frameData.postParams[2].x;

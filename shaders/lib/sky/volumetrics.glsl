@@ -107,46 +107,60 @@ const float VL_FAR_DEPTH_BIAS = 0.02;
 // 太陽が画面から外れていく視線では判定を弱める (cos: 100 度で使わない、60 度より近いと全部使う)
 const float VL_FAR_FADE_COS_OFF = -0.17;
 const float VL_FAR_FADE_COS_ON = 0.5;
+// 画面の外へ出た点は端の画素の深度を外へ延ばして判定し、端から離れるほど信用しない (この幅 (UV) で 1 -> 0)
+const float VL_FAR_OFFSCREEN_RANGE = 0.25;
 
 /*
  * 影マップの範囲より遠い区間の太陽の見え方を画面空間で近似する (Mitchell 2007 の考え方を遠方区間だけに使う)
  * 遠方区間の中ほどの点から光の方向へ進み、画面に写した点より手前に地形があれば影とする。山・木・建物のシルエットから長い光芒が伸び、
  * 高い太陽の下の地形の上の空気 (光の方向へ進むと地形より手前を通る) は影にならない
+ * 点が画面から出ても「見える」とはせず、端の画素で続けて判定する (太陽が画面の外で、手前の山の陰になる時も光が貫通しない)
  * dir: 視線 (player 空間), nearDist/farDist: 遠方区間, dither: 進める距離の揺らし (時間方向の積みで平均される)
+ * 戻り値: x = 遠方区間の点の見え方、y = 影マップの範囲内の点の見え方 (影マップの外にある遮蔽物だけで下げる。範囲内の遮蔽は影マップが正確)
  */
-float vlFarScreenVisibility(vec3 dir, float nearDist, float farDist, float dither) {
-    if (farDist <= nearDist) return 1.0;
+vec2 vlFarScreenVisibility(vec3 dir, float nearDist, float farDist, float dither) {
+    if (farDist <= nearDist) return vec2(1.0);
     float weight = smoothstep(VL_FAR_FADE_COS_OFF, VL_FAR_FADE_COS_ON, dot(dir, getShadowLightDir()));
-    if (weight <= 0.0) return 1.0;
+    if (weight <= 0.0) return vec2(1.0);
     vec3 lightView = normalize(shadowLightPosition);
     vec3 origin = (mat3(gbufferModelView) * dir) * mix(nearDist, farDist, 0.5);
+    vec2 texelMargin = vec2(0.5) / viewSize();
+    vec2 blocked = vec2(0.0);
     for (int i = 0; i < VL_FAR_SAMPLES; i++) {
         float s = VL_FAR_MAX_DIST * sqr((float(i) + dither) / float(VL_FAR_SAMPLES));
         vec3 q = origin + lightView * s;
         if (q.z >= -0.05) break;
         vec2 p = projectAndDivide(gbufferProjection, q).xy * 0.5 + 0.5;
-        // 画面の外は遮るものが分からないので見えるとする
-        if (any(lessThan(p, vec2(0.0))) || any(greaterThan(p, vec2(1.0)))) break;
-        float depth = texelFetch(depthtex0, ivec2(p * viewSize()), 0).r;
-        if (depth < 1.0 && linearizeDepth(depth) < -q.z * (1.0 - VL_FAR_DEPTH_BIAS)) return 1.0 - weight * FS_VL_FAR;
+        vec2 edge = clamp(p, texelMargin, vec2(1.0) - texelMargin);
+        float confidence = 1.0 - smoothstep(0.0, VL_FAR_OFFSCREEN_RANGE, length(p - edge));
+        if (confidence <= 0.0) break;
+        float depth = texelFetch(depthtex0, ivec2(edge * viewSize()), 0).r;
+        if (depth >= 1.0 || isHandDepth(depth)) continue;
+        float blocker = linearizeDepth(depth);
+        if (blocker < -q.z * (1.0 - VL_FAR_DEPTH_BIAS)) {
+            blocked.x = max(blocked.x, confidence);
+            if (blocker >= nearDist) blocked.y = max(blocked.y, confidence);
+            if (blocked.y >= 1.0) break;
+        }
     }
-    return 1.0;
+    return 1.0 - weight * FS_VL_FAR * blocked;
 }
 #endif
 
 /*
  * 空気中のフォグ (全ディメンション)。endDist: 地形 (空なら描画距離) までの距離
- * farVisibility: 影マップの範囲より遠い区間の太陽の見え方 (画面空間の光芒。無ければ 1)
+ * farVisibility: 影マップの範囲の外にある遮蔽物による太陽の見え方 (画面空間の光芒。無ければ 1)
+ *   x = 範囲より遠い区間の点、y = 範囲内の点 (範囲内の点も、影マップに写らない遠い壁や山には遮られる)
  * 戻り値: rgb = 内散乱, a = 透過率 (灰色)
  */
-vec4 marchAirFog(vec3 dir, float endDist, float dither, float farVisibility) {
+vec4 marchAirFog(vec3 dir, float endDist, float dither, vec2 farVisibility) {
     FogLighting fl = fogLightingSetup(dir);
     float outdoor = 1.0 - getCaveFactor();
 #ifdef CAVE_LEAK_PREVENTION
     // 影マップの外では遮蔽が分からないので、目の位置の空の見え方と太陽の見え方で光芒を抑える
-    float farSunVisibility = outdoor * farSunShade(dir) * farVisibility;
+    float farSunVisibility = outdoor * farSunShade(dir) * farVisibility.x;
 #else
-    float farSunVisibility = farVisibility;
+    float farSunVisibility = farVisibility.x;
 #endif
 
 #if defined HAS_SKY
@@ -198,7 +212,7 @@ vec4 marchAirFog(vec3 dir, float endDist, float dither, float farVisibility) {
 #if defined FOG_CLOUD_SHADOWS && defined HAS_SKY
         shadow *= getCloudShadow(p);
 #endif
-        float sunVisibility = inside ? 1.0 : farSunVisibility;
+        float sunVisibility = inside ? farVisibility.y : farSunVisibility;
         float skyVisibility = inside ? max(outdoor, luminance(shadow)) : outdoor;
 
         float ambientVisibility = max(skyVisibility, VL_MIN_AMBIENT_SCALE * MIN_AMBIENT / max(luminance(fl.ambient), 1e-6));

@@ -254,6 +254,7 @@ void main() {
     #else
         float sunVisibility = outdoor;
     #endif
+        sunVisibility *= farSunHiddenShade(dir);
         vec4 fog = fogAnalyticSegment(dir, 0.0, dist, fogLightingSetup(dir), sunVisibility, max(outdoor, 0.05));
 #endif
         color = color * fog.a + fog.rgb;

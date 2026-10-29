@@ -218,10 +218,22 @@ const float FAR_SUN_SHADE_COS_ON = 0.5;
 // 目の周りの見え方がこの範囲で 1 -> 0 に落ちる。柱・柵・細い木で一部が遮られただけでは抑えず、半分以上が遮られた時に効かせる
 const float FAR_SUN_SHADE_VISIBLE_MIN = 0.1;
 const float FAR_SUN_SHADE_VISIBLE_FULL = 0.7;
+float farSunToward(vec3 dir) {
+    return smoothstep(FAR_SUN_SHADE_COS_OFF, FAR_SUN_SHADE_COS_ON, dot(dir, getShadowLightDir()));
+}
+
 float farSunShade(vec3 dir) {
-    float toward = smoothstep(FAR_SUN_SHADE_COS_OFF, FAR_SUN_SHADE_COS_ON, dot(dir, getShadowLightDir()));
     float visible = smoothstep(FAR_SUN_SHADE_VISIBLE_MIN, FAR_SUN_SHADE_VISIBLE_FULL, frameData.skyParams[3].y);
-    return mix(1.0, visible, toward);
+    return mix(1.0, visible, farSunToward(dir));
+}
+
+/*
+ * 太陽が画面の中で、影マップの範囲より遠い地形に隠れている割合 (composite25 が太陽の円盤の深度から求める) で、太陽の方向の霧の光を抑える
+ * 画面空間の光芒 (VL_FAR) が無い構成の手当て。山の裏・遠い壁の裏で、影マップに写らない遮蔽物による貫通を抑える
+ * 範囲内の遮蔽 (木・近い崖) は影マップが見るので含めない。太陽が画面の外にある時は分からないので抑えない
+ */
+float farSunHiddenShade(vec3 dir) {
+    return mix(1.0, 1.0 - frameData.skyParams[3].z, farSunToward(dir));
 }
 
 // 雨で曇った空へ寄せる (雲の無い LUT を灰色の曇天に近づける)
