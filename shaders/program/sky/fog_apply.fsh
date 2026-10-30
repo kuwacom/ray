@@ -193,6 +193,8 @@ void main() {
     vec3 playerPos = screenToPlayer(vec3(texcoord, fixedDepth));
     vec3 dir = normalize(playerPos);
     float dist = isSky ? fogRenderDistance() : length(playerPos);
+    // 地形の手前の雲 (空気中のみ)。フォグの後に重ねる
+    vec4 frontClouds = vec4(0.0, 0.0, 0.0, 1.0);
 
     // 遠景 (空気中のみ。水中・溶岩の中からは遠景が見えないので媒質のフォグだけで十分)
     if (!isSky && isEyeInWater == 0) {
@@ -208,17 +210,16 @@ void main() {
         color = mix(color, getBorderFogColor(dir), borderFog);
         glint *= 1.0 - borderFog;
 #if CLOUDS >= 2 && defined HAS_SKY
-        // 雲の下面より上にいる時だけ、地形の手前の雲を重ねる (deferred20 は地形までの区間だけを積分している)
+        // 雲の下面より上にいる時だけ、地形の手前の雲を求める (deferred20 は地形までの区間だけを積分している)。
+        // 重ねるのは高さフォグの後 (雲の下のもやと霧の層は雲の向こうにあり、雲の上に塗られないように)
         if (cameraPosition.y > cloudLowestBase()) {
-            vec4 clouds = getCloudLayer(texel);
+            frontClouds = getCloudLayer(texel);
             // 半透明が手前にある画素の雲は奥の地形 (空) まで積分してあるので、半透明までの分だけに割り引く
             float depthOpaque = texelFetch(depthtex1, texel, 0).r;
             if (depth < depthOpaque) {
                 float backDist = depthOpaque >= 1.0 ? CLOUD_RAY_FAR : length(screenToPlayer(vec3(texcoord, fixHandDepth(depthOpaque))));
-                clouds = cloudFrontPart(clouds, dir, dist, backDist);
+                frontClouds = cloudFrontPart(frontClouds, dir, dist, backDist);
             }
-            color = color * clouds.a + clouds.rgb;
-            glint *= clouds.a;
         }
 #endif
     }
@@ -259,6 +260,8 @@ void main() {
 #endif
         color = color * fog.a + fog.rgb;
         glint *= fog.a;
+        color = color * frontClouds.a + frontClouds.rgb;
+        glint *= frontClouds.a;
 #if defined HAS_SKY
         vec2 localDensity = fogDensityAt(vec3(0.0), fogMedium());
         scatterCoeff = vec3((localDensity.x + localDensity.y) * FOG_ALBEDO);
