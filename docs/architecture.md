@@ -86,7 +86,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 
 | # | プログラム | モジュール | 役割 | 主な入力 | 主な出力 | dispatch / 解像度 | 有効条件 |
 |---|---|---|---|---|---|---|---|
-| 1 | setup.csh | light | 光源・形状・透過色・ブロックの平均の色の表を SSBO に構築、FrameData 初期化 | `lib/light/light_table.glsl`, `light_table_data.glsl` | SSBO1 BlockData, SSBO0 | local 256, groups (1,1,1) | 常時 |
+| 1 | setup.csh | light | 光源・形状・透過色・ブロックの平均の色・光源の面の光り方の表を SSBO に構築、FrameData 初期化 | `lib/light/light_table.glsl`, `light_table_data.glsl`, `light_mask_data.glsl` | SSBO1 BlockData, SSBO0 | local 256, groups (1,1,1) | 常時 |
 | 2 | setup1.csh | sky | 大気の透過率 LUT (Hillaire 2020) | - | skyTransmittanceImg 256x64 | local 8x8, (32,8,1) | ATMOSPHERE_MODE=1, world0 |
 | 3 | setup2.csh | sky | 多重散乱 LUT | skyTransmittance | skyMultiScatterImg 32x32 | local 8x8, (4,4,1) | 同上 |
 | 4 | begin.csh | light | 光源リストとライトビン (前フレームに使った枠) とエンティティ光源の蓄積表のクリア | - | SSBO2 カウンタ, SSBO3 binCount/binLights/entityAcc | local 256, (160,1,1) | 常時 |
@@ -212,7 +212,7 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 | binding | 名前 (アクセサ) | ファイル | サイズ | 内容 | 書くプログラム (`SSBO_<名前>_WRITE`) |
 |---|---|---|---|---|---|
 | 0 | FrameDataBuffer (`frameData`) | `frame_data.glsl` | 4096 | post: exposure, exposureTarget, averageLuminance, focusDistance, histogram[256], postParams[] (4 個) / sky: sunIrradiance, moonIrradiance, shadowLightIrradiance, skySH[9], skyParams[4] (`[3]` = 目の位置の太陽の見え方: x 今フレーム (フレア用)、y 平滑化済み (影マップより遠いフォグ用)、z 太陽が影マップの範囲より遠い地形に隠れている割合 (post が書く)) / light: lightStats / surface: surfaceParams[4] | `FRAME_DATA`: setup (初期値), begin・deferred_a (lightStats), prepare (sky), composite25 (post) |
-| 1 | BlockDataBuffer (`blockData`) | `block_data.glsl` | 57344 | `LightDef lightDefs[256]`, `uvec4 shapes[128]`, `vec4 tints[128]`, `uint albedo[4096]` (ブロックの平均の色), `uint albedoUp[]` (上向きの面の色、4096 個) | `BLOCK_DATA`: setup のみ |
+| 1 | BlockDataBuffer (`blockData`) | `block_data.glsl` | 61440 | `LightDef lightDefs[256]`, `uvec4 shapes[128]`, `vec4 tints[128]`, `uint albedo[4096]` (ブロックの平均の色), `uint albedoUp[4096]` (上向きの面の色), `uvec4 lightMasks[]` (光るブロックの面の光り方、128 光源 x 上・下・側面の 384 個) | `BLOCK_DATA`: setup のみ |
 | 2 | GlobalLightsBuffer (`globalLights`) | `global_lights.glsl` | 295200 | `count/blockCount/entityCount/overflow`, `cullDistance/culled` + `cullHist[64]` (間引き距離と距離の分布), `LightInstance lights[8192]` (posRadius: ボクセル空間位置 + 到達半径, colorSize: 放射 + 光源半径), `lightPower[]` (揺らぎ前の放射の輝度、8192 個)。使うのは LIGHT_MAX_COUNT 個まで | `GLOBAL_LIGHTS`: setup, begin, deferred, deferred_a |
 | 3 | LightBinsBuffer (`lightBins`) | `light_bins.glsl` | 10944512 (LIGHT_BIN_LIGHTS > 64 で 21430272) | `binCount[40960]`, `entityAcc[32768]` (エンティティ光源の蓄積表), `binLights[]` (40960 x 65 個、> 64 で x 129)。ビン = 8³ ブロック、1 ビン LIGHT_BIN_LIGHTS + 1 枠。枠のキー = 重要度 19 bit + 光源インデックス 13 bit | `LIGHT_BINS`: setup, begin, deferred_a, shadow_entities・shadow_block の gsh と gbuffers_entities・gbuffers_entities_translucent の vsh (蓄積表) |
 | 4 | EntityTriangleBuffer (`entityTris`) | `entity_tris.glsl` | 838672 | `counts[4]`, `groupBounds`, `clusterBounds` + `EntityTriangle tris[]` (16384 個) (ボクセル空間の三角形 v0/e1/e2 + アルファマスク) | `ENTITY_TRIS`: begin (クリア), shadow_entities・shadow_block の gsh |
@@ -273,6 +273,7 @@ lib/light/light_table.glsl       shapeStatic(i) / tintStatic(i)   (正本)
         | setup.csh が起動時に評価
         v
 SSBO1 blockData.lightDefs[256] / shapes[128] / tints[128] / albedo[4096] / albedoUp[4096] (lib/ids/block_albedo.glsl から)
+        / lightMasks[384] (lib/light/light_mask_data.glsl から。データのある光源に LIGHT_FLAG_EMISSION_MASK を立てる)
         | 実行時 (lib/light/block_data.glsl)
         v
 getLightDef(index) -> lightEmission(d, level), lightRange(d, level), lightFalloff(dist, range)
@@ -363,6 +364,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 - 選び方 (N = LIGHT_TRACE_COUNT, deferred1.csh): 上位 N-1 個は確定でトレースし、残り全部からリザーバサンプリングで 1 個を重みに比例して選び、1/確率 倍してトレースする。選ばれなかった光源も影付きで不偏に寄与する。N = 1 の時は上位 1 個だけをトレースし、残りの光源の照度にはその可視率 (輝度) を掛けて近似する
 - 比の推定 (Heitz et al. 2018, `lib/light/light_select.glsl`): deferred1 が同じ光源選択で影あり S と影なし U を低解像度で求め、deferred2 が可視率 S/U だけを時空間フィルタして、フル解像度で求めたビン内全光源の影なし照度に掛ける。減衰・法線の細部はフル解像度のまま残り、ノイズのある可視率だけがぼける
 - 遮蔽判定: Amanatides & Woo DDA (自前実装) で voxelBlock を辿り、部分形状は AABB テスト (LIGHT_SHAPE_TRACE)、半透明は透過色を乗算 (LIGHT_TRANSLUCENT_TINT)、エンティティはサブセルのビット (LIGHT_ENTITY_OCCLUSION / LIGHT_PLAYER_OCCLUSION)。光源側・着色点側のセルは判定しない
+- 近距離の面の放射 (`lightBoxNearField`、deferred2 が影なしで足す): ブロック全体が光る光源 (グロウストーン・シーランタンなど) の、見える面ごとの形態係数を足す。`LIGHT_EMISSION_MASK_MODE` は面の光り方を選ぶ。0 は面全体が一様、1 は面ごとの光る範囲の四角 (テクスチャの暗い縁は光らず、接地面の境目が暗くなる)、2 は四角を 4x4 のマスに分けて内側の模様も反映する (箱から 1.5 ブロックまで。遠くは四角)。光り方は SSBO1 `lightMasks` (光源 x 上・下・側面) で、バニラのテクスチャの発光 (gbuffers_solid の `estimateEmission` と同じ式) から `tools/gen_block_colors.py` が `tools/light_masks.json` に測る。割合は光源の最も明るい面の光る部分を 1 とするので、縁の多い光源は全体の光も減る。点に近い光源のうちランタンは、光らない面 (ふた) の向きで近距離の放射を弱める
 - 半影: 光源半径 (LightDef.shape.w x LIGHT_SOURCE_SIZE) 内でターゲット点を時間的に揺らし (ブルーノイズ)、デノイズと TAA で均す。RV の SDF コーントレースは SDF 構築コストが大きいので採らない
 - 接触影 (LIGHT_CONTACT_SHADOWS): ボクセルに入らない細部 (手・小さいエンティティ・草) を深度バッファのレイマーチで補う
 - 低解像度 (LIGHT_TRACE_RES) + 時空間デノイズ (再投影 + 近傍の平均・分散によるクリップ + エッジ停止の空間フィルタ)。LIGHT_DENOISE=0 で最寄りの 1 サンプルのみ (フィルタなし)、1 で 2x2 + 時間、2 で 4x4 + 時間

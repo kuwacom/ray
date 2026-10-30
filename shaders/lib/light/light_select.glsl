@@ -17,6 +17,7 @@
 //@include "/lib/common/math.glsl"
 //@include "/lib/common/transforms.glsl"
 //@include "/lib/common/voxel_space.glsl"
+//@include "/lib/buffers/block_data.glsl"
 //@include "/lib/buffers/global_lights.glsl"
 //@include "/lib/buffers/light_bins.glsl"
 //@include "/lib/ids/id_decode.glsl"
@@ -149,8 +150,131 @@ float quadFormFactor(vec3 q[4], vec3 n) {
     return abs(sum) * (0.5 / PI);
 }
 
-float lightBoxNearField(vec3 voxelPos, vec3 boxCenter, vec3 n) {
+#if LIGHT_EMISSION_MASK_MODE != 0
+/*
+ * 光るブロックの面の光り方 (LIGHT_FLAG_EMISSION_MASK の付いた光源)。テクスチャの暗い縁を面光源に反映する
+ * 面の光り方は光る範囲の四角 (rect) と、その中の割合 (ratio)。四角の中を一様に光らせ、面全体の光の量は変えない
+ * ratio は光源の最も明るい面の光る部分を 1 とするので、明るい面の光る部分は面全体が光る時と同じ明るさのまま、暗い縁の分だけ減る
+ * LIGHT_EMISSION_MASK_MODE 2 では四角を 4x4 に分けたマスの重みで、四角の中の模様も反映する
+ */
+const int LIGHT_FACE_UP = 0;
+const int LIGHT_FACE_DOWN = 1;
+const int LIGHT_FACE_SIDE = 2;
+
+struct LightFaceMask {
+    vec4 rect;        // 光る範囲 (u0, v0, u1, v1)。テクスチャの座標で v は上が 0
+    float ratio;
+    float gridScale;  // マスの重みの最大
+    uvec2 grid;       // 4x4 のマス (lib/buffers/block_data.glsl の lightMasks)
+};
+
+LightFaceMask readLightMask(int light, int faceClass) {
+    uvec4 m = blockData.lightMasks[clamp(light, 0, LIGHT_MASK_LIGHTS - 1) * LIGHT_MASK_FACE_CLASSES + faceClass];
+    LightFaceMask f;
+    f.rect = unpackUnorm4x8(m.x);
+    vec2 h = unpackHalf2x16(m.y);
+    f.ratio = h.x;
+    f.gridScale = h.y;
+    f.grid = m.zw;
+    return f;
+}
+
+// データの無い光源は面全体を一様に光らせる
+LightFaceMask wholeLightFace() {
+    LightFaceMask f;
+    f.rect = vec4(0.0, 0.0, 1.0, 1.0);
+    f.ratio = 1.0;
+    f.gridScale = 0.0;
+    f.grid = uvec2(0u);
+    return f;
+}
+
+int lightFaceClass(int axis, float side) {
+    return axis == 1 ? (side > 0.0 ? LIGHT_FACE_UP : LIGHT_FACE_DOWN) : LIGHT_FACE_SIDE;
+}
+
+/*
+ * 面のテクスチャの座標 (u, v) を、面の平面の 2 軸 (b = (axis + 1) % 3, c = (axis + 2) % 3) の位置 [-0.5, 0.5] へ写す
+ * Minecraft の既定の UV (外から見て正立、u は右、v は下) の向き。side は面の外向きの符号
+ */
+vec2 lightFaceUvToBox(int axis, float side, vec2 uv) {
+    vec2 p = uv - 0.5;
+    if (axis == 0) return vec2(-p.y, side > 0.0 ? -p.x : p.x);
+    if (axis == 1) return vec2(side > 0.0 ? p.y : -p.y, p.x);
+    return vec2(side * p.x, -p.y);
+}
+
+// 面の中の (u, v) の四角 a..b の、着色点 (箱の中心からの相対位置 rel) から見た形態係数
+float lightMaskQuad(int axis, float side, vec2 a, vec2 b, vec3 rel, vec3 n) {
+    vec3 q[4];
+    for (int k = 0; k < 4; k++) {
+        vec2 uv = vec2((k == 1 || k == 2) ? b.x : a.x, k >= 2 ? b.y : a.y);
+        vec2 bc = lightFaceUvToBox(axis, side, uv);
+        vec3 o = vec3(0.0);
+        o[axis] = 0.5 * side;
+        o[(axis + 1) % 3] = bc.x;
+        o[(axis + 2) % 3] = bc.y;
+        q[k] = o - rel;
+    }
+    return quadFormFactor(q, n);
+}
+
+// 面の種類の光の量 (面全体が光る時を 1 とした割合)
+float lightMaskEnergy(LightFaceMask f) {
+    return f.ratio * (f.rect.z - f.rect.x) * (f.rect.w - f.rect.y);
+}
+
+/*
+ * 点に近い光源 (ランタン) の近距離の放射に掛ける向きの重み。d は光源から着色点への単位ベクトル
+ * 面の種類の光の量を、その向きから見た面の見かけの面積 (d の成分の絶対値) で混ぜ、最も光る面の種類を 1 とする
+ * (近距離の放射の明るさは最も光る向きで調整してあるので、そこは変えない)。ふたが光らないランタンは真下で 0 になる
+ */
+float lightMaskDirection(int light, vec3 d) {
+    float side = lightMaskEnergy(readLightMask(light, LIGHT_FACE_SIDE));
+    float up = lightMaskEnergy(readLightMask(light, LIGHT_FACE_UP));
+    float down = lightMaskEnergy(readLightMask(light, LIGHT_FACE_DOWN));
+    float peak = max(side, max(up, down));
+    vec3 a = abs(d);
+    float vert = d.y > 0.0 ? up : down;
+    return (side * (a.x + a.z) + vert * a.y) / max(peak * (a.x + a.y + a.z), EPS);
+}
+#endif
+
+#if LIGHT_EMISSION_MASK_MODE == 2
+const int LIGHT_MASK_GRID = 4;
+const float LIGHT_MASK_GRID_LEVELS = 15.0;
+// 箱からこの距離までは 4x4 のマスで求め、次の幅で四角へ混ぜる (ブロック)。マスは 16 回の形態係数で重いので近くだけにする
+// 1 ブロック先ではマスと四角の差が 2% 以内。1.0 / 0.5 では部屋で 0.9 ms、壁際の拡大で 2 ms 増えたので半分にした
+const float LIGHT_MASK_GRID_REACH = 0.5;
+const float LIGHT_MASK_GRID_FADE = 0.25;
+
+// 光る範囲の四角を 4x4 に分けたマスごとの形態係数の、重み付きの和
+float lightMaskGridFormFactor(LightFaceMask f, int axis, float side, vec3 rel, vec3 n) {
+    float sum = 0.0;
+    for (int k = 0; k < LIGHT_MASK_GRID * LIGHT_MASK_GRID; k++) {
+        uint q = ((k < 8 ? f.grid.x : f.grid.y) >> (4u * uint(k & 7))) & 15u;
+        if (q == 0u) continue;
+        vec2 cell = vec2(k & 3, k >> 2) / float(LIGHT_MASK_GRID);
+        vec2 a = mix(f.rect.xy, f.rect.zw, cell);
+        vec2 b = mix(f.rect.xy, f.rect.zw, cell + 1.0 / float(LIGHT_MASK_GRID));
+        sum += float(q) * lightMaskQuad(axis, side, a, b, rel, n);
+    }
+    return sum * (f.gridScale / LIGHT_MASK_GRID_LEVELS);
+}
+#endif
+
+/*
+ * light: 光源インデックス、masked: 面の光り方のデータがあるか、grid: 近くで 4x4 のマスを使うか (LIGHT_EMISSION_MASK_MODE 2)
+ * 0 では面全体を光らせるので、3 つとも使わない
+ */
+float lightBoxNearField(vec3 voxelPos, vec3 boxCenter, vec3 n, int light, bool masked, bool grid) {
+#if LIGHT_EMISSION_MASK_MODE == 0
     vec3 rel = voxelPos - boxCenter;
+#else
+    // 呼ぶ所は面から TRACE_NORMAL_OFFSET だけ浮かせた点を渡す。浮いたままだと、テクスチャの縁 (1 画素 = 0.0625) の下半分が
+    // 着色点の水平線の下になり、接地面の境目の暗い縁が効かない。面の上の点から見る
+    vec3 rel = voxelPos - n * TRACE_NORMAL_OFFSET - boxCenter;
+#endif
     float s = length(max(abs(rel) - 0.5, 0.0));
     if (s >= LIGHT_BOX_REACH) return 0.0;
     ivec3 cell = ivec3(floor(boxCenter));
@@ -162,6 +286,7 @@ float lightBoxNearField(vec3 voxelPos, vec3 boxCenter, vec3 n) {
         ivec3 nb = cell;
         nb[axis] += int(side);
         if (isVoxelOpaque(fetchVoxelBlockId(nb))) continue;
+#if LIGHT_EMISSION_MASK_MODE == 0
         int b = (axis + 1) % 3;
         int c = (axis + 2) % 3;
         vec3 q[4];
@@ -173,15 +298,25 @@ float lightBoxNearField(vec3 voxelPos, vec3 boxCenter, vec3 n) {
             q[k] = o - rel;
         }
         sum += quadFormFactor(q, n);
+#else
+        LightFaceMask f = masked ? readLightMask(light, lightFaceClass(axis, side)) : wholeLightFace();
+        if (f.ratio <= 0.0) continue;
+        float ff = f.ratio * lightMaskQuad(axis, side, f.rect.xy, f.rect.zw, rel, n);
+    #if LIGHT_EMISSION_MASK_MODE == 2
+        float gridMix = saturate((s - LIGHT_MASK_GRID_REACH) / LIGHT_MASK_GRID_FADE);
+        if (grid && masked && gridMix < 1.0) ff = mix(lightMaskGridFormFactor(f, axis, side, rel, n), ff, gridMix);
+    #endif
+        sum += ff;
+#endif
     }
     float w = 1.0 - s / LIGHT_BOX_REACH;
     return LIGHT_BOX_RADIANCE * sum * (w * w);
 }
 
 // 光源がブロック全体が光る不透明ブロック (光源の表の LT_OCC) か。光源のセルのブロックから光源の定義を引く
-bool isBlockBoxLight(LightInstance L, out LightDef d, out int voxelId) {
+bool isBlockBoxLight(LightInstance L, out LightDef d, out int voxelId, out int light) {
     voxelId = fetchVoxelBlockId(ivec3(floor(L.posRadius.xyz)));
-    int light = getBlockLightIndex(voxelId);
+    light = getBlockLightIndex(voxelId);
     d = getLightDef(light);
     return light != LIGHT_NONE && (d.info.x & LIGHT_FLAG_OCCLUDES) != 0u;
 }
@@ -209,20 +344,35 @@ vec3 evalLightIrradiance(LightInstance L, vec3 voxelPos, vec3 n, vec3 gateNormal
     // 影を掛けずに足すので lightBoxIrradiance で別に求める
     LightDef d;
     int voxelId;
-    if (dist < LIGHT_BOX_REACH + 1.0 && isBlockBoxLight(L, d, voxelId)) return L.colorSize.rgb * falloff * ndl;
+    int light;
+#if LIGHT_EMISSION_MASK_MODE == 0
+    if (dist < LIGHT_BOX_REACH + 1.0 && isBlockBoxLight(L, d, voxelId, light)) return L.colorSize.rgb * falloff * ndl;
     return L.colorSize.rgb * (falloff + lightNearField(dist, radius)) * ndl;
+#else
+    // ふたが光らないランタンなどは、近距離の放射を着色点の向きで弱める (光源のセルのブロックから面の光り方を引く)
+    float near = 0.0;
+    if (dist < LIGHT_NEAR_REACH) {
+        bool box = isBlockBoxLight(L, d, voxelId, light);
+        if (dist < LIGHT_BOX_REACH + 1.0 && box) return L.colorSize.rgb * falloff * ndl;
+        near = lightNearField(dist, radius);
+        if ((d.info.x & LIGHT_FLAG_EMISSION_MASK) != 0u) near *= lightMaskDirection(light, -dir);
+    }
+    return L.colorSize.rgb * (falloff + near) * ndl;
+#endif
 }
 
 /*
  * ブロック全体が光る光源の面からの近距離の照度 (影を掛けない)
  * 光源の影は中心の点へのトレース (と接触影) なので、根元の床から中心へ向かうと光るブロック自身の面に当たって影になり、
  * 接地面の境目ほど暗くなった。光る面は見える面だけを数えている (lightBoxNearField) ので、影は掛けない
+ * grid: 近くで 4x4 のマスを使うか (LIGHT_EMISSION_MASK_MODE 2)。マスは重いので、画面の大半を占める deferred2 だけが true を渡す
  */
-vec3 lightBoxIrradiance(LightInstance L, vec3 voxelPos, vec3 gateNormal) {
+vec3 lightBoxIrradiance(LightInstance L, vec3 voxelPos, vec3 gateNormal, bool grid) {
     if (distance(L.posRadius.xyz, voxelPos) >= LIGHT_BOX_REACH + 1.0) return vec3(0.0);
     LightDef d;
     int voxelId;
-    if (!isBlockBoxLight(L, d, voxelId)) return vec3(0.0);
+    int light;
+    if (!isBlockBoxLight(L, d, voxelId, light)) return vec3(0.0);
     // 面の明るさは光源の明るさとレベルによらない (光る鉱物ブロックは遠くへは弱く届くが、面は他の発光ブロックと同じに光る)
     float lightLum = luminance(d.color.rgb);
     float power = luminance(L.colorSize.rgb) / max(lightLum, EPS) * LIGHT_LEVEL_MAX / max(d.color.a * d.params.z, EPS);
@@ -230,19 +380,28 @@ vec3 lightBoxIrradiance(LightInstance L, vec3 voxelPos, vec3 gateNormal) {
     // 発光は明るい画素ほど強い (gbuffers の発光の推定) ので、平均色を 1.5 乗して明るく鮮やかな画素の色に寄せる
     vec3 albedo = pow(getBlockAlbedo(voxelId), vec3(LIGHT_BOX_COLOR_POWER));
     vec3 faceColor = albedo * (lightLum / max(luminance(albedo), EPS));
-    return faceColor * (power * lightBoxNearField(voxelPos, floor(L.posRadius.xyz) + 0.5, gateNormal));
+    bool masked = (d.info.x & LIGHT_FLAG_EMISSION_MASK) != 0u;
+    return faceColor * (power * lightBoxNearField(voxelPos, floor(L.posRadius.xyz) + 0.5, gateNormal, light, masked, grid));
+}
+
+vec3 lightBoxIrradiance(LightInstance L, vec3 voxelPos, vec3 gateNormal) {
+    return lightBoxIrradiance(L, voxelPos, gateNormal, false);
 }
 
 // 着色点のビンの全光源の、ブロック全体が光る面からの近距離の照度の和 (影なし)
-vec3 sumBinBoxIrradiance(vec3 voxelPos, vec3 geoNormal) {
+vec3 sumBinBoxIrradiance(vec3 voxelPos, vec3 geoNormal, bool grid) {
     if (!isInVoxelVolume(voxelPos)) return vec3(0.0);
     int bin = lightBinIndex(ivec3(voxelPos));
     uint n = lightBinCount(bin);
     vec3 sum = vec3(0.0);
     for (uint k = 0u; k < n; k++) {
-        sum += lightBoxIrradiance(lightBinLight(bin, k), voxelPos, geoNormal);
+        sum += lightBoxIrradiance(lightBinLight(bin, k), voxelPos, geoNormal, grid);
     }
     return sum;
+}
+
+vec3 sumBinBoxIrradiance(vec3 voxelPos, vec3 geoNormal) {
+    return sumBinBoxIrradiance(voxelPos, geoNormal, false);
 }
 
 vec3 evalLightIrradiance(LightInstance L, vec3 voxelPos, vec3 n, vec3 gateNormal) {

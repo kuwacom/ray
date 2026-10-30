@@ -15,6 +15,7 @@
 #define LIGHT_TRACE_RES 2 // [1 2 4] トレース解像度の分母 (1=フル 2=半分 4=1/4)
 #define LIGHT_SHAPE_TRACE // ハーフブロック等の形状で遮蔽判定
 #define LIGHT_SOURCE_SIZE 0.5 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0] 光源サイズ (半影の柔らかさ)
+#define LIGHT_EMISSION_MASK_MODE 0 // [0 1 2] 光るブロックの照り返しの面の光り方 0=面全体 1=光る範囲の四角 2=テクスチャのマスク
 #define LIGHT_TRANSLUCENT_TINT // 色ガラス越しの光の色付け
 #define LIGHT_SPECULAR // ブロックライトの鏡面反射
 #define LIGHT_DENOISE 2 // [0 1 2] 0=なし 1=時間 2=時間+空間

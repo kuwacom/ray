@@ -131,7 +131,7 @@ void main() {
     vec3 voxelPos = playerToVoxel(playerPos + geoNormal * TRACE_NORMAL_OFFSET);
     vec3 full = sumBinLightsUnshadowed(voxelPos, normal, geoNormal);
     // ブロック全体が光る光源の面からの近距離の照度は影を掛けずに足す (lightBoxIrradiance)
-    vec3 box = sumBinBoxIrradiance(voxelPos, geoNormal);
+    vec3 box = sumBinBoxIrradiance(voxelPos, geoNormal, true);
     if (maxOf(full) <= 0.0) {
         outBlockLight = vec4(box, 1.0);
         outHistory = vec4(1.0, 1.0, 1.0, viewDist);

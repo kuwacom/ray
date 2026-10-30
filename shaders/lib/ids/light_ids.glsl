@@ -100,5 +100,6 @@ const uint LIGHT_FLAG_CAT_PROJECTILE = 8u;  // PROJECTILE_LIGHTS の対象
 const uint LIGHT_FLAG_CAT_BURNING = 16u;    // BURNING_ENTITY_LIGHTS の対象
 const uint LIGHT_FLAG_CAT_GLOWING = 32u;    // GLOWING_ENTITY_LIGHTS の対象
 const uint LIGHT_FLAG_ENTITY_FLASH = 64u;   // entityColor.a (点滅) が強い時だけ光る (TNT・クリーパー)
+const uint LIGHT_FLAG_EMISSION_MASK = 128u; // 面の光り方のデータがある (lightMasks。setup_tables.csh が立てる)
 
 #endif

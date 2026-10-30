@@ -59,6 +59,15 @@ class Light:
     note: tuple[str, ...] = ()       # 表の case の上に置くコメント
     label: str = ""                  # 表の case の式 (既定は定数名)
     count: int = 1                   # 2 以上は index から count 個を同じ式で処理する (i を使える)
+    mask: str = ""                   # 面の光り方を測るブロックと状態 ("redstone_lamp:lit=true")。空なら LT_OCC の光源だけ blocks[0]
+
+    def mask_block(self) -> str:
+        if self.mask:
+            return self.mask
+        return self.blocks[0] if self.blocks and self.make.endswith("LT_OCC") else ""
+
+    def is_decor(self) -> bool:
+        return self.label.startswith("LIGHT_DECOR_FIRST")
 
 
 def _lit(*names: str) -> tuple[str, ...]:
@@ -86,11 +95,11 @@ LIGHTS: list[Light] = [
     Light(4, "LIGHT_COPPER_TORCH", "copper torch", f"COPPER_FLAME_SRGB, 0.9, 14.0, 0.08, {_V}, 0.5, 0u",
           blocks=_lit("copper_torch", "copper_wall_torch"), items=_lit("copper_torch")),
     Light(5, "LIGHT_LANTERN", "lantern", f"fire, 1.0, 15.0, 0.15, {_LAMP}, 0.3, 0u",
-          blocks=_lit("lantern"), items=_lit("lantern")),
+          blocks=_lit("lantern"), items=_lit("lantern"), mask="lantern"),
     Light(6, "LIGHT_SOUL_LANTERN", "soul lantern", f"SOUL_SRGB, 0.8, 10.0, 0.15, {_LAMP}, 0.2, 0u",
-          blocks=_lit("soul_lantern"), items=_lit("soul_lantern")),
+          blocks=_lit("soul_lantern"), items=_lit("soul_lantern"), mask="soul_lantern"),
     Light(7, "LIGHT_COPPER_LANTERN", "copper lantern", f"COPPER_FLAME_SRGB, 0.9, 15.0, 0.15, {_LAMP}, 0.3, 0u",
-          blocks=_copper("copper_lantern"), items=_copper("copper_lantern")),
+          blocks=_copper("copper_lantern"), items=_copper("copper_lantern"), mask="copper_lantern"),
     Light(8, "LIGHT_GLOWSTONE", "glowstone", "vec3(1.0, 0.80, 0.52), 1.0, 15.0, 0.5, LT_CENTER, 0.0, LT_OCC",
           blocks=_lit("glowstone"), items=_lit("glowstone")),
     Light(9, "LIGHT_SEA_LANTERN", "sea lantern", "vec3(0.85, 0.95, 1.0), 0.75, 15.0, 0.5, LT_CENTER, 0.0, LT_OCC",
@@ -127,7 +136,7 @@ LIGHTS: list[Light] = [
     Light(24, "LIGHT_CRYING_OBSIDIAN", "crying obsidian", "vec3(0.60, 0.25, 1.0), 0.8, 10.0, 0.5, LT_CENTER, 0.0, LT_OCC",
           blocks=_lit("crying_obsidian"), items=_lit("crying_obsidian")),
     Light(25, "LIGHT_RESPAWN_ANCHOR", "respawn anchor", "vec3(0.65, 0.30, 1.0), 1.0, 15.0, 0.4, vec3(0.5, 0.9, 0.5), 0.0, LT_OCC",
-          blocks=tuple(state_values("respawn_anchor", "charges", ["1", "2", "3", "4"]))),
+          blocks=tuple(state_values("respawn_anchor", "charges", ["1", "2", "3", "4"])), mask="respawn_anchor:charges=4"),
     Light(26, "LIGHT_REDSTONE_LAMP", "redstone lamp", "vec3(1.0, 0.75, 0.55), 1.0, 15.0, 0.5, LT_CENTER, 0.0, LT_OCC",
           blocks=_lit("redstone_lamp:lit=true")),
     Light(27, "LIGHT_OCHRE_FROGLIGHT", "ochre froglight", "vec3(1.0, 0.85, 0.55), 1.0, 15.0, 0.5, LT_CENTER, 0.0, LT_OCC",
@@ -180,12 +189,12 @@ LIGHTS: list[Light] = [
     # 鉱物ブロック (ブロック ID は 13-18。block.properties は BLOCKS 側)
     Light(63, "LIGHT_DECOR_FIRST", "decorative lapis", f"vec3(0.25, 0.45, 1.00), {_DECOR}",
           comment="63-68: BLOCK_DECOR_* (lapis, emerald, diamond, gold, redstone, amethyst)。DECORATIVE_BLOCK_LIGHTS 2 の時だけ使う",
-          label="LIGHT_DECOR_FIRST + 0"),
-    Light(64, None, "decorative emerald", f"vec3(0.30, 1.00, 0.50), {_DECOR}", label="LIGHT_DECOR_FIRST + 1"),
-    Light(65, None, "decorative diamond", f"vec3(0.50, 0.95, 1.00), {_DECOR}", label="LIGHT_DECOR_FIRST + 2"),
-    Light(66, None, "decorative gold", f"vec3(1.00, 0.80, 0.35), {_DECOR}", label="LIGHT_DECOR_FIRST + 3"),
-    Light(67, None, "decorative redstone", f"vec3(1.00, 0.15, 0.08), {_DECOR}", label="LIGHT_DECOR_FIRST + 4"),
-    Light(68, None, "decorative amethyst", f"vec3(0.75, 0.50, 1.00), {_DECOR}", label="LIGHT_DECOR_FIRST + 5"),
+          label="LIGHT_DECOR_FIRST + 0", mask="lapis_block"),
+    Light(64, None, "decorative emerald", f"vec3(0.30, 1.00, 0.50), {_DECOR}", label="LIGHT_DECOR_FIRST + 1", mask="emerald_block"),
+    Light(65, None, "decorative diamond", f"vec3(0.50, 0.95, 1.00), {_DECOR}", label="LIGHT_DECOR_FIRST + 2", mask="diamond_block"),
+    Light(66, None, "decorative gold", f"vec3(1.00, 0.80, 0.35), {_DECOR}", label="LIGHT_DECOR_FIRST + 3", mask="gold_block"),
+    Light(67, None, "decorative redstone", f"vec3(1.00, 0.15, 0.08), {_DECOR}", label="LIGHT_DECOR_FIRST + 4", mask="redstone_block"),
+    Light(68, None, "decorative amethyst", f"vec3(0.75, 0.50, 1.00), {_DECOR}", label="LIGHT_DECOR_FIRST + 5", mask="amethyst_block"),
 
     Light(128, "LIGHT_ITEM_LAVA_BUCKET", "lava bucket", "LAVA_SRGB, 1.0, 15.0, 0.2, LT_CENTER, 0.2, LT_CAT_ITEM", items=_lit("lava_bucket")),
     Light(129, "LIGHT_ITEM_GLOWSTONE_DUST", "glowstone dust", "vec3(1.0, 0.80, 0.52), 0.7, 8.0, 0.1, LT_CENTER, 0.0, LT_CAT_ITEM", items=_lit("glowstone_dust")),

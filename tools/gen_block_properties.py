@@ -3,10 +3,10 @@ ID と光源の表から、シェーダー側の ID の定数・properties・光
 
     shaders/block.properties, item.properties, entity.properties
     shaders/lib/ids/block_ids.glsl, light_ids.glsl, entity_ids.glsl, block_albedo.glsl
-    shaders/lib/light/light_table_data.glsl
+    shaders/lib/light/light_table_data.glsl, light_mask_data.glsl
 
 正本は、光源・エンティティ・ID の定数が tools/id_tables.py、光源でないブロックの表 (BLOCKS) がこのスクリプト、
-ブロックの色が tools/block_colors.json (tools/gen_block_colors.py が作る)
+ブロックの色と光源の面の光り方が tools/block_colors.json と tools/light_masks.json (tools/gen_block_colors.py が作る)
 未登録のブロックはボクセルで「完全な固体」として扱われるので、光を通す形のブロックは必ずどこかに載せる。
 下の表に載っていないブロックのうち tools/block_colors.json に色のあるものは、色ごとに 2000 番台の ID (色の付いた固体) を振る
 
@@ -32,6 +32,7 @@ from lib.generated import cli  # noqa: E402
 from lib.paths import ROOT, SHADERS  # noqa: E402
 
 BLOCK_COLORS = ROOT / "tools" / "block_colors.json"
+LIGHT_MASKS = ROOT / "tools" / "light_masks.json"
 
 # この刻み (sRGB 8bit) で同じになる色は 1 つの ID にまとめる。照り返しの色にはこれで十分
 COLOR_QUANT = 4
@@ -421,6 +422,7 @@ def render_light_ids() -> str:
         "const uint LIGHT_FLAG_CAT_BURNING = 16u;    // BURNING_ENTITY_LIGHTS の対象",
         "const uint LIGHT_FLAG_CAT_GLOWING = 32u;    // GLOWING_ENTITY_LIGHTS の対象",
         "const uint LIGHT_FLAG_ENTITY_FLASH = 64u;   // entityColor.a (点滅) が強い時だけ光る (TNT・クリーパー)",
+        "const uint LIGHT_FLAG_EMISSION_MASK = 128u; // 面の光り方のデータがある (lightMasks。setup_tables.csh が立てる)",
         "",
         "#endif",
         "",
@@ -576,6 +578,54 @@ def render_light_table_data() -> str:
     return "\n".join(lines)
 
 
+def glsl_float(v: float) -> str:
+    s = f"{v:.4f}".rstrip("0")
+    return s + "0" if s.endswith(".") else s
+
+
+def mask_face_value(m: dict | None) -> str:
+    """面の種類 1 つのデータ (uvec4): x = 光る範囲の四角、y = (割合, マスの最大の重み)、zw = 4x4 のマス (4 bit ずつ、1 行 = 4 マス)"""
+    if m is None:
+        return "uvec4(0u)"
+    rows = m["grid"].split()
+    # 行 0-1 が z、行 2-3 が w。マス (行 r、列 c) は bit 4 x (c + 4 x (r & 1))
+    zw = [sum(int(rows[r][c], 16) << (4 * (c + 4 * (r & 1))) for r in (lo, lo + 1) for c in range(4)) for lo in (0, 2)]
+    rect = ", ".join(glsl_float(v) for v in m["rect"])
+    return (f"uvec4(packUnorm4x8(vec4({rect})), packHalf2x16(vec2({glsl_float(m['ratio'])}, {glsl_float(m['scale'])})), "
+            f"0x{zw[0]:08X}u, 0x{zw[1]:08X}u)")
+
+
+def render_light_mask_data(masks: dict[str, dict]) -> str:
+    wanted = {str(l.index) for l in LIGHTS if l.mask_block()}
+    if wanted != set(masks):
+        raise SystemExit("tools/light_masks.json が光源の表とずれている (uv run tools/gen_block_colors.py <client.jar> で作り直す): "
+                         + ", ".join(sorted(wanted ^ set(masks), key=int)))
+    lines = [
+        "/*",
+        " * 光るブロックの面の光り方 (光る範囲の四角と 4x4 のマス)。面の種類は 0 = 上、1 = 下、2 = 側面 (4 面の平均)",
+        f" * {GENERATED_NOTE.replace('tools/id_tables.py', 'tools/light_masks.json')}",
+        " * 中身の意味は lib/buffers/block_data.glsl の lightMasks",
+        " */",
+        "#ifndef LIGHT_LIGHT_MASK_DATA_GLSL",
+        "#define LIGHT_LIGHT_MASK_DATA_GLSL",
+        "",
+        '//@include "/lib/ids/light_ids.glsl"',
+        "",
+        "uvec4 lightMaskStatic(int i, int faceClass) {",
+        "    switch (i) {",
+    ]
+    for light in LIGHTS:
+        m = masks.get(str(light.index))
+        if m is None:
+            continue
+        lines += [f"        case {light.label or light.name}:",
+                  f"            if (faceClass == 0) return {mask_face_value(m['up'])};",
+                  f"            if (faceClass == 1) return {mask_face_value(m['down'])};",
+                  f"            return {mask_face_value(m['side'])};"]
+    lines += ["    }", "    return uvec4(0u);", "}", "", "#endif", ""]
+    return "\n".join(lines)
+
+
 def generated(shaders: Path = SHADERS) -> dict[Path, str]:
     check_tables()
     data = json.loads(BLOCK_COLORS.read_text(encoding="utf-8"))
@@ -592,6 +642,8 @@ def generated(shaders: Path = SHADERS) -> dict[Path, str]:
         ids / "light_ids.glsl": render_light_ids(),
         ids / "entity_ids.glsl": render_entity_ids(),
         shaders / "lib" / "light" / "light_table_data.glsl": render_light_table_data(),
+        shaders / "lib" / "light" / "light_mask_data.glsl": render_light_mask_data(
+            json.loads(LIGHT_MASKS.read_text(encoding="utf-8"))["lights"]),
     }
 
 

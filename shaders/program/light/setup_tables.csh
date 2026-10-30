@@ -13,6 +13,7 @@
 //@include "/lib/buffers/global_lights.glsl"
 //@include "/lib/buffers/light_bins.glsl"
 //@include "/lib/light/light.glsl"
+//@include "/lib/light/light_mask_data.glsl"
 //@include "/lib/ids/block_albedo.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
@@ -61,6 +62,7 @@
 #include "/lib/light/hand_light.glsl"
 #include "/lib/light/blocklight.glsl"
 #include "/lib/light/light.glsl"
+#include "/lib/light/light_mask_data.glsl"
 #include "/lib/ids/block_albedo.glsl"
 // END GENERATED includes
 
@@ -75,6 +77,15 @@ void main() {
     for (int j = i; j < ALBEDO_TABLE_SIZE; j += 256) {
         blockData.albedo[j] = blockAlbedoPacked(j);
         blockData.albedoUp[j] = blockAlbedoTopPacked(j);
+    }
+    if (i < LIGHT_MASK_LIGHTS) {
+        uint litFaces = 0u;
+        for (int c = 0; c < LIGHT_MASK_FACE_CLASSES; c++) {
+            uvec4 m = lightMaskStatic(i, c);
+            blockData.lightMasks[i * LIGHT_MASK_FACE_CLASSES + c] = m;
+            litFaces |= m.y;
+        }
+        if (litFaces != 0u) blockData.lightDefs[i].info.x |= LIGHT_FLAG_EMISSION_MASK;
     }
     /*
      * ライトビンを全部 0 にする。begin は前フレームに使った枠だけを戻すので、確保直後の中身が 0 でないと残り続ける
