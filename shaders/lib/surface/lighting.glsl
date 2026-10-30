@@ -170,8 +170,13 @@ vec3 secondaryHitBlockLight(vec3 playerPos, vec3 normal, ivec2 screenTexel, floa
 }
 
 // 反射に映る 2 次ヒット点の拡散の放射輝度。shadeSecondaryHit に設置光源・手持ち光源の直接光を足す (倍率は掛けない)
+// unitE: shadeSecondaryHit(playerPos, normal, vec3(1.0), skyLm)。アルベドに比例するので、呼び出し側が借りる処理と共有できる
+vec3 shadeSecondaryHitReflectedFrom(vec3 unitE, vec3 playerPos, vec3 normal, vec3 albedo, ivec2 screenTexel) {
+    return albedo * (unitE + RCP_PI * secondaryHitBlockLight(playerPos, normal, screenTexel, 1.0, true));
+}
+
 vec3 shadeSecondaryHitReflected(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm, ivec2 screenTexel) {
-    return shadeSecondaryHit(playerPos, normal, albedo, skyLm) + albedo * RCP_PI * secondaryHitBlockLight(playerPos, normal, screenTexel, 1.0, true);
+    return shadeSecondaryHitReflectedFrom(shadeSecondaryHit(playerPos, normal, vec3(1.0), skyLm), playerPos, normal, albedo, screenTexel);
 }
 
 /*
@@ -254,9 +259,15 @@ const float VOXEL_SCREEN_NORMAL_COS = 0.9;   // 画面の幾何法線と当た�
 const float VOXEL_SCREEN_PLANE_ABS = 0.08;   // 当たりの平面からの距離の許容 (ブロック)。土の道・耕地の 1/16 低い上面を含める
 const float VOXEL_SCREEN_PLANE_REL = 0.004;  // 距離 1 ブロックあたりの追加 (深度の精度)
 
+// カメラに背を向けた面 (橋の底面など) は画面のどの画素にも映らない。面に沿った移動では向きの判定は変わらない
+bool voxelFaceTowardsCamera(vec3 hitPlayer, vec3 hitNormal) {
+    return dot(hitNormal, hitPlayer) < 0.0;
+}
+
 bool voxelHitOnScreen(vec3 hitPlayer, vec3 hitNormal, out ivec2 texel, out vec3 scenePlayer) {
     texel = ivec2(-1);
     scenePlayer = vec3(0.0);
+    if (!voxelFaceTowardsCamera(hitPlayer, hitNormal)) return false;
     vec3 s = viewToScreen(playerToView(hitPlayer));
     if (any(lessThanEqual(s.xy, vec2(0.0))) || any(greaterThanEqual(s.xy, vec2(1.0))) || s.z <= 0.0 || s.z >= 1.0) return false;
     texel = ivec2(s.xy * viewSize());
@@ -276,37 +287,43 @@ bool voxelHitOnScreen(vec3 hitPlayer, vec3 hitNormal, out ivec2 texel, out vec3 
  * 明るさの比は輝度だけで取る (色ごとの比にすると、色付きの影の 1 タップの差で所々が染まった)
  * throughWater: 水越しに映っている点だけ借りる (岸の草ブロックの側面の縁など、水面より上の色を水底に借りない)
  * 借りた色は画面の発光込みなので、発光は足さない
+ * Ehit: 当たりの点の shadeSecondaryHit(hitPlayer, hitNormal, vec3(1.0), skyLm)
  */
 const int VOXEL_BORROW_TRIES = 6;
 const vec2 VOXEL_BORROW_RATIO_CLAMP = vec2(0.0, 4.0);
 
-bool borrowVoxelFaceColor(vec3 hitPlayer, vec3 hitNormal, int hitBlock, float skyLm, bool throughWater, out vec3 color) {
+bool borrowVoxelFaceColor(vec3 hitPlayer, vec3 hitNormal, int hitBlock, float skyLm, vec3 Ehit, bool throughWater, out vec3 color) {
     color = vec3(0.0);
+    if (!voxelFaceTowardsCamera(hitPlayer, hitNormal)) return false;
     vec3 nAbs = abs(hitNormal);
     ivec2 tAxes = nAbs.x > 0.5 ? ivec2(2, 1) : nAbs.y > 0.5 ? ivec2(0, 2) : ivec2(0, 1);
     if (abs(hitPlayer[tAxes.y]) > abs(hitPlayer[tAxes.x])) tAxes = tAxes.yx;
     vec3 awaySign = vec3(sign(hitPlayer.x), -sign(hitPlayer.y), sign(hitPlayer.z));
     // 試す順: 主軸 +1, +2 / 副軸 +1, -1 / 主軸 +3, -1
-    for (int k = 0; k < VOXEL_BORROW_TRIES; k++) {
+    // 照明の近似は重く、ループの中に置くと試行ごとに展開されて反射のパス全体のコードが膨らむ。借りる点を決めてから 1 回だけ呼ぶ
+    vec3 q = hitPlayer;
+    ivec2 qt = ivec2(-1);
+    for (int k = 0; k < VOXEL_BORROW_TRIES && qt.x < 0; k++) {
         int axis = (k == 2 || k == 3) ? tAxes.y : tAxes.x;
         float steps = k == 0 ? 1.0 : k == 1 ? 2.0 : k == 2 ? 1.0 : k == 3 ? -1.0 : k == 4 ? 3.0 : -1.0;
-        vec3 q = hitPlayer;
-        q[axis] += awaySign[axis] * steps;
-        ivec3 qCell = ivec3(floor(playerToVoxel(q - hitNormal * 0.5)));
-        if (!isInVoxelVolume(qCell) || fetchVoxelBlockId(qCell) != hitBlock) continue;
-        ivec3 outside = ivec3(floor(playerToVoxel(q + hitNormal * 0.5)));
+        vec3 p = hitPlayer;
+        p[axis] += awaySign[axis] * steps;
+        ivec3 pCell = ivec3(floor(playerToVoxel(p - hitNormal * 0.5)));
+        if (!isInVoxelVolume(pCell) || fetchVoxelBlockId(pCell) != hitBlock) continue;
+        ivec3 outside = ivec3(floor(playerToVoxel(p + hitNormal * 0.5)));
         if (!isInVoxelVolume(outside) || isVoxelOpaque(fetchVoxelBlockId(outside))) continue;
-        ivec2 qt;
-        vec3 qScene;
-        if (!voxelHitOnScreen(q, hitNormal, qt, qScene)) continue;
-        if (throughWater && texelFetch(depthtex0, qt, 0).r >= texelFetch(depthtex1, qt, 0).r) continue;
-        vec3 Eq = shadeSecondaryHit(q, hitNormal, vec3(1.0), skyLm);
-        if (luminance(Eq) <= 1e-6) continue;
-        vec3 Ehit = shadeSecondaryHit(hitPlayer, hitNormal, vec3(1.0), skyLm);
-        color = texelFetch(colortex0, qt, 0).rgb * clamp(luminance(Ehit) / luminance(Eq), VOXEL_BORROW_RATIO_CLAMP.x, VOXEL_BORROW_RATIO_CLAMP.y);
-        return true;
+        ivec2 pt;
+        vec3 pScene;
+        if (!voxelHitOnScreen(p, hitNormal, pt, pScene)) continue;
+        if (throughWater && texelFetch(depthtex0, pt, 0).r >= texelFetch(depthtex1, pt, 0).r) continue;
+        q = p;
+        qt = pt;
     }
-    return false;
+    if (qt.x < 0) return false;
+    vec3 Eq = shadeSecondaryHit(q, hitNormal, vec3(1.0), skyLm);
+    if (luminance(Eq) <= 1e-6) return false;
+    color = texelFetch(colortex0, qt, 0).rgb * clamp(luminance(Ehit) / luminance(Eq), VOXEL_BORROW_RATIO_CLAMP.x, VOXEL_BORROW_RATIO_CLAMP.y);
+    return true;
 }
 
 vec4 traceVoxelRadiance(vec3 originPlayer, vec3 dir, float maxDist, float skyLm, bool useSceneColor) {
@@ -334,13 +351,14 @@ vec4 traceVoxelRadiance(vec3 originPlayer, vec3 dir, float maxDist, float skyLm,
             emission = unpack2x8(texelFetch(colortex3, t, 0).g).y;
             hitMaterial = readMaterialId(t);
         }
-    } else if (useSceneColor) {
-        vec3 borrowed;
-        if (borrowVoxelFaceColor(hitPlayer, hitNormal, hitBlock, skyLm, false, borrowed)) return vec4(borrowed, 1.0);
     }
     // useSceneColor = false は GI (多重反射込み)、true は反射
     if (useSceneColor) {
-        return vec4(shadeSecondaryHitReflected(hitPlayer, hitNormal, albedo, skyLm, screenTexel)
+        // 借りる処理と代わりのアルベドの照明で、ヒット点の照明 (重い) を共有する
+        vec3 unitE = shadeSecondaryHit(hitPlayer, hitNormal, vec3(1.0), skyLm);
+        vec3 borrowed;
+        if (borrowVoxelFaceColor(hitPlayer, hitNormal, hitBlock, skyLm, unitE, false, borrowed)) return vec4(borrowed, 1.0);
+        return vec4(shadeSecondaryHitReflectedFrom(unitE, hitPlayer, hitNormal, albedo, screenTexel)
             + albedo * secondaryHitEmission(emission, hitBlock, hitMaterial), 1.0);
     }
     vec3 E = secondaryHitBlockLight(hitPlayer, hitNormal, screenTexel, handLightIndirectScale(), false) * SECONDARY_BLOCKLIGHT_GAIN;

@@ -167,11 +167,12 @@ bool waterRefractVoxel(vec3 surfPlayer, vec3 dir, vec3 floorPlayer, float d1, fl
     }
 
     vec3 voxelColor;
-    bool hasRef = borrowVoxelFaceColor(hitPlayer, hitNormal, hitBlock, skyLm, true, voxelColor);
+    vec3 unitE = shadeSecondaryHit(hitPlayer, hitNormal, vec3(1.0), skyLm);
+    bool hasRef = borrowVoxelFaceColor(hitPlayer, hitNormal, hitBlock, skyLm, unitE, true, voxelColor);
     if (!hasRef) {
         // まっすぐ見た水底の像をそのまま使うと、屈折先が画面に無い所が屈折していない像になった
         // 像は明るさの基準にだけ使い、色はブロックの表の色を照らして作る (模様は写さない)
-        voxelColor = shadeSecondaryHitReflected(hitPlayer, hitNormal, getBlockAlbedo(hitBlock, hitNormal), skyLm, ivec2(-1));
+        voxelColor = shadeSecondaryHitReflectedFrom(unitE, hitPlayer, hitNormal, getBlockAlbedo(hitBlock, hitNormal), ivec2(-1));
     }
     if (!hasRef && d1 < 1.0 && floorPlayer.y < surfPlayer.y) {
         GBufferData g = readGBuffer(ivec2(gl_FragCoord.xy));
