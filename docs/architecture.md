@@ -95,7 +95,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 7 | shadow_block.vsh/gsh/fsh | light | ブロックエンティティ版 (本体共通, `PROGRAM_SHADOW_BLOCK`) | blockEntityId | voxelEntityImg, 影マップ | 同上 | shadowBlockEntities |
 | 8 | prepare.csh | sky | 太陽・月の直達照度、空の SH (全モジュールが使う光の色) | skyView / 解析式 | SSBO0 sun/moon/shadowLight/skySH | (1,1,1) | 常時 |
 | 9 | prepare1.csh | sky | SkyView LUT | transmittance, multiScatter | skyViewImg 192x108 | local 8x4, (24,27,1) | ATMOSPHERE_MODE=1, world0 |
-| 10 | prepare2.csh | sky | 雲の天気マップと雲影マップ | - | cloudWeatherImg, cloudShadowImg 512² | local 16², (32,32,1) | CLOUDS>=2, world0 |
+| 10 | prepare2.csh | sky | 雲の天気マップと雲影マップ、カメラの位置の雲の中の霧 (FrameData) | - | cloudWeatherImg, cloudShadowImg 512² | local 16², (32,32,1) | CLOUDS>=2, world0 |
 | 11 | gbuffers_* (不透明) | surface (空/雲は sky) | G バッファ書き込み、TAA ジッター、エンティティ光源登録 (light の関数) | アトラス | colortex1,2,3,15 / voxelEmitImg, SSBO2 | 画面 | 常時 |
 | 12 | deferred.csh | light | floodfill 1 ステップ伝搬 + ブロック光源・エンティティ光源をグローバルリストへ | voxelBlock/Emit, flood(前) | flood(今), SSBO2 | local 8³, VOXEL_SIZE/8 | 常時 |
 | 13 | deferred_a.csh | light | 光源をワールド空間ライトビン (8³ ブロック) に重要度の降順で振り分け (LIGHT_CULL_MODE)、次フレームの間引き距離を更新 | SSBO2 | SSBO3, SSBO2 cullDistance | local 64, (LIGHT_MAX_COUNT/64,1,1) | 常時 |
@@ -211,7 +211,7 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 
 | binding | 名前 (アクセサ) | ファイル | サイズ | 内容 | 書くプログラム (`SSBO_<名前>_WRITE`) |
 |---|---|---|---|---|---|
-| 0 | FrameDataBuffer (`frameData`) | `frame_data.glsl` | 4096 | post: exposure, exposureTarget, averageLuminance, focusDistance, histogram[256], postParams[] (4 個) / sky: sunIrradiance, moonIrradiance, shadowLightIrradiance, skySH[9], skyParams[4] (`[3]` = 目の位置の太陽の見え方: x 今フレーム (フレア用)、y 平滑化済み (影マップより遠いフォグ用)、z 太陽が影マップの範囲より遠い地形に隠れている割合 (post が書く)) / light: lightStats / surface: surfaceParams[4] | `FRAME_DATA`: setup (初期値), begin・deferred_a (lightStats), prepare (sky), composite25 (post) |
+| 0 | FrameDataBuffer (`frameData`) | `frame_data.glsl` | 4096 | post: exposure, exposureTarget, averageLuminance, focusDistance, histogram[256], postParams[] (4 個) / sky: sunIrradiance, moonIrradiance, shadowLightIrradiance, skySH[9], skyParams[6] (`[3]` = 目の位置の太陽の見え方: x 今フレーム (フレア用)、y 平滑化済み (影マップより遠いフォグ用)、z 太陽が影マップの範囲より遠い地形に隠れている割合 (post が書く)。`[4]` = (カメラの位置の雲の中の太陽の光 rgb, 雲の濃さ。0 なら雲の外)、`[5]` = (雲の中の空の光 rgb, 雲の中の霧の消散係数 1/ブロック) (prepare2 が書く)) / light: lightStats / surface: surfaceParams[4] | `FRAME_DATA`: setup (初期値), begin・deferred_a (lightStats), prepare (sky), prepare2 (skyParams[4] [5]), composite25 (post) |
 | 1 | BlockDataBuffer (`blockData`) | `block_data.glsl` | 61440 | `LightDef lightDefs[256]`, `uvec4 shapes[128]`, `vec4 tints[128]`, `uint albedo[4096]` (ブロックの平均の色), `uint albedoUp[4096]` (上向きの面の色), `uvec4 lightMasks[]` (光るブロックの面の光り方、128 光源 x 上・下・側面の 384 個) | `BLOCK_DATA`: setup のみ |
 | 2 | GlobalLightsBuffer (`globalLights`) | `global_lights.glsl` | 295200 | `count/blockCount/entityCount/overflow`, `cullDistance/culled` + `cullHist[64]` (間引き距離と距離の分布), `LightInstance lights[8192]` (posRadius: ボクセル空間位置 + 到達半径, colorSize: 放射 + 光源半径), `lightPower[]` (揺らぎ前の放射の輝度、8192 個)。使うのは LIGHT_MAX_COUNT 個まで | `GLOBAL_LIGHTS`: setup, begin, deferred, deferred_a |
 | 3 | LightBinsBuffer (`lightBins`) | `light_bins.glsl` | 10944512 (LIGHT_BIN_LIGHTS > 64 で 21430272) | `binCount[40960]`, `entityAcc[32768]` (エンティティ光源の蓄積表), `binLights[]` (40960 x 65 個、> 64 で x 129)。ビン = 8³ ブロック、1 ビン LIGHT_BIN_LIGHTS + 1 枠。枠のキー = 重要度 19 bit + 光源インデックス 13 bit | `LIGHT_BINS`: setup, begin, deferred_a, shadow_entities・shadow_block の gsh と gbuffers_entities・gbuffers_entities_translucent の vsh (蓄積表) |
@@ -394,6 +394,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 |---|---|---|
 | 太陽 / 月の影 | 歪み付き単一影マップ (`lib/common/shadow_space.glsl`) + PCSS (ブロッカー探索と PCF 分離) + スクリーンスペース接触影 + 色付き影 (shadowcolor0)。葉の透過 (SHADOW_LEAF_TINT): 不透明の影のうち葉で遮られた分を、影マップの葉の色 x 重なった枚数 (光源側の葉から受け点へボクセルを辿って数える) で透過させる。SHADOW_FILTER=0 でハード | surface |
 | 雲影 | prepare2 で 512² の雲影マップを作り `getCloudShadow()` で地形・VL に渡す | sky |
+| 雲の中の霧 | カメラが雲 (低層・バニラの形の板・中層) の中にいる間、雲のマーチの消散は外から見た雲のための薄い値で中にいても地面や遠景が透けるので、層を出るまでの一様な霧として fog_apply で掛ける (`CLOUD_INTERIOR_VISIBILITY`、既定 14 ブロック、0 で無効)。prepare2 の 1 スレッドがカメラの周り 7 点の平均の濃さ・雲のマーチと同じ光 (`cloudInscatter`)・マーチがすでに持つ消散を引いた霧の消散係数を求めて `skyParams[4]` `[5]` に書く。fog_apply は `exp(-濃さ x min(距離, 層の出口までの距離) x 消散係数)` で、光源の光は `cloudInteriorPhase` で向きによる差を付ける。外から見た雲、雲の外のカメラは濃さ 0 で変わらない。手の深度には掛けない。レンズフレアの光源の見え具合にも濃さを掛ける | sky |
 | AO | GTAO (AO_MODE=2), 軽量は SSAO | surface |
 | GI | LOW/MED: なし、HIGH: RSM (shadowcolor0/1)、ULTRA: SSGI、EXTREME: ボクセル RT (light の `traceVoxelRay` + floodfill でヒット点を照らす) + SVGF 系デノイズ | surface |
 | 空 / 大気 | Hillaire 2020 の 3 LUT (透過率・多重散乱・SkyView)。照度と空の SH を FrameData に書いて全パスで共有。薄明は SkyView を太陽が ±10 度の間 48 歩にし、成層圏のエアロゾル (20 km) で紫の光を出す。TWILIGHT_STRETCH は空の LUT と夜の度合いに使う太陽の高さだけ地平線より下を縮める (`atmoSkySunMu`)。ATMOSPHERE_MODE=0 は解析近似 | sky |
@@ -669,7 +670,7 @@ post モジュールが提供 (`//@include "/lib/post/post.glsl"`):
 | voxelBlock / Entity / Emit | 書く | 読む | 読む | 読む (debug) |
 | floodImgA/B | 書く | 読む (関数経由) | 読む (関数経由) | 読む (debug) |
 | SSBO1 BlockData, SSBO2, SSBO3, SSBO4 | 書く | 読む | 読む | 読む |
-| SSBO0 FrameData | lightStats を書く | sun/moon/SH/skyParams を書く | surfaceParams を書く | exposure/focus/histogram/postParams と skyParams[3].z を書く |
+| SSBO0 FrameData | lightStats を書く | sun/moon/SH/skyParams[0..3] を書く (prepare2 が skyParams[4] [5] を書く) | surfaceParams を書く | exposure/focus/histogram/postParams と skyParams[3].z を書く |
 | shadowtex / shadowcolor | 書く (shadow パス) | 読む | 読む | - |
 | colortex1/2/3/15 | 読む | 読む | 書く | 読む |
 | colortex4/5 | - | colortex4 に雨を書く | 書く | - |

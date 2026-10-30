@@ -1,7 +1,7 @@
 /*
  * composite11: フォグ / VL の適用 (colortex12 をバイラテラルにアップサンプルして colortex0 に合成)
  * 順番 (遠い方から): 地形 -> 空中遠近 -> 描画距離端のフォグ -> 手前の雲 (雲より上にいる時) -> カメラ側の媒質 (高さフォグ / 水 / 溶岩 / 粉雪)
- * -> 手持ち光源が霧を照らす光 (点光源の内散乱を解析積分) -> 盲目・暗闇
+ * -> 雲の中の霧 (カメラが雲の層の中の時) -> 手持ち光源が霧を照らす光 (点光源の内散乱を解析積分) -> 盲目・暗闇
  * sky モジュール (lib/sky)
  */
 //@include "/lib/common/common.glsl"
@@ -262,6 +262,17 @@ void main() {
         glint *= fog.a;
         color = color * frontClouds.a + frontClouds.rgb;
         glint *= frontClouds.a;
+#ifdef CLOUD_INTERIOR
+        // カメラが雲の中: 層を出るまで一様な霧として掛ける。手持ちの物・自分の体 (手の深度) には掛けない
+        vec4 interior = frameData.skyParams[4];
+        if (interior.a > 0.0 && !isHandDepth(depth)) {
+            float interiorT = exp(-interior.a * min(dist, cloudInteriorExit(dir)) * frameData.skyParams[5].w);
+            vec3 cloudLightDir = frameData.skyParams[0].a > 0.0 ? getSunDir() : getMoonDir();
+            vec3 interiorLight = interior.rgb * cloudInteriorPhase(dot(dir, cloudLightDir)) + frameData.skyParams[5].rgb;
+            color = color * interiorT + interiorLight * (1.0 - interiorT);
+            glint *= interiorT;
+        }
+#endif
 #if defined HAS_SKY
         vec2 localDensity = fogDensityAt(vec3(0.0), fogMedium());
         scatterCoeff = vec3((localDensity.x + localDensity.y) * FOG_ALBEDO);

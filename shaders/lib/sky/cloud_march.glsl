@@ -85,11 +85,8 @@ CloudAccum cloudMarchLow(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, 
 }
 
 #ifdef CLOUD_VANILLA_SHAPE
-/*
- * バニラの形の雲 (厚み 4 ブロックの平らな板)。weight: 板の濃さの倍率 (雨雲へ移る間は薄め、雨の日は雨の濃さの倍率で濃くする)
- * サンプルは区間の入口に寄せた 2 乗の分布 (近くは細かく、遠くは粗く)。区間が短い視線 (板を斜めに抜ける) は歩数を減らす
- */
-CloudAccum cloudMarchVanilla(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, vec2 dither, float weight) {
+// 板の光の絞り (cloud_vanilla.glsl の VANILLA_CLOUD_*)
+CloudLighting cloudVanillaLighting(CloudLighting l) {
     l.lightIrradiance *= VANILLA_CLOUD_SUN;
     l.msGain *= VANILLA_CLOUD_MS_GAIN;
     l.silverBoost *= VANILLA_CLOUD_SILVER;
@@ -97,6 +94,15 @@ CloudAccum cloudMarchVanilla(CloudContext ctx, CloudLighting l, vec3 dir, vec2 s
     l.ambient *= VANILLA_CLOUD_AMBIENT;
     l.skyRadiance = mix(vec3(luminance(l.skyRadiance)), l.skyRadiance, VANILLA_CLOUD_SKY_SATURATION);
     l.groundRadiance = mix(vec3(luminance(l.groundRadiance)), l.groundRadiance, VANILLA_CLOUD_SKY_SATURATION);
+    return l;
+}
+
+/*
+ * バニラの形の雲 (厚み 4 ブロックの平らな板)。weight: 板の濃さの倍率 (雨雲へ移る間は薄め、雨の日は雨の濃さの倍率で濃くする)
+ * サンプルは区間の入口に寄せた 2 乗の分布 (近くは細かく、遠くは粗く)。区間が短い視線 (板を斜めに抜ける) は歩数を減らす
+ */
+CloudAccum cloudMarchVanilla(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, vec2 dither, float weight) {
+    l = cloudVanillaLighting(l);
     CloudAccum acc = CloudAccum(vec3(0.0), 1.0, 0.0, 0.0);
     float segLength = seg.y - seg.x;
     int steps = clamp(int(segLength / VANILLA_CLOUD_STEP_LENGTH), VANILLA_CLOUD_MIN_STEPS, VANILLA_CLOUD_STEPS);

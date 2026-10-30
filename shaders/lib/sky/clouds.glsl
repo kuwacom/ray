@@ -28,11 +28,17 @@
 //@include "/lib/common/dimension.glsl"
 //@include "/lib/common/frame_offset.glsl"
 //@include "/lib/common/math.glsl"
+//@include "/lib/common/phase.glsl"
 //@include "/lib/common/samplers.glsl"
 //@include "/lib/common/transforms.glsl"
 //@include "/lib/common/uniforms.glsl"
 //@include "/lib/buffers/images.glsl"
 //@include "/lib/sky/cloud_styles.glsl"
+
+// カメラが雲の層の中にいる時の霧 (雲の中の視程の設定が 0 でなければ)
+#if CLOUDS >= 2 && CLOUD_INTERIOR_VISIBILITY > 0 && defined HAS_SKY
+    #define CLOUD_INTERIOR
+#endif
 
 const float CLOUD_RAY_FAR = 1e12; // 球との交差が無い方向の距離 (十分遠い値)
 
@@ -316,6 +322,37 @@ float cloudLowestBase() {
     return CLOUD_BASE;
 #endif
 }
+
+#ifdef CLOUD_INTERIOR
+/*
+ * 雲の中の霧: カメラが雲の層の中にいる時、層を出るまでを一様な霧として掛ける (fog_apply)
+ * 雲のマーチの消散係数は外から見た雲のための薄い値で、中にいても地面や遠くが透けるので、雲の中の視程はこちらで決める
+ * 視程 = 3 / 消散係数 (WMO の定義)。濃さ・光・マーチの消散を引いた霧の消散係数は、prepare2 がカメラの位置で求める (frameData.skyParams[4] [5])
+ */
+const float CLOUD_INTERIOR_EXTINCTION = 3.0 / float(CLOUD_INTERIOR_VISIBILITY);
+// 雲の中の光は何度も散乱して向きを失うので、前方の山を弱めて等方に寄せる (太陽は円盤でなく方向の分かるにじみになる)
+const float CLOUD_INTERIOR_G = 0.6;
+const float CLOUD_INTERIOR_ISO = 0.7;
+
+// 光源の光の向きによる差 (光源に対して横から見た時を 1 にした位相)
+float cloudInteriorPhase(float cosTheta) {
+    return mix(phaseHG(cosTheta, CLOUD_INTERIOR_G), PHASE_ISOTROPIC, CLOUD_INTERIOR_ISO)
+         / mix(phaseHG(0.0, CLOUD_INTERIOR_G), PHASE_ISOTROPIC, CLOUD_INTERIOR_ISO);
+}
+
+// カメラを含む雲の層の出口までの距離 (ワールド)。どの層の中でもなければ 0
+float cloudInteriorExit(vec3 dir) {
+    float y = cameraPosition.y;
+    #ifdef CLOUD_VANILLA_SHAPE
+    if (y > vanillaCloudBottom() && y < vanillaCloudBottom() + VANILLA_CLOUD_THICKNESS) return vanillaCloudSegment(y, dir.y, VANILLA_CLOUD_FAR).y;
+    #endif
+    if (y > CLOUD_BASE && y < CLOUD_TOP) return cloudLayerSegment(y, dir.y, CLOUD_BASE, CLOUD_TOP).y;
+    #if CLOUDS == 3
+    if (y > CLOUD_MID_BASE && y < CLOUD_MID_TOP) return cloudLayerSegment(y, dir.y, CLOUD_MID_BASE, CLOUD_MID_TOP).y;
+    #endif
+    return 0.0;
+}
+#endif
 
 /*
  * 半透明 (deferred の後に描くエンティティ・水・ガラス) が手前にある画素の雲を、カメラから半透明までの分に割り引く
