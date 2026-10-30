@@ -95,7 +95,13 @@ const uint BLOCK_ALBEDO_COLORED[357] = uint[357](
     0x15AFF1u, 0xEAEBF3u, 0xEAECF3u, 0xEDEEF6u, 0x29C6F9u
 );
 
+// 向きのある光源の ID (東・南・西) は向きなしの ID の色を使う
+int blockAlbedoBaseId(int id) {
+    return (id > BLOCK_LIGHT_BASE + 255 && id <= BLOCK_LIGHT_LAST) ? BLOCK_LIGHT_BASE + ((id - BLOCK_LIGHT_BASE) & 255) : id;
+}
+
 uint blockAlbedoPacked(int id) {
+    id = blockAlbedoBaseId(id);
     if (id >= BLOCK_COLOR_FIRST) return id - BLOCK_COLOR_FIRST < 357 ? BLOCK_ALBEDO_COLORED[id - BLOCK_COLOR_FIRST] : BLOCK_ALBEDO_DEFAULT;
     if (id >= 0 && id <= 18) return BLOCK_ALBEDO_0[id - 0];
     if (id >= 100 && id <= 110) return BLOCK_ALBEDO_100[id - 100];
@@ -150,6 +156,7 @@ const uint BLOCK_ALBEDO_TOP[151] = uint[151](
 
 // 上面の色 (setup で 1 回だけ引くので線形探索)
 uint blockAlbedoTopPacked(int id) {
+    id = blockAlbedoBaseId(id);
     for (int k = 0; k < 151; k++) if (BLOCK_ALBEDO_TOP_ID[k] == id) return BLOCK_ALBEDO_TOP[k];
     return blockAlbedoPacked(id);
 }

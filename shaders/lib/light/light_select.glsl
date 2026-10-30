@@ -150,6 +150,18 @@ float quadFormFactor(vec3 q[4], vec3 n) {
     return abs(sum) * (0.5 / PI);
 }
 
+/*
+ * 向きのある光源 (LIGHT_FLAG_FACING。点灯したかまど・ジャック・オ・ランタン) は前面だけが光る
+ * 炉の口やくり抜いた顔の奥にだけ光源が見え、ほかの面は光源が見えない。前面の向きはブロック ID の向き (blockLightFacing)
+ */
+const int LIGHT_FACE_FRONT = 3;
+
+// 水平の面 (axis, side) の外向きの向き (0 北 = -z、1 東 = +x、2 南 = +z、3 西 = -x)。上下の面は -1
+int lightFaceFacing(int axis, float side) {
+    if (axis == 1) return -1;
+    return axis == 2 ? (side > 0.0 ? 2 : 0) : (side > 0.0 ? 1 : 3);
+}
+
 #if LIGHT_EMISSION_MASK_MODE != 0
 /*
  * 光るブロックの面の光り方 (LIGHT_FLAG_EMISSION_MASK の付いた光源)。テクスチャの暗い縁を面光源に反映する
@@ -265,9 +277,10 @@ float lightMaskGridFormFactor(LightFaceMask f, int axis, float side, vec3 rel, v
 
 /*
  * light: 光源インデックス、masked: 面の光り方のデータがあるか、grid: 近くで 4x4 のマスを使うか (LIGHT_EMISSION_MASK_MODE 2)
- * 0 では面全体を光らせるので、3 つとも使わない
+ * 0 では面全体を光らせるので、この 3 つは使わない
+ * facing: 向きのある光源の前面の向き (blockLightFacing)。-1 は向きなしで、向きがあれば前面の面だけを数える (どのモードでも)
  */
-float lightBoxNearField(vec3 voxelPos, vec3 boxCenter, vec3 n, int light, bool masked, bool grid) {
+float lightBoxNearField(vec3 voxelPos, vec3 boxCenter, vec3 n, int light, bool masked, bool grid, int facing) {
 #if LIGHT_EMISSION_MASK_MODE == 0
     vec3 rel = voxelPos - boxCenter;
 #else
@@ -283,6 +296,7 @@ float lightBoxNearField(vec3 voxelPos, vec3 boxCenter, vec3 n, int light, bool m
         float side = rel[axis] >= 0.0 ? 1.0 : -1.0;
         // 着色点が面の平面の外側にある時だけ見える
         if (abs(rel[axis]) <= 0.5) continue;
+        if (facing >= 0 && lightFaceFacing(axis, side) != facing) continue;
         ivec3 nb = cell;
         nb[axis] += int(side);
         if (isVoxelOpaque(fetchVoxelBlockId(nb))) continue;
@@ -299,7 +313,7 @@ float lightBoxNearField(vec3 voxelPos, vec3 boxCenter, vec3 n, int light, bool m
         }
         sum += quadFormFactor(q, n);
 #else
-        LightFaceMask f = masked ? readLightMask(light, lightFaceClass(axis, side)) : wholeLightFace();
+        LightFaceMask f = masked ? readLightMask(light, facing >= 0 ? LIGHT_FACE_FRONT : lightFaceClass(axis, side)) : wholeLightFace();
         if (f.ratio <= 0.0) continue;
         float ff = f.ratio * lightMaskQuad(axis, side, f.rect.xy, f.rect.zw, rel, n);
     #if LIGHT_EMISSION_MASK_MODE == 2
@@ -381,7 +395,8 @@ vec3 lightBoxIrradiance(LightInstance L, vec3 voxelPos, vec3 gateNormal, bool gr
     vec3 albedo = pow(getBlockAlbedo(voxelId), vec3(LIGHT_BOX_COLOR_POWER));
     vec3 faceColor = albedo * (lightLum / max(luminance(albedo), EPS));
     bool masked = (d.info.x & LIGHT_FLAG_EMISSION_MASK) != 0u;
-    return faceColor * (power * lightBoxNearField(voxelPos, floor(L.posRadius.xyz) + 0.5, gateNormal, light, masked, grid));
+    int facing = (d.info.x & LIGHT_FLAG_FACING) != 0u ? blockLightFacing(voxelId) : -1;
+    return faceColor * (power * lightBoxNearField(voxelPos, floor(L.posRadius.xyz) + 0.5, gateNormal, light, masked, grid, facing));
 }
 
 vec3 lightBoxIrradiance(LightInstance L, vec3 voxelPos, vec3 gateNormal) {

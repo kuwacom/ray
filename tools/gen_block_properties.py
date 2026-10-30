@@ -24,7 +24,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from id_tables import (  # noqa: E402
     BLOCK_CONSTS, COLOR_BAND_FIRST, COLOR_BAND_LAST, COLORS, COPPER_PREFIX, ENTITIES, ENTITY_LIGHT_ID_BASE, LIGHT_BLOCK_LAST,
-    LIGHT_ENTITY_FIRST, LIGHT_ENTITY_LAST, LIGHT_ID_BASE, LIGHT_ITEM_FIRST, LIGHT_ITEM_LAST, LIGHTS, Light, STAIRS_FIRST, with_state,
+    FACINGS, LIGHT_ENTITY_FIRST, LIGHT_ENTITY_LAST, LIGHT_FACING_LAST, LIGHT_FACING_STRIDE, LIGHT_ID_BASE, LIGHT_ITEM_FIRST,
+    LIGHT_ITEM_LAST, LIGHTS, Light, STAIRS_FIRST, with_state,
 )
 from lib.color import linear_to_srgb, srgb_to_linear  # noqa: E402
 from lib.generated import check as generated_check  # noqa: E402
@@ -248,6 +249,9 @@ def render_albedo_glsl(colors: dict[str, list[int]], tops: dict[str, list[int]],
     by_id: dict[int, Rgb] = {1: DEFAULT_ALBEDO_SRGB}
     top_by_id: dict[int, Rgb] = {}
     for bid, _, names in all_blocks():
+        # 向きのある光源の東・南・西は向きなしと同じ色 (blockAlbedoBaseId で引く)
+        if LIGHT_ID_BASE + 255 < bid <= LIGHT_FACING_LAST:
+            continue
         known = [n.split(":")[0] for n in names if n.split(":")[0] in colors]
         if known:
             by_id[bid] = mean_srgb([colors[n] for n in known])
@@ -295,7 +299,13 @@ def render_albedo_glsl(colors: dict[str, list[int]], tops: dict[str, list[int]],
     lines += table("BLOCK_ALBEDO_COLORED", [pack_srgb(c) for c in palette])
     lines += [
         "",
+        "// 向きのある光源の ID (東・南・西) は向きなしの ID の色を使う",
+        "int blockAlbedoBaseId(int id) {",
+        "    return (id > BLOCK_LIGHT_BASE + 255 && id <= BLOCK_LIGHT_LAST) ? BLOCK_LIGHT_BASE + ((id - BLOCK_LIGHT_BASE) & 255) : id;",
+        "}",
+        "",
         "uint blockAlbedoPacked(int id) {",
+        "    id = blockAlbedoBaseId(id);",
         f"    if (id >= BLOCK_COLOR_FIRST) return id - BLOCK_COLOR_FIRST < {len(palette)} ? BLOCK_ALBEDO_COLORED[id - BLOCK_COLOR_FIRST] : BLOCK_ALBEDO_DEFAULT;",
         *body,
         "    return BLOCK_ALBEDO_DEFAULT;",
@@ -309,6 +319,7 @@ def render_albedo_glsl(colors: dict[str, list[int]], tops: dict[str, list[int]],
         "",
         "// 上面の色 (setup で 1 回だけ引くので線形探索)",
         "uint blockAlbedoTopPacked(int id) {",
+        f"    id = blockAlbedoBaseId(id);",
         f"    for (int k = 0; k < {len(top_ids)}; k++) if (BLOCK_ALBEDO_TOP_ID[k] == id) return BLOCK_ALBEDO_TOP[k];",
         "    return blockAlbedoPacked(id);",
         "}",
@@ -325,7 +336,12 @@ Entry = tuple[int, str, list[str]]
 def light_block_entries() -> list[Entry]:
     out: list[Entry] = []
     for light in LIGHTS:
-        if light.blocks:
+        if light.blocks and light.facing:
+            # 北は向きなしと同じ ID、東・南・西は 256 ずつ上の帯 (向きは Iris の状態 facing で分ける)
+            for f, facing in enumerate(FACINGS):
+                out.append((LIGHT_ID_BASE + LIGHT_FACING_STRIDE * f + light.index, f"{light.title} (facing {facing})",
+                            [f"{b}:facing={facing}" for b in light.blocks]))
+        elif light.blocks:
             out.append((LIGHT_ID_BASE + light.index, light.title, list(light.blocks)))
         for k, (title, names) in enumerate(light.variants):
             out.append((LIGHT_ID_BASE + light.index + k, title, list(names)))
@@ -356,6 +372,8 @@ def check_tables() -> None:
         in_block = light.index + span - 1 <= LIGHT_BLOCK_LAST
         if (light.blocks or light.variants) and not in_block:
             raise SystemExit(f"光源 {light.index} ({light.title}): ブロック光源の帯 (1-{LIGHT_BLOCK_LAST}) の外にブロックがある")
+        if light.facing and (not in_block or span != 1 or not light.mask):
+            raise SystemExit(f"光源 {light.index} ({light.title}): 向きのある光源はブロック光源の帯の 1 つで、前面を測る mask が要る")
         if light.items and light.index > LIGHT_ITEM_LAST:
             raise SystemExit(f"光源 {light.index} ({light.title}): アイテムはエンティティ光源の帯に置けない")
         if LIGHT_ITEM_FIRST <= light.index <= LIGHT_ITEM_LAST and not light.items:
@@ -423,6 +441,7 @@ def render_light_ids() -> str:
         "const uint LIGHT_FLAG_CAT_GLOWING = 32u;    // GLOWING_ENTITY_LIGHTS の対象",
         "const uint LIGHT_FLAG_ENTITY_FLASH = 64u;   // entityColor.a (点滅) が強い時だけ光る (TNT・クリーパー)",
         "const uint LIGHT_FLAG_EMISSION_MASK = 128u; // 面の光り方のデータがある (lightMasks。setup_tables.csh が立てる)",
+        "const uint LIGHT_FLAG_FACING = 256u;        // 向きのある光源 (前面だけが光る。向きはブロック ID の向きの番号 lib/ids/id_decode.glsl blockLightFacing)",
         "",
         "#endif",
         "",
@@ -443,6 +462,7 @@ def render_block_ids() -> str:
         " *   200-299  : 半透明 (透過色テーブル index = id - 200)",
         " *   300-399  : 部分形状 (形状テーブル index = id - 300)",
         f" *   {LIGHT_ID_BASE + 1}-{LIGHT_ID_BASE + LIGHT_ENTITY_LAST}: 光源 (光源インデックス = id - {LIGHT_ID_BASE}, lib/ids/light_ids.glsl)",
+        f" *   {LIGHT_ID_BASE + LIGHT_FACING_STRIDE + 1}-{LIGHT_FACING_LAST}: 向きのある光源の東・南・西 (id - {LIGHT_ID_BASE} = 256 x 向き + 光源インデックス)",
         f" *   {COLOR_BAND_FIRST}-{COLOR_BAND_LAST}: 色の付いた固体 (完全遮蔽。上の帯に無いブロックを平均の色ごとにまとめたもの。色は lib/ids/block_albedo.glsl)",
         f" * ボクセルには下位 12bit しか入らないので {COLOR_BAND_LAST} を超える ID は作らない",
         " */",
@@ -561,7 +581,8 @@ def render_light_table_data() -> str:
         label = f"case {light.label or light.name}:"
         width = 29 if light.index <= LIGHT_BLOCK_LAST else 34
         label = label.ljust(width) if len(label) <= width else label + " "
-        lines.append(f"        {label}return makeLight({light.make});")
+        make = light.make + " | LIGHT_FLAG_FACING" if light.facing else light.make
+        lines.append(f"        {label}return makeLight({make});")
     lines += [
         "    }",
         "    LightDef none;",
@@ -602,7 +623,7 @@ def render_light_mask_data(masks: dict[str, dict]) -> str:
                          + ", ".join(sorted(wanted ^ set(masks), key=int)))
     lines = [
         "/*",
-        " * 光るブロックの面の光り方 (光る範囲の四角と 4x4 のマス)。面の種類は 0 = 上、1 = 下、2 = 側面 (4 面の平均)",
+        " * 光るブロックの面の光り方 (光る範囲の四角と 4x4 のマス)。面の種類は 0 = 上、1 = 下、2 = 側面 (4 面の平均)、3 = 前面 (向きのある光源だけ)",
         f" * {GENERATED_NOTE.replace('tools/id_tables.py', 'tools/light_masks.json')}",
         " * 中身の意味は lib/buffers/block_data.glsl の lightMasks",
         " */",
@@ -620,8 +641,10 @@ def render_light_mask_data(masks: dict[str, dict]) -> str:
             continue
         lines += [f"        case {light.label or light.name}:",
                   f"            if (faceClass == 0) return {mask_face_value(m['up'])};",
-                  f"            if (faceClass == 1) return {mask_face_value(m['down'])};",
-                  f"            return {mask_face_value(m['side'])};"]
+                  f"            if (faceClass == 1) return {mask_face_value(m['down'])};"]
+        # 前面は向きのある光源だけが持つ
+        lines.append(f"            if (faceClass == 3) return {mask_face_value(m['front']) if 'front' in m else 'uvec4(0u)'};")
+        lines.append(f"            return {mask_face_value(m['side'])};")
     lines += ["    }", "    return uvec4(0u);", "}", "", "#endif", ""]
     return "\n".join(lines)
 

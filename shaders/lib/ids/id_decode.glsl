@@ -26,7 +26,14 @@ int getBlockLightIndex(int blockId) {
 #if DECORATIVE_BLOCK_LIGHTS == 2
     if (isDecorativeBlock(blockId)) return LIGHT_DECOR_FIRST + (blockId - BLOCK_DECOR_LAPIS);
 #endif
-    return (blockId > BLOCK_LIGHT_BASE && blockId <= BLOCK_LIGHT_BASE + 255) ? blockId - BLOCK_LIGHT_BASE : LIGHT_NONE;
+    // 向きのある光源 (東・南・西) は 256 ずつ上の帯。下位 8 bit が光源インデックス
+    int r = blockId - BLOCK_LIGHT_BASE;
+    return (r > 0 && r <= BLOCK_LIGHT_LAST - BLOCK_LIGHT_BASE) ? (r & 255) : LIGHT_NONE;
+}
+
+// 向きのある光源ブロックの前面の向き (0 北 1 東 2 南 3 西)。LIGHT_FLAG_FACING の光源にだけ使う
+int blockLightFacing(int blockId) {
+    return max(blockId - BLOCK_LIGHT_BASE, 0) >> 8;
 }
 
 int getItemLightIndex(int itemId) {

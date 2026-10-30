@@ -246,8 +246,9 @@ def class_mask(e: np.ndarray, norm: float) -> dict | None:
             "scale": round(scale, 4), "grid": " ".join("".join(f"{v:x}" for v in row) for row in levels)}
 
 
-def light_mask(assets: Assets, block_spec: str, decor: bool) -> dict | None:
-    """光源ブロック 1 つの 3 種類の面 (上・下・側面) の光り方。元は最も大きい要素 (ランタンは本体)"""
+def light_mask(assets: Assets, block_spec: str, decor: bool, facing: bool = False) -> dict | None:
+    """光源ブロック 1 つの 3 種類の面 (上・下・側面) の光り方。元は最も大きい要素 (ランタンは本体)
+    facing (向きのある光源。block_spec は facing=north) は前面 (モデルの北) だけが光る。残りの面は光源が見えないので光らせない"""
     name, *states = block_spec.split(":")
     state = assets.json(f"assets/minecraft/blockstates/{name}.json")
     ref = state_model(state, dict(s.split("=", 1) for s in states)) if state else None
@@ -260,6 +261,14 @@ def light_mask(assets: Assets, block_spec: str, decor: bool) -> dict | None:
     el = max(elements, key=lambda x: np.prod([t - f for f, t in zip(x["from"], x["to"])]))
     edge = DECOR_EMISSION_EDGE if decor else EMISSION_EDGE
     faces = {f: e for f in ("up", "down", "north", "south", "east", "west") if (e := face_emission(assets, model, el, f, edge)) is not None}
+    if facing:
+        front = faces.get("north")
+        if front is None or emission_rect(front) is None:
+            return None
+        # 正規化 N は前面の光る範囲の中の平均 (前面の光る部分が面全体を光らせる時と同じ明るさになる)
+        r = emission_rect(front)
+        mask = class_mask(front, front[r[1]:r[3], r[0]:r[2]].mean())
+        return {"block": block_spec, "up": None, "down": None, "side": None, "front": mask} if mask else None
     # 正規化 N: 6 面それぞれの光る範囲の中の発光の平均の最大。明るい面の光る部分が今と同じ明るさになる
     inner = []
     for e in faces.values():
@@ -287,7 +296,7 @@ def write_light_masks(assets: Assets, jar_name: str) -> None:
         spec = light.mask_block()
         if not spec:
             continue
-        mask = light_mask(assets, spec, light.is_decor())
+        mask = light_mask(assets, spec, light.is_decor(), light.facing)
         if mask is None:
             raise SystemExit(f"光源 {light.index} ({light.title}): {spec} の面の光り方を測れない")
         lines.append(f'  "{light.index}": ' + json.dumps({"light": light.title, **mask}, ensure_ascii=False))

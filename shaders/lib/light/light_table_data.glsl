@@ -28,7 +28,7 @@ LightDef lightDefStatic(int i) {
         // 明るさ 1.0 では近くの炎の灯りを打ち消して室内がオリーブ色に濁ったので控えめに
         case LIGHT_SEA_LANTERN:      return makeLight(vec3(0.85, 0.95, 1.0), 0.75, 15.0, 0.5, LT_CENTER, 0.0, LT_OCC);
         case LIGHT_SHROOMLIGHT:      return makeLight(vec3(1.0, 0.70, 0.45), 1.0, 15.0, 0.5, LT_CENTER, 0.0, LT_OCC);
-        case LIGHT_JACK_O_LANTERN:   return makeLight(fire, 1.0, 15.0, 0.4, LT_CENTER, 0.3, LT_OCC);
+        case LIGHT_JACK_O_LANTERN:   return makeLight(fire, 1.0, 15.0, 0.4, LT_CENTER, 0.3, LT_OCC | LIGHT_FLAG_FACING);
         case LIGHT_LAVA:             return makeLight(LAVA_SRGB, 1.2, 15.0, 0.5, vec3(0.5, 0.45, 0.5), 0.2, LIGHT_FLAG_FLUID);
         case LIGHT_FIRE:             return makeLight(mix(fire, FIRE_WARM_SRGB, 0.3), 1.1, 15.0, 0.4, vec3(0.5, 0.4, 0.5), 0.8, 0u);
         case LIGHT_SOUL_FIRE:        return makeLight(SOUL_SRGB, 0.9, 10.0, 0.4, vec3(0.5, 0.4, 0.5), 0.6, 0u);
@@ -50,7 +50,7 @@ LightDef lightDefStatic(int i) {
         case LIGHT_CANDLE:           return makeLight(fire, 1.0, 12.0, 0.05, vec3(0.5, 0.4, 0.5), 0.5, 0u);
         case LIGHT_COPPER_BULB:      return makeLight(vec3(1.0, 0.80, 0.60), 1.0, 15.0, 0.5, LT_CENTER, 0.0, LT_OCC);
         case LIGHT_REDSTONE_ORE:     return makeLight(vec3(1.0, 0.20, 0.10), 0.6, 9.0, 0.5, LT_CENTER, 0.0, LT_OCC);
-        case LIGHT_FURNACE:          return makeLight(fire, 0.9, 13.0, 0.3, vec3(0.5, 0.3, 0.5), 0.5, LT_OCC);
+        case LIGHT_FURNACE:          return makeLight(fire, 0.9, 13.0, 0.3, vec3(0.5, 0.3, 0.5), 0.5, LT_OCC | LIGHT_FLAG_FACING);
         case LIGHT_BREWING_STAND:    return makeLight(vec3(1.0, 0.85, 0.50), 0.6, 1.0, 0.1, vec3(0.5, 0.2, 0.5), 0.0, 0u);
         case LIGHT_ENCHANTING_TABLE: return makeLight(vec3(0.70, 0.60, 1.0), 0.6, 7.0, 0.3, vec3(0.5, 0.75, 0.5), 0.0, 0u);
         case LIGHT_END_PORTAL_FRAME: return makeLight(vec3(0.50, 0.90, 0.75), 0.5, 1.0, 0.2, vec3(0.5, 0.9, 0.5), 0.0, 0u);

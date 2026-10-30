@@ -32,6 +32,9 @@ COLOR_BAND_FIRST = 2000       # 色の付いた固体の ID 帯 (ボクセルに
 COLOR_BAND_LAST = 4095
 STAIRS_FIRST = 320            # 階段の ID 帯 320-335 (向き x 上下 x 外角の 16 通り)
 STAIRS_LAST = 335
+LIGHT_FACING_STRIDE = 256     # 向きのある光源ブロックの ID = 1000 + 256 x 向き (1 東 2 南 3 西) + 光源インデックス。北は向きなしと同じ ID
+LIGHT_FACING_LAST = LIGHT_ID_BASE + 3 * LIGHT_FACING_STRIDE + LIGHT_BLOCK_LAST
+FACINGS = ["north", "east", "south", "west"]  # 時計回り (上から見て)。ID の向きの番号と同じ順
 
 
 def with_state(blocks: list[str], state: str) -> list[str]:
@@ -60,6 +63,7 @@ class Light:
     label: str = ""                  # 表の case の式 (既定は定数名)
     count: int = 1                   # 2 以上は index から count 個を同じ式で処理する (i を使える)
     mask: str = ""                   # 面の光り方を測るブロックと状態 ("redstone_lamp:lit=true")。空なら LT_OCC の光源だけ blocks[0]
+    facing: bool = False             # 前面だけが光る向きのあるブロック (かまど・ジャック・オ・ランタン)。向きごとに ID を分ける。mask は facing=north を指定する
 
     def mask_block(self) -> str:
         if self.mask:
@@ -109,7 +113,7 @@ LIGHTS: list[Light] = [
     Light(10, "LIGHT_SHROOMLIGHT", "shroomlight", "vec3(1.0, 0.70, 0.45), 1.0, 15.0, 0.5, LT_CENTER, 0.0, LT_OCC",
           blocks=_lit("shroomlight"), items=_lit("shroomlight")),
     Light(11, "LIGHT_JACK_O_LANTERN", "jack o'lantern", "fire, 1.0, 15.0, 0.4, LT_CENTER, 0.3, LT_OCC",
-          blocks=_lit("jack_o_lantern"), items=_lit("jack_o_lantern")),
+          blocks=_lit("jack_o_lantern"), items=_lit("jack_o_lantern"), mask="jack_o_lantern:facing=north", facing=True),
     Light(12, "LIGHT_LAVA", "lava", "LAVA_SRGB, 1.2, 15.0, 0.5, vec3(0.5, 0.45, 0.5), 0.2, LIGHT_FLAG_FLUID",
           blocks=_lit("lava", "lava_cauldron")),
     Light(13, "LIGHT_FIRE", "fire", f"{_FIRE_MILD}, 1.1, 15.0, 0.4, {_LOW}, 0.8, 0u", blocks=_lit("fire")),
@@ -158,7 +162,8 @@ LIGHTS: list[Light] = [
     Light(48, "LIGHT_REDSTONE_ORE", "lit redstone ore", "vec3(1.0, 0.20, 0.10), 0.6, 9.0, 0.5, LT_CENTER, 0.0, LT_OCC",
           blocks=_lit("redstone_ore:lit=true", "deepslate_redstone_ore:lit=true")),
     Light(49, "LIGHT_FURNACE", "lit furnaces", "fire, 0.9, 13.0, 0.3, vec3(0.5, 0.3, 0.5), 0.5, LT_OCC",
-          blocks=_lit("furnace:lit=true", "smoker:lit=true", "blast_furnace:lit=true")),
+          blocks=_lit("furnace:lit=true", "smoker:lit=true", "blast_furnace:lit=true"),
+          mask="furnace:lit=true:facing=north", facing=True),
     Light(50, "LIGHT_BREWING_STAND", "brewing stand", "vec3(1.0, 0.85, 0.50), 0.6, 1.0, 0.1, vec3(0.5, 0.2, 0.5), 0.0, 0u",
           blocks=_lit("brewing_stand")),
     Light(51, "LIGHT_ENCHANTING_TABLE", "enchanting table", "vec3(0.70, 0.60, 1.0), 0.6, 7.0, 0.3, vec3(0.5, 0.75, 0.5), 0.0, 0u",
@@ -293,7 +298,9 @@ BLOCK_CONSTS: list[tuple] = [
     ("const", 40, "BLOCK_STAIRS_FIRST", STAIRS_FIRST, "320-335 = 階段 (向き x 上下 x 外角の 16 通り。形は lib/light/light_table.glsl)", True),
     ("const", 40, "BLOCK_STAIRS_LAST", STAIRS_LAST, "", True),
     ("raw", ""),
-    ("const", 40, "BLOCK_LIGHT_BASE", LIGHT_ID_BASE, "1001-1255 が光源", False),
+    ("const", 40, "BLOCK_LIGHT_BASE", LIGHT_ID_BASE, "1001-1255 が光源 (光源インデックス = id - 1000)", False),
+    ("const", 40, "BLOCK_LIGHT_FACING_STRIDE", LIGHT_FACING_STRIDE, "向きのある光源は 1000 + 256 x 向き (1 東 2 南 3 西) + 光源インデックス", False),
+    ("const", 40, "BLOCK_LIGHT_LAST", LIGHT_FACING_LAST, "光源の ID の上限 (向きのある光源の西)", False),
     ("raw", ""),
     ("const", 40, "BLOCK_COLOR_FIRST", COLOR_BAND_FIRST, "2000 以降は色の付いた固体 (マテリアル・遮蔽は BLOCK_SOLID と同じ)", False),
 ]
