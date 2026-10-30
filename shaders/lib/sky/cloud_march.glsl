@@ -86,7 +86,7 @@ CloudAccum cloudMarchLow(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, 
 
 #ifdef CLOUD_VANILLA_SHAPE
 /*
- * バニラの形の雲 (厚み 4 ブロックの平らな板)。weight: 板の濃さの倍率 (雨雲へ移る間は薄める)
+ * バニラの形の雲 (厚み 4 ブロックの平らな板)。weight: 板の濃さの倍率 (雨雲へ移る間は薄め、雨の日は雨の濃さの倍率で濃くする)
  * サンプルは区間の入口に寄せた 2 乗の分布 (近くは細かく、遠くは粗く)。区間が短い視線 (板を斜めに抜ける) は歩数を減らす
  */
 CloudAccum cloudMarchVanilla(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, vec2 dither, float weight) {
@@ -342,8 +342,8 @@ vec4 renderClouds(vec3 dir, float maxDist, vec2 dither) {
     vec2 segLow = cloudLayerSegment(y0, dir.y, CLOUD_BASE, ctx.lowTopWorld);
     segLow.y = min(segLow.y, farLimit);
 #ifdef CLOUD_VANILLA_SHAPE
-    // 晴天の低層はバニラの形の雲が担うので積雲のマーチは回さない。降り始めのうちに雨雲へ移る
-    float rainLook = cloudVanillaRainLook(ctx.rain);
+    // 低層はバニラの形の雲が担うので積雲のマーチは回さない。雷雨 (と CLOUD_RAIN_RESHAPE が 0 でない雨) は降り始めのうちに雨雲へ移る
+    float rainLook = cloudVanillaRainLook(ctx.reshape);
     if (rainLook <= 0.0) segLow = vec2(1.0, 0.0);
     vec2 segVanilla = vanillaCloudSegment(y0, dir.y, min(maxDist, VANILLA_CLOUD_FAR));
 #endif
@@ -401,7 +401,7 @@ vec4 renderClouds(vec3 dir, float maxDist, vec2 dither) {
         }
 #ifdef CLOUD_VANILLA_SHAPE
         else if (idx == 4) {
-            cloudComposite(ctx, scattering, transmittance, cloudMarchVanilla(ctx, l, dir, segVanilla, dither, 1.0 - rainLook),
+            cloudComposite(ctx, scattering, transmittance, cloudMarchVanilla(ctx, l, dir, segVanilla, dither, (1.0 - rainLook) * cloudRainDensityScale(ctx)),
                            dir, skyColor, VANILLA_CLOUD_FAR * CLOUD_KH);
         }
 #endif
@@ -415,6 +415,14 @@ vec4 renderClouds(vec3 dir, float maxDist, vec2 dither) {
             cloudComposite(ctx, scattering, transmittance, cloudMarchHigh(ctx, l, dir, segHigh, dither.x), dir, skyColor, CLOUD_HIGH_MAX_DISTANCE);
         }
 #endif
+    }
+    // 雨の空: 雲の向こうの空は、雲の上の見えない雨雲の層の下面 (一様な灰色) にする。雲の形と量は変えず、隙間から晴れの青空や
+    // 太陽が見えないようにするだけ。地形のある画素の手前の雲には掛けない。雷雨は雲の側で覆うので掛けない
+    if (maxDist > 1e8) {
+        float veil = saturate(ctx.rainLight) * (1.0 - cloudRainReshape());
+        vec3 veilRadiance = (l.skyRadiance + l.lightIrradiance * (CLOUD_RAIN_VEIL_SUN * max(l.lightDir.y, 0.0) * RCP_PI)) * CLOUD_RAIN_VEIL_GAIN;
+        scattering += transmittance * veil * veilRadiance;
+        transmittance *= 1.0 - veil;
     }
     return vec4(scattering, transmittance);
 }
@@ -443,7 +451,7 @@ float cloudShadowTransmittance(CloudContext ctx, vec2 relWorld, vec3 lightDirWor
     float transmittance = max(exp(-od), 0.25 * exp(-od * 0.25));
     transmittance *= cloudUpperTransmittance(ctx, rel, CLOUD_R_BASE, lightDir);
 #ifdef CLOUD_VANILLA_SHAPE
-    transmittance *= vanillaCloudShadowTransmittance(relWorld, lightDirWorld, 1.0 - cloudVanillaRainLook(ctx.rain));
+    transmittance *= vanillaCloudShadowTransmittance(relWorld, lightDirWorld, (1.0 - cloudVanillaRainLook(ctx.reshape)) * cloudRainDensityScale(ctx));
 #endif
     return transmittance;
 }

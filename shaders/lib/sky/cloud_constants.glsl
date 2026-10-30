@@ -135,6 +135,12 @@ const float CLOUD_LIGHTNING_FLASH = 0.06; // 雷の閃光で雲に足す上向�
 // 雨雲の層を拡散で抜けてくる光源の光 (等方位相 x 拡散透過) の重み。オクターブの下限 CLOUD_MS_DIFFUSION は
 // 吸収込みで厚い層をほぼ真っ暗にするので、足さないと曇天の夜は空が地面より暗い黒い面になる
 const float CLOUD_OVERCAST_DIFFUSE = 1.0;
+// 雨の日の雲 (形と量はスタイルのまま) は、雲の上の見えない雨雲の層の下にあるとして光を絞る。
+// 雲に当たる直達光の減衰 (地面の直達光の減衰より強め。雲は層のすぐ下にある) と、
+// 雲の向こうの空 (雲の隙間) を層の下面の灰色に置き換える明るさ: 空の光 + 層を拡散で抜けた光源の光 (CLOUD_RAIN_VEIL_SUN 倍)
+const float CLOUD_RAIN_SUN_DIMMING = 0.7;
+const float CLOUD_RAIN_VEIL_SUN = 0.5;
+const float CLOUD_RAIN_VEIL_GAIN = 0.7;
 // 雲の空中遠近: 雲までの大気 (atmosphere.glsl の指数大気) の透過率と、その方向の空の内散乱の取り分で空へ溶かす。
 // 固定の消散係数で青く霞ませると、夕方も地平線の雲が青白いまま空から浮く (iterationT の GetSkyRadianceToPoint 相当)
 // 実大気のままだと地表近くのもや (境界層のエアロゾル) が無いぶん遠い雲が残りすぎるので、Mie を濃くする

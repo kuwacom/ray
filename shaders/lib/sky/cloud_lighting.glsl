@@ -29,7 +29,7 @@ struct CloudLighting {
     float cosTheta;        // 視線と光源の角度
     float overcastDiffuse; // 雨雲の拡散透過の重み
     float lobeShade;       // こぶの陰の強さ (雨雲では弱める)
-    // スタイルの光の値 (cloud_styles.glsl の CS_*)。雨雲は Ray の値へ戻す
+    // スタイルの光の値 (cloud_styles.glsl の CS_*)。雨でも保つ
     float msGain;
     float silverBoost;
     float powder;
@@ -46,6 +46,8 @@ CloudLighting cloudLightingSetup(vec3 viewDir, float rain) {
     // 厚い雨雲の中の光は何度も散乱して太陽の色味が抜け、上から入る青空の光も混ざるのでわずかに寒色の灰になる
     // (太陽色のままだと雨雲が茶色く見える)
     l.lightIrradiance = mix(l.lightIrradiance, luminance(l.lightIrradiance) * CLOUD_OVERCAST_TINT, 0.7 * rain);
+    // 雲が雨雲へ変わる空 (雷雨) は雲の濃さで暗くなるので、直達光は絞らない
+    l.lightIrradiance *= 1.0 - CLOUD_RAIN_SUN_DIMMING * rain * (1.0 - cloudRainReshape());
     vec3 skyUp = frameData.skyParams[2].rgb; // 彩度を落とす前の真上の空の照度 (prepare.csh)
     // 雷は雲の中を一瞬照らす。夜の露出のまま空一面が白飛びしないよう、月夜の地面の数倍の明るさに留める
     // (4.0 では月光の数百倍になり、雲の覆う空が真っ白で降雪が黒い点に見える)
@@ -58,13 +60,12 @@ CloudLighting cloudLightingSetup(vec3 viewDir, float rain) {
     l.overcastDiffuse = CLOUD_OVERCAST_DIFFUSE * rain;
     // 厚い雨雲の中の光は拡散しきっていて、こぶ単位の陰は見えない (雷雨の雲には陰を付けない)
     l.lobeShade = CLOUD_LOBE_SHADE * (1.0 - rain);
-    float style = 1.0 - rain;
-    l.lightIrradiance *= mix(1.0, CS_SUN, style);
-    l.msGain = CLOUD_MS_GAIN * mix(1.0, CS_MS, style);
-    l.silverBoost = CLOUD_SILVER_BOOST * mix(1.0, CS_SILVER, style);
-    l.powder = min(CLOUD_POWDER_STRENGTH * mix(1.0, CS_POWDER, style), 1.0);
-    l.ambient = CLOUD_AMBIENT * mix(1.0, CS_AMBIENT, style);
-    float baseShade = CLOUD_BASE_SHADE * mix(1.0, CS_BASE_SHADE, style);
+    l.lightIrradiance *= CS_SUN;
+    l.msGain = CLOUD_MS_GAIN * CS_MS;
+    l.silverBoost = CLOUD_SILVER_BOOST * CS_SILVER;
+    l.powder = min(CLOUD_POWDER_STRENGTH * CS_POWDER, 1.0);
+    l.ambient = CLOUD_AMBIENT * CS_AMBIENT;
+    float baseShade = CLOUD_BASE_SHADE * CS_BASE_SHADE;
     l.bottomLight = max(1.0 - 0.8 * baseShade, 0.0);
     l.bottomSun = max(1.0 - 0.25 * baseShade, 0.0);
     return l;
@@ -147,9 +148,8 @@ float cloudLowSkyOD(CloudContext ctx, CloudColumn col, vec2 rel, float altitude)
         t += stepLength;
         stepLength *= 3.0;
     }
-    // 視線の密度で読んでいるので、スタイルの濃さ CS_DENSITY は光源方向と同じ割合に直す (晴天だけ)
-    float styleScale = max(CS_DENSITY / CLOUD_STYLE_LIGHT_SIGMA_RATIO, 1.0) / CS_DENSITY;
-    styleScale = mix(styleScale, 1.0, smoothstep(CLOUD_HAZE_RAIN.x, CLOUD_HAZE_RAIN.y, ctx.rain));
+    // 視線の密度で読んでいるので、スタイルの濃さ CS_DENSITY は光源方向と同じ割合に直す
+    float styleScale = cloudStyleDensity(ctx, true) / cloudStyleDensity(ctx, false);
     return od * (CLOUD_LOW_SHADE_SIGMA * CLOUD_SKY_OD_SCALE * styleScale);
 }
 

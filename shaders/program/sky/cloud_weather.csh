@@ -127,7 +127,7 @@ vec4 cloudWeatherTexel(vec2 world, CloudClimate c) {
 
     vec2 pLow = (world - cloudWindLow()) / regionSize;
     float region = weatherFbm(pLow, 4, 101u);
-    float lowCover = c.lowCover + (region - 0.5) * variation * (1.0 - 0.6 * c.rain);
+    float lowCover = c.lowCover + (region - 0.5) * variation * (1.0 - 0.6 * c.reshape);
     float lowType = c.lowType + (weatherFbm(pLow * 1.6 + vec2(31.7, -12.3), 3, 211u) - 0.5) * 0.4;
     // 嵐のセルの外は雄大雲まで (0.75 以上は積乱雲。対流の強い晴れの日に頭上へ積乱雲と雨脚が立った)
     lowType = min(lowType, STORM_FREE_TYPE_MAX);
@@ -152,7 +152,7 @@ vec4 cloudWeatherTexel(vec2 world, CloudClimate c) {
 #endif
 
     vec2 pMid = (world - cloudWindMid()) / (regionSize * MID_REGION_SCALE);
-    float midCover = c.midCover + (weatherFbm(pMid, 4, 401u) - 0.5) * MID_VARIATION_SCALE * variation * (1.0 - 0.5 * c.rain);
+    float midCover = c.midCover + (weatherFbm(pMid, 4, 401u) - 0.5) * MID_VARIATION_SCALE * variation * (1.0 - 0.5 * c.reshape);
 
     // 上層は形を別の水平の縮尺で読むので、天気図の座標をその縮尺に直して被覆を作る (風と群れが形とずれない)
     vec2 pHigh = (world * (CLOUD_KH_HIGH / CLOUD_KH) - cloudWindHigh()) / (regionSize * HIGH_REGION_SCALE);

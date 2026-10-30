@@ -43,8 +43,8 @@ const float VANILLA_CLOUD_POWDER = 0.4;
 const float VANILLA_CLOUD_AMBIENT = 1.1;
 const float VANILLA_CLOUD_SKY_SATURATION = 0.5; // 空の光の彩度の残し方 (陰が真っ青に沈まないように)
 
-// 雨が降り始めてから雨雲へ移り終わるまでの割合 (0 = 晴天のバニラの形, 1 = 雨雲)
-float cloudVanillaRainLook(float rain) { return smoothstep(0.0, CLOUD_HAZE_RAIN.x, rain); }
+// 雲が雨雲へ変わり始めてから移り終わるまでの割合 (0 = バニラの形の板, 1 = 雨雲)。reshape: CloudContext.reshape
+float cloudVanillaRainLook(float reshape) { return smoothstep(0.0, CLOUD_HAZE_RAIN.x, reshape); }
 
 // 格子の座標 (ブロック) でのカメラの位置。テクスチャの一周で先に畳むので、遠い座標でも精度が落ちない
 vec2 vanillaCloudOrigin() {
@@ -91,7 +91,8 @@ float vanillaCloudDensity(vec2 q, float y) {
     return vanillaCloudDensity(q, y, 0.0, slabHeight);
 }
 
-// 光源方向の光学的深さ: 板の上面まで (最長 VANILLA_CLOUD_LIGHT_REACH ブロック) を等分して積む。\r\n// 歩の位置を揺らすと陰がまだらの粒になるので、決まった位置で読む
+// 光源方向の光学的深さ: 板の上面まで (最長 VANILLA_CLOUD_LIGHT_REACH ブロック) を等分して積む。
+// 歩の位置を揺らすと陰がまだらの粒になるので、決まった位置で読む
 float vanillaCloudLightOD(vec2 q, float y, vec3 lightDir) {
     vec3 d = normalize(vec3(lightDir.x, max(lightDir.y, VANILLA_CLOUD_MIN_LIGHT_Y), lightDir.z));
     float top = vanillaCloudBottom() + VANILLA_CLOUD_THICKNESS;
@@ -113,7 +114,7 @@ float vanillaCloudSkyOD(vec2 q, float y) {
 
 /*
  * 雲影マップの点 relWorld (CLOUD_BASE の面の、カメラ基準のワールド xz) から光源方向に板を抜けるまでの透過率
- * weight: 板の濃さの倍率 (雨雲へ移る間は薄める)
+ * weight: 板の濃さの倍率 (雨雲へ移る間は薄め、雨の日は雨の濃さの倍率で濃くする)
  */
 float vanillaCloudShadowTransmittance(vec2 relWorld, vec3 lightDir, float weight) {
     float ly = max(lightDir.y, CLOUD_SHADOW_MIN_LIGHT_Y);

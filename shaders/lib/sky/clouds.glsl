@@ -192,7 +192,12 @@ float cloudRefStretch(vec3 dir, float y) {
 // 雲影マップ (prepare2): 雲の下面の高さの水平面に貼った 512^2、カメラ周辺 CLOUD_SHADOW_EXTENT 四方 (ワールド)
 // 参照空間で 6 km 四方。縮めたテンプレートでも影の届く範囲 (描画距離) を覆うよう下限を設ける
 const float CLOUD_SHADOW_EXTENT = clamp(6144.0 / CLOUD_KH, 1024.0, 6144.0);
-const float CLOUD_SHADOW_RAIN_OUTSIDE = 0.95; // 雨の日の雲影マップの外の影の濃さ (一面の雨雲)
+const float CLOUD_SHADOW_RAIN_OUTSIDE = 0.95; // 雨雲へ変わる空の、雲影マップの外の影の濃さ (一面の雨雲)
+// 雨が雲の量と雲種を雨雲 (全天の乱層雲と高層雲のベール) へ変える割合。0 で雨でも選んだスタイルの雲の形と量のまま
+// (雨らしさは雲の光の曇天化・濃さ・空・直達光・霧で出す)。雷雨は積乱雲の塔を保つので、この値によらず変える
+const float CLOUD_RAIN_RESHAPE = 0.0;
+const float CLOUD_RAIN_DECK_SHADOW = 0.75; // 雲の量を保つ雨で、雲影マップの全域に掛ける太陽の遮り (見えない雨雲の層の分)
+float cloudRainReshape() { return max(CLOUD_RAIN_RESHAPE, thunderStrength); }
 const float CLOUD_SHADOW_RES = 512.0;
 // 光源が低いと投影が伸びて精度が落ちるので、この高さ (sin) 以下では雲影を弱める
 const float CLOUD_SHADOW_MIN_LIGHT_Y = 0.04;
@@ -358,10 +363,12 @@ float getCloudShadow(vec3 playerPos) {
     vec2 edge = saturate((0.5 - abs(uv - 0.5)) * 10.0);
     float worldY = playerPos.y + cameraPosition.y;
     float below = 1.0 - smoothstep(CLOUD_BASE, CLOUD_BASE + 0.5 * CLOUD_DEPTH, worldY);
-    // マップの外は天気からの平均の透過率にする。雨の日に 1 (日なた) へ戻すと、遠くの霧の光の筋がマップの四角い範囲の外だけ
-    // 明るくなり、雷雨の空に直線の縁の白い面が出た
-    float outside = 1.0 - CLOUD_SHADOW_RAIN_OUTSIDE * max(rainStrength, rainWetness);
-    float transmittance = mix(outside, texture(cloudShadowSampler, uv).r, edge.x * edge.y);
+    // マップの外は天気からの平均の透過率にする。雲が全天の雨雲へ変わる空で 1 (日なた) へ戻すと、遠くの霧の光の筋が
+    // マップの四角い範囲の外だけ明るくなり、雷雨の空に直線の縁の白い面が出た (雲の量を保つ雨は晴れと同じ 1)
+    float outside = 1.0 - CLOUD_SHADOW_RAIN_OUTSIDE * max(rainStrength, rainWetness) * cloudRainReshape();
+    // 雲の量を保つ雨は、雲の上の見えない雨雲の層が雲の隙間でも太陽を遮る
+    float deck = 1.0 - CLOUD_RAIN_DECK_SHADOW * max(rainStrength, rainWetness) * (1.0 - cloudRainReshape());
+    float transmittance = mix(outside, texture(cloudShadowSampler, uv).r, edge.x * edge.y) * deck;
     return mix(1.0, transmittance, strength * below);
 #else
     return 1.0;

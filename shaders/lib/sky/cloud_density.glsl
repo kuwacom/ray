@@ -115,6 +115,17 @@ float cloud2dShoulder(float h) {
 #endif
 
 /*
+ * 低層の濃さの倍率 (視線 / 光源方向)。スタイルの濃さ CS_DENSITY は雨でも保ち、雨の濃さの倍率 (densityScale) が上回る分だけ濃くする
+ * (濃いスタイルに雨の倍率を重ねて真っ黒にしない)。
+ * 光源方向は芯の実測の消散係数で陰を見積もっているので (CLOUD_LIGHT_OD_SCALE)、視線の濃さがそれを超えた分だけ濃くする
+ */
+float cloudStyleDensity(CloudContext ctx, bool lightPath) {
+    float rainScale = cloudRainDensityScale(ctx);
+    float style = lightPath ? max(CS_DENSITY / CLOUD_STYLE_LIGHT_SIGMA_RATIO, 1.0) : CS_DENSITY;
+    return style * max(1.0, rainScale / max(style, 1.0));
+}
+
+/*
  * 低層の密度 [0,1] (消散係数 = CLOUD_LOW_SIGMA x 密度)
  * rel: カメラ基準の水平位置 (参照 m), altitude: 参照高度 (m)
  * detail: 縁の浸食の強さ [0,1] (距離の LOD。0 で浸食を省く)
@@ -144,7 +155,7 @@ float cloudLowDensityCumulus(CloudContext ctx, CloudColumn col, vec2 rel, float 
     // 層状の雲の底は乱流で波打ち、下から見ると濃淡のまだらになる
     // 凝結高度の差はセルのなめらかな fbm (雲の背丈のばらつきと同じ) で、隣り合う雲どうしで少しずつ変える (追加のフェッチ無し)
     float lift = cells.g * (CLOUD_BASE_VARIATION / CLOUD_R_DEPTH);
-    lift += wStrat * (1.0 - cells.g) * (CLOUD_STRATUS_UNDULATION * (1.0 + 2.0 * ctx.rain) / CLOUD_R_DEPTH);
+    lift += wStrat * (1.0 - cells.g) * (CLOUD_STRATUS_UNDULATION * (1.0 + 2.0 * ctx.reshape) / CLOUD_R_DEPTH);
     float hb = h - lift;
     if (hb <= 0.0) return 0.0;
 
@@ -226,7 +237,7 @@ float cloudLowDensityCumulus(CloudContext ctx, CloudColumn col, vec2 rel, float 
             float v = mix(cells.r, roll * 0.7 + cells.g * 0.3, wStrat);
             float footprint = linearStep(1.0 - col.cover, 1.0 - col.cover + CLOUD_COVER_SOFTNESS, v);
             // 頂は縁ほど低い (足跡のまま一定の高さだと、上から見て垂直な壁の箱が並んだ)。小さなセルで頂を波打たせる
-            stratusX = hb / (mix(CLOUD_SC_TOP.x, CLOUD_SC_TOP.y, ctx.rain) * (0.35 + 0.65 * footprint) * (0.75 + 0.5 * cells.a));
+            stratusX = hb / (mix(CLOUD_SC_TOP.x, CLOUD_SC_TOP.y, ctx.reshape) * (0.35 + 0.65 * footprint) * (0.75 + 0.5 * cells.a));
             stratus = footprint * (1.0 - smoothstep(0.5, 1.0, stratusX));
         }
         // 外殻のもやは積雲だけ (層積雲は足跡の外を -CLOUD_HAZE_REACH 扱いにして、正側だけ積雲と混ぜる)
@@ -346,10 +357,7 @@ float cloudLowDensityCumulus(CloudContext ctx, CloudColumn col, vec2 rel, float 
     // (一様に厚いと、風下の空一面が暗い灰色の天井になった)
     water *= mix(1.0, mix(CLOUD_CB_WATER, 0.08 + 0.7 * stormCore, ice), wCb);
 #endif
-    // 雨天の濃さの倍率も見た目と同じ範囲で移す (雨上がりの rainWetness が残る間に、層積雲の切れ端まで濃い白い欠片にならないように)
-    float density = d * water * rainMottle * mix(1.0, ctx.densityScale, smoothstep(CLOUD_RAIN_DENSITY.x, CLOUD_RAIN_DENSITY.y, ctx.rain));
-    // 光源方向は芯の実測の消散係数で陰を見積もっているので (CLOUD_LIGHT_OD_SCALE)、視線の濃さがそれを超えた分だけ濃くする
-    density *= mix(lightPath ? max(CS_DENSITY / CLOUD_STYLE_LIGHT_SIGMA_RATIO, 1.0) : CS_DENSITY, 1.0, rainLook);
+    float density = d * water * rainMottle * cloudStyleDensity(ctx, lightPath);
     if (fractus > density) { cloudHeight = fractusHeight; return fractus; }
     return density;
 #else
@@ -365,9 +373,9 @@ float cloudLowDensityCumulus(CloudContext ctx, CloudColumn col, vec2 rel, float 
 
 float cloudLowDensity(CloudContext ctx, CloudColumn col, vec2 rel, float altitude, float detail, bool lightPath, out float cloudHeight) {
 #ifdef CLOUD_VANILLA_SHAPE
-    // 晴天の低層はバニラの形の雲 (cloud_vanilla.glsl) が担う。降り始めのうちに積雲の形 (乱層雲・積乱雲) へ移す
-    // (バニラの形の雲と雨雲が重なる間が長いと、バニラの形の明るい筋が雨雲に残る)
-    float rainLook = cloudVanillaRainLook(ctx.rain);
+    // 低層はバニラの形の雲 (cloud_vanilla.glsl) が担い、積雲の形は描かない。雷雨 (と CLOUD_RAIN_RESHAPE が 0 でない雨) は
+    // 降り始めのうちに積雲の形 (乱層雲・積乱雲) へ移す (バニラの形の雲と雨雲が重なる間が長いと、バニラの形の明るい筋が雨雲に残る)
+    float rainLook = cloudVanillaRainLook(ctx.reshape);
     if (rainLook <= 0.0) { cloudHeight = 0.5; return 0.0; }
     return cloudLowDensityCumulus(ctx, col, rel, altitude, detail, lightPath, cloudHeight) * rainLook;
 #else
@@ -397,7 +405,7 @@ float cloudMidDensity(CloudContext ctx, float cover, vec2 rel, float altitude, b
     vec2 q = rel + ctx.midOrigin;
     // 雨の前後に増える中層は一様な高層雲として広げる (雨上がりの rainWetness が残る間に高積雲の粒のまま増やすと、
     // 低層の雲の周りに縁のくっきりした白い欠片が散らばって見えた)
-    float stratus = max(smoothstep(0.6, 1.0, cover), linearStep(CLOUD_MID_RAIN_VEIL.x, CLOUD_MID_RAIN_VEIL.y, ctx.rainLight));
+    float stratus = max(smoothstep(0.6, 1.0, cover), linearStep(CLOUD_MID_RAIN_VEIL.x, CLOUD_MID_RAIN_VEIL.y, ctx.reshapeLight));
     vec4 n = texture(cloudNoiseTex, q / CLOUD_MID_PERIOD);
     float patches = linearStep(1.0 - cover, 1.0 - cover + CLOUD_MID_PATCH_SOFTNESS, n.g);
     // 高積雲: 細かいセルの一つ一つを、中心ほど背の高い小さなドームにする (うろこ状の小塊。壁のような縁を作らない)
@@ -441,7 +449,7 @@ float cloudMidDensity(CloudContext ctx, float cover, vec2 rel, float altitude, b
 // 中層が空に占める割合 (粒を均した粗い被覆)。下の層に落とす影に使う
 float cloudMidCoverage(CloudContext ctx, float cover, vec2 rel) {
     float g = texture(cloudNoiseTex, (rel + ctx.midOrigin) / CLOUD_MID_PERIOD).g;
-    float stratus = max(smoothstep(0.6, 1.0, cover), linearStep(CLOUD_MID_RAIN_VEIL.x, CLOUD_MID_RAIN_VEIL.y, ctx.rainLight));
+    float stratus = max(smoothstep(0.6, 1.0, cover), linearStep(CLOUD_MID_RAIN_VEIL.x, CLOUD_MID_RAIN_VEIL.y, ctx.reshapeLight));
     float patches = linearStep(1.0 - cover, 1.0 - cover + CLOUD_MID_PATCH_SOFTNESS, g);
     float altostratus = linearStep(0.3, 0.8, cover * (0.75 + 0.5 * g));
     // 高積雲の粒は群れの中の半分ほど、高層雲は薄いので雲 1 つ分より光を通す

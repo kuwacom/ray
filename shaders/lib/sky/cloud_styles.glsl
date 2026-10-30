@@ -2,19 +2,19 @@
  * 雲の形のプリセット: CLOUD_STYLE から低層の雲の基準値 CS_* を決める (cloud_constants.glsl の先頭で読む)
  * 既存の CLOUD_* の設定は CS_* に掛ける微調整 (ルックのプリセット look_presets.glsl と同じ考え方)。Ray の CS_* は雲量以外 1 なので、
  * Ray では各設定の値がそのまま効く
- * 雲量・濃さ・光の値は晴天の雲だけに効かせ、雨雲・雷雨は雨天度で Ray の値へ戻す (どのスタイルでも雨の空は同じ)
+ * 雨でもスタイルの形・量・濃さ・光を保ち、雨天度は雲の光 (曇天の色と拡散) と濃さの倍率だけに効かせる (CLOUD_RAIN_RESHAPE が 0 の間)。雷雨の積乱雲は雷雨の値で立つ
  * 番号: 0 = カスタム (最後の #else, CLOUD_S_*)、1 = Ray (既定)。新しいスタイルは後ろに足し、既存の番号は変えない
  *
  * 値の意味
- *   CS_LOW_COVER / CS_MID_COVER / CS_HIGH_COVER: 晴天の低層・中層・上層の雲量の倍率 (雨の日の雲量には掛けない)
+ *   CS_LOW_COVER / CS_MID_COVER / CS_HIGH_COVER: 低層・中層・上層の雲量の倍率
  *   CS_SIZE: 低層の雲ひとつの水平の大きさ, CS_HEIGHT: 積雲の背丈, CS_CONVECTION: 対流の強さ (積雲の発達と雲種)
- *   CS_TYPE_SHIFT: 晴天の雲種のずらし (負で層積雲へ), CS_SPACING: 大きな雲のまわりの晴れ間の広さ
+ *   CS_TYPE_SHIFT: 雲種のずらし (負で層積雲へ), CS_SPACING: 大きな雲のまわりの晴れ間の広さ
  *   CS_LOBES: こぶの段 (塔の塊・中間のこぶの削り), CS_EROSION: 縁の細かい浸食, CS_BASE_RAGGED: 雲底のちぎれ (小さいほど平らな底)
  *   CS_FRACTUS: 断片雲, CS_HAZE: 縁の外のもや, CS_EDGE: 縁の柔らかさ (立ち上がりの幅)
- *   CS_DENSITY: 晴天の雲全体の濃さ, CS_CORE: 芯の濃さ
+ *   CS_DENSITY: 雲全体の濃さ (雨の濃さの倍率がこれを上回る分だけ雨で濃くなる), CS_CORE: 芯の濃さ
  *   CS_LOBE_SHADE: こぶの陰の深さ (置き換え), CS_SILVER: 逆光の銀の縁, CS_POWDER: 順光の縁の暗さ,
  *   CS_SUN: 雲に当たる日光の強さ (空に対する雲の明るさ), CS_MS: 多重散乱 (日向の明るさ), CS_AMBIENT: 空の光, CS_BASE_SHADE: 雲底の暗さ
- *   CLOUD_VANILLA_SHAPE (マクロ): バニラの雲と同じ場所・格子の柔らかい体積雲 (晴天は積雲の 3D の形を作らない)。
+ *   CLOUD_VANILLA_SHAPE (マクロ): バニラの雲と同じ場所・格子の柔らかい体積雲 (雷雨以外は積雲の 3D の形を作らない)。
  *   格子・厚み・高さ・流れはバニラで決まるので、CS_* には板の寸法を持たない
  */
 #ifndef SKY_CLOUD_STYLES_GLSL
@@ -80,7 +80,7 @@ const float CS_BASE_SHADE = 1.1;
 
 #elif CLOUD_STYLE == 3
 // バニラの形: バニラの雲と同じ高さ・12 ブロックの格子・模様・流れの、厚み 4 ブロックの柔らかい体積雲。
-// 低層の形の値 (雲量・大きさ・こぶ・もや・濃さ) は雨雲へ移った後にだけ効くので、Ray の基準のまま。中層・上層の雲量だけ控えめにする
+// 低層は板だけを描くので、積雲の形の値 (雲量・大きさ・こぶ・もや・濃さ) は雷雨の積乱雲にだけ効く。Ray の基準のまま。中層・上層の雲量だけ控えめにする
 // 板の光の絞りは cloud_vanilla.glsl の VANILLA_CLOUD_* (バニラの形ならどのスタイルでも同じ)
 const float CS_LOW_COVER = 0.75;
 const float CS_MID_COVER = 0.7;
