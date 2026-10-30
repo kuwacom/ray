@@ -92,6 +92,13 @@ class JavaScope:
         return self.field(mc, mc_cls, "options"), self.cls("net.minecraft.client.Options")
 
 
+def iris_frame_count() -> int:
+    # Iris の frameCounter ユニフォームの元 (描画したフレーム数)
+    with JavaScope() as j:
+        counter = j.field(0, j.cls("net.irisshaders.iris.uniforms.SystemTimeUniforms"), "COUNTER")
+        return int(m.java_to_string(j.call(counter, j.cls("java.util.function.IntSupplier"), "getAsInt")))
+
+
 # ray_steps はジョブごとに reload されるため、元の設定値はモジュール dict 上の既存値を引き継いで保持する
 SAVED: dict = globals().get("SAVED", {})
 
@@ -410,11 +417,15 @@ def run_step(step: dict):
                 j.call(afk, inst_cls, "set", j.field(0, j.cls("net.minecraft.client.InactivityFpsLimit"), "MINIMIZED"))
             time.sleep(1.0)
         samples = []
+        frames0, wall0 = iris_frame_count(), time.time()
         for _ in range(int(step["fps"])):
             time.sleep(1.0)
             with JavaScope() as j:
                 mc_cls = j.cls("net.minecraft.client.Minecraft")
                 samples.append(int(m.java_to_string(j.call(j.call(0, mc_cls, "getInstance"), mc_cls, "getFps"))))
+        # getFps は整数で 1 秒ごとの値なので、遅い場面では Iris のフレーム数を計測区間全体で割った 1 フレームの時間 (ms) も返す
+        frames = iris_frame_count() - frames0
+        frame_ms = round((time.time() - wall0) * 1000.0 / frames, 2) if frames > 0 else None
         # 非アクティブ時の FPS 制限 (AFK で 30 に落ちる) に掛かっていないかを一緒に返す
         with JavaScope() as j:
             options, options_cls = j.options()
@@ -426,7 +437,7 @@ def run_step(step: dict):
                 j.call(inst, inst_cls, "set", j.keep(m.java_int(saved_limit)))
                 afk = j.call(options, options_cls, "inactivityFpsLimit")
                 j.call(afk, inst_cls, "set", j.field(0, j.cls("net.minecraft.client.InactivityFpsLimit"), SAVED.pop("inactivity")))
-        return {"fps": samples, **limits}
+        return {"fps": samples, "frame_ms": frame_ms, **limits}
     if "java_methods" in step:
         # 例: {"java_methods": "net.minecraft.client.Camera"} java_* API で呼ぶメソッド名を調べる用
         with JavaScope() as j:
