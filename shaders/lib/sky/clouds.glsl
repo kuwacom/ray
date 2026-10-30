@@ -203,6 +203,7 @@ const float CLOUD_SHADOW_RAIN_OUTSIDE = 0.95; // 雨雲へ変わる空の、雲�
 // (雨らしさは雲の光の曇天化・濃さ・空・直達光・霧で出す)。雷雨は積乱雲の塔を保つので、この値によらず変える
 const float CLOUD_RAIN_RESHAPE = 0.0;
 const float CLOUD_RAIN_DECK_SHADOW = 0.75; // 雲の量を保つ雨で、雲影マップの全域に掛ける太陽の遮り (見えない雨雲の層の分)
+const float CLOUD_RAIN_DISC_SHADOW = 1.0;  // 同じ雨で、太陽の円盤の鏡像 (水のきらめき) に掛ける遮り。1 で円盤が完全に隠れる
 float cloudRainReshape() { return max(CLOUD_RAIN_RESHAPE, thunderStrength); }
 const float CLOUD_SHADOW_RES = 512.0;
 // 光源が低いと投影が伸びて精度が落ちるので、この高さ (sin) 以下では雲影を弱める
@@ -407,6 +408,20 @@ float getCloudShadow(vec3 playerPos) {
     float deck = 1.0 - CLOUD_RAIN_DECK_SHADOW * max(rainStrength, rainWetness) * (1.0 - cloudRainReshape());
     float transmittance = mix(outside, texture(cloudShadowSampler, uv).r, edge.x * edge.y) * deck;
     return mix(1.0, transmittance, strength * below);
+#else
+    return 1.0;
+#endif
+}
+
+/*
+ * 太陽の円盤そのものの見え方 [0,1]。getCloudShadow の遮りは雲の層を抜けた拡散光を含めた量 (地面の明るさ) で、
+ * 円盤の鏡像 (水面のきらめき・水たまりの輝点) は円盤が見えている間だけ出る。見えない雨雲の層の下では 0 にする
+ * (拡散光の残り 1 - CLOUD_RAIN_DECK_SHADOW を鏡像に掛けると、円盤の明るさの数万倍の輝点が雨空の下に残る)
+ * 濡れ (rainWetness) には掛けない。雨が止んで晴れた空では円盤が戻るので、きらめきも戻る
+ */
+float getCloudSunDiscVisibility() {
+#if CLOUDS >= 2 && defined CLOUD_SHADOWS && defined HAS_SKY
+    return 1.0 - CLOUD_RAIN_DISC_SHADOW * rainStrength * (1.0 - cloudRainReshape());
 #else
     return 1.0;
 #endif

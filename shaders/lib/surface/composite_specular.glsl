@@ -18,6 +18,7 @@
 //@include "/lib/surface/lighting.glsl"
 //@include "/lib/surface/material.glsl"
 //@include "/lib/surface/reflection.glsl"
+//@include "/lib/sky/clouds.glsl"
 //@include "/lib/surface/surface_lights.glsl"
 
 // 全画面クアッド (program/common/fullscreen.vsh) の UV。composite1 のような全画面の fragment パスだけが include する
@@ -79,7 +80,7 @@ vec3 surfaceSunVisibility(vec3 playerPos, vec3 geoNormal, float dither, out vec3
     SurfacePoint p = surfacePoint(playerPos, geoNormal);
     p.dither = dither;
     SurfaceLights L = gatherSurfaceLights(p, SL_SUN_SHADOW_MAP, SL_BLOCK_NONE, SL_SUN_LEAF);
-    specular = L.sunVis;
+    specular = L.sunVis * getCloudSunDiscVisibility();
     return L.sunVisAll;
 }
 

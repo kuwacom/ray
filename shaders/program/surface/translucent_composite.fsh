@@ -182,7 +182,7 @@ void main() {
         vec3 sunVis = below ? vec3(0.0)
             : side ? vec3(smoothstep(0.6, 0.95, lmT.y)) * getCloudShadow(surfPlayer)
             : surfaceSunVisibility(surfPlayer, vec3(0.0, 1.0, 0.0), dither, sunSpecVis);
-        if (side) sunSpecVis = sunVis;
+        if (side) sunSpecVis = sunVis * getCloudSunDiscVisibility();
 
         // 太陽以外の光: 手持ち光源 (内散乱・泡・鏡面) とブロックライトの鏡面 (光源ごとにトレース)。水中から見た面の裏は掛けない
         // 省く項: 太陽 (上で別に取る)・GI・AO・接触影 (水面の下に不透明面の深度しか無い)

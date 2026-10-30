@@ -139,9 +139,11 @@ const float PUDDLE_GLINT_MIN_VOH = 0.05;
 /*
  * 水たまりの光 L の鏡面。傾きの分散 slopeVar で広げた滑らかなローブを (1 - share) 残し、share を輝点にする
  * (lib/common/water.glsl の waterSunGlint。composite1 の水面の sunGlint と同じ分け方)
+ * specVis: 光の円盤の見え方 (太陽は雨雲の層の下で隠れる。他の光は 1)。拡散には掛けない
  * 戻り値 rgb = 鏡面の放射輝度, a = そのうち輝点の輝度 (composite20 の TAA を通さずに足す分)
  */
-vec4 puddleSpecular(Material m, vec3 N, vec3 V, LightSample L, vec3 playerPos, vec3 geoNormal, float slopeVar, float share) {
+vec4 puddleSpecular(Material m, vec3 N, vec3 V, LightSample L, vec3 playerPos, vec3 geoNormal, float slopeVar, float share, float specVis) {
+    L.irradiance *= specVis;
     Material rough = m;
     rough.roughness = sqrt(sqr(m.roughness) + slopeVar);
     vec3 lobe = evalDirectSpecular(rough, N, V, L);
@@ -166,16 +168,16 @@ vec4 puddleSpecular(Material m, vec3 N, vec3 V, LightSample L, vec3 playerPos, v
 }
 
 // 直接光 (拡散 + 鏡面)。水たまり (share > 0) は鏡面を puddleSpecular に置き換え、輝点の輝度を glintLum に足す
-vec3 directLight(Material m, vec3 N, vec3 V, LightSample L, vec3 playerPos, vec3 geoNormal, float slopeVar, float share, inout float glintLum) {
+vec3 directLight(Material m, vec3 N, vec3 V, LightSample L, vec3 playerPos, vec3 geoNormal, float slopeVar, float share, float specVis, inout float glintLum) {
     if (share <= 0.0) return evalDirectLight(m, N, V, L);
-    vec4 s = puddleSpecular(m, N, V, L, playerPos, geoNormal, slopeVar, share);
+    vec4 s = puddleSpecular(m, N, V, L, playerPos, geoNormal, slopeVar, share, specVis);
     glintLum += s.a;
     return max(evalDirectLight(m, N, V, L) - evalDirectSpecular(m, N, V, L), 0.0) + s.rgb;
 }
 
-vec3 directSpecular(Material m, vec3 N, vec3 V, LightSample L, vec3 playerPos, vec3 geoNormal, float slopeVar, float share, inout float glintLum) {
+vec3 directSpecular(Material m, vec3 N, vec3 V, LightSample L, vec3 playerPos, vec3 geoNormal, float slopeVar, float share, float specVis, inout float glintLum) {
     if (share <= 0.0) return evalDirectSpecular(m, N, V, L);
-    vec4 s = puddleSpecular(m, N, V, L, playerPos, geoNormal, slopeVar, share);
+    vec4 s = puddleSpecular(m, N, V, L, playerPos, geoNormal, slopeVar, share, specVis);
     glintLum += s.a;
     return s.rgb;
 }
@@ -228,7 +230,7 @@ void main() {
     SurfaceLights L = gatherSurfaceLights(sp, SL_SUN_SHADOW_MAP_FALLBACK, SL_BLOCK_NONE, SL_SUN_CONTACT | SL_SUN_LEAF | SL_POM);
 
     // 太陽 / 月
-    vec3 color = directLight(m, g.normal, V, L.sun, playerPos, g.geoNormal, glintVar, glintShare, glintLum);
+    vec3 color = directLight(m, g.normal, V, L.sun, playerPos, g.geoNormal, glintVar, glintShare, getCloudSunDiscVisibility(), glintLum);
     // 葉を透過した分 (拡散だけに使う。鏡面の太陽は葉の隙間を抜けた光だけで照り返す)
     if (maxOf(L.sunLeafVis) > 0.0) {
         LightSample leafLit = L.celestial;
@@ -251,14 +253,14 @@ void main() {
     sp.sunFade = L.sunShadow.fade;
     SurfaceLights H = gatherSurfaceLights(sp, SL_SUN_NONE, SL_BLOCK_NONE, SL_HAND);
 #ifdef SSS
-    color += directLight(m, g.normal, V, H.handMain, playerPos, g.geoNormal, glintVar, glintShare, glintLum) + evalTranslucency(m, g.normal, V, H.handMain) * SSS_STRENGTH;
-    color += directLight(m, g.normal, V, H.handOff, playerPos, g.geoNormal, glintVar, glintShare, glintLum) + evalTranslucency(m, g.normal, V, H.handOff) * SSS_STRENGTH;
+    color += directLight(m, g.normal, V, H.handMain, playerPos, g.geoNormal, glintVar, glintShare, 1.0, glintLum) + evalTranslucency(m, g.normal, V, H.handMain) * SSS_STRENGTH;
+    color += directLight(m, g.normal, V, H.handOff, playerPos, g.geoNormal, glintVar, glintShare, 1.0, glintLum) + evalTranslucency(m, g.normal, V, H.handOff) * SSS_STRENGTH;
 #else
-    color += directLight(m, g.normal, V, H.handMain, playerPos, g.geoNormal, glintVar, glintShare, glintLum);
-    color += directLight(m, g.normal, V, H.handOff, playerPos, g.geoNormal, glintVar, glintShare, glintLum);
+    color += directLight(m, g.normal, V, H.handMain, playerPos, g.geoNormal, glintVar, glintShare, 1.0, glintLum);
+    color += directLight(m, g.normal, V, H.handOff, playerPos, g.geoNormal, glintVar, glintShare, 1.0, glintLum);
 #endif
     SurfaceLights S = gatherSurfaceLights(sp, SL_SUN_NONE, SL_BLOCK_NONE, SL_BLOCK_SPECULAR);
-    for (int j = 0; j < S.blockSpecCount; j++) color += directSpecular(m, g.normal, V, S.blockSpec[j], playerPos, g.geoNormal, glintVar, glintShare, glintLum);
+    for (int j = 0; j < S.blockSpecCount; j++) color += directSpecular(m, g.normal, V, S.blockSpec[j], playerPos, g.geoNormal, glintVar, glintShare, 1.0, glintLum);
 
     // 環境光 (空・ブロックライト・GI)
     float ao = g.ao * indirect.a;
