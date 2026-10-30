@@ -27,7 +27,7 @@
 | バニラの形の雲 (雲の形 バニラの形) | Nostalgia (RRe36) の雲の見え方を参考に独自実装 (コードは不使用) | lib/sky/cloud_vanilla.glsl |
 | 空中遠近 (消散と内散乱を組にし、遠景を地平線の空へ収束させる) | Koschmieder, "Theorie der horizontalen Sichtweite", Beiträge zur Physik der freien Atmosphäre, 1924 | lib/sky/fog.glsl |
 | 高さフォグの閉形式の光学的深さ | Quilez, "fog" (iquilezles.org) の指数の積分の考え方。上端のロジスティックの積分は独自に導出 | lib/sky/fog.glsl |
-| 遠方区間の画面空間の光芒 | Mitchell, "Volumetric Light Scattering as a Post-Process", GPU Gems 3, 2007 | lib/sky/volumetrics.glsl |
+| 遠方区間と画面空間の光芒 | Mitchell, "Volumetric Light Scattering as a Post-Process", GPU Gems 3, 2007 | lib/sky/volumetrics.glsl, lib/sky/godrays.glsl |
 | 時間帯・天気・バイオームで切り替えるフォグの構成と、太陽側で強く光る霧 (Bliss 風のスタイル) | Bliss Shaders (X0nk) の見え方と考え方を参考に独自実装 (コードは不使用) | lib/sky/fog.glsl, fog_styles.glsl |
 | 2 成分のもやと朝の霧の構成 (Nostalgia 風のスタイル) | Nostalgia Shader (RRe36) の見え方と考え方を参考に独自実装 (コードは不使用) | lib/sky/fog_styles.glsl |
 | 体積雲のレイマーチと天気マップ | Schneider, "The Real-time Volumetric Cloudscapes of Horizon Zero Dawn", SIGGRAPH 2015 | lib/sky/cloud_weather.glsl, cloud_march.glsl, program/sky/cloud_weather.csh, cloud_march.fsh, cloud_upscale.fsh |

@@ -277,7 +277,7 @@ float waterBlockLightPhaseWeight(vec3 voxelPos, vec3 dir) {
 #endif
 
 /*
- * 水中 (カメラが水の中): 水面からの光の減衰込みの光芒。透過率は composite11 が距離から解析的に掛けるので内散乱だけ返す
+ * 水中 (カメラが水の中): 水面からの光の減衰込みの光芒。透過率は composite19 が距離から解析的に掛けるので内散乱だけ返す
  * ステップは空気と同じ指数分布 (近くを細かく)。等間隔では 1 歩が 3-6 ブロックになり、近くの光源の周りの光り方が粗かった
  */
 vec3 marchWaterFog(vec3 dir, float endDist, float dither) {

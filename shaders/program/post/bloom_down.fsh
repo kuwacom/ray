@@ -56,7 +56,7 @@ layout(location = 0) out vec4 outBloom;
 
 /*
  * rgb = ブルームの元の色、a = そのうち溶岩の発光の輝度 (final が溶岩の滲みを溶岩と同じ色を保つトーンマップに寄せる)
- * colortex0.a < 0 は溶岩の発光の割合 (composite11 -> TAA)。ミップは範囲の平均の割合になる
+ * colortex0.a < 0 は溶岩の発光の割合 (composite19 -> TAA)。ミップは範囲の平均の割合になる
  */
 vec4 fetchSource(vec2 uv, float lod) {
     vec4 s = textureLod(colortex0, clamp(uv, vec2(0.0), vec2(1.0)), lod);

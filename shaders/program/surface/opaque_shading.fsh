@@ -293,6 +293,6 @@ void main() {
 
     if (lava) color += lavaRadiance(g.albedo) * EMISSION_STRENGTH;
     else color += g.albedo * g.emission * getVisibleEmissionLuminance() * EMISSION_STRENGTH;
-    // 輝点の割合を a = 1 + 割合で composite1 -> composite11 -> composite20 (TAA の後に足す) へ渡す
+    // 輝点の割合を a = 1 + 割合で composite1 -> composite19 -> composite20 (TAA の後に足す) へ渡す
     outColor = vec4(color, 1.0 + saturate(glintLum / max(luminance(color), 1e-6)));
 }

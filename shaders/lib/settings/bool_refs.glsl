@@ -106,6 +106,8 @@
 #endif
 #ifdef CAVE_LEAK_PREVENTION
 #endif
+#ifdef GODRAYS
+#endif
 #ifdef BORDER_FOG
 #endif
 #ifdef TAA

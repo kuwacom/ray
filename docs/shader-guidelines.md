@@ -103,7 +103,7 @@ Ray のシェーダーを書くときに、読み込み (Iris の前処理とド
 | sampler (1 プログラム) | GL の `GL_MAX_TEXTURE_IMAGE_UNITS` = 32 (NVIDIA、Mesa)。gbuffers と shadow は Iris が 3 ユニットを使うので 29 | composite1 が 26 | `gl_compile_check.py --gpu 1070 --report` |
 | image (1 ステージ、1 プログラム) | 8 (NVIDIA。GL の最小保証も 8) | opt-in で 8 以下に抑える ([architecture.md](architecture.md) の「image の宣言は opt-in」) | 同上 |
 | カスタム image (`image.*`) | 16 (Iris) | 16 (空きなし) | `shaders.properties` |
-| colortex | 32 (Iris) | 16 | `lib/buffers/formats.glsl` |
+| colortex | 32 (Iris。1.10.5 から) | 17 (16 は `size.buffer` の低解像度) | `lib/buffers/formats.glsl` |
 | SSBO (`bufferObject.N`) | 番号 0〜12 (Iris)、1 ステージ 16 ブロック (NVIDIA) | 0〜4 | `shaders.properties`、`lib/buffers/` |
 | UBO の大きさ | 64 KB (NVIDIA)。GL の最小保証は 16 KB | 使っていない | - |
 | compute のスレッド (1 グループ) | 1024 (NVIDIA) | - | `gl_compile_check.py` が検査する |

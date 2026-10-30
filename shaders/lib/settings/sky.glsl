@@ -104,6 +104,10 @@
 #define FOG_CLOUD_SHADOWS // 雲影を光芒に反映
 #define VL_FAR // 影マップの範囲より遠い光芒 (画面空間)
 #define CAVE_LEAK_PREVENTION // 洞窟内への太陽光芒の漏れを防ぐ
+#define GODRAYS // 画面空間の光芒 (太陽・月から放射状にぼかす)
+#define GODRAYS_STRENGTH 1.0 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0 4.0]
+#define GODRAYS_RES 2 // [2 4] 画面空間の光芒の解像度の分母
+#define GODRAYS_SAMPLES 8 // [6 8 12 16] 1 パスのタップ数 (3 パスで 3 乗)
 #define BORDER_FOG // 描画距離端のフォグ
 #define NETHER_FOG_DENSITY 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0]
 #define END_FOG_DENSITY 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0]

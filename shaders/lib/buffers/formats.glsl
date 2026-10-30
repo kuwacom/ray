@@ -15,10 +15,11 @@ const int colortex8Format  = RGBA16F; // C: GI / AO           | deferred11 -> de
 const int colortex9Format  = RGBA16F; // C: GI 履歴           | deferred11 (永続)
 const int colortex10Format = RGBA16F; // B: 雲 (低解像度)     | deferred20 -> deferred21
 const int colortex11Format = RGBA16F; // B: 雲履歴            | deferred21 (永続) -> deferred30 / composite*
-const int colortex12Format = RGBA16F; // B: ボリューメトリック | composite1_a -> composite11
+const int colortex12Format = RGBA16F; // B: ボリューメトリック | composite1_a -> composite19
 const int colortex13Format = RGBA16F; // D: TAA 履歴          | composite20 (永続)
 const int colortex14Format = RGBA16F; // D: ブルームタイル    | composite23 -> composite24 -> final
 const int colortex15Format = RGBA16F; // 速度ベクトル         | gbuffers (エンティティ/手) -> composite20 / 21
+const int colortex16Format = R16F;    // B: 画面空間の光芒 (低解像度) | composite12 -> 13 -> 14 -> composite19
 
 const bool colortex0Clear  = true;
 const bool colortex1Clear  = true;
@@ -36,6 +37,7 @@ const bool colortex12Clear = false;
 const bool colortex13Clear = false;
 const bool colortex14Clear = true;
 const bool colortex15Clear = true;
+const bool colortex16Clear = true;
 
 const vec4 colortex0ClearColor  = vec4(0.0, 0.0, 0.0, 0.0);
 const vec4 colortex1ClearColor  = vec4(0.0, 0.0, 0.0, 0.0);
@@ -47,6 +49,7 @@ const vec4 colortex6ClearColor  = vec4(0.0, 0.0, 0.0, 0.0);
 const vec4 colortex8ClearColor  = vec4(0.0, 0.0, 0.0, 1.0);
 const vec4 colortex14ClearColor = vec4(0.0, 0.0, 0.0, 0.0);
 const vec4 colortex15ClearColor = vec4(0.0, 0.0, 0.0, 0.0);
+const vec4 colortex16ClearColor = vec4(0.0, 0.0, 0.0, 0.0);
 
 const int shadowcolor0Format = RGBA8;  // 最も太陽側の面の色 (半透明は透過色, a = 不透明度)
 const int shadowcolor1Format = RGBA16; // rg = 法線 (oct), b = スカイライト, a = 種別 (0=不透明 0.2=葉 0.5=半透明 1=水)

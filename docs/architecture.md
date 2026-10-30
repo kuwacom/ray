@@ -110,14 +110,17 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 22 | composite.csh | surface | 反射 (SSR / ラフ / ボクセル補完) | colortex0/2/3/5, voxel | reflectionImg | local 8², 0.5 | REFLECTIONS>0 |
 | 23 | composite1_a.csh | sky | VL / 高さフォグのレイマーチ (影マップ空間 + floodfill + 雲影) | 影マップ, flood, cloudShadow | colorimg12 (左上 1/VL_RES), fogHistoryImg | local 8², 1/VL_RES | VL |
 | 24 | composite1.vsh/fsh | surface | 半透明合成 (屈折・水中吸収・反射) | colortex0/4/5, reflectionImg | colortex0 | 画面 | 常時 |
-| 25 | composite11.vsh/fsh | sky | フォグ / VL の適用 (バイラテラルアップサンプル)、水中フォグ、カメラが雲より上のときの手前の雲 (高さフォグの後に重ねる。半透明が手前の画素は `cloudFrontPart` でカメラから半透明までの分に割り引く) | colortex0/12 | colortex0 | 画面 | 常時 |
-| 26 | composite20.vsh/fsh | post | TAA (LENS_WARP_TAA の時は歪曲・魚眼の組み立ても) | colortex0/13/15 | colortex0, colortex13 | 画面 | TAA |
-| 27 | composite21.vsh/fsh | post | モーションブラー | colortex0/15 | colortex0 | 画面 | MOTION_BLUR |
-| 28 | composite22.vsh/fsh | post | DoF (MIP-Bokeh, colortex0 ミップ) | colortex0, SSBO0 focus | colortex0 | 画面 | DOF |
-| 29 | composite23.vsh/fsh | post | ブルーム縮小タイル | colortex0 ミップ | colortex14 | 画面 | BLOOM |
-| 30 | composite24.vsh/fsh | post | ブルームぼかし | colortex14 | colortex14 | 画面 | BLOOM |
-| 31 | composite25.csh | post | 自動露出 (ヒストグラム) + オートフォーカス | colortex0, centerDepthSmooth | SSBO0 exposure/focus/histogram | local 16², (1,1,1) | 常時 |
-| 32 | final.vsh/fsh | post | 歪曲と魚眼の再投影・ブルーム合成・フレア・露出・AgX・色調整・CAS・ディザ・デバッグ表示 | colortex0/14, SSBO0 | 画面 | 画面 | 常時 |
+| 25 | composite12.vsh/fsh | sky | 画面空間の光芒 1/3: 空のマスク (深度 x 雲の透過率 x 光源からの角度) をタップごとに求め、光源へ向かう最短のスパンでぼかす | depthtex2, colortex11 | colortex16 | 画面 (1/GODRAYS_RES) | GODRAYS, world0 |
+| 26 | composite13.vsh/fsh | sky | 同 2/3: 中のスパン | colortex16 | colortex16 | 同上 | 同上 |
+| 27 | composite14.vsh/fsh | sky | 同 3/3: 全長のスパン | colortex16 | colortex16 | 同上 | 同上 |
+| 28 | composite19.vsh/fsh | sky | フォグ / VL の適用 (バイラテラルアップサンプル)、水中フォグ、画面空間の光芒の加算 (カメラの位置の霧の濃さで強さを決める)、カメラが雲より上のときの手前の雲 (高さフォグと光芒の後に重ねる。半透明が手前の画素は `cloudFrontPart` でカメラから半透明までの分に割り引く) | colortex0/12/16 | colortex0 | 画面 | 常時 |
+| 29 | composite20.vsh/fsh | post | TAA (LENS_WARP_TAA の時は歪曲・魚眼の組み立ても) | colortex0/13/15 | colortex0, colortex13 | 画面 | TAA |
+| 30 | composite21.vsh/fsh | post | モーションブラー | colortex0/15 | colortex0 | 画面 | MOTION_BLUR |
+| 31 | composite22.vsh/fsh | post | DoF (MIP-Bokeh, colortex0 ミップ) | colortex0, SSBO0 focus | colortex0 | 画面 | DOF |
+| 32 | composite23.vsh/fsh | post | ブルーム縮小タイル | colortex0 ミップ | colortex14 | 画面 | BLOOM |
+| 33 | composite24.vsh/fsh | post | ブルームぼかし | colortex14 | colortex14 | 画面 | BLOOM |
+| 34 | composite25.csh | post | 自動露出 (ヒストグラム) + オートフォーカス | colortex0, centerDepthSmooth | SSBO0 exposure/focus/histogram | local 16², (1,1,1) | 常時 |
+| 35 | final.vsh/fsh | post | 歪曲と魚眼の再投影・ブルーム合成・フレア・露出・AgX・色調整・CAS・ディザ・デバッグ表示 | colortex0/14, SSBO0 | 画面 | 画面 | 常時 |
 
 補足
 - shadowcomp は使わない。floodfill を deferred に置くのは、gbuffers_entities (deferred より前) が登録した画面内のエンティティ光源を同じフレームで取り込むため (voxelEmitImg は毎フレームクリアされる)
@@ -130,7 +133,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 
 ## バッファ設計
 
-### colortex (16 枚。正本は `lib/buffers/formats.glsl`)
+### colortex (17 枚。正本は `lib/buffers/formats.glsl`)
 
 | buf | フォーマット | 内容 | 書く | 読む | クリア |
 |---|---|---|---|---|---|
@@ -150,6 +153,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 13 | RGBA16F | post: TAA 履歴 | post | post | 永続 |
 | 14 | RGBA16F | post: ブルームタイル | post | post | 毎フレーム |
 | 15 | RGBA16F | 速度: rg = 前フレーム UV - 今の UV, a = 1 なら有効 (エンティティ・手) | surface (gbuffers, post の関数) | post | 毎フレーム |
+| 16 | R16F | sky: 画面空間の光芒 (低解像度 `size.buffer.colortex16` = 1/GODRAYS_RES)。composite12 -> 13 -> 14 で同じバッファをピンポンして読み書きし、composite19 が足す | sky | sky | 毎フレーム |
 
 - gbuffers では colortex0-3 を読めない (Iris の仕様)
 - `shadowcolor0` RGBA8: 最も太陽側の面の色 (半透明は透過色 + a 不透明度、不透明は a=1)。`shadowcolor1` RGBA16: rg 法線 (oct), b スカイライト, a 種別 (0 不透明 / 0.2 葉 / 0.5 半透明 / 1 水)。RSM (surface) と色付き影・葉の透過 (surface) と色付き光芒 (sky) が読む
@@ -376,7 +380,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 - 両手独立 (`oldHandLight = false`)。強さ = `heldBlockLightValue(2)`、色 = `heldItemId(2)` -> 光源テーブル
 - 位置: 一人称は view 空間の固定オフセット (利き手で左右反転)、三人称は `playerBodyVector` / `relativeEyePosition` から構築 (Shrimple basic_hand 相当)
 - 影: HAND_LIGHT_RAYS = DDA (自分のビットは無視)、HAND_LIGHT_SS_SHADOWS = 深度バッファの短いレイ (手・武器・近くのモブ)。両方掛けると「壁 + エンティティ」の両方が遮る
-- ピクセルごとの直接計算で floodfill には注入しない (二重加算防止)。フォグへの寄与は composite11.fsh が `getHandLightPosition` の位置から点光源の内散乱を視線に沿って解析積分して足す (影は無視。水中は水の吸収と散乱で弱まるので、角度を等分した数値積分にする)
+- ピクセルごとの直接計算で floodfill には注入しない (二重加算防止)。フォグへの寄与は composite19.fsh が `getHandLightPosition` の位置から点光源の内散乱を視線に沿って解析積分して足す (影は無視。水中は水の吸収と散乱で弱まるので、角度を等分した数値積分にする)
 - 受け渡し: `getHandLights(playerPos, geoNormal, dither, out mainHand, out offHand)` が `LightSample` を返す
 
 ### ドロップ・投擲・燃焼・発光エンティティ
@@ -400,7 +404,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | GI | LOW/MED: なし、HIGH: RSM (shadowcolor0/1)、ULTRA: SSGI、EXTREME: ボクセル RT (light の `traceVoxelRay` + floodfill でヒット点を照らす) + SVGF 系デノイズ | surface |
 | 空 / 大気 | Hillaire 2020 の 3 LUT (透過率・多重散乱・SkyView)。照度と空の SH を FrameData に書いて全パスで共有。薄明は SkyView を太陽が ±10 度の間 48 歩にし、成層圏のエアロゾル (20 km) で紫の光を出す。TWILIGHT_STRETCH は空の LUT と夜の度合いに使う太陽の高さだけ地平線より下を縮める (`atmoSkySunMu`)。ATMOSPHERE_MODE=0 は解析近似 | sky |
 | 雲 | 3D 体積雲: Kappa の天気マップ事前計算 + 指数ライトマーチ + Nostalgia の 1 マーチ多重散乱近似 (位相の OD 依存非対称性) + チェッカーボード時間アップスケール。2D 押し出し (CLOUDS=2) は平面の被覆を縦に伸ばし、断面を角の丸い箱にする (`cloud2dShoulder`)。既定は被覆 1.1・スケール 3.0 | sky |
-| フォグ / VL | Chocapic13 の指数分布ステップ + 影マップ空間マーチ + 区間解析積分。景色の成分 (上端のある混合層のもや + 空中遠近) は内散乱を空の色から作り (遠景は同じ方位の地平線の空に収束、影の中は太陽の単散乱を引いて光芒)、描画距離 R の端で光学的深さが FOG_EDGE_DEPTH になる距離の写像 d (1 + (d / D)^2) で縮める。局所の成分 (霧の層・地表の霧) は縮めない。高さは FOG_HEIGHT_PRESET (`lib/sky/fog_template.glsl`)、成分の形と比は FOG_STYLE (`lib/sky/fog_styles.glsl`。全体の濃さは LOOK_FOG_DENSITY)、湿地・ジャングルは `fogSwamp` / `fogJungle` (カスタム uniform の smooth 9, 10)、日替わりは `lib/sky/climate.glsl` (雲と同じ種)。地平線の下の虚空は同じ式で仮想の地面まで積み、太陽から 30 度以上の方位では地平線の空の 1.05 倍まで。DH 対応時は `fogRenderDistance()` を DH の描画距離にし、縮めずに景色の成分の濃さを FOG_EDGE_DEPTH / R まで下げる (下限は晴天 1.5e-4)、虚空は DH の描画距離の外だけ、VL の解析区間と画面空間の光芒は DH の深度も見る。floodfill を VL マーチで読んで光源周りのフォグを照らす (FOG_BLOCKLIGHT)。洞窟の光漏れ防止 (スカイライトに加え、prepare が影マップで求める目の位置の太陽の見え方を、影マップの範囲より遠い光芒と画面の外の太陽のフレアに掛ける)。影マップに写らない遠い壁・山の裏では、画面空間の光芒 (VL_FAR) が画面の外へ出た点も端の画素の深度で判定して範囲内の点にも掛け、VL_FAR の無い構成 (VL なし・LOW) は composite25 が太陽の円盤の深度から求める「範囲より遠い地形に隠れている割合」を霧の太陽方向の光に掛ける。全面のブルーミーフォグは弱く | sky |
+| フォグ / VL | Chocapic13 の指数分布ステップ + 影マップ空間マーチ + 区間解析積分。景色の成分 (上端のある混合層のもや + 空中遠近) は内散乱を空の色から作り (遠景は同じ方位の地平線の空に収束、影の中は太陽の単散乱を引いて光芒)、描画距離 R の端で光学的深さが FOG_EDGE_DEPTH になる距離の写像 d (1 + (d / D)^2) で縮める。局所の成分 (霧の層・地表の霧) は縮めない。高さは FOG_HEIGHT_PRESET (`lib/sky/fog_template.glsl`)、成分の形と比は FOG_STYLE (`lib/sky/fog_styles.glsl`。全体の濃さは LOOK_FOG_DENSITY)、湿地・ジャングルは `fogSwamp` / `fogJungle` (カスタム uniform の smooth 9, 10)、日替わりは `lib/sky/climate.glsl` (雲と同じ種)。地平線の下の虚空は同じ式で仮想の地面まで積み、太陽から 30 度以上の方位では地平線の空の 1.05 倍まで。DH 対応時は `fogRenderDistance()` を DH の描画距離にし、縮めずに景色の成分の濃さを FOG_EDGE_DEPTH / R まで下げる (下限は晴天 1.5e-4)、虚空は DH の描画距離の外だけ、VL の解析区間と画面空間の光芒は DH の深度も見る。floodfill を VL マーチで読んで光源周りのフォグを照らす (FOG_BLOCKLIGHT)。洞窟の光漏れ防止 (スカイライトに加え、prepare が影マップで求める目の位置の太陽の見え方を、影マップの範囲より遠い光芒と画面の外の太陽のフレアに掛ける)。影マップに写らない遠い壁・山の裏では、画面空間の光芒 (VL_FAR) が画面の外へ出た点も端の画素の深度で判定して範囲内の点にも掛け、VL_FAR の無い構成 (VL なし・LOW) は composite25 が太陽の円盤の深度から求める「範囲より遠い地形に隠れている割合」を霧の太陽方向の光に掛ける。全面のブルーミーフォグは弱く。画面空間の光芒 (GODRAYS、`lib/sky/godrays.glsl`) は VL とは別に、空の画素 (深度 1、手を含まない) x 雲の透過率 x 光源からの角度の重みのマスクを、光源の画面の位置へ向かう放射状のぼかし (3 パスの入れ子で 1 パス N タップ、実効 N^3 タップ。低解像度の colortex16) でのばし、フォグの適用 (composite19) で光源の照度 x カメラの位置の霧の濃さの係数を掛けて足す。半透明は遮蔽にしない。画面の外のタップは 0、光源が画面の外へ出るほど弱め、外にある分には目の位置の太陽の見え方を掛ける。水中・溶岩・粉雪の中・ネザー・エンドでは足さない | sky |
 | 水 | 前方シェーディング + 波 (Gerstner 系) + 視差、composite1 で屈折 (SS / レイトレース) と吸収 (Jerlov 風)、コースティクスは影マップ参照。水の上から見た内散乱は、深さで弱まる水面の照度を屈折した視線に沿って解析積分する。水中の VL は指数分布のステップで、floodfill の照度にライトビンの光源の向きから求めた前方散乱の位相関数を掛ける (光源の周りのにじみ) | surface |
 | 反射 | SSR (階層なし線形 + 二分探索) + ラフ反射 (時間蓄積)、SSR 失敗時はボクセル補完 (REFLECTIONS=3, light の `traceVoxelRay`)、最後は空 (`getSkyRadiance`) | surface |
 | TAA | Halton(2,3) 16 フレームのジッター (`lib/common/jitter.glsl`) + YCoCg 近傍クランプ + Catmull-Rom 履歴 + トーンマップ空間での混合 (HDR フリッカー対策) + 速度は colortex15 か深度再投影 | post |
@@ -529,6 +533,9 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | FOG_BLOCKLIGHT | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
 | FOG_CLOUD_SHADOWS | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
 | VL_FAR | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
+| GODRAYS | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
+| GODRAYS_RES | 2 | **4** | **4** | **4** | **4** | 2 | 2 | 2 | 2 | 2 |
+| GODRAYS_SAMPLES | 8 | **6** | **6** | **6** | 8 | 8 | **12** | **12** | **16** | **16** |
 
 #### post (`lib/settings/post.glsl`)
 
@@ -568,7 +575,7 @@ DEBUG_VIEW の値 (0-12) と表示内容の対応は `shaders/lang/ja_JP.lang` /
 | モジュール | 範囲 | ファイル |
 |---|---|---|
 | light (ボクセル・ブロックライト) | ボクセル化、floodfill、光源リスト・ビン、光源シャドウ (DDA)、デノイズ、手持ち光源、エンティティ光源、`traceVoxelRay` (surface の GI / 反射が使う) | `lib/light/*`, `program/light/*` (setup, begin, shadow, shadow_entities / shadow_block, deferred, deferred_a, deferred1, deferred2) |
-| sky (空・大気・雲・フォグ・VL) | 大気 LUT、太陽/月の照度と空の SH、空の描画、星、雲 (体積・2D・影)、高さフォグ、VL、水中フォグ、雨 | `lib/sky/*`, `program/sky/*` (setup1, setup2, prepare, prepare1, prepare2, gbuffers_skybasic / skytextured / clouds / weather, deferred20, deferred21, composite1_a, composite11) |
+| sky (空・大気・雲・フォグ・VL) | 大気 LUT、太陽/月の照度と空の SH、空の描画、星、雲 (体積・2D・影)、高さフォグ、VL、水中フォグ、雨 | `lib/sky/*`, `program/sky/*` (setup1, setup2, prepare, prepare1, prepare2, gbuffers_skybasic / skytextured / clouds / weather, deferred20, deferred21, composite1_a, composite12-14, composite19) |
 | surface (太陽影・GI・マテリアル・水・反射) | gbuffers (不透明/半透明/オーバーレイ)、マテリアル (labPBR・自動法線・POM・揺れ)、BRDF、太陽影、AO・GI、不透明シェーディング (deferred30)、水、反射、半透明合成 | `lib/surface/*`, `lib/common/water.glsl`, `program/surface/*` (gbuffers_* が共有する solid / translucent / overlay, gbuffers_lightning, deferred10, deferred11, deferred30, composite, composite1) |
 | post (ポストプロセス) | 速度ベクトルの関数、TAA、モーションブラー、DoF、ブルーム、露出、オートフォーカス、トーンマップ、色調整、CAS、レンズフレア、デバッグ表示 | `lib/post/*`, `program/post/*` (composite20-24, composite25, final) |
 
@@ -604,7 +611,7 @@ light モジュールが提供 (`//@include "/lib/light/light.glsl"`):
 | `vec3 getBlockLightForward(vec3 playerPos, vec3 normal, float lm)` | surface (`gatherSurfaceLights`)、パーティクル・雨 | トレースなし版 |
 | `int getBlockLightSpecular(ivec2 texel, vec3 playerPos, vec3 geoNormal, bool traced, out LightSample s[BLOCKLIGHT_SPECULAR_LIGHTS])` | surface (`gatherSurfaceLights`) | ブロックライトの鏡面用の光 (個数を返す)。traced = 半透明の面で、可視率を光源ごとにトレースする |
 | `void getHandLights(vec3 playerPos, vec3 geoNormal, float dither, out LightSample mainHand, out LightSample offHand)` | surface (`gatherSurfaceLights`) | 両手の光 |
-| `vec3 getHandLightPosition(bool mainHand)` | sky (composite11 の手持ち光源のフォグ) | 手持ち光源の player 空間位置 |
+| `vec3 getHandLightPosition(bool mainHand)` | sky (composite19 の手持ち光源のフォグ) | 手持ち光源の player 空間位置 |
 | `vec3 sampleFloodfill(vec3 playerPos, vec3 normal)` / `vec3 sampleFloodfillVolume(vec3 playerPos)` / `float floodCoverage(vec3 playerPos)` | surface (GI), sky | floodfill 照度 |
 | `vec3 sampleBlockLightVolume(vec3 playerPos)` | sky (FOG_BLOCKLIGHT) | 体積内の点のブロックライト |
 | `vec3 traceVisibility(vec3 fromVoxel, vec3 toVoxel, uint flags, float dither, float entSkipStart, float entSkipEnd)` | light 内部, surface (lighting の最強の光源) | 2 点間の色付き透過率。flags = TRACE_ENTITIES / TRACE_PLAYER / TRACE_TINT / TRACE_SHAPES |
@@ -622,7 +629,7 @@ sky モジュールが提供 (`//@include "/lib/sky/sky.glsl"`):
 | `vec3 renderSky(vec3 dir, vec3 vanillaSky)` | surface (deferred30 の空ピクセル) | 背景の空 (太陽月・星込み) |
 | `vec4 getCloudLayer(ivec2 texel)` | surface (deferred30) | rgb 雲の散乱光, a 透過率 |
 | `float getCloudShadow(vec3 playerPos)` | surface | 雲影の透過率 |
-| `float getBorderFog(vec3 playerPos)` / `vec3 applyForwardFog(vec3 color, vec3 playerPos)` | 前方シェーディング (パーティクル等) | composite11 と同じモデルのフォグ |
+| `float getBorderFog(vec3 playerPos)` / `vec3 applyForwardFog(vec3 color, vec3 playerPos)` | 前方シェーディング (パーティクル等) | composite19 と同じモデルのフォグ |
 | `vec3 shEvalIrradiance(vec3 n)` | (内部) | SH 評価 |
 
 surface モジュールが提供 (`//@include "/lib/surface/surface.glsl"`):
@@ -678,8 +685,8 @@ post モジュールが提供 (`//@include "/lib/post/post.glsl"`):
 | colortex4/5 | - | colortex4 に雨を書く | 書く | - |
 | colortex6/7, blockLightRaw/Aux | 書く | 読む (6) | 読む (6, 関数経由) | 読む (debug) |
 | colortex8/9, giRaw, reflection | 読む (8) | 読む | 書く | 読む (debug) |
-| colortex10/11/12, sky LUT, cloud*, fogHistory | 読む | 書く | 読む (11, 関数経由) | 読む (debug) |
-| colortex0 | - | 空テクスチャ (gbuffers), composite11 で書く | deferred30 / composite1 で書く | composite20 以降で書く |
+| colortex10/11/12/16, sky LUT, cloud*, fogHistory | 読む | 書く | 読む (11, 関数経由) | 読む (debug) |
+| colortex0 | - | 空テクスチャ (gbuffers), composite19 で書く | deferred30 / composite1 で書く | composite20 以降で書く |
 | colortex13/14 | - | - | - | 書く |
 | debugImg | 書ける (IMG_DEBUG) | 書ける (IMG_DEBUG) | 書ける (IMG_DEBUG) | 表示 (DEBUG_VIEW=12) |
 

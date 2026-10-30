@@ -8,7 +8,7 @@
  * 景色の成分 (もやと空中遠近) は、遠景が同じ方位の地平線の空の色へ収束するように内散乱を空の色から作り、
  * 描画距離 R の端で光学的深さが FOG_EDGE_DEPTH になるよう距離を d (1 + d / D) に写して縮める (手前の霞み方は R によらない)。
  * 地表の霧は縮めない (霧の中の距離は本当の距離で見える)
- * 不透明・半透明の大半は composite1_a / composite11 (sky のパス) でまとめて掛ける
+ * 不透明・半透明の大半は composite1_a / composite19 (sky のパス) でまとめて掛ける
  * 前方シェーディングのパーティクル・雨もまとめ掛けに含まれる (個別のフォグは掛けない)
  */
 #ifndef SKY_FOG_GLSL
@@ -151,7 +151,7 @@ const vec3 FOG_POWDER_SNOW_EXTINCTION = vec3(1.2);
 const float BLINDNESS_FOG_EXTINCTION = 0.6;
 
 /*
- * VL の低解像度バッファ (composite1_a -> composite11)
+ * VL の低解像度バッファ (composite1_a -> composite19)
  * 低解像度テクセル q はフル解像度の q * VL_RES + VL_RES / 2 のピクセルで計算する (アップサンプル側が同じ深度を引けるように)
  * 時間蓄積は colortex12 と fogHistoryImg をフレームの偶奇で交互に書く (偶数フレームは colortex12)
  */
@@ -513,7 +513,7 @@ vec3 fogAerialExtinction(float y0, float y1) {
 
 /*
  * 地平線より下の虚空 (描画距離の外) の視線の透過率。仮想の地面までの距離 groundDist まで、描画距離の中の地形と同じ式で積む
- * 空中遠近は全区間、もやと地表の霧は描画距離の外の区間だけ (中の区間は composite1_a / composite11 が空の画素に積む)
+ * 空中遠近は全区間、もやと地表の霧は描画距離の外の区間だけ (中の区間は composite1_a / composite19 が空の画素に積む)
  */
 vec3 fogVoidTransmittance(vec3 dir, float groundDist) {
     float R = min(fogRenderDistance(), groundDist);

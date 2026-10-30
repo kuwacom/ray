@@ -244,6 +244,10 @@
 | FOG_CLOUD_SHADOWS | ON | ON / OFF |
 | VL_FAR | ON | ON / OFF |
 | CAVE_LEAK_PREVENTION | ON | ON / OFF |
+| GODRAYS | ON | ON / OFF |
+| GODRAYS_STRENGTH | 1.0 | 0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0 |
+| GODRAYS_RES | 2 | 2, 4 |
+| GODRAYS_SAMPLES | 8 | 6, 8, 12, 16 |
 | BORDER_FOG | ON | ON / OFF |
 | NETHER_FOG_DENSITY | 1.0 | 0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0 |
 | END_FOG_DENSITY | 1.0 | 0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0 |
