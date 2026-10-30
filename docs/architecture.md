@@ -110,7 +110,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 22 | composite.csh | surface | 反射 (SSR / ラフ / ボクセル補完) | colortex0/2/3/5, voxel | reflectionImg | local 8², 0.5 | REFLECTIONS>0 |
 | 23 | composite1_a.csh | sky | VL / 高さフォグのレイマーチ (影マップ空間 + floodfill + 雲影) | 影マップ, flood, cloudShadow | colorimg12 (左上 1/VL_RES), fogHistoryImg | local 8², 1/VL_RES | VL |
 | 24 | composite1.vsh/fsh | surface | 半透明合成 (屈折・水中吸収・反射) | colortex0/4/5, reflectionImg | colortex0 | 画面 | 常時 |
-| 25 | composite11.vsh/fsh | sky | フォグ / VL の適用 (バイラテラルアップサンプル)、水中フォグ、カメラが雲より上のときの手前の雲 (半透明が手前の画素は `cloudFrontPart` でカメラから半透明までの分に割り引く) | colortex0/12 | colortex0 | 画面 | 常時 |
+| 25 | composite11.vsh/fsh | sky | フォグ / VL の適用 (バイラテラルアップサンプル)、水中フォグ、カメラが雲より上のときの手前の雲 (高さフォグの後に重ねる。半透明が手前の画素は `cloudFrontPart` でカメラから半透明までの分に割り引く) | colortex0/12 | colortex0 | 画面 | 常時 |
 | 26 | composite20.vsh/fsh | post | TAA (LENS_WARP_TAA の時は歪曲・魚眼の組み立ても) | colortex0/13/15 | colortex0, colortex13 | 画面 | TAA |
 | 27 | composite21.vsh/fsh | post | モーションブラー | colortex0/15 | colortex0 | 画面 | MOTION_BLUR |
 | 28 | composite22.vsh/fsh | post | DoF (MIP-Bokeh, colortex0 ミップ) | colortex0, SSBO0 focus | colortex0 | 画面 | DOF |
