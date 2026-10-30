@@ -334,6 +334,16 @@ void cloudComposite(CloudContext ctx, inout vec3 scattering, inout float transmi
 }
 
 /*
+ * 雨の日の雲の向こうの空を置き換える、雲の上の見えない雨雲の層の下面 (rgb = 放射輝度, a = 置き換える割合)
+ * 雲のマーチの末尾と、水面などの反射の空 (prepare2 が frameData.skyParams[6] に書き、skyReflectionFallback が使う) で同じ値にする
+ */
+vec4 cloudRainVeil(CloudContext ctx, CloudLighting l) {
+    float veil = saturate(ctx.rainLight) * (1.0 - cloudRainReshape());
+    vec3 radiance = (l.skyRadiance + l.lightIrradiance * (CLOUD_RAIN_VEIL_SUN * max(l.lightDir.y, 0.0) * RCP_PI)) * CLOUD_RAIN_VEIL_GAIN;
+    return vec4(radiance, veil);
+}
+
+/*
  * 視線 dir の雲 (降水の柱 + 低層 + 中層 + 上層を手前から順に)。maxDist: 地形までの距離 (ワールド, 空なら大きな値)
  * dither: x = 視線方向, y = 光方向のマーチの開始位置
  * 戻り値: rgb = 散乱光 (空中遠近込み), a = 透過率
@@ -425,10 +435,9 @@ vec4 renderClouds(vec3 dir, float maxDist, vec2 dither) {
     // 雨の空: 雲の向こうの空は、雲の上の見えない雨雲の層の下面 (一様な灰色) にする。雲の形と量は変えず、隙間から晴れの青空や
     // 太陽が見えないようにするだけ。地形のある画素の手前の雲には掛けない。雷雨は雲の側で覆うので掛けない
     if (maxDist > 1e8) {
-        float veil = saturate(ctx.rainLight) * (1.0 - cloudRainReshape());
-        vec3 veilRadiance = (l.skyRadiance + l.lightIrradiance * (CLOUD_RAIN_VEIL_SUN * max(l.lightDir.y, 0.0) * RCP_PI)) * CLOUD_RAIN_VEIL_GAIN;
-        scattering += transmittance * veil * veilRadiance;
-        transmittance *= 1.0 - veil;
+        vec4 veil = cloudRainVeil(ctx, l);
+        scattering += transmittance * veil.a * veil.rgb;
+        transmittance *= 1.0 - veil.a;
     }
     return vec4(scattering, transmittance);
 }

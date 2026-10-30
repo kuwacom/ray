@@ -7,7 +7,8 @@
  *   r = 低層の被覆, g = 低層の雲種, b = 中層の被覆, a = 上層の被覆
  * 同じディスパッチで雲影マップが天気図を読むので隣のテクセルは前フレームの値が混ざるが、
  * 1 フレームの変化は風で 1 テクセルの数千分の 1 なので見た目に影響しない
- * カメラが雲の層の中にいる時の霧の濃さと光も 1 スレッドが求めて FrameData に書く (cloudInteriorWrite)
+ * カメラが雲の層の中にいる時の霧の濃さと光 (cloudInteriorWrite) と、雨の日の雲の向こうの空の置き換え (cloudRainVeil) も
+ * 1 スレッドが求めて FrameData に書く
  * sky モジュール (lib/sky)
  */
 // このプログラムで書く image (lib/buffers/images.glsl。宣言は 8 個まで) と SSBO (lib/buffers。ほかのプログラムでは readonly)
@@ -283,8 +284,10 @@ void main() {
     vec2 world = cloudMapCenter() + (vec2(texel) + 0.5 - CLOUD_MAP_RES * 0.5) * CLOUD_MAP_TEXEL;
     imageStore(cloudWeatherImg, texel, cloudWeatherTexel(world, climate));
 
-#if defined CLOUD_SHADOWS || defined CLOUD_INTERIOR
     CloudContext ctx = cloudContextSetup(climate);
+#ifdef HAS_SKY
+    // 雨の日の雲の向こうの空の置き換え。水面などの反射の空を、雲のバッファの空と同じ灰色にそろえるために書く
+    if (texel == ivec2(0)) frameData.skyParams[6] = cloudRainVeil(ctx, cloudLightingSetup(vec3(0.0, 1.0, 0.0), ctx.rainLight));
 #endif
 #ifdef CLOUD_INTERIOR
     // 1 スレッドだけが書く。ほかのスレッドは天気図と雲影マップを作る

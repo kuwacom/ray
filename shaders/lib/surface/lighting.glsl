@@ -21,6 +21,7 @@
 //@include "/lib/common/voxel_space.glsl"
 //@include "/lib/buffers/images.glsl"
 //@include "/lib/buffers/block_data.glsl"
+//@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/buffers/global_lights.glsl"
 //@include "/lib/ids/id_decode.glsl"
 //@include "/lib/ids/light_ids.glsl"
@@ -219,6 +220,8 @@ vec3 skyReflectionFallback(vec3 dir, float skyLm, float perceptualRoughness) {
     // 反射の空は照度ではなく放射輝度なので gatherSurfaceLights では集めない
     vec3 blurry = getSkyIrradiance(dir) * (RCP_PI * SH_LOOK_UNDO);
     vec3 sky = mix(sharp, blurry, saturate(perceptualRoughness * 1.5));
+    // 雨の日は、雲のバッファの空 (雲の向こうを雨雲の層の下面の灰色に置き換えたもの) と同じ灰色にそろえる (晴れは割合 0)
+    sky = mix(sky, frameData.skyParams[6].rgb, frameData.skyParams[6].a);
     return sky * horizon * skylightCurve(skyLm);
 #else
     return getSkyRadiance(dir) * 0.5;

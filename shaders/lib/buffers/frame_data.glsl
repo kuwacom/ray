@@ -26,7 +26,7 @@ layout(std430, binding = 0) SSBO_FRAME_DATA_ACCESS buffer FrameDataBuffer {
     vec4 moonIrradiance;         // rgb = 地表での月直達照度, a = 月高度の sin
     vec4 shadowLightIrradiance;  // rgb = 影を落とす側 (昼は太陽 / 夜は月) の直達照度, a = 1 なら太陽
     vec4 skySH[9];               // rgb = 空の放射の SH L2 係数 (照度は shEvalIrradiance で)
-    vec4 skyParams[6];           // sky の自由領域 ([4] [5] は prepare2 が書く、カメラの位置の雲の中の霧)
+    vec4 skyParams[7];           // sky の自由領域 ([4] [5] は prepare2 が書く、カメラの位置の雲の中の霧。[6] は雨の空の置き換え)
 
     // light (begin / deferred_a で書く)
     uvec4 lightStats;            // x = 前フレームの光源数, y = 溢れ数, z = エンティティ光源の登録締め切りフラグ (light), w = 前フレームに距離で間引いた数
