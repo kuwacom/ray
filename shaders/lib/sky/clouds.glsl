@@ -199,12 +199,15 @@ float cloudRefStretch(vec3 dir, float y) {
 // 参照空間で 6 km 四方。縮めたテンプレートでも影の届く範囲 (描画距離) を覆うよう下限を設ける
 const float CLOUD_SHADOW_EXTENT = clamp(6144.0 / CLOUD_KH, 1024.0, 6144.0);
 const float CLOUD_SHADOW_RAIN_OUTSIDE = 0.95; // 雨雲へ変わる空の、雲影マップの外の影の濃さ (一面の雨雲)
-// 雨が雲の量と雲種を雨雲 (全天の乱層雲と高層雲のベール) へ変える割合。0 で雨でも選んだスタイルの雲の形と量のまま
-// (雨らしさは雲の光の曇天化・濃さ・空・直達光・霧で出す)。雷雨は積乱雲の塔を保つので、この値によらず変える
-const float CLOUD_RAIN_RESHAPE = 0.0;
+// 雨が雲の量と雲種を雨雲 (全天の乱層雲と高層雲のベール) へ変える割合。バニラの形 (CLOUD_RAIN_KEEPS_SHAPE) は 0 で、
+// 雨でも板の形と量のまま (雨らしさは雲の光の曇天化・濃さ・空・直達光・霧で出す)。ほかの形は 1。雷雨は積乱雲の塔を保つので、この値によらず変える
+const float CLOUD_RAIN_DISC_SHADOW = 1.0; // 雨の空で、太陽の円盤の鏡像 (水のきらめき) に掛ける遮り。1 で円盤が完全に隠れる
+#ifdef CLOUD_RAIN_KEEPS_SHAPE
 const float CLOUD_RAIN_DECK_SHADOW = 0.75; // 雲の量を保つ雨で、雲影マップの全域に掛ける太陽の遮り (見えない雨雲の層の分)
-const float CLOUD_RAIN_DISC_SHADOW = 1.0;  // 同じ雨で、太陽の円盤の鏡像 (水のきらめき) に掛ける遮り。1 で円盤が完全に隠れる
-float cloudRainReshape() { return max(CLOUD_RAIN_RESHAPE, thunderStrength); }
+float cloudRainReshape() { return thunderStrength; }
+#else
+float cloudRainReshape() { return 1.0; }
+#endif
 const float CLOUD_SHADOW_RES = 512.0;
 // 光源が低いと投影が伸びて精度が落ちるので、この高さ (sin) 以下では雲影を弱める
 const float CLOUD_SHADOW_MIN_LIGHT_Y = 0.04;
@@ -404,9 +407,11 @@ float getCloudShadow(vec3 playerPos) {
     // マップの外は天気からの平均の透過率にする。雲が全天の雨雲へ変わる空で 1 (日なた) へ戻すと、遠くの霧の光の筋が
     // マップの四角い範囲の外だけ明るくなり、雷雨の空に直線の縁の白い面が出た (雲の量を保つ雨は晴れと同じ 1)
     float outside = 1.0 - CLOUD_SHADOW_RAIN_OUTSIDE * max(rainStrength, rainWetness) * cloudRainReshape();
+    float transmittance = mix(outside, texture(cloudShadowSampler, uv).r, edge.x * edge.y);
+    #ifdef CLOUD_RAIN_KEEPS_SHAPE
     // 雲の量を保つ雨は、雲の上の見えない雨雲の層が雲の隙間でも太陽を遮る
-    float deck = 1.0 - CLOUD_RAIN_DECK_SHADOW * max(rainStrength, rainWetness) * (1.0 - cloudRainReshape());
-    float transmittance = mix(outside, texture(cloudShadowSampler, uv).r, edge.x * edge.y) * deck;
+    transmittance *= 1.0 - CLOUD_RAIN_DECK_SHADOW * max(rainStrength, rainWetness) * (1.0 - cloudRainReshape());
+    #endif
     return mix(1.0, transmittance, strength * below);
 #else
     return 1.0;
@@ -421,7 +426,13 @@ float getCloudShadow(vec3 playerPos) {
  */
 float getCloudSunDiscVisibility() {
 #if CLOUDS >= 2 && defined CLOUD_SHADOWS && defined HAS_SKY
-    return 1.0 - CLOUD_RAIN_DISC_SHADOW * rainStrength * (1.0 - cloudRainReshape());
+    #ifdef CLOUD_RAIN_KEEPS_SHAPE
+    float covered = rainStrength * (1.0 - cloudRainReshape());
+    #else
+    // 雲が全天の雨雲へ変わる空は、雲の層を抜けた拡散光が雲影に残っても円盤は見えない
+    float covered = rainStrength;
+    #endif
+    return 1.0 - CLOUD_RAIN_DISC_SHADOW * covered;
 #else
     return 1.0;
 #endif

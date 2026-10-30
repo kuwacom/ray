@@ -220,8 +220,10 @@ vec3 skyReflectionFallback(vec3 dir, float skyLm, float perceptualRoughness) {
     // 反射の空は照度ではなく放射輝度なので gatherSurfaceLights では集めない
     vec3 blurry = getSkyIrradiance(dir) * (RCP_PI * SH_LOOK_UNDO);
     vec3 sky = mix(sharp, blurry, saturate(perceptualRoughness * 1.5));
+#ifdef CLOUD_RAIN_KEEPS_SHAPE
     // 雨の日は、雲のバッファの空 (雲の向こうを雨雲の層の下面の灰色に置き換えたもの) と同じ灰色にそろえる (晴れは割合 0)
     sky = mix(sky, frameData.skyParams[6].rgb, frameData.skyParams[6].a);
+#endif
     return sky * horizon * skylightCurve(skyLm);
 #else
     return getSkyRadiance(dir) * 0.5;

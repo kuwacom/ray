@@ -114,6 +114,7 @@ float cloud2dShoulder(float h) {
 }
 #endif
 
+#ifdef CLOUD_RAIN_KEEPS_SHAPE
 /*
  * 低層の濃さの倍率 (視線 / 光源方向)。スタイルの濃さ CS_DENSITY は雨でも保ち、雨の濃さの倍率 (densityScale) が上回る分だけ濃くする
  * (濃いスタイルに雨の倍率を重ねて真っ黒にしない)。
@@ -124,6 +125,7 @@ float cloudStyleDensity(CloudContext ctx, bool lightPath) {
     float style = lightPath ? max(CS_DENSITY / CLOUD_STYLE_LIGHT_SIGMA_RATIO, 1.0) : CS_DENSITY;
     return style * max(1.0, rainScale / max(style, 1.0));
 }
+#endif
 
 /*
  * 低層の密度 [0,1] (消散係数 = CLOUD_LOW_SIGMA x 密度)
@@ -357,7 +359,14 @@ float cloudLowDensityCumulus(CloudContext ctx, CloudColumn col, vec2 rel, float 
     // (一様に厚いと、風下の空一面が暗い灰色の天井になった)
     water *= mix(1.0, mix(CLOUD_CB_WATER, 0.08 + 0.7 * stormCore, ice), wCb);
 #endif
+#ifdef CLOUD_RAIN_KEEPS_SHAPE
     float density = d * water * rainMottle * cloudStyleDensity(ctx, lightPath);
+#else
+    // 雨天の濃さの倍率も見た目と同じ範囲で移す (雨上がりの rainWetness が残る間に、層積雲の切れ端まで濃い白い欠片にならないように)
+    float density = d * water * rainMottle * cloudRainDensityScale(ctx);
+    // 光源方向は芯の実測の消散係数で陰を見積もっているので (CLOUD_LIGHT_OD_SCALE)、視線の濃さがそれを超えた分だけ濃くする
+    density *= mix(lightPath ? max(CS_DENSITY / CLOUD_STYLE_LIGHT_SIGMA_RATIO, 1.0) : CS_DENSITY, 1.0, rainLook);
+#endif
     if (fractus > density) { cloudHeight = fractusHeight; return fractus; }
     return density;
 #else
@@ -373,8 +382,8 @@ float cloudLowDensityCumulus(CloudContext ctx, CloudColumn col, vec2 rel, float 
 
 float cloudLowDensity(CloudContext ctx, CloudColumn col, vec2 rel, float altitude, float detail, bool lightPath, out float cloudHeight) {
 #ifdef CLOUD_VANILLA_SHAPE
-    // 低層はバニラの形の雲 (cloud_vanilla.glsl) が担い、積雲の形は描かない。雷雨 (と CLOUD_RAIN_RESHAPE が 0 でない雨) は
-    // 降り始めのうちに積雲の形 (乱層雲・積乱雲) へ移す (バニラの形の雲と雨雲が重なる間が長いと、バニラの形の明るい筋が雨雲に残る)
+    // 低層はバニラの形の雲 (cloud_vanilla.glsl) が担い、積雲の形は描かない。雷雨は
+    // 降り始めのうちに積雲の形 (積乱雲) へ移す (バニラの形の雲と雨雲が重なる間が長いと、バニラの形の明るい筋が雨雲に残る)
     float rainLook = cloudVanillaRainLook(ctx.reshape);
     if (rainLook <= 0.0) { cloudHeight = 0.5; return 0.0; }
     return cloudLowDensityCumulus(ctx, col, rel, altitude, detail, lightPath, cloudHeight) * rainLook;

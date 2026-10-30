@@ -84,7 +84,7 @@ struct CloudClimate {
     float convection; // 対流の強さ (積雲の背の高さ)
     float rain;
     float rainLight;  // 雲の中の光の雨天度 (被覆より早く切り替わる)
-    float reshape;      // 雨が雲の量・雲種・形を雨雲へ変える度合い (rain の CLOUD_RAIN_RESHAPE 倍。雷雨は常に変える)
+    float reshape;      // 雨が雲の量・雲種・形を雨雲へ変える度合い (rain の cloudRainReshape() 倍。バニラの形以外は rain そのもの、雷雨は常に変える)
     float reshapeLight; // 同じ度合いを rainLight で測ったもの (中層のベール)
     float thunder;
     float storm;      // 晴れた日の積乱雲の出やすさ (遠くだけに立てる)

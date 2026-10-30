@@ -333,6 +333,7 @@ void cloudComposite(CloudContext ctx, inout vec3 scattering, inout float transmi
     transmittance *= layer.transmittance;
 }
 
+#ifdef CLOUD_RAIN_KEEPS_SHAPE
 /*
  * 雨の日の雲の向こうの空を置き換える、雲の上の見えない雨雲の層の下面 (rgb = 放射輝度, a = 置き換える割合)
  * 雲のマーチの末尾と、水面などの反射の空 (prepare2 が frameData.skyParams[6] に書き、skyReflectionFallback が使う) で同じ値にする
@@ -342,6 +343,7 @@ vec4 cloudRainVeil(CloudContext ctx, CloudLighting l) {
     vec3 radiance = (l.skyRadiance + l.lightIrradiance * (CLOUD_RAIN_VEIL_SUN * max(l.lightDir.y, 0.0) * RCP_PI)) * CLOUD_RAIN_VEIL_GAIN;
     return vec4(radiance, veil);
 }
+#endif
 
 /*
  * 視線 dir の雲 (降水の柱 + 低層 + 中層 + 上層を手前から順に)。maxDist: 地形までの距離 (ワールド, 空なら大きな値)
@@ -358,7 +360,7 @@ vec4 renderClouds(vec3 dir, float maxDist, vec2 dither) {
     vec2 segLow = cloudLayerSegment(y0, dir.y, CLOUD_BASE, ctx.lowTopWorld);
     segLow.y = min(segLow.y, farLimit);
 #ifdef CLOUD_VANILLA_SHAPE
-    // 低層はバニラの形の雲が担うので積雲のマーチは回さない。雷雨 (と CLOUD_RAIN_RESHAPE が 0 でない雨) は降り始めのうちに雨雲へ移る
+    // 低層はバニラの形の雲が担うので積雲のマーチは回さない。雷雨は降り始めのうちに雨雲へ移る
     float rainLook = cloudVanillaRainLook(ctx.reshape);
     if (rainLook <= 0.0) segLow = vec2(1.0, 0.0);
     vec2 segVanilla = vanillaCloudSegment(y0, dir.y, min(maxDist, VANILLA_CLOUD_FAR));
@@ -432,6 +434,7 @@ vec4 renderClouds(vec3 dir, float maxDist, vec2 dither) {
         }
 #endif
     }
+#ifdef CLOUD_RAIN_KEEPS_SHAPE
     // 雨の空: 雲の向こうの空は、雲の上の見えない雨雲の層の下面 (一様な灰色) にする。雲の形と量は変えず、隙間から晴れの青空や
     // 太陽が見えないようにするだけ。地形のある画素の手前の雲には掛けない。雷雨は雲の側で覆うので掛けない
     if (maxDist > 1e8) {
@@ -439,6 +442,7 @@ vec4 renderClouds(vec3 dir, float maxDist, vec2 dither) {
         scattering += transmittance * veil.a * veil.rgb;
         transmittance *= 1.0 - veil.a;
     }
+#endif
     return vec4(scattering, transmittance);
 }
 

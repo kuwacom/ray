@@ -285,7 +285,7 @@ void main() {
     imageStore(cloudWeatherImg, texel, cloudWeatherTexel(world, climate));
 
     CloudContext ctx = cloudContextSetup(climate);
-#ifdef HAS_SKY
+#if defined CLOUD_RAIN_KEEPS_SHAPE && defined HAS_SKY
     // 雨の日の雲の向こうの空の置き換え。水面などの反射の空を、雲のバッファの空と同じ灰色にそろえるために書く
     if (texel == ivec2(0)) frameData.skyParams[6] = cloudRainVeil(ctx, cloudLightingSetup(vec3(0.0, 1.0, 0.0), ctx.rainLight));
 #endif
