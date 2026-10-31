@@ -355,6 +355,8 @@ vec4 renderClouds(vec3 dir, float maxDist, vec2 dither) {
     CloudLighting l = cloudLightingSetup(dir, ctx.rainLight);
     vec3 skyColor = getSkyRadiance(dir);
     float y0 = cameraPosition.y;
+    // 雲の上から見下ろす視線は、雲の向こうが描画距離の外の虚空 (renderSky が描く青い遠景) なので、雲の縁に戻す空の色も同じにする
+    if (dir.y < 0.0 && y0 > cloudLowestBase()) skyColor = skyBelowHorizon(dir, skyColor);
     float farLimit = min(maxDist, CLOUD_MAX_DISTANCE_WORLD);
 
     vec2 segLow = cloudLayerSegment(y0, dir.y, CLOUD_BASE, ctx.lowTopWorld);

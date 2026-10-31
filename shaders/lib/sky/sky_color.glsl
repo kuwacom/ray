@@ -56,6 +56,9 @@ const float SKY_VOID_MAX_GAIN_SUN = 1.6;
 const float SKY_VOID_SUN_COS_NEAR = 0.9986; // 3 度
 const float SKY_VOID_SUN_COS_FAR = 0.866;   // 30 度
 const float SKY_DISTANT_GROUND_OVERCAST = 0.85; // 雨雲で直達光が減る割合
+// 描画距離を 1 として、地面までの距離がこれだけ描画距離を超えるごとに、地面の色が空の色へ溶ける割合 (1 - 1/e) が増える
+const float SKY_VOID_AERIAL_LENGTH = 1.0;
+const float SKY_VOID_AERIAL_LOW_SUN_KEEP = 0.5; // 太陽が低い時に、地平線の色のまま残す割合
 const float SKY_DISTANT_GROUND_MIN_HEIGHT = 8.0; // 海面より低い視点でも地面までの距離を 0 にしない
 const float SKY_HORIZON_SAMPLE_MU = 0.004;    // 地平線の色を読む高さ (地平線の真上の LUT の継ぎ目を避ける)
 const float SKY_SHADOWED_HAZE_MU = 0.15;      // 朝夕の地表のもやの色を読む高さ
@@ -283,6 +286,7 @@ vec3 getSkyRadiance(vec3 dir) {
 // fog.glsl
 vec3 fogVoidTransmittance(vec3 dir, float groundDist);
 vec3 fogAirSkyDir(vec3 dir, float mu);
+float fogRenderDistance();
 vec3 skyBelowHorizon(vec3 dir, vec3 sky) {
 #if defined HAS_SKY
     float horizonMu = atmoHorizonMu(atmoViewerRadius());
@@ -307,9 +311,18 @@ vec3 skyBelowHorizon(vec3 dir, vec3 sky) {
     albedo = mix(albedo, SKY_DISTANT_SAND_ALBEDO, saturate(distantSand));
     vec3 ground = irradiance * (albedo * RCP_PI);
     // 海: 同じ方位で地平線から同じ角度だけ上の空を映す
-    vec3 sea = getSkyRadiance(vec3(dir.x, horizonMu + below, dir.z)) * SKY_DISTANT_OCEAN_REFLECTANCE;
+    vec3 mirrored = getSkyRadiance(vec3(dir.x, horizonMu + below, dir.z));
+    vec3 sea = mirrored * SKY_DISTANT_OCEAN_REFLECTANCE;
     ground = mix(ground, sea, saturate(distantOcean));
     vec3 result = mix(horizon, ground, transmittance);
+    // 描画距離から遠い地面ほど、地面の色 (雪原は白い) を捨てて、見下ろした角度の上の空の青へ溶かす。
+    // 描画距離の端 (dist = 描画距離) では 0 なので、端で止まる地形との継ぎ目は出ない。地平線のすぐ下 (below が小さい) は
+    // 地平線の色とほぼ同じ空なので、地上から見た見た目は変わらず、高所から見下ろす角度ほど青くなる
+    float renderDistance = fogRenderDistance();
+    float toAerial = 1.0 - exp(-max(dist - renderDistance, 0.0) / (SKY_VOID_AERIAL_LENGTH * renderDistance));
+    // 朝夕は地表近くのもやが地平線の橙を保つので、上の空の青へは半分ほどしか寄せない
+    toAerial *= 1.0 - SKY_VOID_AERIAL_LOW_SUN_KEEP * lowSun;
+    result = mix(result, mix(mirrored, sea, saturate(distantOcean)), toAerial);
     // 太陽から離れた方位では地平線の空より明るくしない (日の当たる霞の上面が空より明るく光るのは太陽の近くだけ)
     vec3 horizonSky = getSkyRadiance(vec3(dir.x, horizonMu + SKY_HORIZON_SAMPLE_MU, dir.z));
     float nearSun = sqr(smoothstep(SKY_VOID_SUN_COS_FAR, SKY_VOID_SUN_COS_NEAR, dot(dir, getSunDir())));
