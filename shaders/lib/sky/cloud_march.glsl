@@ -85,15 +85,26 @@ CloudAccum cloudMarchLow(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, 
 }
 
 #ifdef CLOUD_VANILLA_SHAPE
+// 光源が低い (朝夕) ほど 1
+float cloudVanillaDusk(CloudLighting l) { return 1.0 - smoothstep(0.0, VANILLA_CLOUD_DUSK_SUN_Y, l.lightDir.y); }
+
 // 板の光の絞り (cloud_vanilla.glsl の VANILLA_CLOUD_*)
 CloudLighting cloudVanillaLighting(CloudLighting l) {
     l.lightIrradiance *= VANILLA_CLOUD_SUN;
     l.msGain *= VANILLA_CLOUD_MS_GAIN;
     l.silverBoost *= VANILLA_CLOUD_SILVER;
     l.powder = min(l.powder * VANILLA_CLOUD_POWDER, 1.0);
-    l.ambient *= VANILLA_CLOUD_AMBIENT;
-    l.skyRadiance = mix(vec3(luminance(l.skyRadiance)), l.skyRadiance, VANILLA_CLOUD_SKY_SATURATION);
-    l.groundRadiance = mix(vec3(luminance(l.groundRadiance)), l.groundRadiance, VANILLA_CLOUD_SKY_SATURATION);
+    // 日が低いと直達光は板を横に長く抜けて届かず底が沈むので、空の光・多重散乱・直達光を持ち上げる
+    float dusk = cloudVanillaDusk(l);
+    float duskGain = 1.0 + VANILLA_CLOUD_DUSK_GAIN * dusk;
+    l.msGain *= duskGain;
+    l.ambient *= VANILLA_CLOUD_AMBIENT * duskGain;
+    l.lightIrradiance *= 1.0 + VANILLA_CLOUD_DUSK_SUN_GAIN * dusk;
+    l.bottomLight = max(1.0 - (1.0 - l.bottomLight) * VANILLA_CLOUD_BASE_SHADE, 0.0);
+    l.bottomSun = max(1.0 - (1.0 - l.bottomSun) * VANILLA_CLOUD_BASE_SHADE, 0.0);
+    float saturation = mix(VANILLA_CLOUD_SKY_SATURATION, VANILLA_CLOUD_DUSK_SATURATION, dusk);
+    l.skyRadiance = mix(vec3(luminance(l.skyRadiance)), l.skyRadiance, saturation);
+    l.groundRadiance = mix(vec3(luminance(l.groundRadiance)), l.groundRadiance, saturation);
     return l;
 }
 
@@ -103,6 +114,8 @@ CloudLighting cloudVanillaLighting(CloudLighting l) {
  */
 CloudAccum cloudMarchVanilla(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, vec2 dither, float weight) {
     l = cloudVanillaLighting(l);
+    // 日が低いと底にも横から日が届くので、底の暗さを掛け始める高さを下げる
+    float baseLift = VANILLA_CLOUD_BASE_LIFT * (1.0 - cloudVanillaDusk(l));
     CloudAccum acc = CloudAccum(vec3(0.0), 1.0, 0.0, 0.0);
     float segLength = seg.y - seg.x;
     int steps = clamp(int(segLength / VANILLA_CLOUD_STEP_LENGTH), VANILLA_CLOUD_MIN_STEPS, VANILLA_CLOUD_STEPS);
@@ -126,7 +139,7 @@ CloudAccum cloudMarchVanilla(CloudContext ctx, CloudLighting l, vec3 dir, vec2 s
         float odSky = vanillaCloudSkyOD(q, y) * weight;
         vec2 rel = dir.xz * (t * CLOUD_KH);
         float upperT = cloudUpperTransmittance(ctx, rel, altitude, cloudRefDir(l.lightDir, CLOUD_KH, slope));
-        vec3 inscatter = cloudInscatter(l, extinction, odLight, 0.0, odSky, sqr(1.0 - slabHeight), upperT, slabHeight);
+        vec3 inscatter = cloudInscatter(l, extinction, odLight, 0.0, odSky, sqr(1.0 - slabHeight), upperT, max(slabHeight - baseLift, 0.0));
 
         float stepT = exp(-extinction * dt * VANILLA_CLOUD_KREF);
         float w = acc.transmittance * (1.0 - stepT);
