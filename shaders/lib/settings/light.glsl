@@ -11,6 +11,7 @@
 #define LIGHT_FLICKER // 炎系光源の揺らぎ
 #define DECORATIVE_BLOCK_LIGHTS 0 // [0 1 2] 光らない鉱物ブロック (ラピス・エメラルド・ダイヤ・金・レッドストーン・アメジスト) 0=そのまま 1=発光のみ 2=光源
 #define LIGHT_SHADOWS // 設置光源の光源シャドウ (直接光のレイトレース)
+#define LIGHT_SHADOW_STRENGTH 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0] 設置光源 (ドロップ・燃焼・発光エンティティの光も) の影の濃さ 0=影なし 1=真っ暗な影
 #define LIGHT_TRACE_COUNT 4 // [1 2 3 4 6 8 12 16] 1 ピクセルあたりトレースする光源数
 #define LIGHT_TRACE_RES 2 // [1 2 4] トレース解像度の分母 (1=フル 2=半分 4=1/4)
 #define LIGHT_SHAPE_TRACE // ハーフブロック等の形状で遮蔽判定
@@ -34,7 +35,7 @@
 #define HAND_LIGHT_RAYS // 手持ち光源のレイトレース影
 #define HAND_LIGHT_SS_SHADOWS // 手持ち光源のスクリーンスペース影 (手・エンティティの遮蔽)
 #define HAND_LIGHT_BRIGHTNESS 1.0 // [0.1 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0 4.0]
-#define HAND_LIGHT_SHADOW_STRENGTH 0.6 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1.0] 手持ち光源の陰の濃さ 0=薄い 1=真っ暗
+#define HAND_LIGHT_SHADOW_STRENGTH 0.6 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1.0] 手持ち光源の影の濃さ 0=影なし 0.6=直接光の影は真っ暗 (照り返しあり) 1=照り返しなし
 #define ENTITY_LIGHTS // 動的エンティティ光源の総スイッチ
 #define ITEM_LIGHTS // ドロップした光源アイテム
 #define PROJECTILE_LIGHTS // 投擲物 (光る矢・火の玉等)

@@ -145,7 +145,7 @@ vec3 secondaryHitBlockLight(vec3 playerPos, vec3 normal, ivec2 screenTexel, floa
             }
             if (strongest >= 0) {
                 uint flags = blockLightTraceFlags() & ~(TRACE_ENTITIES | TRACE_PLAYER);
-                E *= luminance(traceVisibility(fromVoxel, globalLights.lights[strongest].posRadius.xyz, flags, 0.5, 0.0, 0.0));
+                E *= luminance(blockLightShadow(traceVisibility(fromVoxel, globalLights.lights[strongest].posRadius.xyz, flags, 0.5, 0.0, 0.0)));
             }
             if (nearField) E += sumBinBoxIrradiance(fromVoxel, normal);
         }

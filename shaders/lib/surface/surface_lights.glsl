@@ -17,6 +17,7 @@
 //@include "/lib/common/transforms.glsl"
 //@include "/lib/common/uniforms.glsl"
 //@include "/lib/common/voxel_space.glsl"
+//@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/light/blocklight.glsl"
 //@include "/lib/light/floodfill.glsl"
 //@include "/lib/light/hand_light.glsl"
@@ -56,6 +57,11 @@ const uint SL_BLOCK_SPECULAR_TRACED = 1u << 9; // 鏡面の光源を 1 つずつ
 const vec2 SHADOW_FALLBACK_SKYLIGHT = vec2(0.8, 0.97);
 // GI が空の光を運ぶ時 (GI_TRACES_SKY): ボクセル体積の判定で面から浮かせる量
 const float GI_VOLUME_TEST_OFFSET = 0.1;
+
+// 影を落とす天体の影の濃さ (昼 = 太陽, 夜・エンド = 月)。可視率に mix(1, 可視率, 濃さ) で掛ける
+float celestialShadowStrength() {
+    return frameData.shadowLightIrradiance.a > 0.5 ? SUN_SHADOW_STRENGTH : MOON_SHADOW_STRENGTH;
+}
 
 // 洞窟の最低限の可視光と暗視の環境光 (照度)。AO は呼ぶ側で掛ける
 float minAmbientIrradiance() { return MIN_AMBIENT + nightVision * NIGHT_VISION_AMBIENT; }
@@ -133,15 +139,18 @@ SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, ui
 
     if ((terms & SL_GI) != 0u) L.indirect = getIndirectLight(p.texel);
 
+    // 影の濃さ (SUN_SHADOW_STRENGTH / MOON_SHADOW_STRENGTH) は影マップ・接触影・POM の可視率だけに掛け、雲影は対象外
+    float shadowStrength = celestialShadowStrength();
     if (sunMode == SL_SUN_SHADOW_MAP) {
         L.celestial = getCelestialLight();
         if ((terms & SL_SUN_LEAF) != 0u) {
             float cloud = getCloudShadow(p.playerPos);
             vec3 specular;
-            L.sunVisAll = getSunShadow(p.playerPos, p.geoNormal, p.dither, specular) * cloud;
-            L.sunVis = specular * cloud;
+            vec3 withLeaf = getSunShadow(p.playerPos, p.geoNormal, p.dither, specular);
+            L.sunVisAll = mix(vec3(1.0), withLeaf, shadowStrength) * cloud;
+            L.sunVis = mix(vec3(1.0), specular, shadowStrength) * cloud;
         } else {
-            L.sunVis = getSunShadow(p.playerPos, p.geoNormal, p.dither) * getCloudShadow(p.playerPos);
+            L.sunVis = mix(vec3(1.0), getSunShadow(p.playerPos, p.geoNormal, p.dither), shadowStrength) * getCloudShadow(p.playerPos);
             L.sunVisAll = L.sunVis;
         }
         L.sun = L.celestial;
@@ -170,6 +179,9 @@ SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, ui
             leaf *= contact;
         }
 #endif
+        // 葉を透過した分も S 倍にして、葉でない遮蔽の分が 1 - S + S x 元の値になるようにする
+        vis = mix(vec3(1.0), vis, shadowStrength);
+        leaf *= shadowStrength;
         L.cloudShadow = getCloudShadow(p.playerPos);
         L.sunVisAll = vis * L.cloudShadow;
         if ((terms & SL_SUN_LEAF) != 0u) {
@@ -186,7 +198,7 @@ SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, ui
         L.sun = L.celestial;
         L.sun.irradiance = vec3(0.0);
         if (NoL > 0.0) {
-            L.sun.irradiance += L.celestial.irradiance * NoL * sampleShadowVolume(p.playerPos + p.normal * 0.08) * getCloudShadow(p.playerPos);
+            L.sun.irradiance += L.celestial.irradiance * NoL * mix(vec3(1.0), sampleShadowVolume(p.playerPos + p.normal * 0.08), shadowStrength) * getCloudShadow(p.playerPos);
         }
     }
 

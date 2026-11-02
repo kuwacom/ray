@@ -49,6 +49,9 @@ const float HAND_DISK_PHASE_OFFSET = 0.27;
 const float HAND_THIRD_PERSON_SELF_SKIP = 0.45;
 // 三角形方式で手の光源から自分の三角形を無視する距離 (光源を持つ手と腕の先)。形どおりなのでボクセルより短くてよい
 const float HAND_TRI_SELF_SKIP = 0.3;
+// 直接光の影が真っ暗になる HAND_LIGHT_SHADOW_STRENGTH。これ未満では影が薄くなり、これ以上では陰の照り返しだけが減る
+const float HAND_SHADOW_FULL_STRENGTH = 0.6;
+const float HAND_DIRECT_SHADOW_STRENGTH = min(HAND_LIGHT_SHADOW_STRENGTH / HAND_SHADOW_FULL_STRENGTH, 1.0);
 
 // プレイヤーの目の位置 (player 空間)。relativeEyePosition = cameraPosition - eyePosition
 vec3 getEyePlayerPos() { return -relativeEyePosition; }
@@ -160,14 +163,14 @@ LightSample evalHandLight(bool mainHand, vec3 playerPos, vec3 geoNormal, float d
             skipEnd = HAND_THIRD_PERSON_SELF_SKIP;
         }
     #endif
-        s.irradiance *= traceVisibility(fromVoxel, target, flags, dither, TRACE_ENTITY_SKIP_START, skipEnd);
+        s.irradiance *= mix(vec3(1.0), traceVisibility(fromVoxel, target, flags, dither, TRACE_ENTITY_SKIP_START, skipEnd), HAND_DIRECT_SHADOW_STRENGTH);
     }
 #endif
 #ifdef HAND_LIGHT_SS_SHADOWS
     if (maxOf(s.irradiance) > 0.0) {
         // 光源の直前 (手・たいまつ自身の形) までで止める
         float len = min(dist - HAND_SS_END_MARGIN, HAND_SS_LENGTH);
-        s.irradiance *= lightContactShadow(playerPos, geoNormal, s.direction, len, HAND_SS_STEPS, dither);
+        s.irradiance *= mix(1.0, lightContactShadow(playerPos, geoNormal, s.direction, len, HAND_SS_STEPS, dither), HAND_DIRECT_SHADOW_STRENGTH);
     }
 #endif
     return s;
@@ -182,6 +185,7 @@ const float HAND_LIGHT_FILL = 0.18;
 
 /*
  * 手持ち光の照り返し (陰の中に回り込む分) の倍率。HAND_LIGHT_SHADOW_STRENGTH = 0.5 で 1 倍、1 で照り返しなし
+ * 直接光の影の濃さ (HAND_DIRECT_SHADOW_STRENGTH) は 0.6 以上で最大なので、0.6 から上は影の濃さそのままで照り返しだけが減る
  * 陰の中の明るさは、GI_MODE 0/1 ではほぼこの getHandLightFill だけ、GI_MODE 2/3 では GI のヒット点の手持ち光
  * (lib/surface/lighting.glsl の secondaryHitBlockLight) と半分ずつ (ゲーム内で計測)。両方に同じ倍率を掛ける
  */

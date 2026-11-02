@@ -115,7 +115,7 @@ vec3 traceBlockLight(int li, vec3 fromVoxel, vec3 playerPos, vec3 geoNormal, uin
         vis *= lightContactShadow(playerPos, geoNormal, normalize(target - fromVoxel), len, LIGHT_CONTACT_STEPS, dither);
     }
 #endif
-    return vis;
+    return blockLightShadow(vis);
 }
 
 void main() {

@@ -106,6 +106,8 @@ value.DECORATIVE_BLOCK_LIGHTS.1=Glow Only
 value.DECORATIVE_BLOCK_LIGHTS.2=Light Source
 option.LIGHT_SHADOWS=Light Source Shadows
 option.LIGHT_SHADOWS.comment=Ray traces the strongest nearby lights so blocks, players and entities cast shadows from placed lights.
+option.LIGHT_SHADOW_STRENGTH=Placed Light Shadow Darkness
+option.LIGHT_SHADOW_STRENGTH.comment=How dark the shadows cast by placed lights are, including dropped, burning and glowing entities. 0 = no shadows, 1 = full shadows.
 option.LIGHT_TRACE_COUNT=Traced Lights per Pixel
 option.LIGHT_TRACE_RES=Trace Resolution
 option.LIGHT_TRACE_RES.comment=Resolution of the light shadow trace. Lower is faster but noisier.
@@ -163,7 +165,7 @@ option.HAND_LIGHT_SS_SHADOWS=Handheld Light Contact Shadows
 option.HAND_LIGHT_SS_SHADOWS.comment=Screen space shadows from your hand and nearby entities.
 option.HAND_LIGHT_BRIGHTNESS=Handheld Light Brightness
 option.HAND_LIGHT_SHADOW_STRENGTH=Handheld Light Shadow Darkness
-option.HAND_LIGHT_SHADOW_STRENGTH.comment=How dark the shadows cast by a handheld light are. Lower lets more bounced light into the shadows, 1 = no bounce light from the handheld light.
+option.HAND_LIGHT_SHADOW_STRENGTH.comment=How dark the shadows cast by a handheld light are. 0 = no shadows. At 0.6 the direct shadow is full and some bounced light reaches it; above that only the bounced light shrinks, 1 = no bounce light from the handheld light.
 option.ENTITY_LIGHTS=Entity Lights
 option.ENTITY_LIGHTS.comment=Master switch for dynamic light from entities.
 option.ITEM_LIGHTS=Dropped Item Lights
@@ -190,6 +192,10 @@ value.SHADOW_FILTER.1=PCF
 value.SHADOW_FILTER.2=PCSS
 option.SHADOW_SAMPLES=Shadow Samples
 option.SHADOW_SOFTNESS=Shadow Softness
+option.SUN_SHADOW_STRENGTH=Sun Shadow Darkness
+option.SUN_SHADOW_STRENGTH.comment=How dark the shadows cast by the sun are. 0 = no shadows, 1 = full shadows. Cloud shadows are not affected.
+option.MOON_SHADOW_STRENGTH=Moon Shadow Darkness
+option.MOON_SHADOW_STRENGTH.comment=How dark the shadows cast by the moon and the End light are. 0 = no shadows, 1 = full shadows.
 option.SHADOW_COLORED=Colored Shadows
 option.SHADOW_COLORED.comment=Stained glass and water cast colored sun shadows.
 option.SHADOW_LEAF_TINT=Leaf Transmission

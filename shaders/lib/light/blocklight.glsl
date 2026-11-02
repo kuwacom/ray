@@ -88,7 +88,7 @@ vec3 getBlockLightForwardEntity(vec3 playerPos, vec3 geoNormal, vec3 normal, flo
             float dist = distance(L.posRadius.xyz, fromVoxel);
             if (dist >= L.posRadius.w) continue;
             // 半影の揺らぎは入れない (この経路はデノイズも TAA の速度も無いので、ノイズがそのまま残る)
-            vec3 vis = traceVisibility(fromVoxel, L.posRadius.xyz, flags, 0.5, 0.0, 0.0);
+            vec3 vis = blockLightShadow(traceVisibility(fromVoxel, L.posRadius.xyz, flags, 0.5, 0.0, 0.0));
             direct += evalLightIrradiance(L, fromVoxel, normal, geoNormal) * vis + lightBoxIrradiance(L, fromVoxel, geoNormal);
             bounce += L.colorSize.rgb * lightFalloff(dist, L.posRadius.w) * vis;
             traced++;
@@ -147,7 +147,7 @@ int getBlockLightSpecular(ivec2 texel, vec3 playerPos, vec3 geoNormal, bool trac
         float dist = length(toL);
         s[j].direction = toL / max(dist, EPS);
         s[j].irradiance = L.colorSize.rgb * lightFalloff(dist, L.posRadius.w) * scale;
-        if (traced) s[j].irradiance *= traceVisibility(fromVoxel, L.posRadius.xyz, traceFlags, 0.5, 0.0, 0.0);
+        if (traced) s[j].irradiance *= blockLightShadow(traceVisibility(fromVoxel, L.posRadius.xyz, traceFlags, 0.5, 0.0, 0.0));
         s[j].angularSize = atan(L.colorSize.a, max(dist, EPS));
         count++;
     }

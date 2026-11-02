@@ -62,6 +62,9 @@ uint blockLightTraceFlags() {
     return f;
 }
 
+// 設置光源の影の濃さ。可視率の遮られた分を LIGHT_SHADOW_STRENGTH 倍にする (1 でそのまま、0 で影なし)
+vec3 blockLightShadow(vec3 vis) { return mix(vec3(1.0), vis, LIGHT_SHADOW_STRENGTH); }
+
 // 部分形状のうち、形状判定なしでも完全なブロックとして遮るもの (階段は 3/4 が埋まっている)
 bool isShapeOccluderWithoutTrace(int voxelId) {
     return (voxelId >= BLOCK_STAIRS_FIRST && voxelId <= BLOCK_STAIRS_LAST) || voxelId == BLOCK_DOOR_CLOSED;
