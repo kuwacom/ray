@@ -168,13 +168,18 @@ vec4 cloudWeatherTexel(vec2 world, CloudClimate c) {
 /*
  * カメラの位置の雲の媒質 (fog_apply が雲の中の霧として掛ける)
  * skyParams[4] = (太陽の光, 濃さ), skyParams[5] = (空の光, 霧の消散係数 1/ブロック)。濃さが 0 なら雲の外
- * 縁で急に切り替わらないよう、周りの数点の平均の濃さにする。密度の場もカメラの動きも滑らかなので時間方向には均さない
+ * 縁で急に切り替わらないよう、周りの点 (中心・上下・水平の 2 つの輪) の平均の濃さから霧の濃さを作る。縁から輪の半径ほど中へ入るまで
+ * 霧は滑らかに濃くなり、出るときも同じ距離で薄くなる。密度の場もカメラの動きも滑らかなので時間方向には均さない
  * (均すと雲を出た後も遠景が白いまま残る)
  */
-const int CLOUD_INTERIOR_TAPS = 7;                // 中心 + 上下左右前後
-const float CLOUD_INTERIOR_RADIUS = 5.0;          // ブロック (水平。雲の縁で霧が立ち上がる幅)
+const int CLOUD_INTERIOR_RING_TAPS = 8;           // 輪 1 つの点の数
+const int CLOUD_INTERIOR_TAPS = 3 + 2 * CLOUD_INTERIOR_RING_TAPS; // 中心 + 上下 + 2 つの輪
+const vec2 CLOUD_INTERIOR_RING_RADIUS = vec2(4.0, 12.0); // ブロック (水平。遠い輪の半径が霧の立ち上がる幅の目安。バニラの形の 1 マス)
 const float CLOUD_INTERIOR_RADIUS_Y = 3.0;        // ブロック (鉛直)
-const vec2 CLOUD_INTERIOR_ENTER = vec2(0.05, 0.35); // この平均の濃さの間で霧を立ち上げる (縁の外の薄いもやでは霧にしない。雲の中の平均は 0.4 前後)
+const vec2 CLOUD_INTERIOR_ENTER = vec2(0.05, 0.35); // この平均の濃さの間で霧を立ち上げる (縁の外の薄いもやでは霧にしない。体積雲の中の平均は 0.4 前後)
+// バニラの形の板は中で濃さが 1 に揃うので、平均が最大 (全点が板の中) の 17/19 に届くまでを縁からの距離で立ち上げる
+const vec2 CLOUD_INTERIOR_SLAB_ENTER = vec2(0.47, 0.88);
+const float CLOUD_INTERIOR_SLAB_FACE = 0.5;       // 板の厚みの割合: 上面・下面からこの深さまで霧を立ち上げる (板の外へ出る縁もなめらかにする)
 const float CLOUD_INTERIOR_MID_SHARE = 0.5;       // 中層の雲は薄いので低層より霧を弱める
 const float CLOUD_INTERIOR_MIN_SHARE = 0.5;       // 雲のマーチが濃くても、霧は視程の消散係数のこの割合を下限にする (遠くで空と地形の雲の色の差を残さない)
 const float CLOUD_INTERIOR_SATURATION = 0.5;      // 空の光の彩度の残し方 (雲の中は何度も散乱して色が抜ける。空の青のままだと青い霧に見える)
@@ -182,16 +187,19 @@ const float CLOUD_INTERIOR_LIGHT_DITHER = 0.5;    // 光方向のマーチの開
 
 // i 番目の点のカメラからのずれ (ワールド, ブロック)
 vec3 cloudInteriorTap(int i) {
-    vec3 offset = vec3(0.0);
-    if (i > 0) {
-        int axis = (i - 1) >> 1;
-        offset[axis] = ((i & 1) == 1 ? 1.0 : -1.0) * (axis == 1 ? CLOUD_INTERIOR_RADIUS_Y : CLOUD_INTERIOR_RADIUS);
-    }
-    return offset;
+    if (i == 0) return vec3(0.0);
+    if (i < 3) return vec3(0.0, (i == 1 ? 1.0 : -1.0) * CLOUD_INTERIOR_RADIUS_Y, 0.0);
+    int ring = (i - 3) / CLOUD_INTERIOR_RING_TAPS;
+    // 輪ごとに半歩ずらして、軸に沿った縁だけに偏らないようにする
+    float angle = (float(i - 3 - ring * CLOUD_INTERIOR_RING_TAPS) + 0.5 * float(ring)) * (TAU / float(CLOUD_INTERIOR_RING_TAPS));
+    return vec3(cos(angle), 0.0, sin(angle)) * CLOUD_INTERIOR_RING_RADIUS[ring];
 }
 
-// カメラからのずれ offset の点の雲の濃さ [0,1]。cloudHeight: 低層の雲の中の高さ、marchExtinction: 雲のマーチがその点に持つ消散係数 (1/ブロック)
-float cloudInteriorDensity(CloudContext ctx, vec3 offset, out float cloudHeight, out float marchExtinction) {
+/*
+ * カメラからのずれ offset の点の雲の濃さ [0,1] (体積の層。バニラの形の板は slabDensity に分ける)
+ * cloudHeight: 低層の雲の中の高さ、marchExtinction: 雲のマーチがその点に持つ消散係数 (1/ブロック)
+ */
+float cloudInteriorDensity(CloudContext ctx, vec3 offset, out float cloudHeight, out float marchExtinction, out float slabDensity) {
     float y = cameraPosition.y + offset.y;
     vec2 rel = offset.xz * CLOUD_KH;
     float altitude = cloudRefAltitude(y);
@@ -199,10 +207,11 @@ float cloudInteriorDensity(CloudContext ctx, vec3 offset, out float cloudHeight,
     float low = cloudLowDensity(ctx, cloudLowColumn(map), rel, altitude, 0.0, false, cloudHeight);
     float rho = low;
     marchExtinction = low * CLOUD_LOW_SIGMA * CLOUD_KH;
+    slabDensity = 0.0;
     #ifdef CLOUD_VANILLA_SHAPE
     float slab = vanillaCloudDensity(vanillaCloudOrigin() + offset.xz, y);
     float slabShare = 1.0 - cloudVanillaRainLook(ctx.reshape);
-    rho = max(rho, slab * slabShare);
+    slabDensity = slab * slabShare;
     marchExtinction += slab * slabShare * cloudRainDensityScale(ctx) * VANILLA_CLOUD_SIGMA * VANILLA_CLOUD_KREF;
     #endif
     #ifdef CLOUD_MID_LAYER
@@ -215,19 +224,27 @@ float cloudInteriorDensity(CloudContext ctx, vec3 offset, out float cloudHeight,
 
 void cloudInteriorWrite(CloudContext ctx) {
     float rho = 0.0;
+    float slabRho = 0.0;
     float extinction = 0.0;
     float cloudHeight = 0.5;
     for (int i = 0; i < CLOUD_INTERIOR_TAPS; i++) {
-        float height, tapExtinction;
-        rho += cloudInteriorDensity(ctx, cloudInteriorTap(i), height, tapExtinction);
+        float height, tapExtinction, tapSlab;
+        rho += cloudInteriorDensity(ctx, cloudInteriorTap(i), height, tapExtinction, tapSlab);
+        slabRho += tapSlab;
         extinction += tapExtinction;
         if (i == 0) cloudHeight = height;
     }
     rho /= float(CLOUD_INTERIOR_TAPS);
+    slabRho /= float(CLOUD_INTERIOR_TAPS);
     // 雲のマーチがすでに持つ消散を差し引いて、マーチと霧の合計が設定の視程になるようにする (薄い雲だけ霧が足す)
     float fogExtinction = max(CLOUD_INTERIOR_EXTINCTION - extinction / float(CLOUD_INTERIOR_TAPS), CLOUD_INTERIOR_EXTINCTION * CLOUD_INTERIOR_MIN_SHARE);
     // 縁の立ち上がりを緩くするため 2 乗する (濃さが小さくても遠景を白く閉じてしまうので、縁ではまず手前だけが霞むように)
     rho = sqr(smoothstep(CLOUD_INTERIOR_ENTER.x, CLOUD_INTERIOR_ENTER.y, rho));
+    #ifdef CLOUD_VANILLA_SHAPE
+    float slabY = (cameraPosition.y - vanillaCloudBottom()) / VANILLA_CLOUD_THICKNESS;
+    float faceFade = smoothstep(0.0, CLOUD_INTERIOR_SLAB_FACE, min(slabY, 1.0 - slabY));
+    rho = max(rho, smoothstep(CLOUD_INTERIOR_SLAB_ENTER.x, CLOUD_INTERIOR_SLAB_ENTER.y, slabRho) * faceFade);
+    #endif
 
     vec3 sun = vec3(0.0);
     vec3 ambient = vec3(0.0);
