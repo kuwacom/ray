@@ -5,6 +5,7 @@
 #ifndef SKY_CLOUD_MARCH_GLSL
 #define SKY_CLOUD_MARCH_GLSL
 
+//@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/sky/cloud_constants.glsl"
 //@include "/lib/sky/cloud_weather.glsl"
 //@include "/lib/sky/cloud_density.glsl"
@@ -122,6 +123,11 @@ CloudAccum cloudMarchVanilla(CloudContext ctx, CloudLighting l, vec3 dir, vec2 s
     float invSteps = 1.0 / float(steps);
     vec2 origin = vanillaCloudOrigin();
     vec3 sums = vec3(0.0);
+    // カメラが雲の中にいる間は雲の中の霧が視界を閉じるので、板は視線の消散を倍にしない (入る・出るときに一気に白く閉じない)
+    float opacity = VANILLA_CLOUD_OPACITY;
+#ifdef CLOUD_INTERIOR
+    opacity = mix(opacity, 1.0, frameData.skyParams[4].a);
+#endif
     for (int i = 0; i < steps; i++) {
         float t = seg.x + segLength * sqr((float(i) + dither.x) * invSteps);
         float dt = segLength * (2.0 * float(i) + 1.0) * sqr(invSteps);
@@ -134,14 +140,14 @@ CloudAccum cloudMarchVanilla(CloudContext ctx, CloudLighting l, vec3 dir, vec2 s
         float density = vanillaCloudDensity(q, y, cloudDetailLod(tRef), slabHeight);
         if (density <= 0.0) continue;
 
-        float extinction = density * weight * VANILLA_CLOUD_SIGMA;
+        float extinction = density * weight * VANILLA_CLOUD_SHADE_SIGMA;
         float odLight = vanillaCloudLightOD(q, y, l.lightDir) * weight;
         float odSky = vanillaCloudSkyOD(q, y) * weight;
         vec2 rel = dir.xz * (t * CLOUD_KH);
         float upperT = cloudUpperTransmittance(ctx, rel, altitude, cloudRefDir(l.lightDir, CLOUD_KH, slope));
         vec3 inscatter = cloudInscatter(l, extinction, odLight, 0.0, odSky, sqr(1.0 - slabHeight), upperT, max(slabHeight - baseLift, 0.0));
 
-        float stepT = exp(-extinction * dt * VANILLA_CLOUD_KREF);
+        float stepT = exp(-density * weight * VANILLA_CLOUD_SIGMA * opacity * dt * VANILLA_CLOUD_KREF);
         float w = acc.transmittance * (1.0 - stepT);
         acc.scattering += inscatter * CLOUD_ALBEDO * w;
         sums += vec3(tRef, altitude, 1.0) * w;
@@ -352,7 +358,7 @@ void cloudComposite(CloudContext ctx, inout vec3 scattering, inout float transmi
  * 雲のマーチの末尾と、水面などの反射の空 (prepare2 が frameData.skyParams[6] に書き、skyReflectionFallback が使う) で同じ値にする
  */
 vec4 cloudRainVeil(CloudContext ctx, CloudLighting l) {
-    float veil = saturate(ctx.rainLight) * (1.0 - cloudRainReshape());
+    float veil = saturate(ctx.rainLight) * (1.0 - cloudRainReshape()) * cloudRainBelowDeck();
     vec3 radiance = (l.skyRadiance + l.lightIrradiance * (CLOUD_RAIN_VEIL_SUN * max(l.lightDir.y, 0.0) * RCP_PI)) * CLOUD_RAIN_VEIL_GAIN;
     return vec4(radiance, veil);
 }

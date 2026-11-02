@@ -19,6 +19,7 @@
 //@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/sky/atmosphere.glsl"
 //@include "/lib/sky/celestial.glsl"
+//@include "/lib/sky/clouds.glsl"
 //@include "/lib/sky/sh.glsl"
 
 // 月光の色。物理的には太陽光とほぼ同じだが、夜の視覚 (プルキンエ効果) に寄せて青に振る
@@ -31,6 +32,8 @@ const float MOON_PHASE_EXPONENT = 1.5;
 // 曇天 (雨) で空が灰色に寄る量と暗くなる量
 const float SKY_OVERCAST_DESATURATE = 0.85;
 const float SKY_OVERCAST_DARKEN = 0.55;
+// 雨雲の層より上から見る空に残す曇天の割合 (雲の上の空は普通の空で、少しだけ暗い)
+const float SKY_OVERCAST_ABOVE_DECK = 0.2;
 // 月も無い夜の空の下限 (大気光・星明かり)
 const vec3 SKY_NIGHT_FLOOR = vec3(0.55, 0.75, 1.0) * 3e-5;
 /*
@@ -240,8 +243,10 @@ float farSunHiddenShade(vec3 dir) {
 }
 
 // 雨で曇った空へ寄せる (雲の無い LUT を灰色の曇天に近づける)
+float skyOvercast() { return rainStrength * mix(SKY_OVERCAST_ABOVE_DECK, 1.0, cloudRainBelowDeck()); }
+
 vec3 skyApplyOvercast(vec3 radiance) {
-    float overcast = rainStrength;
+    float overcast = skyOvercast();
     vec3 grey = vec3(luminance(radiance));
     radiance = mix(radiance, grey, overcast * SKY_OVERCAST_DESATURATE);
     return radiance * mix(1.0, SKY_OVERCAST_DARKEN, overcast);
@@ -344,7 +349,7 @@ vec3 renderSky(vec3 dir, vec3 vanillaSky) {
     // 地平線より下は描画距離の外の霞んだ地面にして、虚空が明るく見えないようにする
     sky = skyBelowHorizon(dir, sky);
 
-    vec3 viewT = atmoTransmittanceToLight(r, dir.y) * (1.0 - 0.95 * rainStrength);
+    vec3 viewT = atmoTransmittanceToLight(r, dir.y) * (1.0 - 0.95 * skyOvercast());
     #if SUN_MOON_STYLE == 1
         sky += skySunDisk(dir, getSunDir(), getSunIlluminanceTOA(), viewT);
         sky += skyMoonDisk(dir, getMoonDir(), getMoonIlluminanceFull(), viewT);

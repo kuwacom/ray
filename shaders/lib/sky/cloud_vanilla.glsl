@@ -22,12 +22,15 @@ const vec2 VANILLA_CLOUD_ORIGIN = vec2(0.0, 3.96); // 格子の座標 = ワー�
 const float VANILLA_CLOUD_ALPHA_CUT = 0.5;         // 雲のあるマスの不透明度のしきい値
 const float VANILLA_CLOUD_KREF = 14.0;             // 参照 m / ブロック
 const float VANILLA_CLOUD_CORNER = 0.22;           // マスの角の丸み (マスの割合)
-const float VANILLA_CLOUD_ROUND = 1.1;             // 上下の縁の丸め (枕のような断面にする)
+const float VANILLA_CLOUD_ROUND = 0.95;            // 上下の縁の丸め (枕のような断面にする)
 const float VANILLA_CLOUD_ROUND_POW = 2.0;
-const float VANILLA_CLOUD_SOFT = 0.30 * CLOUD_EDGE_SOFTNESS;   // 縁の立ち上がりの幅 (field の単位。ぼやけた縁で、遠くでも輪郭が硬くならない)
+const float VANILLA_CLOUD_SOFT = 0.20 * CLOUD_EDGE_SOFTNESS;   // 縁の立ち上がりの幅 (field の単位。ぼやけた縁で、遠くでも輪郭が硬くならない)
 const float VANILLA_CLOUD_EDGE_NOISE = 0.10;       // 縁を揺らす量 (field の単位。縁を広く透かすので控えめにして、浮いた欠片を作らない)
 const float VANILLA_CLOUD_NOISE_PERIOD = 18.0;     // ブロック: 縁の揺れの 3D ノイズの周期
 const float VANILLA_CLOUD_SIGMA = 0.275 * CLOUD_LOW_DENSITY;   // 1 / 参照 m。既定の濃さで鉛直の光学的深さ約 3.8、横 1 マスで約 11
+const float VANILLA_CLOUD_OPACITY = 3.0;           // 視線方向の消散の倍率 (バニラの雲のように透けない塊にする。陰の光学的深さには掛けない)
+// 陰と内散乱の濃さは既定の濃さで頭打ち (板はすでに光を通さないので、濃さを上げても底がさらに暗く青灰色になるだけ)
+const float VANILLA_CLOUD_SHADE_SIGMA = 0.275 * min(CLOUD_LOW_DENSITY, 0.25);
 const float VANILLA_CLOUD_LIGHT_REACH = 24.0;      // ブロック: 光源方向の陰を見る長さ (低い日でも 2 マス先まで)
 const int VANILLA_CLOUD_LIGHT_STEPS = 4;
 const float VANILLA_CLOUD_MIN_LIGHT_Y = 0.05;      // 光源の高さの下限 (地平線すれすれで陰の長さが発散しない)
@@ -109,13 +112,13 @@ float vanillaCloudLightOD(vec2 q, float y, vec3 lightDir) {
         float s = (float(i) + 0.5) * ds;
         od += vanillaCloudDensity(q + d.xz * s, y + d.y * s);
     }
-    return od * ds * (VANILLA_CLOUD_KREF * VANILLA_CLOUD_SIGMA);
+    return od * ds * (VANILLA_CLOUD_KREF * VANILLA_CLOUD_SHADE_SIGMA);
 }
 
 // 真上 (空の光) 方向の光学的深さ: 板の上面までの真ん中の 1 点で代表させる
 float vanillaCloudSkyOD(vec2 q, float y) {
     float top = vanillaCloudBottom() + VANILLA_CLOUD_THICKNESS;
-    return vanillaCloudDensity(q, 0.5 * (y + top)) * (top - y) * (VANILLA_CLOUD_KREF * VANILLA_CLOUD_SIGMA);
+    return vanillaCloudDensity(q, 0.5 * (y + top)) * (top - y) * (VANILLA_CLOUD_KREF * VANILLA_CLOUD_SHADE_SIGMA);
 }
 
 /*

@@ -327,6 +327,27 @@ float cloudLowestBase() {
 #endif
 }
 
+/*
+ * 雨雲の層の下にいる度合い [0,1]。雨の曇天 (空の灰色・雲の向こうの灰色の置き換え) は雲の層の下から見たときだけ掛け、
+ * 層の上に出たら普通の空にする。雨雲は雲の層の上端までで、その上は晴れている
+ * 層の上端はバニラの形では板の上面 (見えない雨雲の層はその直上)、ほかのスタイルでは低層の上端
+ */
+const float CLOUD_RAIN_DECK_MARGIN = 4.0; // ブロック: 層の上端のこの上で普通の空に戻りきる
+float cloudRainBelowDeck() {
+#if CLOUDS >= 2 && defined HAS_SKY
+    #ifdef CLOUD_VANILLA_SHAPE
+    float base = vanillaCloudBottom();
+    float top = base + VANILLA_CLOUD_THICKNESS;
+    #else
+    float base = CLOUD_BASE;
+    float top = CLOUD_TOP;
+    #endif
+    return 1.0 - smoothstep(0.5 * (base + top), top + CLOUD_RAIN_DECK_MARGIN, cameraPosition.y);
+#else
+    return 1.0;
+#endif
+}
+
 #ifdef CLOUD_INTERIOR
 /*
  * 雲の中の霧: カメラが雲の層の中にいる時、層を出るまでを一様な霧として掛ける (fog_apply)
