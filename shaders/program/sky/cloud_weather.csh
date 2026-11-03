@@ -204,23 +204,25 @@ vec3 cloudInteriorTap(int i) {
  */
 float cloudInteriorDensity(CloudContext ctx, vec3 offset, out float cloudHeight, out float marchExtinction) {
     float y = cameraPosition.y + offset.y;
+    #ifdef CLOUD_VANILLA_SHAPE
+    // 写実の層は描かない。バニラの形の濃さは霧には入れず、マーチの消散係数にだけ足す
+    cloudHeight = 0.5;
+    marchExtinction = vanillaCloudDensity(vanillaCloudOrigin() + offset.xz, y) * cloudRainDensityScale(ctx) * VANILLA_CLOUD_SIGMA * VANILLA_CLOUD_KREF;
+    return 0.0;
+    #else
     vec2 rel = offset.xz * CLOUD_KH;
     float altitude = cloudRefAltitude(y);
     vec4 map = cloudMapFetch(rel);
     float low = cloudLowDensity(ctx, cloudLowColumn(map), rel, altitude, 0.0, false, cloudHeight);
     float rho = low;
     marchExtinction = low * CLOUD_LOW_SIGMA * CLOUD_KH;
-    #ifdef CLOUD_VANILLA_SHAPE
-    float slab = vanillaCloudDensity(vanillaCloudOrigin() + offset.xz, y);
-    float slabShare = 1.0 - cloudVanillaRainLook(ctx.reshape);
-    marchExtinction += slab * slabShare * cloudRainDensityScale(ctx) * VANILLA_CLOUD_SIGMA * VANILLA_CLOUD_KREF;
-    #endif
     #ifdef CLOUD_MID_LAYER
     float mid = cloudMidDensity(ctx, map.b * CLOUD_COVER_RANGE, rel, altitude, false);
     rho = max(rho, mid * CLOUD_INTERIOR_MID_SHARE);
     marchExtinction += mid * CLOUD_MID_SIGMA * CLOUD_KH;
     #endif
     return saturate(rho);
+    #endif
 }
 
 #ifdef CLOUD_VANILLA_SHAPE
@@ -236,7 +238,7 @@ float cloudInteriorSlabCover(CloudContext ctx) {
         float a = float(i) * GOLDEN_ANGLE;
         sum += vanillaCloudDensity(origin + r * vec2(cos(a), sin(a)), cameraPosition.y);
     }
-    return sum / float(CLOUD_INTERIOR_SLAB_TAPS) * (1.0 - cloudVanillaRainLook(ctx.reshape));
+    return sum / float(CLOUD_INTERIOR_SLAB_TAPS);
 }
 #endif
 
@@ -271,26 +273,30 @@ void cloudInteriorWrite(CloudContext ctx) {
         float slope;
         float altitude = cloudRefAltitude(y, slope);
         vec3 lightDir = cloudRefDir(l.lightDir, CLOUD_KH, slope);
-        vec4 map = cloudMapFetch(vec2(0.0));
-        float odNear;
-        float odLight = cloudLowLightOD(ctx, cloudLowColumn(map), vec2(0.0), altitude, lightDir, CLOUD_INTERIOR_LIGHT_DITHER, odNear);
-        float odSky = cloudLowSkyOD(ctx, cloudLowColumn(map), vec2(0.0), altitude);
-        float groundVisibility = sqr(1.0 - saturate((altitude - CLOUD_R_BASE) / CLOUD_R_DEPTH));
-        #ifdef CLOUD_MID_LAYER
-        odLight += cloudMidLightOD(ctx, map.b * CLOUD_COVER_RANGE, vec2(0.0), altitude, lightDir, CLOUD_INTERIOR_LIGHT_DITHER);
-        #endif
+        float odNear = 0.0;
+        float odLight = 0.0;
+        float odSky = 0.0;
+        float groundVisibility = 1.0;
         #ifdef CLOUD_VANILLA_SHAPE
-        float slabWeight = (1.0 - cloudVanillaRainLook(ctx.reshape)) * cloudRainDensityScale(ctx);
+        // 写実の層は描かない。バニラの形の柱の中の光だけ
+        float slabWeight = cloudRainDensityScale(ctx);
         vec2 q = vanillaCloudOrigin();
-        odLight += vanillaCloudLightOD(q, y, l.lightDir) * slabWeight;
-        odSky += vanillaCloudSkyOD(q, y) * slabWeight;
+        odLight = vanillaCloudLightOD(q, y, l.lightDir) * slabWeight;
+        odSky = vanillaCloudSkyOD(q, y) * slabWeight;
         l = cloudVanillaLighting(l);
         float slabHeight = (y - vanillaCloudBottom()) / VANILLA_CLOUD_THICKNESS;
         if (slabHeight > 0.0 && slabHeight < 1.0) {
             cloudHeight = slabHeight;
             groundVisibility = sqr(1.0 - slabHeight);
-            odNear = 0.0;
         }
+        #else
+        vec4 map = cloudMapFetch(vec2(0.0));
+        odLight = cloudLowLightOD(ctx, cloudLowColumn(map), vec2(0.0), altitude, lightDir, CLOUD_INTERIOR_LIGHT_DITHER, odNear);
+        odSky = cloudLowSkyOD(ctx, cloudLowColumn(map), vec2(0.0), altitude);
+        groundVisibility = sqr(1.0 - saturate((altitude - CLOUD_R_BASE) / CLOUD_R_DEPTH));
+        #ifdef CLOUD_MID_LAYER
+        odLight += cloudMidLightOD(ctx, map.b * CLOUD_COVER_RANGE, vec2(0.0), altitude, lightDir, CLOUD_INTERIOR_LIGHT_DITHER);
+        #endif
         #endif
         float sigma = extinction / (float(CLOUD_INTERIOR_TAPS) * CLOUD_KH);
         float upperT = cloudUpperTransmittance(ctx, vec2(0.0), altitude, lightDir);
@@ -314,8 +320,13 @@ void main() {
     ivec2 texel = ivec2(gl_GlobalInvocationID.xy);
     CloudClimate climate = cloudClimate();
 
+#ifdef CLOUD_VANILLA_SHAPE
+    // 天気図は使わない。同じ image に、バニラの形の柱の表を書く (1 スレッド = 1 マス)
+    imageStore(cloudWeatherImg, texel, vanillaCloudTableTexel(texel));
+#else
     vec2 world = cloudMapCenter() + (vec2(texel) + 0.5 - CLOUD_MAP_RES * 0.5) * CLOUD_MAP_TEXEL;
     imageStore(cloudWeatherImg, texel, cloudWeatherTexel(world, climate));
+#endif
 
     CloudContext ctx = cloudContextSetup(climate);
 #if defined CLOUD_RAIN_KEEPS_SHAPE && defined HAS_SKY

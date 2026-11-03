@@ -27,11 +27,15 @@ uniform sampler3D cloudDetailTex;
 uniform sampler2D cloudNoiseTex;
 
 // 中層は品質によらず描く (品質で変えるのは歩数だけにして、雲の形と陰影をそろえる)
-#if CLOUDS == 3
+// バニラの形は写実の雲 (中層・上層・積乱雲と雨脚) を一切描かない。上の雲はバニラの形の段だけ
+#if CLOUDS == 3 && !defined CLOUD_VANILLA_SHAPE
     #define CLOUD_MID_LAYER
 #endif
-#if CLOUDS == 3 && defined CLOUD_CUMULONIMBUS
+#if CLOUDS == 3 && defined CLOUD_CUMULONIMBUS && !defined CLOUD_VANILLA_SHAPE
     #define CLOUD_CB
+#endif
+#if defined CLOUD_CIRRUS && !defined CLOUD_VANILLA_SHAPE
+    #define CLOUD_HIGH_LAYER
 #endif
 
 // 定数

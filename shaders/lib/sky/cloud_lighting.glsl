@@ -205,7 +205,7 @@ float cloudUpperTransmittance(CloudContext ctx, vec2 rel, float altitude, vec3 l
         transmittance *= 1.0 - fraction * (1.0 - cloudT);
     }
 #endif
-#ifdef CLOUD_CIRRUS
+#ifdef CLOUD_HIGH_LAYER
     if (altitude < CLOUD_R_HIGH_BASE) {
         float a = CLOUD_R_HIGH_BASE + 0.7 * CLOUD_R_HIGH_DEPTH;
         vec2 ph = rel + lightDir.xz * ((a - altitude) / ly);

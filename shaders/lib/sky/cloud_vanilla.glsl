@@ -20,6 +20,8 @@ uniform sampler2D vanillaCloudTex; // バニラの雲のテクスチャ (shaders
 
 const vec2 VANILLA_CLOUD_ORIGIN = vec2(0.0, 3.96); // 格子の座標 = ワールドの xz + これ (x にはさらに cloudTime)
 const float VANILLA_CLOUD_ALPHA_CUT = 0.5;         // 雲のあるマスの不透明度のしきい値
+// 柱の表 (cloudWeatherImg) に収まるテクスチャの大きさ。これより大きいリソースパックは表を使わず、模様を直接読んで全マスを同じ厚みにする
+const int VANILLA_CLOUD_TABLE_SIZE = 512;
 const float VANILLA_CLOUD_KREF = 14.0;             // 参照 m / ブロック
 const float VANILLA_CLOUD_CORNER = 0.22;           // マスの角の丸み (マスの割合)
 const float VANILLA_CLOUD_ROUND = 0.45;            // 上下の縁の丸め (小さいほど側面が垂直に近く、横から見て厚みが帯として残る)
@@ -58,21 +60,44 @@ const float VANILLA_CLOUD_RAIN_SUN = 0.2;         // 直達光の倍率
 const float VANILLA_CLOUD_RAIN_AMBIENT = 1.0;     // 空の光の倍率
 const float VANILLA_CLOUD_RAIN_BASE = 0.8;        // 底の暗さを無くす割合 (層の中から見下ろす底が、霧や地形より暗い影にならないように)
 
-// 雲が雨雲へ変わり始めてから移り終わるまでの割合 (0 = バニラの形の板, 1 = 雨雲)。reshape: CloudContext.reshape
-float cloudVanillaRainLook(float reshape) { return smoothstep(0.0, CLOUD_HAZE_RAIN.x, reshape); }
-
 // 格子の座標 (ブロック) でのカメラの位置。テクスチャの一周で先に畳むので、遠い座標でも精度が落ちない
 vec2 vanillaCloudOrigin() {
     vec2 tile = vec2(textureSize(vanillaCloudTex, 0)) * VANILLA_CLOUD_CELL;
     return mod(mod(cameraPosition.xz, tile) + VANILLA_CLOUD_ORIGIN + vec2(cloudTime * CLOUD_SPEED, 0.0), tile);
 }
 
-float vanillaCloudCell(ivec2 c) {
+// 模様のマスに雲があるか。負の整数の % は未定義なので、床で畳む
+bool vanillaCloudPattern(ivec2 c) {
     ivec2 size = textureSize(vanillaCloudTex, 0);
-    // 負の整数の % は未定義なので、床で畳む
-    ivec2 wrapped = c - size * ivec2(floor(vec2(c) / vec2(size)));
-    return texelFetch(vanillaCloudTex, wrapped, 0).a >= VANILLA_CLOUD_ALPHA_CUT ? 1.0 : 0.0;
+    return texelFetch(vanillaCloudTex, c - size * ivec2(floor(vec2(c) / vec2(size))), 0).a >= VANILLA_CLOUD_ALPHA_CUT;
 }
+
+/*
+ * 柱の表 (cloudWeatherImg) の 1 マス。prepare2 が毎フレーム、模様のマスごとに作る (vanillaCloudTableTexel)
+ * x = 柱の頭の高さ (底からのブロック。0 は雲のないマス), y = 金床の下面, z = 金床の上面 (どちらも底からのブロック。0 は金床なし), w = このマスを含む 4x4 マスの区画に雲があるか
+ */
+vec4 vanillaCloudColumn(ivec2 c) {
+    ivec2 size = textureSize(vanillaCloudTex, 0);
+    if (max(size.x, size.y) > VANILLA_CLOUD_TABLE_SIZE) return vec4(vanillaCloudPattern(c) ? VANILLA_CLOUD_EDGE_HEIGHT : 0.0, 0.0, 0.0, 1.0);
+    vec4 t = texelFetch(cloudWeatherSampler, c - size * ivec2(floor(vec2(c) / vec2(size))), 0);
+    return vec4(round(t.rgb * 255.0), t.a);
+}
+
+// 表のテクセル c に書く値 (prepare2 の各スレッドが 1 マスずつ)。模様の外のテクセルと大きなテクスチャは使わない
+vec4 vanillaCloudTableTexel(ivec2 c) {
+    ivec2 size = textureSize(vanillaCloudTex, 0);
+    if (any(greaterThanEqual(c, size)) || max(size.x, size.y) > VANILLA_CLOUD_TABLE_SIZE) return vec4(0.0);
+    float height = vanillaCloudPattern(c) ? VANILLA_CLOUD_EDGE_HEIGHT : 0.0;
+    // 4x4 マスの区画に雲が 1 つでもあるか (マーチが空の区画を丸ごと飛ばす)
+    ivec2 block = c - c % 4;
+    float occupied = 0.0;
+    for (int y = 0; y < 4; y++) {
+        for (int x = 0; x < 4; x++) occupied = max(occupied, vanillaCloudPattern(block + ivec2(x, y)) ? 1.0 : 0.0);
+    }
+    return vec4(vec3(height, 0.0, 0.0) / 255.0, occupied);
+}
+
+float vanillaCloudCell(ivec2 c) { return vanillaCloudColumn(c).x > 0.0 ? 1.0 : 0.0; }
 
 /*
  * 密度 [0,1]。q: 格子の座標 (ブロック), y: ワールドの高さ, detail: 縁の揺れの強さ [0,1] (距離の LOD)

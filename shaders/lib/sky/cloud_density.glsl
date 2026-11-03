@@ -382,11 +382,9 @@ float cloudLowDensityCumulus(CloudContext ctx, CloudColumn col, vec2 rel, float 
 
 float cloudLowDensity(CloudContext ctx, CloudColumn col, vec2 rel, float altitude, float detail, bool lightPath, out float cloudHeight) {
 #ifdef CLOUD_VANILLA_SHAPE
-    // 低層はバニラの形の雲 (cloud_vanilla.glsl) が担い、積雲の形は描かない。雷雨は
-    // 降り始めのうちに積雲の形 (積乱雲) へ移す (バニラの形の雲と雨雲が重なる間が長いと、バニラの形の明るい筋が雨雲に残る)
-    float rainLook = cloudVanillaRainLook(ctx.reshape);
-    if (rainLook <= 0.0) { cloudHeight = 0.5; return 0.0; }
-    return cloudLowDensityCumulus(ctx, col, rel, altitude, detail, lightPath, cloudHeight) * rainLook;
+    // 低層はバニラの形の雲 (cloud_vanilla.glsl) が担い、積雲の形は描かない
+    cloudHeight = 0.5;
+    return 0.0;
 #else
     return cloudLowDensityCumulus(ctx, col, rel, altitude, detail, lightPath, cloudHeight);
 #endif

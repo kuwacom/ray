@@ -216,7 +216,7 @@ CloudAccum cloudMarchMid(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, 
 }
 #endif
 
-#ifdef CLOUD_CIRRUS
+#ifdef CLOUD_HIGH_LAYER
 // 上層 (薄い体積)。光学的に薄いので単散乱 + 等方な多重散乱の底上げ + 空の光。光源までは層の上端までの解析的な透過率
 CloudAccum cloudMarchHigh(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, float dither) {
     CloudAccum acc = CloudAccum(vec3(0.0), 1.0, 0.0, 0.0);
@@ -380,29 +380,30 @@ vec4 renderClouds(vec3 dir, float maxDist, vec2 dither) {
     float y0 = cameraPosition.y;
     // 雲の上から見下ろす視線は、雲の向こうが描画距離の外の虚空 (renderSky が描く青い遠景) なので、雲の縁に戻す空の色も同じにする
     if (dir.y < 0.0 && y0 > cloudLowestBase()) skyColor = skyBelowHorizon(dir, skyColor);
+    vec3 scattering = vec3(0.0);
+    float transmittance = 1.0;
+#ifdef CLOUD_VANILLA_SHAPE
+    // 写実の層 (積雲・中層・上層・積乱雲) は描かず、バニラの形の雲だけを描く
+    vec2 segVanilla = vanillaCloudSegment(y0, dir.y, min(maxDist, VANILLA_CLOUD_FAR));
+    if (segVanilla.y > segVanilla.x) {
+        cloudComposite(ctx, scattering, transmittance, cloudMarchVanilla(ctx, l, dir, segVanilla, dither, cloudRainDensityScale(ctx)), dir, skyColor, VANILLA_CLOUD_FAR * CLOUD_KH);
+    }
+#else
     float farLimit = min(maxDist, CLOUD_MAX_DISTANCE_WORLD);
 
     vec2 segLow = cloudLayerSegment(y0, dir.y, CLOUD_BASE, ctx.lowTopWorld);
     segLow.y = min(segLow.y, farLimit);
-#ifdef CLOUD_VANILLA_SHAPE
-    // 低層はバニラの形の雲が担うので積雲のマーチは回さない。雷雨は降り始めのうちに雨雲へ移る
-    float rainLook = cloudVanillaRainLook(ctx.reshape);
-    if (rainLook <= 0.0) segLow = vec2(1.0, 0.0);
-    vec2 segVanilla = vanillaCloudSegment(y0, dir.y, min(maxDist, VANILLA_CLOUD_FAR));
-#endif
     vec2 segMid = vec2(1.0, 0.0);
 #ifdef CLOUD_MID_LAYER
     segMid = cloudLayerSegment(y0, dir.y, CLOUD_MID_BASE, CLOUD_MID_TOP);
     segMid.y = min(segMid.y, farLimit);
 #endif
     vec2 segHigh = vec2(1.0, 0.0);
-#ifdef CLOUD_CIRRUS
+#ifdef CLOUD_HIGH_LAYER
     segHigh = cloudLayerSegment(y0, dir.y, CLOUD_HIGH_BASE, CLOUD_HIGH_TOP);
     segHigh.y = min(segHigh.y, min(maxDist, CLOUD_HIGH_MAX_DISTANCE / CLOUD_KH));
 #endif
 
-    vec3 scattering = vec3(0.0);
-    float transmittance = 1.0;
 #ifdef CLOUD_CB
     // 降水の柱は雲底より下だけなので、どの層よりも手前
     if (ctx.storm > 1e-3) cloudComposite(ctx, scattering, transmittance, cloudMarchShaft(ctx, l, dir, maxDist, dither.x), dir, skyColor, CLOUD_SHAFT_FAR);
@@ -417,14 +418,8 @@ vec4 renderClouds(vec3 dir, float maxDist, vec2 dither) {
         segLowFar = vec2(segMid.y, segLow.y);
         segLow.y = segMid.y;
     }
-#ifdef CLOUD_VANILLA_SHAPE
-    const int LAYER_SLOTS = 5;
-    float starts[LAYER_SLOTS] = float[LAYER_SLOTS](segLow.y > segLow.x ? segLow.x : CLOUD_SEG_NONE, segMid.y > segMid.x ? segMid.x : CLOUD_SEG_NONE, segHigh.y > segHigh.x ? segHigh.x : CLOUD_SEG_NONE, segLowFar.y > segLowFar.x ? segLowFar.x : CLOUD_SEG_NONE,
-                                                   segVanilla.y > segVanilla.x ? segVanilla.x : CLOUD_SEG_NONE);
-#else
     const int LAYER_SLOTS = 4;
     float starts[LAYER_SLOTS] = float[LAYER_SLOTS](segLow.y > segLow.x ? segLow.x : CLOUD_SEG_NONE, segMid.y > segMid.x ? segMid.x : CLOUD_SEG_NONE, segHigh.y > segHigh.x ? segHigh.x : CLOUD_SEG_NONE, segLowFar.y > segLowFar.x ? segLowFar.x : CLOUD_SEG_NONE);
-#endif
     /*
      * 回数は区間のある層の数 (それより先は starts が全部 1e30 で抜ける)。定数の回数にするとドライバがループを展開し、
      * 各層のマーチが層の数だけ複製されてリンクが数秒延びる
@@ -442,23 +437,18 @@ vec4 renderClouds(vec3 dir, float maxDist, vec2 dither) {
             cloudComposite(ctx, scattering, transmittance, cloudMarchLow(ctx, l, dir, far ? segLowFar : segLow, dither, far ? 1.0 - lowShare : lowShare),
                            dir, skyColor, CLOUD_MAX_DISTANCE);
         }
-#ifdef CLOUD_VANILLA_SHAPE
-        else if (idx == 4) {
-            cloudComposite(ctx, scattering, transmittance, cloudMarchVanilla(ctx, l, dir, segVanilla, dither, (1.0 - rainLook) * cloudRainDensityScale(ctx)),
-                           dir, skyColor, VANILLA_CLOUD_FAR * CLOUD_KH);
-        }
-#endif
 #ifdef CLOUD_MID_LAYER
         else if (idx == 1) {
             cloudComposite(ctx, scattering, transmittance, cloudMarchMid(ctx, l, dir, segMid, dither), dir, skyColor, CLOUD_MAX_DISTANCE);
         }
 #endif
-#ifdef CLOUD_CIRRUS
+#ifdef CLOUD_HIGH_LAYER
         else {
             cloudComposite(ctx, scattering, transmittance, cloudMarchHigh(ctx, l, dir, segHigh, dither.x), dir, skyColor, CLOUD_HIGH_MAX_DISTANCE);
         }
 #endif
     }
+#endif
 #ifdef CLOUD_RAIN_KEEPS_SHAPE
     // 雨の空: 雲の向こうの空は、雲の上の見えない雨雲の層の下面 (一様な灰色) にする。雲の形と量は変えず、隙間から晴れの青空や
     // 太陽が見えないようにするだけ。地形のある画素の手前の雲には掛けない。雷雨は雲の側で覆うので掛けない
@@ -476,6 +466,9 @@ vec4 renderClouds(vec3 dir, float maxDist, vec2 dither) {
  * lightDir: ワールドの光源方向
  */
 float cloudShadowTransmittance(CloudContext ctx, vec2 relWorld, vec3 lightDirWorld, float dither) {
+#ifdef CLOUD_VANILLA_SHAPE
+    return vanillaCloudShadowTransmittance(relWorld, lightDirWorld, cloudRainDensityScale(ctx));
+#else
     const int SHADOW_STEPS = 10;
     vec2 rel = relWorld * CLOUD_KH;
     vec3 lightDir = cloudRefDir(lightDirWorld, CLOUD_BASE);
@@ -494,10 +487,8 @@ float cloudShadowTransmittance(CloudContext ctx, vec2 relWorld, vec3 lightDirWor
     // 多重散乱で厚い雲の下にも光が少し抜ける (オクターブ和の 2 項目相当)
     float transmittance = max(exp(-od), 0.25 * exp(-od * 0.25));
     transmittance *= cloudUpperTransmittance(ctx, rel, CLOUD_R_BASE, lightDir);
-#ifdef CLOUD_VANILLA_SHAPE
-    transmittance *= vanillaCloudShadowTransmittance(relWorld, lightDirWorld, (1.0 - cloudVanillaRainLook(ctx.reshape)) * cloudRainDensityScale(ctx));
-#endif
     return transmittance;
+#endif
 }
 
 #endif

@@ -204,7 +204,8 @@ const float CLOUD_SHADOW_RAIN_OUTSIDE = 0.95; // 雨雲へ変わる空の、雲�
 const float CLOUD_RAIN_DISC_SHADOW = 1.0; // 雨の空で、太陽の円盤の鏡像 (水のきらめき) に掛ける遮り。1 で円盤が完全に隠れる
 #ifdef CLOUD_RAIN_KEEPS_SHAPE
 const float CLOUD_RAIN_DECK_SHADOW = 0.75; // 雲の量を保つ雨で、雲影マップの全域に掛ける太陽の遮り (見えない雨雲の層の分)
-float cloudRainReshape() { return thunderStrength; }
+// バニラの形は写実の積乱雲を持たないので、雷雨も雨と同じく板の形と量のまま曇天にする
+float cloudRainReshape() { return 0.0; }
 #else
 float cloudRainReshape() { return 1.0; }
 #endif
@@ -292,7 +293,8 @@ const float CLOUD_FRONT_EPS = 1e-4;   // 透過率が 1 に近いときの散乱
 #ifdef CLOUD_VANILLA_SHAPE
 // バニラの雲の寸法 (ブロック)。格子の 1 マスと厚みと、Iris の cloudHeight から下面までの差
 const float VANILLA_CLOUD_CELL = 12.0;
-const float VANILLA_CLOUD_THICKNESS = 4.0;
+const float VANILLA_CLOUD_EDGE_HEIGHT = 4.0;  // 塊の外周のマスの厚み
+const float VANILLA_CLOUD_THICKNESS = 4.0;    // 外形の厚み (下面から、どの柱の頭よりも上まで)
 const float VANILLA_CLOUD_Y_OFFSET = 0.33;
 // この距離 (ブロック) で空へ溶かし切る。テクスチャは 3072 ブロックで一周するので、繰り返しを見せない
 const float VANILLA_CLOUD_FAR = 2048.0;
@@ -358,8 +360,8 @@ const float CLOUD_INTERIOR_EXTINCTION = 3.0 / float(CLOUD_INTERIOR_VISIBILITY);
 // 雲の中の光は何度も散乱して向きを失うので、前方の山を弱めて等方に寄せる (太陽は円盤でなく方向の分かるにじみになる)
 const float CLOUD_INTERIOR_G = 0.6;
 const float CLOUD_INTERIOR_ISO = 0.7;
-// バニラの形の板の中の霧の長さ (ブロック)。厚み 4 ブロックの薄い板は上下へ抜ける視線の霧が短く、水平の視線だけが濃い白い横帯になるので、
-// 板の中ではどの向きも同じ長さで頭打ちにして、向きによる濃さの差を無くす
+// バニラの形の柱の中の霧の長さ (ブロック)。上下へ抜ける視線の霧は水平の視線より短く、水平の視線だけが濃い白い横帯になるので、
+// 柱の中ではどの向きも同じ長さで頭打ちにして、向きによる濃さの差を無くす
 const float CLOUD_INTERIOR_SLAB_LENGTH = 3.0;
 
 // 光源の光の向きによる差 (光源に対して横から見た時を 1 にした位相)
@@ -372,13 +374,16 @@ float cloudInteriorPhase(float cosTheta) {
 float cloudInteriorExit(vec3 dir) {
     float y = cameraPosition.y;
     #ifdef CLOUD_VANILLA_SHAPE
-    if (y > vanillaCloudBottom() && y < vanillaCloudBottom() + VANILLA_CLOUD_THICKNESS) return CLOUD_INTERIOR_SLAB_LENGTH;
-    #endif
+    // 写実の層は描かないので、バニラの形の外形の高さだけ。縁の外では霧の濃さ (prepare2 の円盤の平均) が 0 なので、縁をまたいでも連続する
+    float bottom = vanillaCloudBottom();
+    return y > bottom && y < bottom + VANILLA_CLOUD_THICKNESS ? CLOUD_INTERIOR_SLAB_LENGTH : 0.0;
+    #else
     if (y > CLOUD_BASE && y < CLOUD_TOP) return cloudLayerSegment(y, dir.y, CLOUD_BASE, CLOUD_TOP).y;
     #if CLOUDS == 3
     if (y > CLOUD_MID_BASE && y < CLOUD_MID_TOP) return cloudLayerSegment(y, dir.y, CLOUD_MID_BASE, CLOUD_MID_TOP).y;
     #endif
     return 0.0;
+    #endif
 }
 #endif
 
