@@ -93,7 +93,7 @@ uvec4 lightMaskStatic(int i, int faceClass) {
         case LIGHT_FURNACE:
             if (faceClass == 0) return uvec4(0u);
             if (faceClass == 1) return uvec4(0u);
-            if (faceClass == 3) return uvec4(packUnorm4x8(vec4(0.0625, 0.5625, 0.875, 1.0)), packHalf2x16(vec2(1.0795, 2.1109)), 0x64328677u, 0xAFF56FD2u);
+            if (faceClass == 3) return uvec4(packUnorm4x8(vec4(0.1875, 0.6875, 0.8125, 1.0)), packHalf2x16(vec2(1.0, 1.4422)), 0x9EC77321u, 0xFFFFBFFBu);
             return uvec4(0u);
         case LIGHT_SCULK_CATALYST:
             if (faceClass == 0) return uvec4(packUnorm4x8(vec4(0.125, 0.125, 0.625, 1.0)), packHalf2x16(vec2(0.1738, 0.6951)), 0xF00F000Fu, 0xF0000000u);

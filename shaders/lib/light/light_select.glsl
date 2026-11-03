@@ -162,12 +162,12 @@ int lightFaceFacing(int axis, float side) {
     return axis == 2 ? (side > 0.0 ? 2 : 0) : (side > 0.0 ? 1 : 3);
 }
 
-#if LIGHT_EMISSION_MASK_MODE != 0
 /*
  * 光るブロックの面の光り方 (LIGHT_FLAG_EMISSION_MASK の付いた光源)。テクスチャの暗い縁を面光源に反映する
  * 面の光り方は光る範囲の四角 (rect) と、その中の割合 (ratio)。四角の中を一様に光らせ、面全体の光の量は変えない
  * ratio は光源の最も明るい面の光る部分を 1 とするので、明るい面の光る部分は面全体が光る時と同じ明るさのまま、暗い縁の分だけ減る
  * LIGHT_EMISSION_MASK_MODE 2 では四角を 4x4 に分けたマスの重みで、四角の中の模様も反映する
+ * 向きのある光源の前面は、モード 0 でもこの四角で数える (面全体を光らせると、炉の口の周りの石まで光る)
  */
 const int LIGHT_FACE_UP = 0;
 const int LIGHT_FACE_DOWN = 1;
@@ -236,6 +236,7 @@ float lightMaskEnergy(LightFaceMask f) {
     return f.ratio * (f.rect.z - f.rect.x) * (f.rect.w - f.rect.y);
 }
 
+#if LIGHT_EMISSION_MASK_MODE != 0
 /*
  * 点に近い光源 (ランタン) の近距離の放射に掛ける向きの重み。d は光源から着色点への単位ベクトル
  * 面の種類の光の量を、その向きから見た面の見かけの面積 (d の成分の絶対値) で混ぜ、最も光る面の種類を 1 とする
@@ -277,17 +278,14 @@ float lightMaskGridFormFactor(LightFaceMask f, int axis, float side, vec3 rel, v
 
 /*
  * light: 光源インデックス、masked: 面の光り方のデータがあるか、grid: 近くで 4x4 のマスを使うか (LIGHT_EMISSION_MASK_MODE 2)
- * 0 では面全体を光らせるので、この 3 つは使わない
+ * 0 では面全体を光らせるので、この 3 つは使わない (向きのある光源の前面を除く)
  * facing: 向きのある光源の前面の向き (blockLightFacing)。-1 は向きなしで、向きがあれば前面の面だけを数える (どのモードでも)
  */
 float lightBoxNearField(vec3 voxelPos, vec3 boxCenter, vec3 n, int light, bool masked, bool grid, int facing) {
-#if LIGHT_EMISSION_MASK_MODE == 0
-    vec3 rel = voxelPos - boxCenter;
-#else
+    bool useMask = LIGHT_EMISSION_MASK_MODE != 0 || (facing >= 0 && masked);
     // 呼ぶ所は面から TRACE_NORMAL_OFFSET だけ浮かせた点を渡す。浮いたままだと、テクスチャの縁 (1 画素 = 0.0625) の下半分が
-    // 着色点の水平線の下になり、接地面の境目の暗い縁が効かない。面の上の点から見る
-    vec3 rel = voxelPos - n * TRACE_NORMAL_OFFSET - boxCenter;
-#endif
+    // 着色点の水平線の下になり、接地面の境目の暗い縁が効かない。光る範囲を使う時は面の上の点から見る
+    vec3 rel = voxelPos - (useMask ? n * TRACE_NORMAL_OFFSET : vec3(0.0)) - boxCenter;
     float s = length(max(abs(rel) - 0.5, 0.0));
     if (s >= LIGHT_BOX_REACH) return 0.0;
     ivec3 cell = ivec3(floor(boxCenter));
@@ -300,28 +298,18 @@ float lightBoxNearField(vec3 voxelPos, vec3 boxCenter, vec3 n, int light, bool m
         ivec3 nb = cell;
         nb[axis] += int(side);
         if (isVoxelOpaque(fetchVoxelBlockId(nb))) continue;
-#if LIGHT_EMISSION_MASK_MODE == 0
-        int b = (axis + 1) % 3;
-        int c = (axis + 2) % 3;
-        vec3 q[4];
-        for (int k = 0; k < 4; k++) {
-            vec3 o = vec3(0.0);
-            o[axis] = 0.5 * side;
-            o[b] = (k == 1 || k == 2) ? 0.5 : -0.5;
-            o[c] = k >= 2 ? 0.5 : -0.5;
-            q[k] = o - rel;
+        if (!useMask) {
+            sum += lightMaskQuad(axis, side, vec2(0.0), vec2(1.0), rel, n);
+            continue;
         }
-        sum += quadFormFactor(q, n);
-#else
         LightFaceMask f = masked ? readLightMask(light, facing >= 0 ? LIGHT_FACE_FRONT : lightFaceClass(axis, side)) : wholeLightFace();
         if (f.ratio <= 0.0) continue;
         float ff = f.ratio * lightMaskQuad(axis, side, f.rect.xy, f.rect.zw, rel, n);
-    #if LIGHT_EMISSION_MASK_MODE == 2
+#if LIGHT_EMISSION_MASK_MODE == 2
         float gridMix = saturate((s - LIGHT_MASK_GRID_REACH) / LIGHT_MASK_GRID_FADE);
         if (grid && masked && gridMix < 1.0) ff = mix(lightMaskGridFormFactor(f, axis, side, rel, n), ff, gridMix);
-    #endif
-        sum += ff;
 #endif
+        sum += ff;
     }
     float w = 1.0 - s / LIGHT_BOX_REACH;
     return LIGHT_BOX_RADIANCE * sum * (w * w);
@@ -396,6 +384,8 @@ vec3 lightBoxIrradiance(LightInstance L, vec3 voxelPos, vec3 gateNormal, bool gr
     vec3 faceColor = albedo * (lightLum / max(luminance(albedo), EPS));
     bool masked = (d.info.x & LIGHT_FLAG_EMISSION_MASK) != 0u;
     int facing = (d.info.x & LIGHT_FLAG_FACING) != 0u ? blockLightFacing(voxelId) : -1;
+    // 向きのある光源は光るのが火の部分だけで、ブロックの平均の色 (かまどの灰色の石) ではなく光源の色で光る
+    if (facing >= 0) faceColor = d.color.rgb;
     return faceColor * (power * lightBoxNearField(voxelPos, floor(L.posRadius.xyz) + 0.5, gateNormal, light, masked, grid, facing));
 }
 

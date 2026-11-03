@@ -57,6 +57,9 @@ TOP_COLOR_MIN_DIFF = 8
 # 光源ブロックの発光 smoothstep(e0, e1, max(sRGB))。gbuffers_solid.fsh の estimateEmission と、鉱物ブロックは同ファイルの DECOR の式
 EMISSION_EDGE = (0.55, 0.90)
 DECOR_EMISSION_EDGE = (0.15, 0.85)
+# 向きのある光源の火の部分 (gbuffers_solid.fsh の facingFireMask と同じ)
+FACING_FIRE_SATURATION = (0.12, 0.3)
+FACING_FIRE_CORE = (0.93, 0.98)
 # 光る範囲 = 面の最大の発光のこの割合を超える画素の外接矩形
 RECT_THRESHOLD = 0.5
 MASK_GRID = 4
@@ -109,16 +112,21 @@ class Assets:
                 self.textures[ref] = img
         return self.textures[ref]
 
-    def emission(self, ref: str, edge: tuple[float, float]) -> np.ndarray | None:
-        """(H, W) の発光 [0, 1]。アニメーションは全コマの平均 (texture() は最初のコマだけ)"""
+    def emission(self, ref: str, edge: tuple[float, float], fire_only: bool = False) -> np.ndarray | None:
+        """(H, W) の発光 [0, 1]。アニメーションは全コマの平均 (texture() は最初のコマだけ)
+        fire_only (向きのある光源) は火の部分だけ。彩度の高い画素と芯の白熱で、灰色の石は光らない"""
         path = f"assets/minecraft/textures/{self.norm(ref)}.png"
         if path not in self.names:
             return None
         img = np.asarray(Image.open(io.BytesIO(self.zip.read(path))).convert("RGBA"), dtype=np.float64) / 255.0
         w = img.shape[1]
         frames = img.reshape(-1, w, w, 4)
-        t = np.clip((frames[..., :3].max(axis=-1) - edge[0]) / (edge[1] - edge[0]), 0.0, 1.0)
-        return (t * t * (3.0 - 2.0 * t) * (frames[..., 3] > ALPHA_CUTOFF)).mean(axis=0)
+        mx = frames[..., :3].max(axis=-1)
+        e = smoothstep(edge[0], edge[1], mx)
+        if fire_only:
+            sat = (mx - frames[..., :3].min(axis=-1)) / np.maximum(mx, 1e-6)
+            e = e * np.maximum(smoothstep(*FACING_FIRE_SATURATION, sat), smoothstep(*FACING_FIRE_CORE, mx))
+        return (e * (frames[..., 3] > ALPHA_CUTOFF)).mean(axis=0)
 
 
 def resolve_texture(textures: dict[str, str | dict], ref: str | dict) -> str | None:
@@ -194,10 +202,15 @@ def state_model(state: dict, props: dict[str, str]) -> str | None:
     return first_model(state)
 
 
-def face_emission(assets: Assets, model: dict, element: dict, face: str, edge: tuple[float, float]) -> np.ndarray | None:
+def smoothstep(e0: float, e1: float, x: np.ndarray) -> np.ndarray:
+    t = np.clip((x - e0) / (e1 - e0), 0.0, 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def face_emission(assets: Assets, model: dict, element: dict, face: str, edge: tuple[float, float], fire_only: bool = False) -> np.ndarray | None:
     spec = element.get("faces", {}).get(face)
     ref = resolve_texture(model["textures"], spec.get("texture", "")) if spec else None
-    e = assets.emission(ref, edge) if ref else None
+    e = assets.emission(ref, edge, fire_only) if ref else None
     if e is None:
         return None
     uv = spec.get("uv")
@@ -260,7 +273,7 @@ def light_mask(assets: Assets, block_spec: str, decor: bool, facing: bool = Fals
         return None
     el = max(elements, key=lambda x: np.prod([t - f for f, t in zip(x["from"], x["to"])]))
     edge = DECOR_EMISSION_EDGE if decor else EMISSION_EDGE
-    faces = {f: e for f in ("up", "down", "north", "south", "east", "west") if (e := face_emission(assets, model, el, f, edge)) is not None}
+    faces = {f: e for f in ("up", "down", "north", "south", "east", "west") if (e := face_emission(assets, model, el, f, edge, facing)) is not None}
     if facing:
         front = faces.get("north")
         if front is None or emission_rect(front) is None:

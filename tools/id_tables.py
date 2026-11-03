@@ -161,7 +161,7 @@ LIGHTS: list[Light] = [
           blocks=tuple(with_state([f"{p}copper_bulb" for p in COPPER_PREFIX] + [f"waxed_{p}copper_bulb" for p in COPPER_PREFIX], "lit=true"))),
     Light(48, "LIGHT_REDSTONE_ORE", "lit redstone ore", "vec3(1.0, 0.20, 0.10), 0.6, 9.0, 0.5, LT_CENTER, 0.0, LT_OCC",
           blocks=_lit("redstone_ore:lit=true", "deepslate_redstone_ore:lit=true")),
-    Light(49, "LIGHT_FURNACE", "lit furnaces", "fire, 0.9, 13.0, 0.3, vec3(0.5, 0.3, 0.5), 0.5, LT_OCC",
+    Light(49, "LIGHT_FURNACE", "lit furnaces", f"{_FIRE_BLAZE}, 0.9, 13.0, 0.3, vec3(0.5, 0.3, 0.5), 0.5, LT_OCC",
           blocks=_lit("furnace:lit=true", "smoker:lit=true", "blast_furnace:lit=true"),
           mask="furnace:lit=true:facing=north", facing=True),
     Light(50, "LIGHT_BREWING_STAND", "brewing stand", "vec3(1.0, 0.85, 0.50), 0.6, 1.0, 0.1, vec3(0.5, 0.2, 0.5), 0.0, 0u",

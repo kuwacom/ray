@@ -103,4 +103,9 @@ const uint LIGHT_FLAG_ENTITY_FLASH = 64u;   // entityColor.a (点滅) が強い�
 const uint LIGHT_FLAG_EMISSION_MASK = 128u; // 面の光り方のデータがある (lightMasks。setup_tables.csh が立てる)
 const uint LIGHT_FLAG_FACING = 256u;        // 向きのある光源 (前面だけが光る。向きはブロック ID の向きの番号 lib/ids/id_decode.glsl blockLightFacing)
 
+// 向きのある光源か (LIGHT_FLAG_FACING の光源。光源の表を引かずに gbuffers で判定する)
+bool isFacingLight(int light) {
+    return light == LIGHT_JACK_O_LANTERN || light == LIGHT_FURNACE;
+}
+
 #endif

@@ -50,7 +50,7 @@ LightDef lightDefStatic(int i) {
         case LIGHT_CANDLE:           return makeLight(fire, 1.0, 12.0, 0.05, vec3(0.5, 0.4, 0.5), 0.5, 0u);
         case LIGHT_COPPER_BULB:      return makeLight(vec3(1.0, 0.80, 0.60), 1.0, 15.0, 0.5, LT_CENTER, 0.0, LT_OCC);
         case LIGHT_REDSTONE_ORE:     return makeLight(vec3(1.0, 0.20, 0.10), 0.6, 9.0, 0.5, LT_CENTER, 0.0, LT_OCC);
-        case LIGHT_FURNACE:          return makeLight(fire, 0.9, 13.0, 0.3, vec3(0.5, 0.3, 0.5), 0.5, LT_OCC | LIGHT_FLAG_FACING);
+        case LIGHT_FURNACE:          return makeLight(mix(fire, FIRE_WARM_SRGB, 0.5), 0.9, 13.0, 0.3, vec3(0.5, 0.3, 0.5), 0.5, LT_OCC | LIGHT_FLAG_FACING);
         case LIGHT_BREWING_STAND:    return makeLight(vec3(1.0, 0.85, 0.50), 0.6, 1.0, 0.1, vec3(0.5, 0.2, 0.5), 0.0, 0u);
         case LIGHT_ENCHANTING_TABLE: return makeLight(vec3(0.70, 0.60, 1.0), 0.6, 7.0, 0.3, vec3(0.5, 0.75, 0.5), 0.0, 0u);
         case LIGHT_END_PORTAL_FRAME: return makeLight(vec3(0.50, 0.90, 0.75), 0.5, 1.0, 0.2, vec3(0.5, 0.9, 0.5), 0.0, 0u);

@@ -130,6 +130,26 @@ float estimateEmission(vec3 albedoSrgb, int materialId) {
 
 const float DECOR_EMISSION = 0.3;
 
+/*
+ * 向きのある光源 (点灯したかまど・ジャック・オ・ランタン) は前面の火の部分だけが光る
+ * 火は彩度の高い橙〜黄か、芯の白熱 (最大成分が FACING_FIRE_CORE 以上)。石の灰色は明るくても彩度が無いので光らせない
+ * tools/gen_block_colors.py の面の光り方 (light_masks.json) と同じ式
+ */
+const vec2 FACING_FIRE_SATURATION = vec2(0.12, 0.3);
+const vec2 FACING_FIRE_CORE = vec2(0.93, 0.98);
+
+float facingFireMask(vec3 albedoSrgb) {
+    float mx = maxOf(albedoSrgb);
+    float sat = (mx - min(albedoSrgb.r, min(albedoSrgb.g, albedoSrgb.b))) / max(mx, EPS);
+    return max(smoothstep(FACING_FIRE_SATURATION.x, FACING_FIRE_SATURATION.y, sat), smoothstep(FACING_FIRE_CORE.x, FACING_FIRE_CORE.y, mx));
+}
+
+// facing: 前面の向き (0 北 1 東 2 南 3 西。lib/ids/id_decode.glsl blockLightFacing)
+float facingLightEmissionMask(vec3 albedoSrgb, vec3 geoNormal, int facing) {
+    const vec3 FRONT[4] = vec3[4](vec3(0.0, 0.0, -1.0), vec3(1.0, 0.0, 0.0), vec3(0.0, 0.0, 1.0), vec3(-1.0, 0.0, 0.0));
+    return dot(geoNormal, FRONT[facing & 3]) > 0.5 ? facingFireMask(albedoSrgb) : 0.0;
+}
+
 // スプライト内で UV を折り返す (POM でスプライトの外を読まないため)
 vec2 wrapTile(vec2 uv) {
     vec2 size = max(tileHalf * 2.0, vec2(1e-6));
@@ -433,6 +453,9 @@ void main() {
 #endif
     g.wetness = max(wetAmount, puddle);
     g.emission = max(estimateEmission(albedo.rgb, materialId), sp.emission);
+#if defined GBUF_TERRAIN
+    if (isFacingLight(getBlockLightIndex(blockId))) g.emission *= facingLightEmissionMask(albedo.rgb, geoN, blockLightFacing(blockId));
+#endif
 #if defined GBUF_ENTITIES
     // クリーパー・TNT は点滅の白さ (entityColor) の分だけ、発光エンティティと同じ式で明るい画素を光らせる。点滅していない時は光らない
     if (isFlashEntity(entityId)) {
