@@ -174,15 +174,16 @@ vec4 cloudWeatherTexel(vec2 world, CloudClimate c) {
  */
 const int CLOUD_INTERIOR_RING_TAPS = 8;           // 輪 1 つの点の数
 const int CLOUD_INTERIOR_TAPS = 3 + 2 * CLOUD_INTERIOR_RING_TAPS; // 中心 + 上下 + 2 つの輪
-const vec2 CLOUD_INTERIOR_RING_RADIUS = vec2(4.0, 12.0); // ブロック (水平。遠い輪の半径が霧の立ち上がる幅の目安。バニラの形の 1 マス)
+const vec2 CLOUD_INTERIOR_RING_RADIUS = vec2(5.0, 15.0); // ブロック (水平。遠い輪の半径が霧の立ち上がる幅の目安。バニラの形の 1 マス強)
 const float CLOUD_INTERIOR_RADIUS_Y = 3.0;        // ブロック (鉛直)
 const vec2 CLOUD_INTERIOR_ENTER = vec2(0.05, 0.35); // この平均の濃さの間で霧を立ち上げる (縁の外の薄いもやでは霧にしない。体積雲の中の平均は 0.4 前後)
-// バニラの形の板は中で濃さが 1 に揃うので、平均が最大 (全点が板の中) の 17/19 に届くまでを縁からの距離で立ち上げる
-const vec2 CLOUD_INTERIOR_SLAB_ENTER = vec2(0.47, 0.88);
+// バニラの形の板は中で濃さが 1 に揃うので、19 点のうち 1 点が板に掛かる縁の外から、8 割が板の中に入るまでを縁からの距離で立ち上げる。
+// 壁が見えている間から霧が始まるので、縁を越えて壁が消えるときには壁と同じくらいの濃さになっている
+const vec2 CLOUD_INTERIOR_SLAB_ENTER = vec2(0.08, 0.8);
 const float CLOUD_INTERIOR_SLAB_FACE = 0.5;       // 板の厚みの割合: 上面・下面からこの深さまで霧を立ち上げる (板の外へ出る縁もなめらかにする)
 const float CLOUD_INTERIOR_MID_SHARE = 0.5;       // 中層の雲は薄いので低層より霧を弱める
 const float CLOUD_INTERIOR_MIN_SHARE = 0.5;       // 雲のマーチが濃くても、霧は視程の消散係数のこの割合を下限にする (遠くで空と地形の雲の色の差を残さない)
-const float CLOUD_INTERIOR_SATURATION = 0.5;      // 空の光の彩度の残し方 (雲の中は何度も散乱して色が抜ける。空の青のままだと青い霧に見える)
+const float CLOUD_INTERIOR_SATURATION = 0.3;      // 空の光の彩度の残し方 (雲の中は何度も散乱して色が抜ける。空の青のままだと青い霧に見える)
 const float CLOUD_INTERIOR_LIGHT_DITHER = 0.5;    // 光方向のマーチの開始位置 (揺らさず 1 本で代表させる)
 
 // i 番目の点のカメラからのずれ (ワールド, ブロック)
@@ -243,7 +244,8 @@ void cloudInteriorWrite(CloudContext ctx) {
     #ifdef CLOUD_VANILLA_SHAPE
     float slabY = (cameraPosition.y - vanillaCloudBottom()) / VANILLA_CLOUD_THICKNESS;
     float faceFade = smoothstep(0.0, CLOUD_INTERIOR_SLAB_FACE, min(slabY, 1.0 - slabY));
-    rho = max(rho, smoothstep(CLOUD_INTERIOR_SLAB_ENTER.x, CLOUD_INTERIOR_SLAB_ENTER.y, slabRho) * faceFade);
+    // 霧は視線の全長に掛かるので、縁の外のわずかな濃さでも遠景が曇る。2 乗にして縁の手前はごく薄く、縁を越えるあたりから濃くする
+    rho = max(rho, sqr(smoothstep(CLOUD_INTERIOR_SLAB_ENTER.x, CLOUD_INTERIOR_SLAB_ENTER.y, slabRho)) * faceFade);
     #endif
 
     vec3 sun = vec3(0.0);

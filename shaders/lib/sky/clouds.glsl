@@ -358,6 +358,9 @@ const float CLOUD_INTERIOR_EXTINCTION = 3.0 / float(CLOUD_INTERIOR_VISIBILITY);
 // 雲の中の光は何度も散乱して向きを失うので、前方の山を弱めて等方に寄せる (太陽は円盤でなく方向の分かるにじみになる)
 const float CLOUD_INTERIOR_G = 0.6;
 const float CLOUD_INTERIOR_ISO = 0.7;
+// 層の出口までの距離に足す長さ (ブロック)。薄い板の中では上下へ抜ける視線の霧が短く、水平の視線だけが濃くなって白い横帯に見えるので、
+// 上下を見たときも霧が掛かるようにして帯を目立たなくする
+const float CLOUD_INTERIOR_EXIT_EXTRA = 12.0;
 
 // 光源の光の向きによる差 (光源に対して横から見た時を 1 にした位相)
 float cloudInteriorPhase(float cosTheta) {

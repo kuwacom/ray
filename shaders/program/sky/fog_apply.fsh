@@ -276,7 +276,8 @@ void main() {
         // カメラが雲の中: 層を出るまで一様な霧として掛ける。手持ちの物・自分の体 (手の深度) には掛けない
         vec4 interior = frameData.skyParams[4];
         if (interior.a > 0.0 && !isHandDepth(depth)) {
-            float interiorT = exp(-interior.a * min(dist, cloudInteriorExit(dir)) * frameData.skyParams[5].w);
+            float exitDistance = cloudInteriorExit(dir);
+            float interiorT = exp(-interior.a * min(dist, exitDistance > 0.0 ? exitDistance + CLOUD_INTERIOR_EXIT_EXTRA : 0.0) * frameData.skyParams[5].w);
             vec3 cloudLightDir = frameData.skyParams[0].a > 0.0 ? getSunDir() : getMoonDir();
             vec3 interiorLight = interior.rgb * cloudInteriorPhase(dot(dir, cloudLightDir)) + frameData.skyParams[5].rgb;
             color = color * interiorT + interiorLight * (1.0 - interiorT);
