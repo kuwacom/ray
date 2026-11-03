@@ -105,6 +105,8 @@ CloudLighting cloudVanillaLighting(CloudLighting l) {
     l.ambient *= mix(1.0, VANILLA_CLOUD_RAIN_AMBIENT, l.rainDeck);
     l.bottomLight = max(1.0 - (1.0 - l.bottomLight) * VANILLA_CLOUD_BASE_SHADE, 0.0);
     l.bottomSun = max(1.0 - (1.0 - l.bottomSun) * VANILLA_CLOUD_BASE_SHADE, 0.0);
+    l.bottomLight = mix(l.bottomLight, 1.0, VANILLA_CLOUD_RAIN_BASE * l.rainDeck);
+    l.bottomSun = mix(l.bottomSun, 1.0, VANILLA_CLOUD_RAIN_BASE * l.rainDeck);
     float saturation = mix(VANILLA_CLOUD_SKY_SATURATION, VANILLA_CLOUD_DUSK_SATURATION, dusk);
     l.skyRadiance = mix(vec3(luminance(l.skyRadiance)), l.skyRadiance, saturation);
     l.groundRadiance = mix(vec3(luminance(l.groundRadiance)), l.groundRadiance, saturation);
@@ -125,10 +127,10 @@ CloudAccum cloudMarchVanilla(CloudContext ctx, CloudLighting l, vec3 dir, vec2 s
     float invSteps = 1.0 / float(steps);
     vec2 origin = vanillaCloudOrigin();
     vec3 sums = vec3(0.0);
-    // カメラが雲の中にいる間は雲の中の霧が視界を閉じるので、板は視線の消散を倍にしない (入る・出るときに一気に白く閉じない)
+    // カメラが雲の中にいる間は雲の中の霧が視界を閉じるので、板は視線の消散を弱める (入る・出るときに一気に白く閉じない)
     float opacity = VANILLA_CLOUD_OPACITY;
 #ifdef CLOUD_INTERIOR
-    opacity = mix(opacity, 1.0, frameData.skyParams[4].a);
+    opacity = mix(opacity, VANILLA_CLOUD_INSIDE_OPACITY, pow(frameData.skyParams[4].a, VANILLA_CLOUD_INSIDE_POW));
 #endif
     for (int i = 0; i < steps; i++) {
         float t = seg.x + segLength * sqr((float(i) + dither.x) * invSteps);

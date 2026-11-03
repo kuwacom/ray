@@ -29,6 +29,7 @@ const float VANILLA_CLOUD_EDGE_NOISE = 0.10;       // 縁を揺らす量 (field 
 const float VANILLA_CLOUD_NOISE_PERIOD = 18.0;     // ブロック: 縁の揺れの 3D ノイズの周期
 const float VANILLA_CLOUD_SIGMA = 0.275 * CLOUD_LOW_DENSITY;   // 1 / 参照 m。既定の濃さで鉛直の光学的深さ約 3.8、横 1 マスで約 11
 const float VANILLA_CLOUD_OPACITY = 3.0;           // 視線方向の消散の倍率 (バニラの雲のように透けない塊にする。陰の光学的深さには掛けない)
+const float VANILLA_CLOUD_INSIDE_OPACITY = 0.05;   // 同じく、カメラが板の中にいるときの倍率 (中の見通しは雲の中の霧が決めるので、板の消散で地形が白く閉じたり暗い影になったりしない)
 // 陰と内散乱の濃さは既定の濃さで頭打ち (板はすでに光を通さないので、濃さを上げても底がさらに暗く青灰色になるだけ)
 const float VANILLA_CLOUD_SHADE_SIGMA = 0.275 * min(CLOUD_LOW_DENSITY, 0.25);
 const float VANILLA_CLOUD_LIGHT_REACH = 24.0;      // ブロック: 光源方向の陰を見る長さ (低い日でも 2 マス先まで)
@@ -44,7 +45,7 @@ const float VANILLA_CLOUD_MS_GAIN = 1.0;
 const float VANILLA_CLOUD_SILVER = 0.3;
 const float VANILLA_CLOUD_POWDER = 0.4;
 const float VANILLA_CLOUD_AMBIENT = 1.1;
-const float VANILLA_CLOUD_BASE_SHADE = 1.0;     // 底の暗さの倍率 (CS_BASE_SHADE に掛かる。4 で底の直達光と多重散乱が 0 になり、空の色だけの暗い底になる)
+const float VANILLA_CLOUD_BASE_SHADE = 1.5;     // 底の暗さの倍率 (CS_BASE_SHADE に掛かる。4 で底の直達光と多重散乱が 0 になり、空の色だけの暗い底になる)
 const float VANILLA_CLOUD_BASE_LIFT = 0.2;      // 底の暗さを掛け始める高さ (板の割合。丸めで底の面は密度 0 なので、見える底はこの上から始まる)
 const float VANILLA_CLOUD_DUSK_GAIN = 0.4;      // 光源が低い (朝夕) ときの空の光と多重散乱の増し分
 const float VANILLA_CLOUD_DUSK_SUN_GAIN = 1.2;  // 同じく直達光の増し分 (橙の日が雲を桃色に染める)
@@ -52,8 +53,10 @@ const float VANILLA_CLOUD_DUSK_SUN_Y = 0.3;     // 増し分が消える光源�
 const float VANILLA_CLOUD_DUSK_SATURATION = 0.2; // 同じく空の光の彩度 (青を薄めて雲を桃色寄りにする)
 const float VANILLA_CLOUD_SKY_SATURATION = 0.4; // 空の光の彩度 (1 で空の色のまま。陰の青みはこの光の色で決まる。底が空と同じ青にならないよう青みを抜く)
 // 雨雲の層の中から見る板は、層の下から見た曇天の暗さ (見えない雨雲の層の灰色) に合わせる
+const float VANILLA_CLOUD_INSIDE_POW = 0.33;       // 板の消散を弱める割合は、霧の濃さのこの乗 (小さいほど縁に近い所から板が透け、縁のすぐ中で白く閉じる区間が短い)
 const float VANILLA_CLOUD_RAIN_SUN = 0.2;         // 直達光の倍率
-const float VANILLA_CLOUD_RAIN_AMBIENT = 0.75;    // 空の光の倍率
+const float VANILLA_CLOUD_RAIN_AMBIENT = 1.0;     // 空の光の倍率
+const float VANILLA_CLOUD_RAIN_BASE = 0.8;        // 底の暗さを無くす割合 (層の中から見下ろす底が、霧や地形より暗い影にならないように)
 
 // 雲が雨雲へ変わり始めてから移り終わるまでの割合 (0 = バニラの形の板, 1 = 雨雲)。reshape: CloudContext.reshape
 float cloudVanillaRainLook(float reshape) { return smoothstep(0.0, CLOUD_HAZE_RAIN.x, reshape); }
