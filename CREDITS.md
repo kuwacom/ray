@@ -8,7 +8,7 @@
 
 | 手法 | 出典 | 使用箇所 |
 |---|---|---|
-| 3D DDA (ボクセル走査) | Amanatides & Woo, "A Fast Voxel Traversal Algorithm for Ray Tracing", Eurographics 1987 | lib/light/trace.glsl |
+| 3D DDA (ボクセル走査) と、バニラの形の雲の空の区画・マスの飛ばし (xz の 2 軸の DDA) | Amanatides & Woo, "A Fast Voxel Traversal Algorithm for Ray Tracing", Eurographics 1987 | lib/light/trace.glsl, lib/sky/cloud_march.glsl |
 | void-and-cluster ブルーノイズ | Ulichney, "The void-and-cluster method for dither array generation", SPIE 1993 | tools/gen_blue_noise.py |
 | PCG ハッシュ | Jarzynski & Olano, "Hash Functions for GPU Rendering", JCGT 2020 | lib/common/noise.glsl |
 | Interleaved Gradient Noise | Jimenez, "Next Generation Post Processing in Call of Duty: Advanced Warfare", SIGGRAPH 2014 | lib/common/noise.glsl |
