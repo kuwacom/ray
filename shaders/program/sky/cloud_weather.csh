@@ -283,7 +283,7 @@ void cloudInteriorWrite(CloudContext ctx) {
         // 写実の層は描かない。バニラの形の柱の中の光だけ
         float slabWeight = cloudRainDensityScale(ctx);
         vec2 q = vanillaCloudOrigin();
-        odLight = vanillaCloudLightOD(q, y, l.lightDir) * slabWeight;
+        odLight = vanillaCloudLightOD(q, y, l.lightDir, 0.5) * slabWeight;
         odSky = vanillaCloudSkyOD(q, y) * slabWeight;
         l = cloudVanillaLighting(l);
         float slabHeight = (y - vanillaCloudBottom()) / VANILLA_CLOUD_BASE_DEPTH;

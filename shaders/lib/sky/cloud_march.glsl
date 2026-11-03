@@ -95,12 +95,11 @@ CloudLighting cloudVanillaLighting(CloudLighting l) {
     l.msGain *= VANILLA_CLOUD_MS_GAIN;
     l.silverBoost *= VANILLA_CLOUD_SILVER;
     l.powder = min(l.powder * VANILLA_CLOUD_POWDER, 1.0);
-    // 日が低いと直達光は板を横に長く抜けて届かず底が沈むので、空の光・多重散乱・直達光を持ち上げる
+    // 日が低いと厚い柱の側面に横から日が当たり、橙の光で明るく黄ばむので、直達光を絞って彩度を抜く
     float dusk = cloudVanillaDusk(l);
-    float duskGain = 1.0 + VANILLA_CLOUD_DUSK_GAIN * dusk;
-    l.msGain *= duskGain;
-    l.ambient *= VANILLA_CLOUD_AMBIENT * duskGain;
+    l.ambient *= VANILLA_CLOUD_AMBIENT;
     l.lightIrradiance *= 1.0 + VANILLA_CLOUD_DUSK_SUN_GAIN * dusk;
+    l.lightIrradiance = mix(l.lightIrradiance, vec3(luminance(l.lightIrradiance)), VANILLA_CLOUD_DUSK_SUN_DESAT * dusk);
     l.lightIrradiance *= mix(1.0, VANILLA_CLOUD_RAIN_SUN, l.rainDeck);
     l.ambient *= mix(1.0, VANILLA_CLOUD_RAIN_AMBIENT, l.rainDeck);
     l.bottomLight = max(1.0 - (1.0 - l.bottomLight) * VANILLA_CLOUD_BASE_SHADE, 0.0);
@@ -180,7 +179,7 @@ CloudAccum cloudMarchVanilla(CloudContext ctx, CloudLighting l, vec3 dir, vec2 s
         float tRef = cloudRefDistance(ctx, dir, t, altitude);
         float height = saturate((y - bottom) / VANILLA_CLOUD_BASE_DEPTH);
         float extinction = density * weight * VANILLA_CLOUD_SHADE_SIGMA;
-        float odLight = vanillaCloudLightOD(q, y, l.lightDir) * weight * vanillaCloudMottle(q);
+        float odLight = vanillaCloudLightOD(q, y, l.lightDir, mix(0.15, 0.85, dither.y)) * weight * vanillaCloudMottle(q);
         float odSky = vanillaCloudSkyOD(q, y) * weight;
         CloudLighting lit = l;
         lit.ambient *= 1.0 - occlusion;
