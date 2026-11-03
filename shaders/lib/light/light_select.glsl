@@ -121,19 +121,34 @@ const float LIGHT_NORMAL_GRAZING = 0.35;
 const float LIGHT_BOX_RADIANCE = 4.5;   // 形態係数 1 の時の照度 / (色 x BLOCKLIGHT_ILLUMINANCE)
 const float LIGHT_BOX_REACH = 4.0;      // 箱からこの距離で 0 へ落とす (ブロック)
 const float LIGHT_BOX_COLOR_POWER = 1.5;
+const int LIGHT_DECOR_COUNT = 6;                      // LIGHT_DECOR_FIRST から続く飾りの鉱物ブロックの光源の数
+const float LIGHT_BOX_DECOR_LUM_MIN = 0.42;           // ブロック自身の明るさの、光源の表の明るさに対する割合の下限 (暗い青のラピスラズリが消えないように)
+const vec2 LIGHT_BOX_DECOR_LUM_FADE = vec2(0.25, 1.5); // 光源の表の明るさへ戻る箱からの距離 (ブロック)
 
 /*
- * 光る面から離れた所の広がり。形態係数だけでは面から 1 ブロックを超えると急に暗くなり、面全体が光っている感じが根元で終わる
- * 光を何度か跳ねた GI の広がりを、距離に応じた倍率で補う (面に近い所は上の根元の分で足りているので 0 から始める)
- * 光源の影を掛ける側で足すので、壁の裏へは漏れない
+ * 面の形態係数に掛ける、箱からの距離 s (ブロック) の係数。形態係数だけでは面から 1 ブロックを超えると急に暗くなり、
+ * 面全体が光っている感じが根元で終わる。光を何度か跳ねた GI の広がりに合わせて、根元で弱く、離れるほど強くして補う
+ * 係数は根元の分 (影を掛けない) と広がりの分 (光源の影を掛ける) に配分し、合計は距離に対してなめらかに保つ
+ * 面に近い所は光源自身の影になるので影なしで足し、離れるほど影を掛ける側へ移す。影なしの分は近くだけなので、壁の裏へは漏れない
  */
-const float LIGHT_BOX_ROOT_SCALE = 0.85;            // 根元の分 (影なし) の倍率。広がりの分を足した合計が、根元で明るくなりすぎないように
-const float LIGHT_BOX_SPREAD = 0.6;
-const vec2 LIGHT_BOX_SPREAD_RISE = vec2(0.0, 2.0);  // 倍率が 0 から全開になる箱からの距離 (ブロック)
-const vec2 LIGHT_BOX_SPREAD_FALL = vec2(2.8, 4.0);  // 全開から 0 に戻る距離
+const float LIGHT_BOX_GAIN_ROOT = 0.83;             // 根元の係数
+const float LIGHT_BOX_GAIN_MID = 1.05;              // 離れた所の係数
+const vec2 LIGHT_BOX_GAIN_RISE = vec2(0.0, 0.5);    // 根元の係数から離れた所の係数へ移る箱からの距離 (ブロック)
+const vec2 LIGHT_BOX_GAIN_FALL = vec2(1.75, 3.5);   // 係数が 0 に戻る距離
+const vec2 LIGHT_BOX_ROOT_SPLIT = vec2(0.25, 1.25); // 係数が影なしから影を掛ける側へ移る距離
+
+float lightBoxGain(float s) {
+    return mix(LIGHT_BOX_GAIN_ROOT, LIGHT_BOX_GAIN_MID, smoothstep(LIGHT_BOX_GAIN_RISE.x, LIGHT_BOX_GAIN_RISE.y, s))
+        * (1.0 - smoothstep(LIGHT_BOX_GAIN_FALL.x, LIGHT_BOX_GAIN_FALL.y, s));
+}
+
+// 係数のうち、影を掛けずに足す根元の分の割合
+float lightBoxRootShare(float s) {
+    return 1.0 - smoothstep(LIGHT_BOX_ROOT_SPLIT.x, LIGHT_BOX_ROOT_SPLIT.y, s);
+}
 
 float lightBoxSpread(float s) {
-    return LIGHT_BOX_SPREAD * smoothstep(LIGHT_BOX_SPREAD_RISE.x, LIGHT_BOX_SPREAD_RISE.y, s) * (1.0 - smoothstep(LIGHT_BOX_SPREAD_FALL.x, LIGHT_BOX_SPREAD_FALL.y, s));
+    return lightBoxGain(s) * (1.0 - lightBoxRootShare(s));
 }
 
 /*
@@ -322,7 +337,8 @@ float lightBoxFormFactors(vec3 voxelPos, vec3 boxCenter, vec3 n, int light, bool
         float ff = f.ratio * lightMaskQuad(axis, side, f.rect.xy, f.rect.zw, rel, n);
 #if LIGHT_EMISSION_MASK_MODE == 2
         float gridMix = saturate((s - LIGHT_MASK_GRID_REACH) / LIGHT_MASK_GRID_FADE);
-        if (grid && masked && gridMix < 1.0) ff = mix(lightMaskGridFormFactor(f, axis, side, rel, n), ff, gridMix);
+        // 向きのある光源の前面は、火が炉の口の奥にあって枠に遮られる。マスで火の下の行を近くから見ると、接地面の境目に鋭い筋が出る
+        if (grid && masked && facing < 0 && gridMix < 1.0) ff = mix(lightMaskGridFormFactor(f, axis, side, rel, n), ff, gridMix);
 #endif
         sum += ff;
     }
@@ -366,10 +382,15 @@ vec3 lightBoxTerms(LightInstance L, vec3 voxelPos, vec3 gateNormal, bool grid, o
     vec3 faceColor = albedo * (lightLum / max(luminance(albedo), EPS));
     // 向きのある光源は光るのが火の部分だけで、ブロックの平均の色 (かまどの灰色の石) ではなく光源の色で光る
     if (facing >= 0) faceColor = d.color.rgb;
+    // 飾りの鉱物ブロックは光源の表の明るさがブロックの色と合わず (暗い赤のレッドストーンも他と同じ明るさになる)、
+    // 根元ではブロック自身の色の明るさで光らせ、離れるほど光源の表の明るさへ戻す
+    if (light >= LIGHT_DECOR_FIRST && light < LIGHT_DECOR_FIRST + LIGHT_DECOR_COUNT) {
+        float own = max(luminance(getBlockAlbedo(voxelId)) / max(lightLum, EPS), LIGHT_BOX_DECOR_LUM_MIN);
+        faceColor *= mix(own, 1.0, smoothstep(LIGHT_BOX_DECOR_LUM_FADE.x, LIGHT_BOX_DECOR_LUM_FADE.y, s));
+    }
     vec3 irradiance = faceColor * (power * LIGHT_BOX_RADIANCE * sum);
-    float w = 1.0 - s / LIGHT_BOX_REACH;
     spread = irradiance * lightBoxSpread(s);
-    return irradiance * (LIGHT_BOX_ROOT_SCALE * w * w);
+    return irradiance * (lightBoxGain(s) * lightBoxRootShare(s));
 }
 
 vec3 lightBoxIrradiance(LightInstance L, vec3 voxelPos, vec3 gateNormal, bool grid) {

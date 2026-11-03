@@ -58,7 +58,7 @@ TOP_COLOR_MIN_DIFF = 8
 EMISSION_EDGE = (0.55, 0.90)
 DECOR_EMISSION_EDGE = (0.15, 0.85)
 # 向きのある光源の火の部分 (gbuffers_solid.fsh の facingFireMask と同じ)
-FACING_FIRE_SATURATION = (0.12, 0.3)
+FACING_FIRE_SATURATION = (0.26, 0.36)
 FACING_FIRE_CORE = (0.93, 0.98)
 # 光る範囲 = 面の最大の発光のこの割合を超える画素の外接矩形
 RECT_THRESHOLD = 0.5

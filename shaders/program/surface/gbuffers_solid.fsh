@@ -135,7 +135,7 @@ const float DECOR_EMISSION = 0.3;
  * 火は彩度の高い橙〜黄か、芯の白熱 (最大成分が FACING_FIRE_CORE 以上)。石の灰色は明るくても彩度が無いので光らせない
  * tools/gen_block_colors.py の面の光り方 (light_masks.json) と同じ式
  */
-const vec2 FACING_FIRE_SATURATION = vec2(0.12, 0.3);
+const vec2 FACING_FIRE_SATURATION = vec2(0.26, 0.36);
 const vec2 FACING_FIRE_CORE = vec2(0.93, 0.98);
 
 float facingFireMask(vec3 albedoSrgb) {
