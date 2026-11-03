@@ -113,17 +113,6 @@ CloudLighting cloudVanillaLighting(CloudLighting l) {
 }
 
 /*
- * 視線が xz の箱 [lo, lo + size) を出るまでの距離 (ブロック)。xz の 2 軸の「次の境目までの距離 / 方向の成分」の小さいほう (Amanatides & Woo の DDA の 1 歩)
- * q: 視線上の今の点の xz, dxz: 視線の方向の xz 成分
- */
-float vanillaCloudBoxExit(vec2 q, vec2 dxz, vec2 lo, float size) {
-    vec2 edge = lo + vec2(dxz.x > 0.0 ? size : 0.0, dxz.y > 0.0 ? size : 0.0);
-    vec2 axis = vec2(abs(dxz.x) < 1e-6 ? 1e-6 : dxz.x, abs(dxz.y) < 1e-6 ? 1e-6 : dxz.y);
-    vec2 t = (edge - q) / axis;
-    return max(min(t.x, t.y), 0.0) + VANILLA_CLOUD_SKIP_MARGIN;
-}
-
-/*
  * バニラの形の雲 (マスごとの直方体の柱)。weight: 濃さの倍率 (雨の日は雨の濃さの倍率で濃くする)
  * 柱の表で空の区画 (4x4 マス) と空のマス・頭より上を飛ばし、柱の近くだけ細かく歩く。光を求めるのは密度のあるサンプルだけで、その数を
  * VANILLA_CLOUD_STEPS までにする。歩幅は距離に比例し、雲の近くでは縁の柔らかさの半分以下
@@ -179,10 +168,11 @@ CloudAccum cloudMarchVanilla(CloudContext ctx, CloudLighting l, vec3 dir, vec2 s
         float tRef = cloudRefDistance(ctx, dir, t, altitude);
         float height = saturate((y - bottom) / VANILLA_CLOUD_BASE_DEPTH);
         float extinction = density * weight * VANILLA_CLOUD_SHADE_SIGMA;
-        float odLight = vanillaCloudLightOD(q, y, l.lightDir, mix(0.15, 0.85, dither.y)) * weight * vanillaCloudMottle(q);
+        float odLight = vanillaCloudLightOD(q, y, l.lightDir) * weight * vanillaCloudMottle(q);
         float odSky = vanillaCloudSkyOD(q, y) * weight;
         CloudLighting lit = l;
         lit.ambient *= 1.0 - occlusion;
+        lit.lightIrradiance *= mix(1.0, vanillaCloudTopMottle(q), saturate(1.0 - (head - y) / VANILLA_CLOUD_TOP_MOTTLE_DEPTH));
         vec3 inscatter = cloudInscatter(lit, extinction, odLight, 0.0, odSky, sqr(1.0 - height), 1.0, max(height - baseLift, 0.0));
 
         float stepT = exp(-density * weight * VANILLA_CLOUD_SIGMA * opacity * dt * VANILLA_CLOUD_KREF);

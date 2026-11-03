@@ -1,6 +1,6 @@
 /*
  * バニラの形の雲の密度・光の見積もり・雲影 (CLOUD_VANILLA_SHAPE, sky モジュール。cloud_march.glsl が読む)
- * バニラの雲と同じ高さ (Iris の cloudHeight)・12 ブロックの格子・模様・流れ (Iris の cloudTime) に置く、角ばった体積雲。
+ * バニラの雲と同じ高さ (Iris の cloudHeight)・模様・流れ (Iris の cloudTime) に置く、角を丸めた体積雲。格子はバニラの 12 ブロックの VANILLA_CLOUD_CELL_SCALE 倍。
  * 模様はバニラの雲のテクスチャ (リソースパックのものに従う) を customTexture で読み、1 画素 = 1 マスとして置く。
  * 雲はマスごとの直方体の柱で、面はすべて軸に平行 (曲面・ノイズの凹凸を持たない)。柱の頭の高さは塊の奥ほど段階的に高く、
  * 柱の表 (cloudWeatherImg) に入れて prepare2 が毎フレーム作る。形は変えずに、表に出ている面の近くだけ密度を下げて縁を透かす
@@ -32,21 +32,25 @@ const float VANILLA_CLOUD_SOFT_BOTTOM = 1.8 * CLOUD_EDGE_SOFTNESS;
 const float VANILLA_CLOUD_SOFT_PIXELS = 1.5;       // 頭と底の柔らかさの下限 (画素の大きさの倍率)。遠くの角の階段のぎざぎざが時間方向に揺れて見えるのを防ぐ
 // 側面の柔らかさの下限。近くは SOFT_SIDE が勝つので変わらず、遠くだけ画素の大きさに比例して広がる (近くをピンぼけにせず、遠くの硬い箱を和らげる)
 const float VANILLA_CLOUD_SOFT_SIDE_PIXELS = 4.5;
-const float VANILLA_CLOUD_CORNER_RADIUS = 2.5;      // ブロック: 直方体の辺と角を丸める半径。0 で四角いまま
+const float VANILLA_CLOUD_CORNER_RADIUS = 6.0;      // ブロック: 直方体の辺と角を丸める半径。0 で四角いまま
 const float VANILLA_CLOUD_SOFT_MAX = 6.0;          // ブロック: 柔らかさの上限 (マスの半分。これを超えると小さな塊の芯まで薄くなる)
 const float VANILLA_CLOUD_OCCLUSION = 0.25;        // 段差の根元で空の光が減る最大の割合
 const float VANILLA_CLOUD_OCCLUSION_REACH = 2.0;   // ブロック: 壁の遮りの距離の減衰の下駄
 const float VANILLA_CLOUD_OCCLUSION_FULL = 2.0;    // 壁の高さ / (距離 + 下駄) がこの値で遮りが最大になる
 const float VANILLA_CLOUD_MOTTLE_MIN = 0.6;        // 光源方向の濃さに掛けるむらの下限
-const float VANILLA_CLOUD_MOTTLE_PERIOD = 160.0;   // ブロック: むらのノイズ (cloudNoiseTex の滑らかな fbm) 1 周の長さ
+const float VANILLA_CLOUD_MOTTLE_CELLS = 12.0;     // マス: むらのノイズ (cloudNoiseTex の滑らかな fbm) 1 周の長さ。マスの大きさに比例させて、模様の大きさが変わってもむらの見え方を保つ
+const float VANILLA_CLOUD_TOP_MOTTLE = 0.15;       // 光源の光にかけるむらの深さ (0 でむらなし)。面は平らなまま、上から見たときの一様な白さに緩い明暗を付ける
+const float VANILLA_CLOUD_TOP_MOTTLE_CELLS = 3.0;  // マス: 同じむらの 1 周の長さ
+const float VANILLA_CLOUD_TOP_MOTTLE_DEPTH = 3.0;  // ブロック: 柱の頭からこの深さまでだけにかける (側面に縦縞が出ない)
 const float VANILLA_CLOUD_SIGMA = 0.275 * CLOUD_LOW_DENSITY;   // 1 / 参照 m。既定の濃さで 1 ブロックあたり約 1 (参照 m への換算は VANILLA_CLOUD_KREF)
 const float VANILLA_CLOUD_OPACITY = 1.3;           // 視線方向の消散の倍率 (陰の光学的深さには掛けない)。縁の 2 ブロックは半透明になり、光が透けて柔らかく見える
 const float VANILLA_CLOUD_INSIDE_OPACITY = 0.05;   // 同じく、カメラが柱の中にいるときの倍率 (中の見通しは雲の中の霧が決めるので、柱の消散で地形が白く閉じたり暗い影になったりしない)
 const float VANILLA_CLOUD_INSIDE_DEPTH = 0.5;      // ブロック: カメラが柱の面からこの深さまで入ると、倍率が INSIDE_OPACITY になる
 // 陰と内散乱の濃さは既定の濃さで頭打ち (柱はすでに光を通さないので、濃さを上げても底がさらに暗く青灰色になるだけ)
 const float VANILLA_CLOUD_SHADE_SIGMA = 0.275 * min(CLOUD_LOW_DENSITY, 0.25);
+const float VANILLA_CLOUD_LIGHT_REACH = 12.0;      // ブロック: 光源方向の影を数える距離
+const int VANILLA_CLOUD_LIGHT_CELLS = 3;           // その間に渡るマスの最大数 (マスは 13 ブロック以上なので、REACH の間に渡るのは 2 つ)
 const float VANILLA_CLOUD_MIN_LIGHT_Y = 0.05;      // 光源の高さの下限 (地平線すれすれで陰の長さが発散しない)
-const float VANILLA_CLOUD_LIGHT_STEP0 = 0.75;      // ブロック: 光源方向の最初の歩幅 (毎回 2 倍)
 const float VANILLA_CLOUD_STEP_REL = 0.004;        // 視線の歩幅 (距離に対する割合)。ブロック
 const float VANILLA_CLOUD_STEP_MIN = 0.3;          // 雲の近くの歩幅は縁の柔らかさの 1/6 以下 (柔らかさの層を何歩かで渡り、等高線の縞を青ノイズに崩す)
 const float VANILLA_CLOUD_STEP_MAX = 6.0;
@@ -59,7 +63,7 @@ const float VANILLA_CLOUD_MS_GAIN = 1.2;
 const float VANILLA_CLOUD_SILVER = 0.35;
 const float VANILLA_CLOUD_POWDER = 0.8;
 const float VANILLA_CLOUD_AMBIENT = 0.8;
-const float VANILLA_CLOUD_BASE_SHADE = 1.5;     // 底の暗さの倍率 (CS_BASE_SHADE に掛かる。4 で底の直達光と多重散乱が 0 になり、空の色だけの暗い底になる)
+const float VANILLA_CLOUD_BASE_SHADE = 1.8;     // 底の暗さの倍率 (CS_BASE_SHADE に掛かる。4 で底の直達光と多重散乱が 0 になり、空の色だけの暗い底になる)
 const float VANILLA_CLOUD_BASE_DEPTH = 4.0;     // ブロック: 底の暗さが 1 に戻る高さ (底の暗さと地面の照り返しは底から数ブロックだけ)
 const float VANILLA_CLOUD_BASE_LIFT = 0.1;      // 底の暗さを掛け始める高さ (BASE_DEPTH の割合)
 const float VANILLA_CLOUD_DUSK_SUN_GAIN = -0.4; // 光源が低い (朝夕) ときの直達光の増減 (厚い柱の側面は横からの橙の光で明るくなりすぎるので絞る)
@@ -160,7 +164,12 @@ void vanillaCloudFaces(vec2 q, float y, out vec2 side, out float up, out float d
     // へこんだ角: 斜めの隣だけが空きのときは角の柱 (四角い等高線のまま)
     if (!openX && !openZ && y > bottom + headD) side.x = max(ex, ez);
     // 頭より上へ出ている隣の壁の高さ / (壁までの距離 + 頭から潜った深さ + 2)。壁に近く浅いほど強い
-    float wall = max(headX - head, 0.0) / (ex + up + VANILLA_CLOUD_OCCLUSION_REACH) + max(headZ - head, 0.0) / (ez + up + VANILLA_CLOUD_OCCLUSION_REACH);
+    // 近い側だけを見ると、マスの中央で見る壁が入れ替わって明るさが段になる。反対側の壁も足して、マスの中でなめらかにつなぐ
+    float headX2 = vanillaCloudColumn(c - ivec2(n.x, 0)).x;
+    float headZ2 = vanillaCloudColumn(c - ivec2(0, n.y)).x;
+    float reach = up + VANILLA_CLOUD_OCCLUSION_REACH;
+    float wall = max(headX - head, 0.0) / (ex + reach) + max(headX2 - head, 0.0) / (VANILLA_CLOUD_CELL - ex + reach)
+               + max(headZ - head, 0.0) / (ez + reach) + max(headZ2 - head, 0.0) / (VANILLA_CLOUD_CELL - ez + reach);
     occlusion = VANILLA_CLOUD_OCCLUSION * saturate(wall / VANILLA_CLOUD_OCCLUSION_FULL);
 }
 
@@ -211,25 +220,42 @@ float vanillaCloudInsideDepth(vec2 q, float y) {
 
 // 光源方向の光学的深さに掛ける、周期の大きいむら [MOTTLE_MIN, 1]。視線の消散 (形・透け) には掛けないので、形は変わらず、面の上の明るさだけがゆるくむらになる
 float vanillaCloudMottle(vec2 q) {
-    return mix(VANILLA_CLOUD_MOTTLE_MIN, 1.0, textureLod(cloudNoiseTex, q / VANILLA_CLOUD_MOTTLE_PERIOD, 0.0).g);
+    return mix(VANILLA_CLOUD_MOTTLE_MIN, 1.0, textureLod(cloudNoiseTex, q / (VANILLA_CLOUD_MOTTLE_CELLS * VANILLA_CLOUD_CELL), 0.0).g);
 }
 
-// 光源方向の光学的深さ。歩幅を毎回 2 倍にして、柱の上端 (外形の上端) を出るまで積む。1 歩は表の 1 マスだけ読み、その歩が頭より下にある長さの割合を数える
-// jitter: 各歩の中での読む位置 [0,1)。青ノイズで揺らすと、隣の柱の影の境目が柱の列でそろって出るぎざぎざにならず、時間方向に均される
-float vanillaCloudLightOD(vec2 q, float y, vec3 lightDir, float jitter) {
+// 光源の光にかけるむら [1 - TOP_MOTTLE, 1 + TOP_MOTTLE] (平均は 1)。光源方向のむらとは別の周期と位置で読み、面の上の明暗が光の通り道のむらと重ならないようにする
+float vanillaCloudTopMottle(vec2 q) {
+    float g = textureLod(cloudNoiseTex, q / (VANILLA_CLOUD_TOP_MOTTLE_CELLS * VANILLA_CLOUD_CELL) + vec2(0.37, 0.71), 0.0).g;
+    return 1.0 + VANILLA_CLOUD_TOP_MOTTLE * (2.0 * g - 1.0);
+}
+
+/*
+ * 視線が xz の箱 [lo, lo + size) を出るまでの距離 (ブロック)。xz の 2 軸の「次の境目までの距離 / 方向の成分」の小さいほう (Amanatides & Woo の DDA の 1 歩)
+ * q: 視線上の今の点の xz, dxz: 視線の方向の xz 成分
+ */
+float vanillaCloudBoxExit(vec2 q, vec2 dxz, vec2 lo, float size) {
+    vec2 edge = lo + vec2(dxz.x > 0.0 ? size : 0.0, dxz.y > 0.0 ? size : 0.0);
+    vec2 axis = vec2(abs(dxz.x) < 1e-6 ? 1e-6 : dxz.x, abs(dxz.y) < 1e-6 ? 1e-6 : dxz.y);
+    vec2 t = (edge - q) / axis;
+    return max(min(t.x, t.y), 0.0) + VANILLA_CLOUD_SKIP_MARGIN;
+}
+
+// 光源方向の光学的深さ。光源の向きへ表のマスを 1 つずつ渡り、柱の頭より下を通る長さを足す (柱は直方体なので長さは厳密。
+// 点で読むと、隣の柱の影の境目が柱の列でそろったぎざぎざになる)。上端 (外形の上端) を出るか、LIGHT_REACH ブロック進んだら止める
+// (遠くの柱まで数えると、低い日の雲が真っ暗になる。光は雲の奥から何度も散乱して届くので、近くの柱だけが影を作る)
+float vanillaCloudLightOD(vec2 q, float y, vec3 lightDir) {
     vec3 d = normalize(vec3(lightDir.x, max(lightDir.y, VANILLA_CLOUD_MIN_LIGHT_Y), lightDir.z));
     float bottom = vanillaCloudBottom();
-    float top = bottom + VANILLA_CLOUD_ENVELOPE;
+    float tTop = min((bottom + VANILLA_CLOUD_ENVELOPE - y) / d.y, VANILLA_CLOUD_LIGHT_REACH);
     float od = 0.0;
     float t = 0.0;
-    float stepLength = VANILLA_CLOUD_LIGHT_STEP0;
-    for (int i = 0; i < VANILLA_CLOUD_LIGHT_STEPS; i++) {
-        float yLow = y + d.y * t;
-        if (yLow >= top) break;
-        float head = bottom + vanillaCloudColumn(vanillaCloudCellOf(q + d.xz * (t + jitter * stepLength))).x;
-        od += saturate((head - yLow) / (d.y * stepLength)) * stepLength;
-        t += stepLength;
-        stepLength *= 2.0;
+    for (int i = 0; i < VANILLA_CLOUD_LIGHT_CELLS && t < tTop; i++) {
+        vec2 p = q + d.xz * t;
+        ivec2 cell = vanillaCloudCellOf(p);
+        float next = t + vanillaCloudBoxExit(p, d.xz, vec2(cell) * VANILLA_CLOUD_CELL, VANILLA_CLOUD_CELL);
+        float head = bottom + vanillaCloudColumn(cell).x;
+        od += max(min(min(next, tTop), (head - y) / d.y) - t, 0.0);
+        t = next;
     }
     return od * (VANILLA_CLOUD_KREF * VANILLA_CLOUD_SHADE_SIGMA);
 }

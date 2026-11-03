@@ -292,14 +292,14 @@ const float CLOUD_FRONT_EPS = 1e-4;   // 透過率が 1 に近いときの散乱
 
 #ifdef CLOUD_VANILLA_SHAPE
 // バニラの雲の寸法 (ブロック)。格子の 1 マスと厚みと、Iris の cloudHeight から下面までの差
-const float VANILLA_CLOUD_CELL_SCALE = 1.1;  // バニラの雲のマスの 12 ブロックに掛ける倍率。1 でバニラと同じ大きさ・位置 (大きくすると、格子の原点 (0, 0) から離れるほど雲の位置がバニラからずれる)
+const float VANILLA_CLOUD_CELL_SCALE = 2.0;  // バニラの雲のマスの 12 ブロックに掛ける倍率。1 でバニラと同じ大きさ・位置 (大きくすると、格子の原点 (0, 0) から離れるほど雲の位置がバニラからずれる)
 const float VANILLA_CLOUD_CELL = 12.0 * VANILLA_CLOUD_CELL_SCALE;
 const float VANILLA_CLOUD_EDGE_HEIGHT = float(CLOUD_VANILLA_THICKNESS);  // 塊の外周のマスの厚み
 const int VANILLA_CLOUD_TERRACE = CLOUD_VANILLA_TERRACE;                 // 塊の奥のマスを高く積む段の数
 const float VANILLA_CLOUD_TERRACE_STEP = 4.0;                            // 1 段の高さ
 const float VANILLA_CLOUD_ENVELOPE = VANILLA_CLOUD_EDGE_HEIGHT + float(VANILLA_CLOUD_TERRACE) * VANILLA_CLOUD_TERRACE_STEP; // 外形の厚み (下面から、どの柱の頭よりも上まで)
 const float VANILLA_CLOUD_Y_OFFSET = 0.33;
-// この距離 (ブロック) で空へ溶かし切る。テクスチャは 3072 ブロックで一周するので、繰り返しを見せない
+// この距離 (ブロック) で空へ溶かし切る。テクスチャは 256 マス (CELL_SCALE 2 で 6144 ブロック) で一周するので、繰り返しを見せない
 const float VANILLA_CLOUD_FAR = 2048.0;
 
 float vanillaCloudBottom() { return cloudHeight + VANILLA_CLOUD_Y_OFFSET; }
