@@ -123,6 +123,20 @@ const float LIGHT_BOX_REACH = 4.0;      // 箱からこの距離で 0 へ落と�
 const float LIGHT_BOX_COLOR_POWER = 1.5;
 
 /*
+ * 光る面から離れた所の広がり。形態係数だけでは面から 1 ブロックを超えると急に暗くなり、面全体が光っている感じが根元で終わる
+ * 光を何度か跳ねた GI の広がりを、距離に応じた倍率で補う (面に近い所は上の根元の分で足りているので 0 から始める)
+ * 光源の影を掛ける側で足すので、壁の裏へは漏れない
+ */
+const float LIGHT_BOX_ROOT_SCALE = 0.85;            // 根元の分 (影なし) の倍率。広がりの分を足した合計が、根元で明るくなりすぎないように
+const float LIGHT_BOX_SPREAD = 0.6;
+const vec2 LIGHT_BOX_SPREAD_RISE = vec2(0.0, 2.0);  // 倍率が 0 から全開になる箱からの距離 (ブロック)
+const vec2 LIGHT_BOX_SPREAD_FALL = vec2(2.8, 4.0);  // 全開から 0 に戻る距離
+
+float lightBoxSpread(float s) {
+    return LIGHT_BOX_SPREAD * smoothstep(LIGHT_BOX_SPREAD_RISE.x, LIGHT_BOX_SPREAD_RISE.y, s) * (1.0 - smoothstep(LIGHT_BOX_SPREAD_FALL.x, LIGHT_BOX_SPREAD_FALL.y, s));
+}
+
+/*
  * 着色点 (原点、法線 n) から見た多角形 (頂点は着色点からの相対位置) の形態係数
  * F = 1 / (2 pi) |sum_i angle(v_i, v_i+1) * dot(n, normalize(cross(v_i, v_i+1)))|
  * 着色点の地平線より下の部分は先に切り取る (切り取らないと地平線の下の部分が負の寄与になる)
@@ -280,13 +294,14 @@ float lightMaskGridFormFactor(LightFaceMask f, int axis, float side, vec3 rel, v
  * light: 光源インデックス、masked: 面の光り方のデータがあるか、grid: 近くで 4x4 のマスを使うか (LIGHT_EMISSION_MASK_MODE 2)
  * 0 では面全体を光らせるので、この 3 つは使わない (向きのある光源の前面を除く)
  * facing: 向きのある光源の前面の向き (blockLightFacing)。-1 は向きなしで、向きがあれば前面の面だけを数える (どのモードでも)
+ * 戻り値は見える面の形態係数の和 (光る範囲の割合込み)。s は着色点から箱までの距離 (ブロック)
  */
-float lightBoxNearField(vec3 voxelPos, vec3 boxCenter, vec3 n, int light, bool masked, bool grid, int facing) {
+float lightBoxFormFactors(vec3 voxelPos, vec3 boxCenter, vec3 n, int light, bool masked, bool grid, int facing, out float s) {
     bool useMask = LIGHT_EMISSION_MASK_MODE != 0 || (facing >= 0 && masked);
     // 呼ぶ所は面から TRACE_NORMAL_OFFSET だけ浮かせた点を渡す。浮いたままだと、テクスチャの縁 (1 画素 = 0.0625) の下半分が
     // 着色点の水平線の下になり、接地面の境目の暗い縁が効かない。光る範囲を使う時は面の上の点から見る
     vec3 rel = voxelPos - (useMask ? n * TRACE_NORMAL_OFFSET : vec3(0.0)) - boxCenter;
-    float s = length(max(abs(rel) - 0.5, 0.0));
+    s = length(max(abs(rel) - 0.5, 0.0));
     if (s >= LIGHT_BOX_REACH) return 0.0;
     ivec3 cell = ivec3(floor(boxCenter));
     float sum = 0.0;
@@ -311,8 +326,7 @@ float lightBoxNearField(vec3 voxelPos, vec3 boxCenter, vec3 n, int light, bool m
 #endif
         sum += ff;
     }
-    float w = 1.0 - s / LIGHT_BOX_REACH;
-    return LIGHT_BOX_RADIANCE * sum * (w * w);
+    return sum;
 }
 
 // 光源がブロック全体が光る不透明ブロック (光源の表の LT_OCC) か。光源のセルのブロックから光源の定義を引く
@@ -324,12 +338,75 @@ bool isBlockBoxLight(LightInstance L, out LightDef d, out int voxelId, out int l
 }
 
 /*
+ * ブロック全体が光る光源の面からの近距離の照度。戻り値は根元の分 (影を掛けない)、spread は離れた所の広がりの分
+ * 光源の影は中心の点へのトレース (と接触影) なので、根元の床から中心へ向かうと光るブロック自身の面に当たって影になり、
+ * 接地面の境目ほど暗くなった。光る面は見える面だけを数えている (lightBoxFormFactors) ので、根元は影を掛けない
+ * 広がりは光源の影を掛ける側 (evalLightIrradiance、deferred2 の full) に入れるので、壁の裏へ漏れない
+ * grid: 近くで 4x4 のマスを使うか (LIGHT_EMISSION_MASK_MODE 2)。マスは重いので、画面の大半を占める deferred2 だけが true を渡す
+ */
+vec3 lightBoxTerms(LightInstance L, vec3 voxelPos, vec3 gateNormal, bool grid, out vec3 spread) {
+    spread = vec3(0.0);
+    if (distance(L.posRadius.xyz, voxelPos) >= LIGHT_BOX_REACH + 1.0) return vec3(0.0);
+    LightDef d;
+    int voxelId;
+    int light;
+    if (!isBlockBoxLight(L, d, voxelId, light)) return vec3(0.0);
+    vec3 boxCenter = floor(L.posRadius.xyz) + 0.5;
+    bool masked = (d.info.x & LIGHT_FLAG_EMISSION_MASK) != 0u;
+    int facing = (d.info.x & LIGHT_FLAG_FACING) != 0u ? blockLightFacing(voxelId) : -1;
+    float s;
+    float sum = lightBoxFormFactors(voxelPos, boxCenter, gateNormal, light, masked, grid, facing, s);
+    if (sum <= 0.0) return vec3(0.0);
+    // 面の明るさは光源の明るさとレベルによらない (光る鉱物ブロックは遠くへは弱く届くが、面は他の発光ブロックと同じに光る)
+    float lightLum = luminance(d.color.rgb);
+    float power = luminance(L.colorSize.rgb) / max(lightLum, EPS) * LIGHT_LEVEL_MAX / max(d.color.a * d.params.z, EPS);
+    // 面の色はブロックのテクスチャの色 (光源の表の色より鮮やかで、ブロックごとの色が根元に出る)。明るさは表の色に合わせる
+    // 発光は明るい画素ほど強い (gbuffers の発光の推定) ので、平均色を 1.5 乗して明るく鮮やかな画素の色に寄せる
+    vec3 albedo = pow(getBlockAlbedo(voxelId), vec3(LIGHT_BOX_COLOR_POWER));
+    vec3 faceColor = albedo * (lightLum / max(luminance(albedo), EPS));
+    // 向きのある光源は光るのが火の部分だけで、ブロックの平均の色 (かまどの灰色の石) ではなく光源の色で光る
+    if (facing >= 0) faceColor = d.color.rgb;
+    vec3 irradiance = faceColor * (power * LIGHT_BOX_RADIANCE * sum);
+    float w = 1.0 - s / LIGHT_BOX_REACH;
+    spread = irradiance * lightBoxSpread(s);
+    return irradiance * (LIGHT_BOX_ROOT_SCALE * w * w);
+}
+
+vec3 lightBoxIrradiance(LightInstance L, vec3 voxelPos, vec3 gateNormal, bool grid) {
+    vec3 spread;
+    return lightBoxTerms(L, voxelPos, gateNormal, grid, spread);
+}
+
+vec3 lightBoxIrradiance(LightInstance L, vec3 voxelPos, vec3 gateNormal) {
+    return lightBoxIrradiance(L, voxelPos, gateNormal, false);
+}
+
+/*
+ * 広がりの分の簡易版 (deferred1 の光源の重みと可視率の比、前方のエンティティ、反射の 2 次ヒット用)
+ * 面の形態係数を、箱からの距離だけで決まる関数で置き換える (壁が広い時の値。光源ごとの形の違いは重みの差になるだけ)
+ * 光源ごとに 4 角形の形態係数を求めるとトレースのパスが重くなり、フレームが 2 ms ほど延びた
+ */
+const float LIGHT_BOX_SPREAD_FF = 0.5;
+const float LIGHT_BOX_SPREAD_FF_SCALE = 0.55;
+const float LIGHT_BOX_SPREAD_FF_POWER = 1.6;
+
+vec3 lightBoxSpreadApprox(LightInstance L, LightDef d, vec3 voxelPos) {
+    float s = length(max(abs(voxelPos - (floor(L.posRadius.xyz) + 0.5)) - 0.5, 0.0));
+    if (s >= LIGHT_BOX_REACH) return vec3(0.0);
+    float ff = LIGHT_BOX_SPREAD_FF / (1.0 + pow(s / LIGHT_BOX_SPREAD_FF_SCALE, LIGHT_BOX_SPREAD_FF_POWER));
+    // 光源の色を、明るさとレベルによらない面の明るさへ戻す (lightBoxTerms の power と同じ)
+    vec3 unit = L.colorSize.rgb * (LIGHT_LEVEL_MAX / max(d.color.a * d.params.z, EPS));
+    return unit * (LIGHT_BOX_RADIANCE * ff * lightBoxSpread(s));
+}
+
+/*
  * 光源 L が voxelPos の面 (法線 n) に作る影なしの照度 (NdotL 込み)
  * gateNormal: この法線で地平線の下なら 0 (テクスチャ法線で照らす時に、幾何的に裏側の光源を拾わないため)
  * nearField: 光源のすぐ周りの近距離の放射を足すか。GI の 2 次ヒットでは足さない (光源のそばの狭い面だけが急に明るく、
  *   少ない本数のレイがそこに当たるかどうかで GI がノイズになる)
+ * boxSpread: ブロック全体が光る光源の広がりの分 (簡易版) を足すか。deferred2 は面の分と一緒に正確に求めるので false
  */
-vec3 evalLightIrradiance(LightInstance L, vec3 voxelPos, vec3 n, vec3 gateNormal, bool nearField) {
+vec3 evalLightIrradiance(LightInstance L, vec3 voxelPos, vec3 n, vec3 gateNormal, bool nearField, bool boxSpread) {
     vec3 toL = L.posRadius.xyz - voxelPos;
     float dist = length(toL);
     if (dist >= L.posRadius.w) return vec3(0.0);
@@ -342,20 +419,24 @@ vec3 evalLightIrradiance(LightInstance L, vec3 voxelPos, vec3 n, vec3 gateNormal
     float ndl = mix(gate, sphereLightNdotL(n, dir, dist, radius), smoothstep(0.0, LIGHT_NORMAL_GRAZING, gate));
     float falloff = lightFalloff(dist, L.posRadius.w);
     if (!nearField) return L.colorSize.rgb * falloff * ndl;
-    // 点に近い光源 (たいまつ・ランタンなど) は中心の点から近距離の放射を足す。ブロック全体が光る光源の面からの分は
-    // 影を掛けずに足すので lightBoxIrradiance で別に求める
+    // 点に近い光源 (たいまつ・ランタンなど) は中心の点から近距離の放射を足す。ブロック全体が光る光源は、根元の分を
+    // 影を掛けずに lightBoxIrradiance で別に足し、離れた所の広がりの分だけここで足す
     LightDef d;
     int voxelId;
     int light;
 #if LIGHT_EMISSION_MASK_MODE == 0
-    if (dist < LIGHT_BOX_REACH + 1.0 && isBlockBoxLight(L, d, voxelId, light)) return L.colorSize.rgb * falloff * ndl;
+    if (dist < LIGHT_BOX_REACH + 1.0 && isBlockBoxLight(L, d, voxelId, light)) {
+        return L.colorSize.rgb * falloff * ndl + (boxSpread ? lightBoxSpreadApprox(L, d, voxelPos) : vec3(0.0));
+    }
     return L.colorSize.rgb * (falloff + lightNearField(dist, radius)) * ndl;
 #else
     // ふたが光らないランタンなどは、近距離の放射を着色点の向きで弱める (光源のセルのブロックから面の光り方を引く)
     float near = 0.0;
     if (dist < LIGHT_NEAR_REACH) {
         bool box = isBlockBoxLight(L, d, voxelId, light);
-        if (dist < LIGHT_BOX_REACH + 1.0 && box) return L.colorSize.rgb * falloff * ndl;
+        if (dist < LIGHT_BOX_REACH + 1.0 && box) {
+            return L.colorSize.rgb * falloff * ndl + (boxSpread ? lightBoxSpreadApprox(L, d, voxelPos) : vec3(0.0));
+        }
         near = lightNearField(dist, radius);
         if ((d.info.x & LIGHT_FLAG_EMISSION_MASK) != 0u) near *= lightMaskDirection(light, -dir);
     }
@@ -363,46 +444,39 @@ vec3 evalLightIrradiance(LightInstance L, vec3 voxelPos, vec3 n, vec3 gateNormal
 #endif
 }
 
+vec3 evalLightIrradiance(LightInstance L, vec3 voxelPos, vec3 n, vec3 gateNormal, bool nearField) {
+    return evalLightIrradiance(L, voxelPos, n, gateNormal, nearField, true);
+}
+
+// 広がりの分を足してよい光源か。evalLightIrradiance と同じ条件 (光の届く範囲と、中心の地平線)
+bool lightBoxSpreadReaches(LightInstance L, vec3 voxelPos, vec3 gateNormal) {
+    vec3 toL = L.posRadius.xyz - voxelPos;
+    float dist = length(toL);
+    return dist < L.posRadius.w && sphereLightNdotL(gateNormal, toL / max(dist, EPS), dist, L.colorSize.a) > 0.0;
+}
+
 /*
- * ブロック全体が光る光源の面からの近距離の照度 (影を掛けない)
- * 光源の影は中心の点へのトレース (と接触影) なので、根元の床から中心へ向かうと光るブロック自身の面に当たって影になり、
- * 接地面の境目ほど暗くなった。光る面は見える面だけを数えている (lightBoxNearField) ので、影は掛けない
- * grid: 近くで 4x4 のマスを使うか (LIGHT_EMISSION_MASK_MODE 2)。マスは重いので、画面の大半を占める deferred2 だけが true を渡す
+ * 着色点のビンの全光源の、ブロック全体が光る面からの近距離の照度の和。戻り値は影なしの根元の分
+ * spread は広がりの分で、evalLightIrradiance と同じ条件 (光の届く範囲と中心の地平線) で数える。光源の影を掛ける側 (deferred2 の full) に足す
  */
-vec3 lightBoxIrradiance(LightInstance L, vec3 voxelPos, vec3 gateNormal, bool grid) {
-    if (distance(L.posRadius.xyz, voxelPos) >= LIGHT_BOX_REACH + 1.0) return vec3(0.0);
-    LightDef d;
-    int voxelId;
-    int light;
-    if (!isBlockBoxLight(L, d, voxelId, light)) return vec3(0.0);
-    // 面の明るさは光源の明るさとレベルによらない (光る鉱物ブロックは遠くへは弱く届くが、面は他の発光ブロックと同じに光る)
-    float lightLum = luminance(d.color.rgb);
-    float power = luminance(L.colorSize.rgb) / max(lightLum, EPS) * LIGHT_LEVEL_MAX / max(d.color.a * d.params.z, EPS);
-    // 面の色はブロックのテクスチャの色 (光源の表の色より鮮やかで、ブロックごとの色が根元に出る)。明るさは表の色に合わせる
-    // 発光は明るい画素ほど強い (gbuffers の発光の推定) ので、平均色を 1.5 乗して明るく鮮やかな画素の色に寄せる
-    vec3 albedo = pow(getBlockAlbedo(voxelId), vec3(LIGHT_BOX_COLOR_POWER));
-    vec3 faceColor = albedo * (lightLum / max(luminance(albedo), EPS));
-    bool masked = (d.info.x & LIGHT_FLAG_EMISSION_MASK) != 0u;
-    int facing = (d.info.x & LIGHT_FLAG_FACING) != 0u ? blockLightFacing(voxelId) : -1;
-    // 向きのある光源は光るのが火の部分だけで、ブロックの平均の色 (かまどの灰色の石) ではなく光源の色で光る
-    if (facing >= 0) faceColor = d.color.rgb;
-    return faceColor * (power * lightBoxNearField(voxelPos, floor(L.posRadius.xyz) + 0.5, gateNormal, light, masked, grid, facing));
-}
-
-vec3 lightBoxIrradiance(LightInstance L, vec3 voxelPos, vec3 gateNormal) {
-    return lightBoxIrradiance(L, voxelPos, gateNormal, false);
-}
-
-// 着色点のビンの全光源の、ブロック全体が光る面からの近距離の照度の和 (影なし)
-vec3 sumBinBoxIrradiance(vec3 voxelPos, vec3 geoNormal, bool grid) {
+vec3 sumBinBoxIrradiance(vec3 voxelPos, vec3 geoNormal, bool grid, out vec3 spread) {
+    spread = vec3(0.0);
     if (!isInVoxelVolume(voxelPos)) return vec3(0.0);
     int bin = lightBinIndex(ivec3(voxelPos));
     uint n = lightBinCount(bin);
     vec3 sum = vec3(0.0);
     for (uint k = 0u; k < n; k++) {
-        sum += lightBoxIrradiance(lightBinLight(bin, k), voxelPos, geoNormal, grid);
+        LightInstance L = lightBinLight(bin, k);
+        vec3 s;
+        sum += lightBoxTerms(L, voxelPos, geoNormal, grid, s);
+        if (maxOf(s) > 0.0 && lightBoxSpreadReaches(L, voxelPos, geoNormal)) spread += s;
     }
     return sum;
+}
+
+vec3 sumBinBoxIrradiance(vec3 voxelPos, vec3 geoNormal, bool grid) {
+    vec3 spread;
+    return sumBinBoxIrradiance(voxelPos, geoNormal, grid, spread);
 }
 
 vec3 sumBinBoxIrradiance(vec3 voxelPos, vec3 geoNormal) {
@@ -414,15 +488,19 @@ vec3 evalLightIrradiance(LightInstance L, vec3 voxelPos, vec3 n, vec3 gateNormal
 }
 
 // 着色点のビンの全光源の影なし照度の和 (deferred2 がフル解像度で使う)
-vec3 sumBinLightsUnshadowed(vec3 voxelPos, vec3 normal, vec3 geoNormal, bool nearField) {
+vec3 sumBinLightsUnshadowed(vec3 voxelPos, vec3 normal, vec3 geoNormal, bool nearField, bool boxSpread) {
     if (!isInVoxelVolume(voxelPos)) return vec3(0.0);
     int bin = lightBinIndex(ivec3(voxelPos));
     uint n = lightBinCount(bin);
     vec3 sum = vec3(0.0);
     for (uint k = 0u; k < n; k++) {
-        sum += evalLightIrradiance(lightBinLight(bin, k), voxelPos, normal, geoNormal, nearField);
+        sum += evalLightIrradiance(lightBinLight(bin, k), voxelPos, normal, geoNormal, nearField, boxSpread);
     }
     return sum;
+}
+
+vec3 sumBinLightsUnshadowed(vec3 voxelPos, vec3 normal, vec3 geoNormal, bool nearField) {
+    return sumBinLightsUnshadowed(voxelPos, normal, geoNormal, nearField, true);
 }
 
 vec3 sumBinLightsUnshadowed(vec3 voxelPos, vec3 normal, vec3 geoNormal) {

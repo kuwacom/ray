@@ -129,9 +129,11 @@ void main() {
     vec3 geoNormal = octDecode(unpack2x8(c2.b));
 
     vec3 voxelPos = playerToVoxel(playerPos + geoNormal * TRACE_NORMAL_OFFSET);
-    vec3 full = sumBinLightsUnshadowed(voxelPos, normal, geoNormal);
-    // ブロック全体が光る光源の面からの近距離の照度は影を掛けずに足す (lightBoxIrradiance)
-    vec3 box = sumBinBoxIrradiance(voxelPos, geoNormal, true);
+    // ブロック全体が光る光源の面からの近距離の照度は、根元の分を影を掛けずに足し (lightBoxTerms)、
+    // 離れた所の広がりの分は光源の影を掛ける full に入れる (同じ形態係数なので 1 回で求める)
+    vec3 boxSpread;
+    vec3 box = sumBinBoxIrradiance(voxelPos, geoNormal, true, boxSpread);
+    vec3 full = sumBinLightsUnshadowed(voxelPos, normal, geoNormal, true, false) + boxSpread;
     if (maxOf(full) <= 0.0) {
         outBlockLight = vec4(box, 1.0);
         outHistory = vec4(1.0, 1.0, 1.0, viewDist);
