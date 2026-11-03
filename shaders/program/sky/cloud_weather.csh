@@ -182,7 +182,7 @@ const vec2 CLOUD_INTERIOR_ENTER = vec2(0.05, 0.35); // この平均の濃さの�
 const float CLOUD_INTERIOR_SLAB_RADIUS = 8.0;     // ブロック
 const int CLOUD_INTERIOR_SLAB_TAPS = 48;          // 円盤の点の数 (1 点が縁をまたぐ段差が霧の濃さに出ない数)
 const vec2 CLOUD_INTERIOR_SLAB_ENTER = vec2(0.2, 0.98);
-const float CLOUD_INTERIOR_SLAB_FACE = 0.5;       // 板の厚みの割合: 上面・下面からこの深さまで霧を立ち上げる (板の外へ出る縁もなめらかにする)
+const float CLOUD_INTERIOR_SLAB_FACE = 3.0;       // ブロック: 頭・底の面からこの深さまで霧を立ち上げる
 const float CLOUD_INTERIOR_MID_SHARE = 0.5;       // 中層の雲は薄いので低層より霧を弱める
 const float CLOUD_INTERIOR_MIN_SHARE = 0.5;       // 雲のマーチが濃くても、霧は視程の消散係数のこの割合を下限にする (遠くで空と地形の雲の色の差を残さない)
 const float CLOUD_INTERIOR_SATURATION = 0.3;      // 空の光の彩度の残し方 (雲の中は何度も散乱して色が抜ける。空の青のままだと青い霧に見える)
@@ -258,8 +258,10 @@ void cloudInteriorWrite(CloudContext ctx) {
     // 縁の立ち上がりを緩くするため 2 乗する (濃さが小さくても遠景を白く閉じてしまうので、縁ではまず手前だけが霞むように)
     rho = sqr(smoothstep(CLOUD_INTERIOR_ENTER.x, CLOUD_INTERIOR_ENTER.y, rho));
     #ifdef CLOUD_VANILLA_SHAPE
-    float slabY = (cameraPosition.y - vanillaCloudBottom()) / VANILLA_CLOUD_THICKNESS;
-    float faceFade = smoothstep(0.0, CLOUD_INTERIOR_SLAB_FACE, min(slabY, 1.0 - slabY));
+    // 柱の頭と底から CLOUD_INTERIOR_SLAB_FACE ブロックまで霧を立ち上げる (柱の外へ出る縁もなめらかにする)。柱の外のマスは頭が 0 なので、円盤の濃さだけで決める
+    float head = vanillaCloudColumn(vanillaCloudCellOf(vanillaCloudOrigin())).x;
+    float faceDepth = min(cameraPosition.y - vanillaCloudBottom(), vanillaCloudBottom() + head - cameraPosition.y);
+    float faceFade = head > 0.0 ? smoothstep(0.0, CLOUD_INTERIOR_SLAB_FACE, faceDepth) : 1.0;
     // 霧は視線の全長に掛かるので、縁の外のわずかな濃さでも遠景が曇る。2 乗にして縁の手前はごく薄く、縁を越えるあたりから濃くする
     rho = max(rho, sqr(smoothstep(CLOUD_INTERIOR_SLAB_ENTER.x, CLOUD_INTERIOR_SLAB_ENTER.y, cloudInteriorSlabCover(ctx))) * faceFade);
     #endif
@@ -284,10 +286,10 @@ void cloudInteriorWrite(CloudContext ctx) {
         odLight = vanillaCloudLightOD(q, y, l.lightDir) * slabWeight;
         odSky = vanillaCloudSkyOD(q, y) * slabWeight;
         l = cloudVanillaLighting(l);
-        float slabHeight = (y - vanillaCloudBottom()) / VANILLA_CLOUD_THICKNESS;
-        if (slabHeight > 0.0 && slabHeight < 1.0) {
-            cloudHeight = slabHeight;
-            groundVisibility = sqr(1.0 - slabHeight);
+        float slabHeight = (y - vanillaCloudBottom()) / VANILLA_CLOUD_BASE_DEPTH;
+        if (slabHeight > 0.0 && y < vanillaCloudBottom() + VANILLA_CLOUD_ENVELOPE) {
+            cloudHeight = saturate(slabHeight);
+            groundVisibility = sqr(1.0 - cloudHeight);
         }
         #else
         vec4 map = cloudMapFetch(vec2(0.0));

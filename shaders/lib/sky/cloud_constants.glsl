@@ -394,7 +394,9 @@ const float CLOUD_BOTTOM_REACH = 0.6;    // この高さで 1 に戻る
     const int CLOUD_SKY_STEPS = 2;
     const int CLOUD_HIGH_STEPS = 3;
     const int CLOUD_SHAFT_STEPS = 6;
-    const int VANILLA_CLOUD_STEPS = 16;
+    const int VANILLA_CLOUD_STEPS = 24;
+    const int VANILLA_CLOUD_MAX_ITER = 64;
+    const int VANILLA_CLOUD_LIGHT_STEPS = 3;
 #elif CLOUD_QUALITY == 1
     const int CLOUD_LOW_STEPS = 36;
     const int CLOUD_MID_STEPS = 12;
@@ -402,7 +404,9 @@ const float CLOUD_BOTTOM_REACH = 0.6;    // この高さで 1 に戻る
     const int CLOUD_SKY_STEPS = 2;
     const int CLOUD_HIGH_STEPS = 3;
     const int CLOUD_SHAFT_STEPS = 8;
-    const int VANILLA_CLOUD_STEPS = 24;
+    const int VANILLA_CLOUD_STEPS = 32;
+    const int VANILLA_CLOUD_MAX_ITER = 80;
+    const int VANILLA_CLOUD_LIGHT_STEPS = 4;
 #elif CLOUD_QUALITY == 2
     const int CLOUD_LOW_STEPS = 48;
     const int CLOUD_MID_STEPS = 16;
@@ -410,7 +414,9 @@ const float CLOUD_BOTTOM_REACH = 0.6;    // この高さで 1 に戻る
     const int CLOUD_SKY_STEPS = 2;
     const int CLOUD_HIGH_STEPS = 4;
     const int CLOUD_SHAFT_STEPS = 10;
-    const int VANILLA_CLOUD_STEPS = 32;
+    const int VANILLA_CLOUD_STEPS = 48;
+    const int VANILLA_CLOUD_MAX_ITER = 96;
+    const int VANILLA_CLOUD_LIGHT_STEPS = 5;
 #else
     const int CLOUD_LOW_STEPS = 64;
     const int CLOUD_MID_STEPS = 24;
@@ -418,7 +424,9 @@ const float CLOUD_BOTTOM_REACH = 0.6;    // この高さで 1 に戻る
     const int CLOUD_SKY_STEPS = 3;
     const int CLOUD_HIGH_STEPS = 6;
     const int CLOUD_SHAFT_STEPS = 12;
-    const int VANILLA_CLOUD_STEPS = 48;
+    const int VANILLA_CLOUD_STEPS = 64;
+    const int VANILLA_CLOUD_MAX_ITER = 128;
+    const int VANILLA_CLOUD_LIGHT_STEPS = 5;
 #endif
 const int CLOUD_MID_LIGHT_STEPS = CLOUD_QUALITY >= 2 ? 4 : 3;
 

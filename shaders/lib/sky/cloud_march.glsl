@@ -114,42 +114,77 @@ CloudLighting cloudVanillaLighting(CloudLighting l) {
 }
 
 /*
- * バニラの形の雲 (厚み 4 ブロックの平らな板)。weight: 板の濃さの倍率 (雨雲へ移る間は薄め、雨の日は雨の濃さの倍率で濃くする)
- * サンプルは区間の入口に寄せた 2 乗の分布 (近くは細かく、遠くは粗く)。区間が短い視線 (板を斜めに抜ける) は歩数を減らす
+ * 視線が xz の箱 [lo, lo + size) を出るまでの距離 (ブロック)。xz の 2 軸の「次の境目までの距離 / 方向の成分」の小さいほう (Amanatides & Woo の DDA の 1 歩)
+ * q: 視線上の今の点の xz, dxz: 視線の方向の xz 成分
+ */
+float vanillaCloudBoxExit(vec2 q, vec2 dxz, vec2 lo, float size) {
+    vec2 edge = lo + vec2(dxz.x > 0.0 ? size : 0.0, dxz.y > 0.0 ? size : 0.0);
+    vec2 axis = vec2(abs(dxz.x) < 1e-6 ? 1e-6 : dxz.x, abs(dxz.y) < 1e-6 ? 1e-6 : dxz.y);
+    vec2 t = (edge - q) / axis;
+    return max(min(t.x, t.y), 0.0) + VANILLA_CLOUD_SKIP_MARGIN;
+}
+
+/*
+ * バニラの形の雲 (マスごとの直方体の柱)。weight: 濃さの倍率 (雨の日は雨の濃さの倍率で濃くする)
+ * 柱の表で空の区画 (4x4 マス) と空のマス・頭より上を飛ばし、柱の近くだけ細かく歩く。光を求めるのは密度のあるサンプルだけで、その数を
+ * VANILLA_CLOUD_STEPS までにする。歩幅は距離に比例し、雲の近くでは縁の柔らかさの半分以下
+ * 区間の入口は平らな面 (底・上端) との交差で、青ノイズで歩幅の分だけ揺らす (同心円の縞にならない)
  */
 CloudAccum cloudMarchVanilla(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, vec2 dither, float weight) {
     l = cloudVanillaLighting(l);
     // 日が低いと底にも横から日が届くので、底の暗さを掛け始める高さを下げる
     float baseLift = VANILLA_CLOUD_BASE_LIFT * (1.0 - cloudVanillaDusk(l));
     CloudAccum acc = CloudAccum(vec3(0.0), 1.0, 0.0, 0.0);
-    float segLength = seg.y - seg.x;
-    int steps = clamp(int(segLength / VANILLA_CLOUD_STEP_LENGTH), VANILLA_CLOUD_MIN_STEPS, VANILLA_CLOUD_STEPS);
-    float invSteps = 1.0 / float(steps);
     vec2 origin = vanillaCloudOrigin();
+    float bottom = vanillaCloudBottom();
+    // 距離 1 ブロックあたりの画素の大きさ (ブロック)。柔らかさを画素より細かくしない
+    float pixel = 2.0 / (gbufferProjection[1][1] * viewHeight) * float(CLOUD_RES);
     vec3 sums = vec3(0.0);
-    // カメラが雲の中にいる間は雲の中の霧が視界を閉じるので、板は視線の消散を弱める (入る・出るときに一気に白く閉じない)
+    // カメラが柱の中にいる間は雲の中の霧が視界を閉じるので、柱は視線の消散を弱める (入る・出るときに一気に白く閉じない)。
+    // 面から内側へ VANILLA_CLOUD_INSIDE_DEPTH 入るまでに弱め切る (霧の濃さではなくカメラの位置の深さで決めるので、縁のすぐ中で白く閉じない)
     float opacity = VANILLA_CLOUD_OPACITY;
 #ifdef CLOUD_INTERIOR
-    opacity = mix(opacity, VANILLA_CLOUD_INSIDE_OPACITY, pow(frameData.skyParams[4].a, VANILLA_CLOUD_INSIDE_POW));
+    opacity = mix(opacity, VANILLA_CLOUD_INSIDE_OPACITY, smoothstep(0.0, VANILLA_CLOUD_INSIDE_DEPTH, vanillaCloudInsideDepth(origin, cameraPosition.y)));
 #endif
-    for (int i = 0; i < steps; i++) {
-        float t = seg.x + segLength * sqr((float(i) + dither.x) * invSteps);
-        float dt = segLength * (2.0 * float(i) + 1.0) * sqr(invSteps);
+    float t = seg.x + clamp(seg.x * VANILLA_CLOUD_STEP_REL, VANILLA_CLOUD_STEP_MIN, VANILLA_CLOUD_STEP_MAX) * dither.x;
+    int samples = 0;
+    for (int iter = 0; iter < VANILLA_CLOUD_MAX_ITER && t < seg.y && samples < VANILLA_CLOUD_STEPS; iter++) {
+        vec2 q = origin + dir.xz * t;
         float y = cameraPosition.y + dir.y * t;
+        ivec2 cell = vanillaCloudCellOf(q);
+        vec4 column = vanillaCloudColumn(cell);
+        // 4x4 マスの区画が空なら、その区画の箱を出るまで飛ばす
+        if (column.w < 0.5) {
+            t += vanillaCloudBoxExit(q, dir.xz, vec2(floor(vec2(cell) / float(VANILLA_CLOUD_BLOCK))) * (VANILLA_CLOUD_CELL * float(VANILLA_CLOUD_BLOCK)), VANILLA_CLOUD_CELL * float(VANILLA_CLOUD_BLOCK));
+            continue;
+        }
+        float head = bottom + column.x;
+        // 空のマスと頭より上は、マスの箱を出るまで (下へ向かう視線は頭の面に当たるまで) 飛ばす
+        if (column.x <= 0.0 || y >= head) {
+            float skip = vanillaCloudBoxExit(q, dir.xz, vec2(cell) * VANILLA_CLOUD_CELL, VANILLA_CLOUD_CELL);
+            if (column.x > 0.0 && dir.y < 0.0) skip = min(skip, (head - y) / dir.y + VANILLA_CLOUD_SKIP_MARGIN);
+            t += skip;
+            continue;
+        }
+        float dt = clamp(t * VANILLA_CLOUD_STEP_REL, VANILLA_CLOUD_STEP_MIN, VANILLA_CLOUD_STEP_MAX);
+        float occlusion;
+        float density = vanillaCloudDensity(q, y, t * pixel, occlusion);
+        if (density <= 0.0) {
+            t += dt;
+            continue;
+        }
+        samples++;
+
         float slope;
         float altitude = cloudRefAltitude(y, slope);
         float tRef = cloudRefDistance(ctx, dir, t, altitude);
-        vec2 q = origin + dir.xz * t;
-        float slabHeight;
-        float density = vanillaCloudDensity(q, y, cloudDetailLod(tRef), slabHeight);
-        if (density <= 0.0) continue;
-
+        float height = saturate((y - bottom) / VANILLA_CLOUD_BASE_DEPTH);
         float extinction = density * weight * VANILLA_CLOUD_SHADE_SIGMA;
-        float odLight = vanillaCloudLightOD(q, y, l.lightDir) * weight;
+        float odLight = vanillaCloudLightOD(q, y, l.lightDir) * weight * vanillaCloudMottle(q);
         float odSky = vanillaCloudSkyOD(q, y) * weight;
-        vec2 rel = dir.xz * (t * CLOUD_KH);
-        float upperT = cloudUpperTransmittance(ctx, rel, altitude, cloudRefDir(l.lightDir, CLOUD_KH, slope));
-        vec3 inscatter = cloudInscatter(l, extinction, odLight, 0.0, odSky, sqr(1.0 - slabHeight), upperT, max(slabHeight - baseLift, 0.0));
+        CloudLighting lit = l;
+        lit.ambient *= 1.0 - occlusion;
+        vec3 inscatter = cloudInscatter(lit, extinction, odLight, 0.0, odSky, sqr(1.0 - height), 1.0, max(height - baseLift, 0.0));
 
         float stepT = exp(-density * weight * VANILLA_CLOUD_SIGMA * opacity * dt * VANILLA_CLOUD_KREF);
         float w = acc.transmittance * (1.0 - stepT);
@@ -160,6 +195,7 @@ CloudAccum cloudMarchVanilla(CloudContext ctx, CloudLighting l, vec3 dir, vec2 s
             acc.transmittance = 0.0;
             break;
         }
+        t += dt;
     }
     cloudAccumFinish(acc, sums, ctx, dir, seg.x);
     return acc;

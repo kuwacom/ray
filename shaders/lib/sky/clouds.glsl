@@ -293,8 +293,10 @@ const float CLOUD_FRONT_EPS = 1e-4;   // 透過率が 1 に近いときの散乱
 #ifdef CLOUD_VANILLA_SHAPE
 // バニラの雲の寸法 (ブロック)。格子の 1 マスと厚みと、Iris の cloudHeight から下面までの差
 const float VANILLA_CLOUD_CELL = 12.0;
-const float VANILLA_CLOUD_EDGE_HEIGHT = 4.0;  // 塊の外周のマスの厚み
-const float VANILLA_CLOUD_THICKNESS = 4.0;    // 外形の厚み (下面から、どの柱の頭よりも上まで)
+const float VANILLA_CLOUD_EDGE_HEIGHT = float(CLOUD_VANILLA_THICKNESS);  // 塊の外周のマスの厚み
+const int VANILLA_CLOUD_TERRACE = CLOUD_VANILLA_TERRACE;                 // 塊の奥のマスを高く積む段の数
+const float VANILLA_CLOUD_TERRACE_STEP = 4.0;                            // 1 段の高さ
+const float VANILLA_CLOUD_ENVELOPE = VANILLA_CLOUD_EDGE_HEIGHT + float(VANILLA_CLOUD_TERRACE) * VANILLA_CLOUD_TERRACE_STEP; // 外形の厚み (下面から、どの柱の頭よりも上まで)
 const float VANILLA_CLOUD_Y_OFFSET = 0.33;
 // この距離 (ブロック) で空へ溶かし切る。テクスチャは 3072 ブロックで一周するので、繰り返しを見せない
 const float VANILLA_CLOUD_FAR = 2048.0;
@@ -304,7 +306,7 @@ float vanillaCloudBottom() { return cloudHeight + VANILLA_CLOUD_Y_OFFSET; }
 // 平らな板 [bottom, bottom + 厚み] との交差 (バニラの雲は平面なので曲率は付けない)。無ければ x >= y
 vec2 vanillaCloudSegment(float y0, float dy, float far) {
     float bottom = vanillaCloudBottom();
-    float top = bottom + VANILLA_CLOUD_THICKNESS;
+    float top = bottom + VANILLA_CLOUD_ENVELOPE;
     if (abs(dy) < 1e-5) return (y0 > bottom && y0 < top) ? vec2(0.0, far) : vec2(1.0, 0.0);
     vec2 t = (vec2(bottom, top) - y0) / dy;
     return vec2(max(min(t.x, t.y), 0.0), min(max(t.x, t.y), far));
@@ -339,7 +341,7 @@ float cloudRainBelowDeck() {
 #if CLOUDS >= 2 && defined HAS_SKY
     #ifdef CLOUD_VANILLA_SHAPE
     float base = vanillaCloudBottom();
-    float top = base + VANILLA_CLOUD_THICKNESS;
+    float top = base + VANILLA_CLOUD_ENVELOPE;
     #else
     float base = CLOUD_BASE;
     float top = CLOUD_TOP;
@@ -376,7 +378,7 @@ float cloudInteriorExit(vec3 dir) {
     #ifdef CLOUD_VANILLA_SHAPE
     // 写実の層は描かないので、バニラの形の外形の高さだけ。縁の外では霧の濃さ (prepare2 の円盤の平均) が 0 なので、縁をまたいでも連続する
     float bottom = vanillaCloudBottom();
-    return y > bottom && y < bottom + VANILLA_CLOUD_THICKNESS ? CLOUD_INTERIOR_SLAB_LENGTH : 0.0;
+    return y > bottom && y < bottom + VANILLA_CLOUD_ENVELOPE ? CLOUD_INTERIOR_SLAB_LENGTH : 0.0;
     #else
     if (y > CLOUD_BASE && y < CLOUD_TOP) return cloudLayerSegment(y, dir.y, CLOUD_BASE, CLOUD_TOP).y;
     #if CLOUDS == 3
