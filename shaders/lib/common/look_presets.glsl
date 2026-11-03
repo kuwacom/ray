@@ -1,6 +1,6 @@
 /*
  * ルックのプリセット: LOOK_PRESET から基準値 LK_* を決める (lib/settings.glsl の直後に読む。sky / surface / post のどれも使う)
- * 既存の設定は LK_* に掛ける微調整 (露出補正は足す)。ナチュラルの LK_* は掛ける値が 1・足す値が 0 なので、ナチュラルでは各設定の値がそのまま効く
+ * 既存の設定は LK_* に掛ける微調整 (露出補正は足す)。ナチュラルの LK_* は明部の伸びだけが 1.1 で、ほかは掛ける値が 1・足す値が 0 (各設定の値がそのまま効く)
  * Iris の profile は 1 組しか持てず、品質のプロファイルと別に選べないので、シェーダー内の #if で差し替える (LENS_PRESET と同じ方式)
  * 番号: 0 = カスタム (最後の #else, LOOK_C_*)、1 = ナチュラル (既定)、2 = ビビッド、3 = デイライト、4 = 夏の青空、5 = ゴールデンアワー、
  *       6 = ティール & オレンジ、7 = ブリーチバイパス、8 = クロスプロセス、9 = ゲーム (鮮やか)。新しいプリセットは後ろに足し、既存の番号は変えない
@@ -23,7 +23,7 @@ const float LK_GI_BOUNCE = 1.0;          // 照り返し (GI のレイが当た�
 const float LK_GI_BOUNCE_SAT = 1.0;      // 照り返し (GI のレイが当たった面) の彩度 (gi.glsl giBounceGrade)
 const float LK_SKY_OCCLUSION = 1.0;      // 空の光の遮蔽 (GI_SKY_OCCLUSION に掛ける, 上限 1)
 const float LK_EXPOSURE_EV = 0.0;        // 露出 (EXPOSURE_BIAS に足す)
-const float LK_HIGHLIGHT = 1.0;          // 明部の伸び: 中間グレーより明るい所だけ log2 で掛ける傾き (grading.glsl applyHighlightRange)
+const float LK_HIGHLIGHT = 1.1;          // 明部の伸び: 中間グレーより明るい所だけ log2 で掛ける傾き (grading.glsl applyHighlightRange)。1 だと雲や日向が白に届かず平らに見える。色の比は変わらない
 const float LK_DARK_LIFT = 0.0;          // AgX の出力の復号を 2.2 乗から sRGB の区分曲線へ寄せる割合 (暗部の持ち上げ, tonemap.glsl)
 const float LK_CONTRAST = 1.0;           // CONTRAST に掛ける
 const float LK_SATURATION = 1.0;         // SATURATION に掛ける
