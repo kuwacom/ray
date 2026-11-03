@@ -36,6 +36,7 @@ struct CloudLighting {
     float ambient;
     float bottomLight;
     float bottomSun;
+    float rainDeck;        // 雨雲の層の中にいる度合い (バニラの形の板を曇天の暗さへ寄せる割合)
 };
 
 // rain: 雲の中の光の雨天度 (CloudClimate.rainLight)。rainStrength (数秒で切り替わる) より少し遅く、被覆より早い
@@ -75,6 +76,11 @@ CloudLighting cloudLightingSetup(vec3 viewDir, float rain) {
     float baseShade = CLOUD_BASE_SHADE * mix(1.0, CS_BASE_SHADE, style);
     l.bottomLight = max(1.0 - 0.8 * baseShade, 0.0);
     l.bottomSun = max(1.0 - 0.25 * baseShade, 0.0);
+#ifdef CLOUD_RAIN_KEEPS_SHAPE
+    l.rainDeck = saturate(rain) * (1.0 - cloudRainReshape()) * cloudRainBelowDeck();
+#else
+    l.rainDeck = 0.0;
+#endif
     return l;
 }
 

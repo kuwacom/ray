@@ -101,6 +101,8 @@ CloudLighting cloudVanillaLighting(CloudLighting l) {
     l.msGain *= duskGain;
     l.ambient *= VANILLA_CLOUD_AMBIENT * duskGain;
     l.lightIrradiance *= 1.0 + VANILLA_CLOUD_DUSK_SUN_GAIN * dusk;
+    l.lightIrradiance *= mix(1.0, VANILLA_CLOUD_RAIN_SUN, l.rainDeck);
+    l.ambient *= mix(1.0, VANILLA_CLOUD_RAIN_AMBIENT, l.rainDeck);
     l.bottomLight = max(1.0 - (1.0 - l.bottomLight) * VANILLA_CLOUD_BASE_SHADE, 0.0);
     l.bottomSun = max(1.0 - (1.0 - l.bottomSun) * VANILLA_CLOUD_BASE_SHADE, 0.0);
     float saturation = mix(VANILLA_CLOUD_SKY_SATURATION, VANILLA_CLOUD_DUSK_SATURATION, dusk);

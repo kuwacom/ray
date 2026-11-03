@@ -99,6 +99,8 @@ void main() {
         color = srgbToLinear(c.rgb) * (ambient * RCP_PI + celestial.irradiance * phase * RAIN_FORWARD_SCATTER * sunVisibility);
         opacity = c.a * RAIN_OPACITY;
     }
+    // 雨雲の層より上は雲の上で降っていないので、層の上端へ向けて薄くして消す
+    opacity *= cloudRainBelowDeck();
     // colortex4 は既定のアルファブレンドで乗算済みになるので、ここでは掛けない
     outColor = vec4(color, opacity);
 }

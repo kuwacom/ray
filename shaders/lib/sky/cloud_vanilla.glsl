@@ -22,7 +22,7 @@ const vec2 VANILLA_CLOUD_ORIGIN = vec2(0.0, 3.96); // 格子の座標 = ワー�
 const float VANILLA_CLOUD_ALPHA_CUT = 0.5;         // 雲のあるマスの不透明度のしきい値
 const float VANILLA_CLOUD_KREF = 14.0;             // 参照 m / ブロック
 const float VANILLA_CLOUD_CORNER = 0.22;           // マスの角の丸み (マスの割合)
-const float VANILLA_CLOUD_ROUND = 0.95;            // 上下の縁の丸め (枕のような断面にする)
+const float VANILLA_CLOUD_ROUND = 0.45;            // 上下の縁の丸め (小さいほど側面が垂直に近く、横から見て厚みが帯として残る)
 const float VANILLA_CLOUD_ROUND_POW = 2.0;
 const float VANILLA_CLOUD_SOFT = 0.20 * CLOUD_EDGE_SOFTNESS;   // 縁の立ち上がりの幅 (field の単位。ぼやけた縁で、遠くでも輪郭が硬くならない)
 const float VANILLA_CLOUD_EDGE_NOISE = 0.10;       // 縁を揺らす量 (field の単位。縁を広く透かすので控えめにして、浮いた欠片を作らない)
@@ -37,20 +37,23 @@ const float VANILLA_CLOUD_MIN_LIGHT_Y = 0.05;      // 光源の高さの下限 (
 const float VANILLA_CLOUD_STEP_LENGTH = 0.8;       // ブロック: 視線の歩幅の目安 (板を短く抜ける視線は歩数を減らす)
 const int VANILLA_CLOUD_MIN_STEPS = 6;
 const int VANILLA_CLOUD_SHADOW_STEPS = 3;
-// 厚み 4 ブロックの薄い板は光が回り込んで白く飛びやすいので、底に近い所は直達光と多重散乱を切って空の光だけにし、日向の上面の白と底の青みがかった灰色の差を出す
+// 厚み 4 ブロックの薄い板は光が回り込んで白く飛びやすいので、底に近い所は直達光と多重散乱を弱めて空の光を主にし、日向の上面の白と底の灰白色の差を出す
 // (CS_* の光の値はスタイルごとの微調整で、これはどのスタイルでもバニラの形に掛かる)
 const float VANILLA_CLOUD_SUN = 1.3;
-const float VANILLA_CLOUD_MS_GAIN = 0.6;
-const float VANILLA_CLOUD_SILVER = 0.6;
+const float VANILLA_CLOUD_MS_GAIN = 1.0;
+const float VANILLA_CLOUD_SILVER = 0.3;
 const float VANILLA_CLOUD_POWDER = 0.4;
 const float VANILLA_CLOUD_AMBIENT = 1.1;
-const float VANILLA_CLOUD_BASE_SHADE = 4.0;     // 底の暗さの倍率 (CS_BASE_SHADE に掛かる。4 で底の直達光と多重散乱が 0)
-const float VANILLA_CLOUD_BASE_LIFT = 0.3;      // 底の暗さを掛け始める高さ (板の割合。丸めで底の面は密度 0 なので、見える底はこの上から始まる)
+const float VANILLA_CLOUD_BASE_SHADE = 1.0;     // 底の暗さの倍率 (CS_BASE_SHADE に掛かる。4 で底の直達光と多重散乱が 0 になり、空の色だけの暗い底になる)
+const float VANILLA_CLOUD_BASE_LIFT = 0.2;      // 底の暗さを掛け始める高さ (板の割合。丸めで底の面は密度 0 なので、見える底はこの上から始まる)
 const float VANILLA_CLOUD_DUSK_GAIN = 0.4;      // 光源が低い (朝夕) ときの空の光と多重散乱の増し分
 const float VANILLA_CLOUD_DUSK_SUN_GAIN = 1.2;  // 同じく直達光の増し分 (橙の日が雲を桃色に染める)
 const float VANILLA_CLOUD_DUSK_SUN_Y = 0.3;     // 増し分が消える光源の高さ (sin 高度)
 const float VANILLA_CLOUD_DUSK_SATURATION = 0.2; // 同じく空の光の彩度 (青を薄めて雲を桃色寄りにする)
-const float VANILLA_CLOUD_SKY_SATURATION = 1.0; // 空の光の彩度 (1 で空の色のまま。陰の青みはこの光の色で決まる)
+const float VANILLA_CLOUD_SKY_SATURATION = 0.4; // 空の光の彩度 (1 で空の色のまま。陰の青みはこの光の色で決まる。底が空と同じ青にならないよう青みを抜く)
+// 雨雲の層の中から見る板は、層の下から見た曇天の暗さ (見えない雨雲の層の灰色) に合わせる
+const float VANILLA_CLOUD_RAIN_SUN = 0.2;         // 直達光の倍率
+const float VANILLA_CLOUD_RAIN_AMBIENT = 0.75;    // 空の光の倍率
 
 // 雲が雨雲へ変わり始めてから移り終わるまでの割合 (0 = バニラの形の板, 1 = 雨雲)。reshape: CloudContext.reshape
 float cloudVanillaRainLook(float reshape) { return smoothstep(0.0, CLOUD_HAZE_RAIN.x, reshape); }

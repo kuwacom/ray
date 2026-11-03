@@ -332,7 +332,7 @@ float cloudLowestBase() {
  * 層の上に出たら普通の空にする。雨雲は雲の層の上端までで、その上は晴れている
  * 層の上端はバニラの形では板の上面 (見えない雨雲の層はその直上)、ほかのスタイルでは低層の上端
  */
-const float CLOUD_RAIN_DECK_MARGIN = 4.0; // ブロック: 層の上端のこの上で普通の空に戻りきる
+const float CLOUD_RAIN_DECK_MARGIN = 8.0; // ブロック: 層の上端のこの上で普通の空に戻りきる (層を抜けて上がるとき灰色から青へ急に切り替わらない幅)
 float cloudRainBelowDeck() {
 #if CLOUDS >= 2 && defined HAS_SKY
     #ifdef CLOUD_VANILLA_SHAPE
