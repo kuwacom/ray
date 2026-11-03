@@ -35,7 +35,7 @@ float puddleSlopeVar() {
  * 傾きは反射の向きを 1 度ほど揺らすだけで、映り込みの輪郭がわずかに揺れる程度 (水面のような波模様は出さない)
  * 海の状態 (waterSeaState) は地形の全画素で呼ぶには重いので使わない
  */
-const float PUDDLE_WAVE_SLOPE = 0.008;     // 層ごとの傾きの RMS
+const float PUDDLE_WAVE_SLOPE = 0.004;     // 層ごとの傾きの RMS
 const float PUDDLE_WAVE_RAIN_GAIN = 1.5;   // 降っている間の倍率 (雨の風)
 const int PUDDLE_WAVE_FIRST_LAYER = WATER_LAYERS - 2;
 
