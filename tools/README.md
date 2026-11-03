@@ -48,6 +48,7 @@ uv sync
 | `equiv_check.py` | 2 つのコミット (または作業ツリー) のシェーダーをドライバにリンクさせ、バイナリが同じかを比べます。リファクタで計算が変わっていないかを、ゲームを使わずに確かめます |
 | `pixdiff.py` | 2 枚の撮影の画素の差 (平均・p99・最大・4/255 を超える画素の割合・平均色の差) を出します |
 | `pass_preview.py` | 全画面の fragment パスと compute パスを手元の GPU で 1 回ずつ実行して、出力を PNG と npy に保存します。下の「パスを 1 つだけ描く」 |
+| `image_style.py` | 写真・参考画像のトーン・色・質感・構図を測って CSV と集計にし、コンタクトシートも作ります。下の「画像の画づくりを測る」 |
 
 `tools/lib/` はスクリプト共通の部品です (リポジトリの場所 `paths.py`、sRGB の変換 `color.py`、PNG と .mcmeta の書き出し `textures.py`、生成物の書き込みと `--check` `generated.py`、shaders.properties の読み取りと `#if` の評価 `properties.py`)。スクリプトを足すときは、同じ処理を書き直さずここを使ってください
 
@@ -149,6 +150,27 @@ uv run tools/gen_look_lut.py test-swap-rb --out shaders/textures/look/user_lut.p
 - パラメーター (`tools/look_luts/*.json`) は、色の混ざり (3x3)、色温度の転び、コントラスト (中間グレーを軸にした log2) とチャンネルごとのコントラスト、輝度帯ごとの彩度、Oklab の色相帯ごとの色相の回転・彩度・明るさ、暗部と明部の色付け、出力の黒と白の位置です。意味は `gen_look_lut.py` の `BakeParams`
 - 新しい同梱の LUT を足すときは、JSON を足して `BUNDLED` と shaders.properties の `#if LOOK_LUT` に後ろの番号で足し、lib/settings/look.glsl と lang の LOOK_LUT の値もそろえます
 - `.dat` はリトルエンディアンの uint16 で、赤が最速・次に緑・青の順 (.cube と同じ)。PNG のストリップは上の行が緑 0 で、ゲームで恒等と赤青の入れ替えの LUT を使って向きを確かめてあります
+
+## 画像の画づくりを測る
+
+`image_style.py` は、写真やスクリーンショット (参考画像) のトーン・色・質感・構図を数値にします。ルックの目標を決めるとき、好きな写真や撮影した画面を同じ物差しで比べるために使います。追加のパッケージは numpy と pillow だけです
+
+```powershell
+# 1 枚 1 行の metrics.csv / metrics.json と、中央値・四分位の aggregate.csv / summary.md を出す (フォルダは再帰)
+uv run tools/image_style.py measure <画像かフォルダ>... --out <出力フォルダ> [--jobs 8] [--size 640] [--labels labels.csv]
+
+# 測り直さずに集計だけやり直す (labels.csv を足したときなど)
+uv run tools/image_style.py aggregate <出力フォルダ>/metrics.csv --labels labels.csv
+
+# コンタクトシート (画像入力で目視する用)。--from-csv なら指標で並べ替えや絞り込みができる
+uv run tools/image_style.py sheet <画像かフォルダ>... --out <出力フォルダ> --cols 6 --rows 4 --thumb 256
+uv run tools/image_style.py sheet --from-csv <出力フォルダ>/metrics.csv --sort y_p50 --where scene_auto=night --label-metric y_p50 --out <出力フォルダ>
+```
+
+- 測るのは縮小した sRGB 画像 (見た目) です。輝度は Rec.709 の重みで、`y_p1` `y_p99` が黒と白の点、`gamma_mid` が中間調の持ち上げ (1 より大きいと暗い側)、`dark_ch` が霞みと浮いた黒の目安です。色は Lab の彩度 `chroma_*`、HSV の彩度 `sat_*`、色相 `hue000`-`hue330` (30 度刻みの割合)、白に近い無彩色の色かぶり `neu_*`、輝度の下位 20% / 中位 / 上位 20% の色の偏り `sh_*` `mid_*` `hi_*` (スプリットトーン)、空 `sky_*`、緑 `green_*` です。構図は地平線の高さ `horizon_y`、主題の位置 `sal_*` と三分割の交点との距離、空の割合、余白 `flat_frac`、左右対称 `sym_lr` です
+- EXIF があれば焦点距離・F 値・シャッター・ISO・撮影時刻 (`hour`) も入ります。粒子 `noise_native` は原寸の中央 512 px で測ります
+- `scene_auto` は数値だけの粗い場面分け (night / sky_landscape / green_nature / urban_detail / flat_closeup / other) です。目視で直すときは `file,scene` の CSV を `--labels` に渡します (`file` は拡張子なしのファイル名か `フォルダ/ファイル名`)
+- 空・地平線・主題の位置は簡易な推定で、夜空や白い壁は空として拾えません。値の意味と限界は `image_style.py` の関数の説明を見てください
 
 ## ゲーム内で撮影する
 
