@@ -130,6 +130,10 @@ uint flareVisibilityTap(uint index) {
     float vis = 1.0 - smoothstep(0.0, LENS_VIS_OFFSCREEN, outside);
     // カメラが雲の中なら光源は雲に隠れる (画面の外の光源は画素の明るさでは分からないので、雲の中の濃さで隠す。frameData.skyParams[4].a)
     vis *= 1.0 - frameData.skyParams[4].a;
+#if CLOUDS >= 2
+    // 円盤の点ごとの雲の透過率を掛ける (明るさの比だけだと、雲の縁で光る薄い雲や縁に隠れかけた円盤で見えている割合より多く残る)
+    vis *= saturate(texelFetch(colortex11, ivec2(clamped * viewSize()), 0).a);
+#endif
 #ifdef HAS_SUN_SHADOWS
     // 画面の外の太陽は端の画素しか見えない (洞窟の口や尾根の上の空が写っていても太陽は隠れている) ので、目の位置の影マップの判定を使う
     vis *= mix(1.0, saturate(frameData.skyParams[3].x), smoothstep(0.0, LENS_VIS_EYE_FADE, outside));
