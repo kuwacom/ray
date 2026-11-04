@@ -2,9 +2,8 @@
  * バニラの形の雲の密度・光の見積もり・雲影 (CLOUD_VANILLA_SHAPE, sky モジュール。cloud_march.glsl が読む)
  * バニラの雲と同じ高さ (Iris の cloudHeight)・模様・流れ (Iris の cloudTime) に置く、角を丸めた体積雲。格子はバニラの 12 ブロックの VANILLA_CLOUD_CELL_SCALE 倍。
  * 模様はバニラの雲のテクスチャ (リソースパックのものに従う) を customTexture で読み、1 画素 = 1 マスとして置く。
- * 雲はマスごとの直方体の柱で、面はすべて軸に平行 (曲面・ノイズの凹凸を持たない)。柱の頭の高さは塊の奥ほど段階的に高く、
- * 柱の表 (cloudWeatherImg) に入れて prepare2 が毎フレーム作る。形は変えずに、表に出ている面の近くだけ密度を下げて縁を透かす
- * 雷雨のときは、表に塔 (柱の積み上げ) と金床 (浮いた板) も書く
+ * 雲はマスごとの同じ厚みの柱 (板雲) で、面はすべて軸に平行 (曲面・ノイズの凹凸を持たない)。辺と角だけ小さく丸める。
+ * 柱の表 (cloudWeatherImg) に入れて prepare2 が毎フレーム作る (雨では模様の外のマスも埋めて空を覆う)。形は変えずに、表に出ている面の近くだけ密度を下げて縁を透かす
  * 下段の上に、同じ模様を回転・ずらし・間引き・引き伸ばしで別の雲に見せた上の段 (中段・上段。薄い直方体の層) を重ねる。上の段の列は表を使わず模様から直接求める
  * 長さは参照空間の縮尺 VANILLA_CLOUD_KREF (参照 m / ブロック) で測るので、高さテンプレートによらず同じ透け方になる
  */
@@ -17,6 +16,7 @@
 //@include "/lib/common/uniforms.glsl"
 //@include "/lib/sky/cloud_constants.glsl"
 //@include "/lib/sky/clouds.glsl"
+//@include "/lib/sky/cloud_weather.glsl"
 
 #ifdef CLOUD_VANILLA_SHAPE
 
@@ -35,11 +35,9 @@ const float VANILLA_CLOUD_SOFT_BOTTOM = 1.8 * CLOUD_EDGE_SOFTNESS;
 const float VANILLA_CLOUD_SOFT_PIXELS = 1.5;       // 頭と底の柔らかさの下限 (画素の大きさの倍率)。遠くの角の階段のぎざぎざが時間方向に揺れて見えるのを防ぐ
 // 側面の柔らかさの下限。近くは SOFT_SIDE が勝つので変わらず、遠くだけ画素の大きさに比例して広がる (近くをピンぼけにせず、遠くの硬い箱を和らげる)
 const float VANILLA_CLOUD_SOFT_SIDE_PIXELS = 4.5;
-const float VANILLA_CLOUD_CORNER_RADIUS = 6.0;      // ブロック: 直方体の辺と角を丸める半径。0 で四角いまま
+const float VANILLA_CLOUD_CORNER_RADIUS = 3.0;      // ブロック: 直方体の辺と角を丸める半径。0 で四角いまま
+const float VANILLA_CLOUD_RAIN_COVER = 0.95;       // 雨の最大で雲に埋まるマスの割合 (模様の外のマスを含めた全体。残りは所々の隙間)
 const float VANILLA_CLOUD_SOFT_MAX = 6.0;          // ブロック: 柔らかさの上限 (マスの半分。これを超えると小さな塊の芯まで薄くなる)
-const float VANILLA_CLOUD_OCCLUSION = 0.25;        // 段差の根元で空の光が減る最大の割合
-const float VANILLA_CLOUD_OCCLUSION_REACH = 2.0;   // ブロック: 壁の遮りの距離の減衰の下駄
-const float VANILLA_CLOUD_OCCLUSION_FULL = 2.0;    // 壁の高さ / (距離 + 下駄) がこの値で遮りが最大になる
 const float VANILLA_CLOUD_MOTTLE_MIN = 0.6;        // 光源方向の濃さに掛けるむらの下限
 const float VANILLA_CLOUD_MOTTLE_CELLS = 12.0;     // マス: むらのノイズ (cloudNoiseTex の滑らかな fbm) 1 周の長さ。マスの大きさに比例させて、模様の大きさが変わってもむらの見え方を保つ
 const float VANILLA_CLOUD_TOP_MOTTLE = 0.25;       // 光源の光にかけるむらの深さ (0 でむらなし)。面は平らなまま、上から見たときの一様な白さに緩い明暗を付ける
@@ -53,8 +51,6 @@ const float VANILLA_CLOUD_INSIDE_DEPTH = 0.5;      // ブロック: カメラが
 const float VANILLA_CLOUD_SHADE_SIGMA = 0.275 * min(CLOUD_LOW_DENSITY, 0.25);
 const float VANILLA_CLOUD_LIGHT_REACH = 12.0;      // ブロック: 光源方向の影を数える距離
 const int VANILLA_CLOUD_LIGHT_CELLS = 3;           // その間に渡るマスの最大数 (マスは 13 ブロック以上なので、REACH の間に渡るのは 2 つ)
-// 真上の陰を数える高さ。塔の側面は外の空に開いているので、頭までの長さを丸ごと数えると塔が真っ暗になる (低い柱は頭までの長さがこれ以下)
-const float VANILLA_CLOUD_SKY_REACH = 30.0;
 const float VANILLA_CLOUD_MIN_LIGHT_Y = 0.05;      // 光源の高さの下限 (地平線すれすれで陰の長さが発散しない)
 const float VANILLA_CLOUD_STEP_REL = 0.004;        // 視線の歩幅 (距離に対する割合)。ブロック
 const float VANILLA_CLOUD_STEP_MIN = 0.3;          // 雲の近くの歩幅は縁の柔らかさの 1/6 以下 (柔らかさの層を何歩かで渡り、等高線の縞を青ノイズに崩す)
@@ -82,7 +78,7 @@ const float VANILLA_CLOUD_SKY_SATURATION = 0.7; // 空の光の彩度 (1 で空�
 const float VANILLA_CLOUD_RAIN_SUN = 0.2;         // 直達光の倍率
 const float VANILLA_CLOUD_RAIN_AMBIENT = 1.0;     // 空の光の倍率
 const float VANILLA_CLOUD_RAIN_BASE = 0.8;        // 底の暗さを無くす割合 (層の中から見下ろす底が、霧や地形より暗い影にならないように)
-const float VANILLA_CLOUD_RAIN_FLOOR = 0.35;      // 柱の明るさの下限 (雲の向こうの曇天の灰色の倍率)。塔の根元や日陰の側面が真っ黒な影絵にならず、暗い灰色までに収まる
+const float VANILLA_CLOUD_RAIN_FLOOR = 0.9;       // 柱の明るさの下限 (雲の向こうの曇天の灰色の倍率)。日陰の側面や底が真っ黒な影絵にならず、暗い灰色までに収まる
 // 曇天の下では光が何度も散乱して向きを失うので、散乱の向きを横から見た値へ寄せる割合 (寄せないと、太陽の方向の雲の底が前方散乱の山で白く光る)
 const float VANILLA_CLOUD_RAIN_DIFFUSE = 1.0;
 const float VANILLA_CLOUD_RAIN_SKY = 0.7;          // 雨の空で、雲の上に戻す空の色 (雲の上の空の光 skyRadiance の倍率)
@@ -123,21 +119,6 @@ const vec2 VANILLA_TIER_RAIN_HIDE = vec2(0.1, 0.6);          // 雨雲の層の�
 const float VANILLA_TIER_SHADOW = 0.5;                       // 上の段が下の雲や地面に落とす影の強さ
 const float VANILLA_TIER_SHADOW_MIN_Y = 0.08;                // 影を落とす光源の高さの下限
 
-#ifdef CLOUD_CUMULONIMBUS
-const int VANILLA_CB_REGION = 16;                 // マス: 塔の候補を置く区画の一辺
-const int VANILLA_CB_MARGIN = 2;                  // マス: 区画の端から塔の中心までの下限 (塔は中心から 2 マス)
-const int VANILLA_CB_TRIES = 8;                   // 塔の中心の候補を試す回数 (周り 8 マスがすべて雲のマスは少ない)
-const int VANILLA_CB_REACH = 12;                  // マス: 塔の中心から金床の端までの最大
-const float VANILLA_CB_CHANCE = 0.5;             // 塔が立つ区画の割合
-const float VANILLA_CB_TOWER_STEP = 4.0;          // ブロック: 塔の高さを丸める段
-const ivec2 VANILLA_CB_ANVIL_SHIFT = ivec2(3, 0); // マス: 金床の中心の塔の中心からのずれ (下段の流れの向き)
-const float VANILLA_CB_ANVIL_RADIUS = 6.0;        // マス: 金床の半径 (チェビシェフ距離)
-const float VANILLA_CB_ANVIL_MANHATTAN = 9.0;     // マス: 金床の角を落とす距離 (マンハッタン距離)
-const float VANILLA_CB_ANVIL_HOLES = 0.15;        // 金床のいちばん外の周から抜くマスの割合
-const float VANILLA_CB_ANVIL_EDGE = 12.0;         // ブロック: 金床の縁の厚さ
-const float VANILLA_CB_ANVIL_SLOPE = 4.0;         // ブロック: 中心へ 1 マス寄るごとに下面が下がる量
-#endif
-
 struct VanillaTier {
     int index;        // 0 下段 / 1 中段 / 2 上段
     float bottom;     // 底の高さ (ワールド y)
@@ -162,7 +143,7 @@ VanillaTier vanillaTier(int i) {
     bool mid = i == 1;
     t.index = i;
     t.bottom = vanillaCloudBottom() + (low ? 0.0 : mid ? VANILLA_TIER_MID_BOTTOM : VANILLA_TIER_HIGH_BOTTOM);
-    t.envelope = low ? vanillaCloudEnvelope() : mid ? VANILLA_TIER_MID_THICKNESS : VANILLA_TIER_HIGH_THICKNESS;
+    t.envelope = low ? VANILLA_CLOUD_ENVELOPE : mid ? VANILLA_TIER_MID_THICKNESS : VANILLA_TIER_HIGH_THICKNESS;
     t.cell = low ? vec2(VANILLA_CLOUD_CELL) : mid ? VANILLA_TIER_MID_CELL : VANILLA_TIER_HIGH_CELL;
     t.shift = low ? vec2(0.0) : mid ? VANILLA_TIER_MID_SHIFT : VANILLA_TIER_HIGH_SHIFT;
     t.flow = low ? vec2(1.0, 0.0) : mid ? VANILLA_TIER_MID_FLOW : VANILLA_TIER_HIGH_FLOW;
@@ -194,193 +175,80 @@ ivec2 vanillaCloudWrap(ivec2 c) {
     return c - size * ivec2(floor(vec2(c) / vec2(size)));
 }
 
-// 模様のマスに雲があるか
+// 模様のマスに雲があるか。雨ではマスごとのハッシュの順に模様の外のマスも埋まり、雲が空を覆う
 bool vanillaCloudPattern(ivec2 c) {
-    return texelFetch(vanillaCloudTex, vanillaCloudWrap(c), 0).a >= VANILLA_CLOUD_ALPHA_CUT;
+    ivec2 w = vanillaCloudWrap(c);
+    if (texelFetch(vanillaCloudTex, w, 0).a >= VANILLA_CLOUD_ALPHA_CUT) return true;
+    return hash3(uvec3(uvec2(w), 61u)).x < VANILLA_CLOUD_RAIN_COVER * smoothstep(0.0, 1.0, cloudRainAmount());
 }
 
 /*
- * 列 (マス 1 つ) の中身。x = 下の柱の頭の高さ (底からのブロック。0 は雲のないマス), y = 金床の下面, z = 金床の上面 (0 は金床なし), w = 4x4 マスの区画に雲があるか
- * 下段は柱の表 (cloudWeatherImg) から読む。prepare2 が毎フレーム、模様のマスごとに作る (vanillaCloudTableTexel)
+ * 列 (マス 1 つ) の中身。x = 柱の頭の高さ (底からのブロック。0 は雲のないマス), y = 4x4 マスの区画に雲があるか
+ * 下段は柱の表 (cloudWeatherImg) から読む。prepare2 が毎フレーム、マスごとに作る (vanillaCloudTableTexel)
  * 上の段は表を使わず、模様を回転・間引いて外形の厚さの柱にする。間引きは回転前の模様のマス番号で決めるので、流れても粒が点滅しない
  */
-vec4 vanillaCloudColumn(VanillaTier t, ivec2 c) {
+vec2 vanillaCloudColumn(VanillaTier t, ivec2 c) {
     ivec2 size = textureSize(vanillaCloudTex, 0);
     if (t.index == 0) {
-        if (max(size.x, size.y) > VANILLA_CLOUD_TABLE_SIZE) return vec4(vanillaCloudPattern(c) ? VANILLA_CLOUD_EDGE_HEIGHT : 0.0, 0.0, 0.0, 1.0);
+        if (max(size.x, size.y) > VANILLA_CLOUD_TABLE_SIZE) return vec2(vanillaCloudPattern(c) ? VANILLA_CLOUD_ENVELOPE : 0.0, 1.0);
         vec4 v = texelFetch(cloudWeatherSampler, vanillaCloudWrap(c), 0);
-        return vec4(round(v.rgb * 255.0), v.a);
+        return vec2(round(v.r * 255.0), v.a);
     }
     ivec2 w = vanillaCloudWrap(t.turn == 1 ? ivec2(c.y, -c.x) : c);
     bool has = texelFetch(vanillaCloudTex, w, 0).a >= VANILLA_CLOUD_ALPHA_CUT && hash3(uvec3(uvec2(w / t.keepBlock), 91u + uint(t.index))).x < t.keep;
-    return vec4(has ? t.envelope : 0.0, 0.0, 0.0, 1.0);
+    return vec2(has ? t.envelope : 0.0, 1.0);
 }
 
 // 底からの高さ h の点が列の中にあるか
-bool vanillaCloudInside(vec4 col, float h) {
-    return (h > 0.0 && h < col.x) || (col.y > 0.0 && h >= col.y && h < col.z);
+bool vanillaCloudInside(vec2 col, float h) {
+    return h > 0.0 && h < col.x;
 }
 
 // 点がいる区間 (下端, 上端)。列の外なら (0, 0)
-vec2 vanillaCloudSpan(vec4 col, float h) {
-    if (col.y > 0.0 && h >= col.y && h < col.z) return col.yz;
-    if (h > 0.0 && h < col.x) return vec2(0.0, col.x);
-    return vec2(0.0);
+vec2 vanillaCloudSpan(vec2 col, float h) {
+    return vanillaCloudInside(col, h) ? vec2(0.0, col.x) : vec2(0.0);
 }
-
-#ifdef CLOUD_CUMULONIMBUS
-// 区画の塔の中心がある所の周り 8 マスがすべて雲か
-bool vanillaCloudTowerOk(ivec2 center) {
-    for (int y = -1; y <= 1; y++) {
-        for (int x = -1; x <= 1; x++) {
-            if (!vanillaCloudPattern(center + ivec2(x, y))) return false;
-        }
-    }
-    return true;
-}
-
-/*
- * 雷雨の塔と金床をマス c に書き足す。模様を 16 マス四方の区画に分け、区画の番号のハッシュで一部の区画に塔の中心を置く
- * (模様のマス番号で決めるので、塔は雲と一緒に流れ、毎回同じ所に立つ)。塔は中心から 2 マスまでの雲のマスを高くした階段状の柱、
- * 金床は塔の中心から流れの向きに 3 マスずらした所の、角を落とした八角形の板 (いちばん外の周は一部のマスを抜く)。下面は中心ほど下がる
- */
-void vanillaCloudStorm(ivec2 c, ivec2 block, inout float height, inout float anvilLow, inout float anvilHigh, inout float occupied) {
-    ivec2 size = textureSize(vanillaCloudTex, 0);
-    float anvilGrow = vanillaCloudAnvilGrow();
-    int ring = int(floor(VANILLA_CB_ANVIL_RADIUS * anvilGrow + 1e-3));
-    int reach = int(floor(VANILLA_CB_ANVIL_MANHATTAN * anvilGrow + 1e-3));
-    ivec2 regions = max(size / VANILLA_CB_REGION, ivec2(1));
-    ivec2 base = c / VANILLA_CB_REGION;
-    for (int dy = -1; dy <= 1; dy++) {
-        for (int dx = -1; dx <= 1; dx++) {
-            ivec2 r = base + ivec2(dx, dy);
-            // 金床の端 (塔の中心から最大 12 マス) が c に届く区画だけ
-            ivec2 lo = r * VANILLA_CB_REGION - VANILLA_CB_REACH;
-            if (any(lessThan(c, lo)) || any(greaterThan(c, lo + (VANILLA_CB_REGION + 2 * VANILLA_CB_REACH)))) continue;
-            ivec2 rw = r - regions * ivec2(floor(vec2(r) / vec2(regions)));
-            if (hash3(uvec3(uvec2(rw), 313u)).x >= VANILLA_CB_CHANCE) continue;
-            // 周り 8 マスがすべて雲のマスが見つかるまで、区画の中の候補を順に試す
-            ivec2 center = ivec2(-1000);
-            for (int k = 0; k < VANILLA_CB_TRIES; k++) {
-                vec3 hk = hash3(uvec3(uvec2(rw), 400u + uint(k)));
-                ivec2 candidate = r * VANILLA_CB_REGION + VANILLA_CB_MARGIN + ivec2(hk.xy * float(VANILLA_CB_REGION - 2 * VANILLA_CB_MARGIN));
-                if (vanillaCloudTowerOk(candidate)) {
-                    center = candidate;
-                    break;
-                }
-            }
-            if (center.x < -500) continue;
-            ivec2 anvil = center + VANILLA_CB_ANVIL_SHIFT;
-            // 区画の印: 金床がかかりうる区画は空にしない (塔は模様の中なので模様が持つ)
-            ivec2 gap = max(max(block - anvil, anvil - (block + (VANILLA_CLOUD_BLOCK - 1))), ivec2(0));
-            if (max(gap.x, gap.y) <= ring) occupied = 1.0;
-            ivec2 dT = abs(c - center);
-            ivec2 dA = abs(c - anvil);
-            int towerD = max(dT.x, dT.y);
-            int anvilD = max(dA.x, dA.y);
-            int anvilM = dA.x + dA.y;
-            bool inTower = towerD <= 2;
-            bool inAnvil = ring > 0 && anvilD <= ring && anvilM <= reach;
-            if (!(inTower || inAnvil)) continue;
-            if (inTower && vanillaCloudPattern(c)) {
-                float shape = towerD == 0 ? 1.0 : towerD == 1 ? 0.8 : 0.55;
-                float jitter = floor(hash3(uvec3(uvec2(c), 17u)).x * 3.0) - 1.0;
-                height = max(height, (round(VANILLA_CB_TOWER * vanillaCloudTowerGrow() * shape / VANILLA_CB_TOWER_STEP) + jitter) * VANILLA_CB_TOWER_STEP);
-            }
-            bool rim = anvilD == ring || anvilM == reach;
-            if (inAnvil && !(rim && hash3(uvec3(uvec2(c), 29u)).x < VANILLA_CB_ANVIL_HOLES)) {
-                float low = VANILLA_CB_ANVIL_TOP - (VANILLA_CB_ANVIL_EDGE + VANILLA_CB_ANVIL_SLOPE * float(ring - anvilD));
-                anvilLow = anvilLow > 0.0 ? min(anvilLow, low) : low;
-                anvilHigh = VANILLA_CB_ANVIL_TOP;
-            }
-        }
-    }
-    // 塔が金床の下面まで届いていれば、ひと続きの柱にする
-    if (anvilLow > 0.0 && height >= anvilLow) {
-        height = max(height, anvilHigh);
-        anvilLow = 0.0;
-        anvilHigh = 0.0;
-    }
-}
-#endif
 
 /*
  * 表のテクセル c に書く値 (prepare2 の各スレッドが 1 マスずつ)。模様の外のテクセルと大きなテクスチャは使わない
- * 頭の高さ = 縁の厚み + 塊の奥ゆき (周りのマスがすべて雲の周の数。縁のマスは 0) x 段の高さ。奥ゆきは TERRACE まで
+ * r = 柱の頭の高さ (どのマスも同じ厚み), a = 空の区画を飛ばすための印 (4x4 マスの区画に雲が 1 つでもあるか)
  */
 vec4 vanillaCloudTableTexel(ivec2 c) {
     ivec2 size = textureSize(vanillaCloudTex, 0);
     if (any(greaterThanEqual(c, size)) || max(size.x, size.y) > VANILLA_CLOUD_TABLE_SIZE) return vec4(0.0);
-    float height = 0.0;
-    if (vanillaCloudPattern(c)) {
-        int depth = 0;
-        for (int r = 1; r <= VANILLA_CLOUD_TERRACE; r++) {
-            // 距離 r の周 (チェビシェフ距離) がすべて雲なら 1 周深い
-            bool ring = true;
-            for (int y = -r; y <= r; y++) {
-                for (int x = -r; x <= r; x++) {
-                    if (max(abs(x), abs(y)) == r && !vanillaCloudPattern(c + ivec2(x, y))) ring = false;
-                }
-            }
-            if (!ring) break;
-            depth = r;
-        }
-        height = VANILLA_CLOUD_EDGE_HEIGHT + float(depth) * VANILLA_CLOUD_TERRACE_STEP;
-    }
-    // 空の区画を飛ばすための印: 4x4 マスの区画に雲が 1 つでもあるか
     ivec2 block = c - c % VANILLA_CLOUD_BLOCK;
     float occupied = 0.0;
     for (int y = 0; y < VANILLA_CLOUD_BLOCK; y++) {
         for (int x = 0; x < VANILLA_CLOUD_BLOCK; x++) occupied = max(occupied, vanillaCloudPattern(block + ivec2(x, y)) ? 1.0 : 0.0);
     }
-    float anvilLow = 0.0;
-    float anvilHigh = 0.0;
-#ifdef CLOUD_CUMULONIMBUS
-    if (VANILLA_THUNDER > 0.001) vanillaCloudStorm(c, block, height, anvilLow, anvilHigh, occupied);
-#endif
-    return vec4(vec3(height, anvilLow, anvilHigh) / 255.0, occupied);
+    return vec4(vanillaCloudPattern(c) ? VANILLA_CLOUD_ENVELOPE / 255.0 : 0.0, 0.0, 0.0, occupied);
 }
 
 /*
  * 点 (格子の座標 q, 高さ y) から、列の表に出ている面までの距離 (ブロック)
  * side: 側面 (x 一定の面までが x、z 一定の面までが y。隣の列がその高さまで雲なら、その面は表に出ていない。出ていない側は 1e3), up: 頭の面, down: 底の面。列の外は up か down が 0 以下
  * min と max だけで組むので、等高線は四角い (角と辺の丸めは vanillaCloudRound)
- * occlusion: 空の光の遮り [0, VANILLA_CLOUD_OCCLUSION]。頭が隣の高い柱の壁に接する所は、壁に空の一部を遮られる (段差の根元の陰)
  */
-void vanillaCloudFaces(VanillaTier t, vec2 q, float y, out vec2 side, out float up, out float down, out float occlusion) {
+void vanillaCloudFaces(VanillaTier t, vec2 q, float y, out vec2 side, out float up, out float down) {
     vec2 g = q / t.cell;
     ivec2 c = ivec2(floor(g));
     vec2 f = g - vec2(c);
     float h = y - t.bottom;
-    vec4 col = vanillaCloudColumn(t, c);
-    vec2 span = vanillaCloudSpan(col, h);
+    vec2 span = vanillaCloudSpan(vanillaCloudColumn(t, c), h);
     up = span.y - h;
     down = h - span.x;
     side = vec2(1e3);
-    occlusion = 0.0;
     if (up <= 0.0 || down <= 0.0) return;
     // 近い側の隣 (x, z) と斜めの隣
     ivec2 n = ivec2(f.x < 0.5 ? -1 : 1, f.y < 0.5 ? -1 : 1);
-    vec4 colX = vanillaCloudColumn(t, c + ivec2(n.x, 0));
-    vec4 colZ = vanillaCloudColumn(t, c + ivec2(0, n.y));
     float ex = (f.x < 0.5 ? f.x : 1.0 - f.x) * t.cell.x;
     float ez = (f.y < 0.5 ? f.y : 1.0 - f.y) * t.cell.y;
-    bool openX = !vanillaCloudInside(colX, h);
-    bool openZ = !vanillaCloudInside(colZ, h);
+    bool openX = !vanillaCloudInside(vanillaCloudColumn(t, c + ivec2(n.x, 0)), h);
+    bool openZ = !vanillaCloudInside(vanillaCloudColumn(t, c + ivec2(0, n.y)), h);
     if (openX) side.x = ex;
     if (openZ) side.y = ez;
     // へこんだ角: 斜めの隣だけが空きのときは角の柱 (四角い等高線のまま)
     if (!openX && !openZ && !vanillaCloudInside(vanillaCloudColumn(t, c + n), h)) side.x = max(ex, ez);
-    if (t.index != 0 || span.x > 0.0) return;
-    // 頭より上へ出ている隣の壁の高さ / (壁までの距離 + 頭から潜った深さ + 2)。壁に近く浅いほど強い
-    // 近い側だけを見ると、マスの中央で見る壁が入れ替わって明るさが段になる。反対側の壁も足して、マスの中でなめらかにつなぐ
-    float head = col.x;
-    float headX2 = vanillaCloudColumn(t, c - ivec2(n.x, 0)).x;
-    float headZ2 = vanillaCloudColumn(t, c - ivec2(0, n.y)).x;
-    float reach = up + VANILLA_CLOUD_OCCLUSION_REACH;
-    float wall = max(colX.x - head, 0.0) / (ex + reach) + max(headX2 - head, 0.0) / (t.cell.x - ex + reach)
-               + max(colZ.x - head, 0.0) / (ez + reach) + max(headZ2 - head, 0.0) / (t.cell.y - ez + reach);
-    occlusion = VANILLA_CLOUD_OCCLUSION * saturate(wall / VANILLA_CLOUD_OCCLUSION_FULL);
 }
 
 /*
@@ -398,13 +266,13 @@ void vanillaCloudRound(float radius, inout vec2 side, inout float up, inout floa
 }
 
 /*
- * 密度 [0,1] と空の光の遮り。形はマスの直方体のままで、表に出ている面から数ブロックだけ密度を下げる
+ * 密度 [0,1]。形はマスの直方体のままで、表に出ている面から数ブロックだけ密度を下げる
  * footprint: その点での画素の大きさ (ブロック)。柔らかさを画素より細かくしない (遠くの縁が時間方向に揺れて見えない)
  */
-float vanillaCloudDensity(VanillaTier t, vec2 q, float y, float footprint, out float occlusion) {
+float vanillaCloudDensity(VanillaTier t, vec2 q, float y, float footprint) {
     vec2 side;
     float up, down;
-    vanillaCloudFaces(t, q, y, side, up, down, occlusion);
+    vanillaCloudFaces(t, q, y, side, up, down);
     if (up <= 0.0 || down <= 0.0) return 0.0;
     vanillaCloudRound(t.radius, side, up, down);
     float pixel = VANILLA_CLOUD_SOFT_PIXELS * footprint;
@@ -416,15 +284,14 @@ float vanillaCloudDensity(VanillaTier t, vec2 q, float y, float footprint, out f
 }
 
 float vanillaCloudDensity(VanillaTier t, vec2 q, float y) {
-    float occlusion;
-    return vanillaCloudDensity(t, q, y, 0.0, occlusion);
+    return vanillaCloudDensity(t, q, y, 0.0);
 }
 
 // 点が列の面から内側へ何ブロック入っているか (列の外は 0)。カメラが柱の中にいるかの判定に使う
 float vanillaCloudInsideDepth(VanillaTier t, vec2 q, float y) {
     vec2 side;
-    float up, down, occlusion;
-    vanillaCloudFaces(t, q, y, side, up, down, occlusion);
+    float up, down;
+    vanillaCloudFaces(t, q, y, side, up, down);
     return max(min(min(side.x, side.y), min(up, down)), 0.0);
 }
 
@@ -450,7 +317,7 @@ float vanillaCloudBoxExit(vec2 q, vec2 dxz, vec2 lo, vec2 size) {
     return max(min(t.x, t.y), 0.0) + VANILLA_CLOUD_SKIP_MARGIN;
 }
 
-// 光源方向の光学的深さ。光源の向きへ表のマスを 1 つずつ渡り、柱の頭より下 (と金床の中) を通る長さを足す (柱は直方体なので長さは厳密。
+// 光源方向の光学的深さ。光源の向きへ表のマスを 1 つずつ渡り、柱の頭より下を通る長さを足す (柱は直方体なので長さは厳密。
 // 点で読むと、隣の柱の影の境目が柱の列でそろったぎざぎざになる)。上端 (外形の上端) を出るか、LIGHT_REACH ブロック進んだら止める
 // (遠くの柱まで数えると、低い日の雲が真っ暗になる。光は雲の奥から何度も散乱して届くので、近くの柱だけが影を作る)
 float vanillaCloudLightOD(VanillaTier t, vec2 q, float y, vec3 lightDir) {
@@ -462,10 +329,9 @@ float vanillaCloudLightOD(VanillaTier t, vec2 q, float y, vec3 lightDir) {
         vec2 p = q + d.xz * s;
         ivec2 cell = vanillaCloudCellOf(t, p);
         float next = s + vanillaCloudBoxExit(p, d.xz, vec2(cell) * t.cell, t.cell);
-        vec4 col = vanillaCloudColumn(t, cell);
+        vec2 col = vanillaCloudColumn(t, cell);
         float end = min(next, tTop);
         od += max(min(end, (t.bottom + col.x - y) / d.y) - s, 0.0);
-        if (col.y > 0.0) od += max(min(end, (t.bottom + col.z - y) / d.y) - max(s, (t.bottom + col.y - y) / d.y), 0.0);
         s = next;
     }
     return od * (VANILLA_CLOUD_KREF * VANILLA_CLOUD_SHADE_SIGMA * t.shade);
@@ -475,7 +341,7 @@ float vanillaCloudLightOD(VanillaTier t, vec2 q, float y, vec3 lightDir) {
 float vanillaCloudSkyOD(VanillaTier t, vec2 q, float y) {
     float h = y - t.bottom;
     vec2 span = vanillaCloudSpan(vanillaCloudColumn(t, vanillaCloudCellOf(t, q)), h);
-    return min(max(span.y - h, 0.0), VANILLA_CLOUD_SKY_REACH) * (VANILLA_CLOUD_KREF * VANILLA_CLOUD_SHADE_SIGMA * t.shade);
+    return max(span.y - h, 0.0) * (VANILLA_CLOUD_KREF * VANILLA_CLOUD_SHADE_SIGMA * t.shade);
 }
 
 /*

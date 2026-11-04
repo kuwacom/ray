@@ -171,28 +171,22 @@ CloudAccum cloudMarchVanilla(CloudContext ctx, CloudLighting l, vec3 dir, vec2 s
         float y = cameraPosition.y + dir.y * t;
         float h = y - tier.bottom;
         ivec2 cell = vanillaCloudCellOf(tier, q);
-        vec4 column = vanillaCloudColumn(tier, cell);
+        vec2 column = vanillaCloudColumn(tier, cell);
         // 4x4 マスの区画が空なら、その区画の箱を出るまで飛ばす
-        if (column.w < 0.5) {
+        if (column.y < 0.5) {
             t += vanillaCloudBoxExit(q, dir.xz, floor(vec2(cell) / float(VANILLA_CLOUD_BLOCK)) * blockSize, blockSize);
             continue;
         }
-        // 列の外 (空のマス・頭より上・金床の上下) は、マスの箱を出るまで (柱や金床の面に当たるならその面まで) 飛ばす
+        // 列の外 (空のマス・頭より上) は、マスの箱を出るまで (柱の頭の面に当たるならその面まで) 飛ばす
         if (!vanillaCloudInside(column, h)) {
             float skip = vanillaCloudBoxExit(q, dir.xz, vec2(cell) * tier.cell, tier.cell);
-            if (abs(dir.y) > 1e-5) {
-                vec3 planes = vec3(column.x, column.y, column.z);
-                for (int k = 0; k < 3; k++) {
-                    float toPlane = (planes[k] - h) / dir.y;
-                    if (planes[k] > 0.0 && toPlane > 0.0) skip = min(skip, toPlane + VANILLA_CLOUD_SKIP_MARGIN);
-                }
-            }
+            float toHead = (column.x - h) / dir.y;
+            if (abs(dir.y) > 1e-5 && column.x > 0.0 && toHead > 0.0) skip = min(skip, toHead + VANILLA_CLOUD_SKIP_MARGIN);
             t += skip;
             continue;
         }
         float dt = clamp(t * stepRel, VANILLA_CLOUD_STEP_MIN, stepMax);
-        float occlusion;
-        float density = vanillaCloudDensity(tier, q, y, t * pixel, occlusion);
+        float density = vanillaCloudDensity(tier, q, y, t * pixel);
         if (density <= 0.0) {
             t += dt;
             continue;
@@ -209,7 +203,6 @@ CloudAccum cloudMarchVanilla(CloudContext ctx, CloudLighting l, vec3 dir, vec2 s
         float odSky = vanillaCloudSkyOD(tier, q, y) * weight;
         if (tier.index == 0 && samples == 1) upperT = vanillaCloudUpperTransmittance(dir.xz * t, y, l.lightDir, weight);
         CloudLighting lit = l;
-        lit.ambient *= 1.0 - occlusion;
         if (mottled) lit.lightIrradiance *= mix(1.0, vanillaCloudTopMottle(q), saturate(1.0 - (vanillaCloudSpan(column, h).y - h) / VANILLA_CLOUD_TOP_MOTTLE_DEPTH));
         vec3 inscatter = cloudInscatter(lit, extinction, odLight, 0.0, odSky, sqr(1.0 - height), upperT, max(height - baseLift, 0.0));
         inscatter = max(inscatter, rainFloor);

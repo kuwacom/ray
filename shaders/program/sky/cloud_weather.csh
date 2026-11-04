@@ -270,11 +270,11 @@ void cloudInteriorWrite(CloudContext ctx) {
     #ifdef CLOUD_VANILLA_SHAPE
     // 柱の頭と底から CLOUD_INTERIOR_SLAB_FACE ブロックまで霧を立ち上げる (柱の外へ出る縁もなめらかにする)。柱の外のマスは頭が 0 なので、円盤の濃さだけで決める
     VanillaTier tier = cloudInteriorTier();
-    vec4 column = vanillaCloudColumn(tier, vanillaCloudCellOf(tier, vanillaCloudOrigin(tier)));
+    vec2 column = vanillaCloudColumn(tier, vanillaCloudCellOf(tier, vanillaCloudOrigin(tier)));
     float camH = cameraPosition.y - tier.bottom;
     vec2 span = vanillaCloudSpan(column, camH);
     float faceDepth = min(camH - span.x, span.y - camH);
-    float faceFade = column.x > 0.0 || column.z > 0.0 ? smoothstep(0.0, CLOUD_INTERIOR_SLAB_FACE, max(faceDepth, 0.0)) : 1.0;
+    float faceFade = column.x > 0.0 ? smoothstep(0.0, CLOUD_INTERIOR_SLAB_FACE, max(faceDepth, 0.0)) : 1.0;
     // 霧は視線の全長に掛かるので、縁の外のわずかな濃さでも遠景が曇る。2 乗にして縁の手前はごく薄く、縁を越えるあたりから濃くする
     rho = max(rho, sqr(smoothstep(CLOUD_INTERIOR_SLAB_ENTER.x, CLOUD_INTERIOR_SLAB_ENTER.y, cloudInteriorSlabCover(tier))) * faceFade);
     #endif

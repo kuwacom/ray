@@ -200,11 +200,11 @@ float cloudRefStretch(vec3 dir, float y) {
 const float CLOUD_SHADOW_EXTENT = clamp(6144.0 / CLOUD_KH, 1024.0, 6144.0);
 const float CLOUD_SHADOW_RAIN_OUTSIDE = 0.95; // 雨雲へ変わる空の、雲影マップの外の影の濃さ (一面の雨雲)
 // 雨が雲の量と雲種を雨雲 (全天の乱層雲と高層雲のベール) へ変える割合。バニラの形 (CLOUD_RAIN_KEEPS_SHAPE) は 0 で、
-// 雨でも板の形と量のまま (雨らしさは雲の光の曇天化・濃さ・空・直達光・霧で出す)。ほかの形は 1。雷雨は積乱雲の塔を保つので、この値によらず変える
+// 雨でも板の形のまま (雨らしさは雲の光の曇天化・濃さ・空・直達光・霧と、雲量 = 模様の外のマスを埋めて空を覆うことで出す)。ほかの形は 1。雷雨は積乱雲の塔を保つので、この値によらず変える
 const float CLOUD_RAIN_DISC_SHADOW = 1.0; // 雨の空で、太陽の円盤の鏡像 (水のきらめき) に掛ける遮り。1 で円盤が完全に隠れる
 #ifdef CLOUD_RAIN_KEEPS_SHAPE
-const float CLOUD_RAIN_DECK_SHADOW = 0.75; // 雲の量を保つ雨で、雲影マップの全域に掛ける太陽の遮り (見えない雨雲の層の分)
-// バニラの形は写実の積乱雲を持たないので、雷雨も雨と同じく板の形と量のまま曇天にする
+const float CLOUD_RAIN_DECK_SHADOW = 0.75; // 雲の形を保つ雨で、雲影マップの全域に掛ける太陽の遮り (見えない雨雲の層の分。隙間の分)
+// バニラの形は写実の積乱雲を持たないので、雷雨も雨と同じく板の形のまま曇天にする
 float cloudRainReshape() { return 0.0; }
 #else
 float cloudRainReshape() { return 1.0; }
@@ -294,33 +294,12 @@ const float CLOUD_FRONT_EPS = 1e-4;   // 透過率が 1 に近いときの散乱
 // バニラの雲の寸法 (ブロック)。格子の 1 マスと厚みと、Iris の cloudHeight から下面までの差
 const float VANILLA_CLOUD_CELL_SCALE = 2.0;  // バニラの雲のマスの 12 ブロックに掛ける倍率。1 でバニラと同じ大きさ・位置 (大きくすると、格子の原点 (0, 0) から離れるほど雲の位置がバニラからずれる)
 const float VANILLA_CLOUD_CELL = 12.0 * VANILLA_CLOUD_CELL_SCALE;
-const float VANILLA_CLOUD_EDGE_HEIGHT = float(CLOUD_VANILLA_THICKNESS);  // 塊の外周のマスの厚み
-const int VANILLA_CLOUD_TERRACE = CLOUD_VANILLA_TERRACE;                 // 塊の奥のマスを高く積む段の数
-const float VANILLA_CLOUD_TERRACE_STEP = 4.0;                            // 1 段の高さ
-const float VANILLA_CLOUD_ENVELOPE = VANILLA_CLOUD_EDGE_HEIGHT + float(VANILLA_CLOUD_TERRACE) * VANILLA_CLOUD_TERRACE_STEP; // 外形の厚み (下面から、どの柱の頭よりも上まで)
+const float VANILLA_CLOUD_ENVELOPE = float(CLOUD_VANILLA_THICKNESS);  // 板の厚み (どのマスも同じ。下面から頭まで)
 const float VANILLA_CLOUD_Y_OFFSET = 0.33;
 // この距離 (ブロック) で空へ溶かし切る (0.6 倍から溶け始める)。テクスチャは 256 マス (CELL_SCALE 2 で 6144 ブロック) で一周するので、繰り返しを見せない。\n// これより遠い雲は、厚みが画素より細い短冊になって地平線の近くが細かく見えるので、描かない
 const float VANILLA_CLOUD_FAR = 1200.0;
 
 float vanillaCloudBottom() { return cloudHeight + VANILLA_CLOUD_Y_OFFSET; }
-
-#define VANILLA_THUNDER thunderStrength
-#ifdef CLOUD_CUMULONIMBUS
-// 雷雨の塔 (下段の列を高く積み上げたもの) と金床の高さ (下段の底からのブロック)。建築の上限以下の案では低くする
-const float VANILLA_CB_TOWER = CLOUD_VANILLA_TIER_HEIGHT == 0 ? 150.0 : 100.0;
-const float VANILLA_CB_ANVIL_TOP = CLOUD_VANILLA_TIER_HEIGHT == 0 ? 160.0 : 110.0;
-// 雷雨が始まると塔が伸び、遅れて金床が広がる
-float vanillaCloudTowerGrow() { return smoothstep(0.0, 0.6, VANILLA_THUNDER); }
-float vanillaCloudAnvilGrow() { return smoothstep(0.4, 1.0, VANILLA_THUNDER); }
-#endif
-
-// 下段の外形の厚さ。雷雨のときだけ、金床の上面まで伸びる
-float vanillaCloudEnvelope() {
-#ifdef CLOUD_CUMULONIMBUS
-    if (VANILLA_THUNDER > 0.001) return max(VANILLA_CLOUD_ENVELOPE, VANILLA_CB_ANVIL_TOP);
-#endif
-    return VANILLA_CLOUD_ENVELOPE;
-}
 
 // 平らな板 [bottom, bottom + envelope] との交差 (バニラの雲は平面なので曲率は付けない)。無ければ x >= y
 vec2 vanillaCloudSegment(float y0, float dy, float bottom, float envelope, float far) {
@@ -334,7 +313,7 @@ vec2 vanillaCloudSegment(float y0, float dy, float bottom, float envelope, float
 // 最初に通る雲の層の区間 (半透明の手前の分を見積もる基準)
 vec2 cloudPrimarySegment(float y0, float dy) {
 #ifdef CLOUD_VANILLA_SHAPE
-    return vanillaCloudSegment(y0, dy, vanillaCloudBottom(), vanillaCloudEnvelope(), VANILLA_CLOUD_FAR);
+    return vanillaCloudSegment(y0, dy, vanillaCloudBottom(), VANILLA_CLOUD_ENVELOPE, VANILLA_CLOUD_FAR);
 #else
     return cloudLayerSegment(y0, dy, CLOUD_BASE, CLOUD_TOP);
 #endif
@@ -453,11 +432,11 @@ float getCloudShadow(vec3 playerPos) {
     float worldY = playerPos.y + cameraPosition.y;
     float below = 1.0 - smoothstep(CLOUD_BASE, CLOUD_BASE + 0.5 * CLOUD_DEPTH, worldY);
     // マップの外は天気からの平均の透過率にする。雲が全天の雨雲へ変わる空で 1 (日なた) へ戻すと、遠くの霧の光の筋が
-    // マップの四角い範囲の外だけ明るくなり、雷雨の空に直線の縁の白い面が出た (雲の量を保つ雨は晴れと同じ 1)
+    // マップの四角い範囲の外だけ明るくなり、雷雨の空に直線の縁の白い面が出た (雲の形を保つ雨は晴れと同じ 1)
     float outside = 1.0 - CLOUD_SHADOW_RAIN_OUTSIDE * max(rainStrength, rainWetness) * cloudRainReshape();
     float transmittance = mix(outside, texture(cloudShadowSampler, uv).r, edge.x * edge.y);
     #ifdef CLOUD_RAIN_KEEPS_SHAPE
-    // 雲の量を保つ雨は、雲の上の見えない雨雲の層が雲の隙間でも太陽を遮る
+    // 雲の形を保つ雨は、雲の上の見えない雨雲の層が雲の隙間でも太陽を遮る
     transmittance *= 1.0 - CLOUD_RAIN_DECK_SHADOW * max(rainStrength, rainWetness) * (1.0 - cloudRainReshape());
     #endif
     return mix(1.0, transmittance, strength * below);

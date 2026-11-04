@@ -95,6 +95,10 @@ struct CloudClimate {
     float storm;      // 晴れた日の積乱雲の出やすさ (遠くだけに立てる)
 };
 
+// 雨の強さ [0,1]。降り始めは rainStrength (約 5 秒で 1) で半分だけ、残りは rainWetness (既定の半減期 30 秒) で 1-2 分かけて進む
+// (rainStrength のままだと数秒で空が一気に雨雲に変わった。雨上がりは rainWetness が残るので雲がゆっくり晴れる)
+float cloudRainAmount() { return max(0.5 * rainStrength, rainWetness * mix(0.6, 1.0, rainStrength)); }
+
 CloudClimate cloudClimate() {
     CloudClimate c;
     CloudRegion region = cloudRegion();
@@ -104,10 +108,7 @@ CloudClimate cloudClimate() {
     float highMoisture = climateDayRandom(53u);
     // 日射による対流は 14 時ごろ最大、明け方に最小 (worldTime 8000 = 14 時)
     float diurnal = 0.5 + 0.5 * cos(TAU * (float(worldTime) - 8000.0) / 24000.0);
-    // rainWetness は雨の後もしばらく残るので、雨上がりの雲がゆっくり晴れる
-    // 降り始めは rainStrength (約 5 秒で 1) で半分だけ曇らせ、残りは rainWetness (既定の半減期 30 秒) で 1-2 分かけて覆う
-    // (rainStrength のままだと数秒で空が一気に雨雲に変わった)
-    c.rain = max(0.5 * rainStrength, rainWetness * mix(0.6, 1.0, rainStrength));
+    c.rain = cloudRainAmount();
     // 雲の中の光 (曇天の色・拡散) と中層・上層のベールは降り始めから早めに切り替える: 低い雲が覆う前に上空の高層雲が陽射しを弱める。
     // 被覆と同じ遅さだと、降り始めの 10 秒ほどは暗い雲に白く陽の当たる縁が残った劇的な空になった
     c.rainLight = max(c.rain, 0.85 * rainStrength);
