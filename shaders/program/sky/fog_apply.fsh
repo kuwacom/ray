@@ -239,15 +239,19 @@ void main() {
         vec3 inscatter = ambient * waterScattering() / extinction * (1.0 - transmittance) * exp(-extinction * 3.0);
 #endif
         color = color * transmittance + inscatter * WATER_FOG_INSCATTER;
+        // 媒質の内散乱は白飛び分に入れない (掛け忘れると割合が 1 に張り付き、画素全体が TAA を通らなくなる)
+        sparkle *= luminance(transmittance);
         scatterCoeff = waterScattering();
     } else if (isEyeInWater == 2) {
         vec3 transmittance = exp(-FOG_LAVA_EXTINCTION * dist);
         color = color * transmittance + FOG_LAVA_RADIANCE * (1.0 - transmittance);
+        sparkle *= luminance(transmittance);
         scatterCoeff = vec3(0.0);
     } else if (isEyeInWater == 3) {
         vec3 transmittance = exp(-FOG_POWDER_SNOW_EXTINCTION * dist);
         vec3 snowLight = (shEvalIrradiance(vec3(0.0, 1.0, 0.0)) + getCelestialLight().irradiance * 0.3) * RCP_PI * 0.8 + MIN_AMBIENT;
         color = color * transmittance + snowLight * (1.0 - transmittance);
+        sparkle *= luminance(transmittance);
         scatterCoeff = vec3(0.0);
     } else {
 #ifdef VL
