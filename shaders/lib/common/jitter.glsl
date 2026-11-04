@@ -38,4 +38,13 @@ void applyTaaJitter(inout vec4 clipPos) {
 #endif
 }
 
+// 深度バッファの画素 uv に写っている点の、ジッターを掛ける前の画面 UV (ラスタライズはジッター分ずれている)
+vec2 removeTaaJitter(vec2 uv) {
+#ifdef TAA
+    return uv - taaJitterUv();
+#else
+    return uv;
+#endif
+}
+
 #endif

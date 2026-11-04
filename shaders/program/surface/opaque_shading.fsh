@@ -14,6 +14,7 @@
  */
 //@include "/lib/common/common.glsl"
 //@include "/lib/common/exposure.glsl"
+//@include "/lib/common/jitter.glsl"
 //@include "/lib/surface/surface.glsl"
 //@include "/lib/sky/sky.glsl"
 //@include "/lib/light/light.glsl"
@@ -36,6 +37,7 @@
 #include "/lib/common/common.glsl"
 #include "/lib/buffers/frame_data.glsl"
 #include "/lib/common/exposure.glsl"
+#include "/lib/common/jitter.glsl"
 #include "/lib/common/color.glsl"
 #include "/lib/common/encoding.glsl"
 #include "/lib/common/gbuffer.glsl"
@@ -197,8 +199,14 @@ void main() {
     GBufferData g = readGBuffer(texel);
     Material m = decodeMaterial(g);
     bool hand = isHandDepth(depth);
+    // 画面空間の接触影は深度バッファと同じくジッター込みの位置から辿る
     vec3 viewPos = screenToView(vec3(texcoord, fixHandDepth(depth)));
-    vec3 playerPos = viewToPlayer(viewPos);
+    /*
+     * 光と影はジッターを戻した面の上の点で求める。texcoord のまま戻すと面から最大で半画素ぶん浮くか沈み、
+     * 影マップの解像度が高い足元では深度の余裕より大きくなって、ジッターの向きによっては足元の円の中の日向が
+     * 自分の影になっていた (動いて TAA の履歴が効かない時にだけ 1 フレーム見える)
+     */
+    vec3 playerPos = viewToPlayer(screenToView(vec3(removeTaaJitter(texcoord), fixHandDepth(depth))));
     vec3 V = -normalize(playerPos);
     float dither = interleavedGradientNoise(gl_FragCoord.xy, frameCounter);
     SurfacePoint sp = surfacePoint(playerPos, g.normal);
