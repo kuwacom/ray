@@ -299,15 +299,32 @@ const int VANILLA_CLOUD_TERRACE = CLOUD_VANILLA_TERRACE;                 // 塊�
 const float VANILLA_CLOUD_TERRACE_STEP = 4.0;                            // 1 段の高さ
 const float VANILLA_CLOUD_ENVELOPE = VANILLA_CLOUD_EDGE_HEIGHT + float(VANILLA_CLOUD_TERRACE) * VANILLA_CLOUD_TERRACE_STEP; // 外形の厚み (下面から、どの柱の頭よりも上まで)
 const float VANILLA_CLOUD_Y_OFFSET = 0.33;
-// この距離 (ブロック) で空へ溶かし切る。テクスチャは 256 マス (CELL_SCALE 2 で 6144 ブロック) で一周するので、繰り返しを見せない
-const float VANILLA_CLOUD_FAR = 2048.0;
+// この距離 (ブロック) で空へ溶かし切る (0.6 倍から溶け始める)。テクスチャは 256 マス (CELL_SCALE 2 で 6144 ブロック) で一周するので、繰り返しを見せない。\n// これより遠い雲は、厚みが画素より細い短冊になって地平線の近くが細かく見えるので、描かない
+const float VANILLA_CLOUD_FAR = 1200.0;
 
 float vanillaCloudBottom() { return cloudHeight + VANILLA_CLOUD_Y_OFFSET; }
 
-// 平らな板 [bottom, bottom + 厚み] との交差 (バニラの雲は平面なので曲率は付けない)。無ければ x >= y
-vec2 vanillaCloudSegment(float y0, float dy, float far) {
-    float bottom = vanillaCloudBottom();
-    float top = bottom + VANILLA_CLOUD_ENVELOPE;
+#define VANILLA_THUNDER thunderStrength
+#ifdef CLOUD_CUMULONIMBUS
+// 雷雨の塔 (下段の列を高く積み上げたもの) と金床の高さ (下段の底からのブロック)。建築の上限以下の案では低くする
+const float VANILLA_CB_TOWER = CLOUD_VANILLA_TIER_HEIGHT == 0 ? 150.0 : 100.0;
+const float VANILLA_CB_ANVIL_TOP = CLOUD_VANILLA_TIER_HEIGHT == 0 ? 160.0 : 110.0;
+// 雷雨が始まると塔が伸び、遅れて金床が広がる
+float vanillaCloudTowerGrow() { return smoothstep(0.0, 0.6, VANILLA_THUNDER); }
+float vanillaCloudAnvilGrow() { return smoothstep(0.4, 1.0, VANILLA_THUNDER); }
+#endif
+
+// 下段の外形の厚さ。雷雨のときだけ、金床の上面まで伸びる
+float vanillaCloudEnvelope() {
+#ifdef CLOUD_CUMULONIMBUS
+    if (VANILLA_THUNDER > 0.001) return max(VANILLA_CLOUD_ENVELOPE, VANILLA_CB_ANVIL_TOP);
+#endif
+    return VANILLA_CLOUD_ENVELOPE;
+}
+
+// 平らな板 [bottom, bottom + envelope] との交差 (バニラの雲は平面なので曲率は付けない)。無ければ x >= y
+vec2 vanillaCloudSegment(float y0, float dy, float bottom, float envelope, float far) {
+    float top = bottom + envelope;
     if (abs(dy) < 1e-5) return (y0 > bottom && y0 < top) ? vec2(0.0, far) : vec2(1.0, 0.0);
     vec2 t = (vec2(bottom, top) - y0) / dy;
     return vec2(max(min(t.x, t.y), 0.0), min(max(t.x, t.y), far));
@@ -317,7 +334,7 @@ vec2 vanillaCloudSegment(float y0, float dy, float far) {
 // 最初に通る雲の層の区間 (半透明の手前の分を見積もる基準)
 vec2 cloudPrimarySegment(float y0, float dy) {
 #ifdef CLOUD_VANILLA_SHAPE
-    return vanillaCloudSegment(y0, dy, VANILLA_CLOUD_FAR);
+    return vanillaCloudSegment(y0, dy, vanillaCloudBottom(), vanillaCloudEnvelope(), VANILLA_CLOUD_FAR);
 #else
     return cloudLayerSegment(y0, dy, CLOUD_BASE, CLOUD_TOP);
 #endif
@@ -379,7 +396,7 @@ float cloudInteriorExit(vec3 dir) {
     #ifdef CLOUD_VANILLA_SHAPE
     // 写実の層は描かないので、バニラの形の外形の高さだけ。縁の外では霧の濃さ (prepare2 の円盤の平均) が 0 なので、縁をまたいでも連続する
     float bottom = vanillaCloudBottom();
-    return y > bottom && y < bottom + VANILLA_CLOUD_ENVELOPE ? CLOUD_INTERIOR_SLAB_LENGTH : 0.0;
+    return y > bottom && y < bottom + vanillaCloudEnvelope() ? CLOUD_INTERIOR_SLAB_LENGTH : 0.0;
     #else
     if (y > CLOUD_BASE && y < CLOUD_TOP) return cloudLayerSegment(y, dir.y, CLOUD_BASE, CLOUD_TOP).y;
     #if CLOUDS == 3

@@ -207,7 +207,7 @@ float cloudInteriorDensity(CloudContext ctx, vec3 offset, out float cloudHeight,
     #ifdef CLOUD_VANILLA_SHAPE
     // 写実の層は描かない。バニラの形の濃さは霧には入れず、マーチの消散係数にだけ足す
     cloudHeight = 0.5;
-    marchExtinction = vanillaCloudDensity(vanillaCloudOrigin() + offset.xz, y) * cloudRainDensityScale(ctx) * VANILLA_CLOUD_SIGMA * VANILLA_CLOUD_KREF;
+    marchExtinction = vanillaCloudDensity(vanillaTier(0), vanillaCloudOrigin(vanillaTier(0)) + offset.xz, y) * cloudRainDensityScale(ctx) * VANILLA_CLOUD_SIGMA * VANILLA_CLOUD_KREF;
     return 0.0;
     #else
     vec2 rel = offset.xz * CLOUD_KH;
@@ -231,12 +231,13 @@ float cloudInteriorDensity(CloudContext ctx, vec3 offset, out float cloudHeight,
  * 縁からどれだけ中にいるかを滑らかに表す。点が多いので、1 点が縁をまたぐ段差が霧の濃さに出ない (板の濃さは軽いので点を増やせる)
  */
 float cloudInteriorSlabCover(CloudContext ctx) {
-    vec2 origin = vanillaCloudOrigin();
+    VanillaTier tier = vanillaTier(0);
+    vec2 origin = vanillaCloudOrigin(tier);
     float sum = 0.0;
     for (int i = 0; i < CLOUD_INTERIOR_SLAB_TAPS; i++) {
         float r = CLOUD_INTERIOR_SLAB_RADIUS * sqrt((float(i) + 0.5) / float(CLOUD_INTERIOR_SLAB_TAPS));
         float a = float(i) * GOLDEN_ANGLE;
-        sum += vanillaCloudDensity(origin + r * vec2(cos(a), sin(a)), cameraPosition.y);
+        sum += vanillaCloudDensity(tier, origin + r * vec2(cos(a), sin(a)), cameraPosition.y);
     }
     return sum / float(CLOUD_INTERIOR_SLAB_TAPS);
 }
@@ -259,9 +260,12 @@ void cloudInteriorWrite(CloudContext ctx) {
     rho = sqr(smoothstep(CLOUD_INTERIOR_ENTER.x, CLOUD_INTERIOR_ENTER.y, rho));
     #ifdef CLOUD_VANILLA_SHAPE
     // 柱の頭と底から CLOUD_INTERIOR_SLAB_FACE ブロックまで霧を立ち上げる (柱の外へ出る縁もなめらかにする)。柱の外のマスは頭が 0 なので、円盤の濃さだけで決める
-    float head = vanillaCloudColumn(vanillaCloudCellOf(vanillaCloudOrigin())).x;
-    float faceDepth = min(cameraPosition.y - vanillaCloudBottom(), vanillaCloudBottom() + head - cameraPosition.y);
-    float faceFade = head > 0.0 ? smoothstep(0.0, CLOUD_INTERIOR_SLAB_FACE, faceDepth) : 1.0;
+    VanillaTier tier0 = vanillaTier(0);
+    vec4 column = vanillaCloudColumn(tier0, vanillaCloudCellOf(tier0, vanillaCloudOrigin(tier0)));
+    float camH = cameraPosition.y - tier0.bottom;
+    vec2 span = vanillaCloudSpan(column, camH);
+    float faceDepth = min(camH - span.x, span.y - camH);
+    float faceFade = column.x > 0.0 || column.z > 0.0 ? smoothstep(0.0, CLOUD_INTERIOR_SLAB_FACE, max(faceDepth, 0.0)) : 1.0;
     // 霧は視線の全長に掛かるので、縁の外のわずかな濃さでも遠景が曇る。2 乗にして縁の手前はごく薄く、縁を越えるあたりから濃くする
     rho = max(rho, sqr(smoothstep(CLOUD_INTERIOR_SLAB_ENTER.x, CLOUD_INTERIOR_SLAB_ENTER.y, cloudInteriorSlabCover(ctx))) * faceFade);
     #endif
@@ -282,12 +286,13 @@ void cloudInteriorWrite(CloudContext ctx) {
         #ifdef CLOUD_VANILLA_SHAPE
         // 写実の層は描かない。バニラの形の柱の中の光だけ
         float slabWeight = cloudRainDensityScale(ctx);
-        vec2 q = vanillaCloudOrigin();
-        odLight = vanillaCloudLightOD(q, y, l.lightDir) * slabWeight;
-        odSky = vanillaCloudSkyOD(q, y) * slabWeight;
+        VanillaTier tier = vanillaTier(0);
+        vec2 q = vanillaCloudOrigin(tier);
+        odLight = vanillaCloudLightOD(tier, q, y, l.lightDir) * slabWeight;
+        odSky = vanillaCloudSkyOD(tier, q, y) * slabWeight;
         l = cloudVanillaLighting(l);
-        float slabHeight = (y - vanillaCloudBottom()) / VANILLA_CLOUD_BASE_DEPTH;
-        if (slabHeight > 0.0 && y < vanillaCloudBottom() + VANILLA_CLOUD_ENVELOPE) {
+        float slabHeight = (y - tier.bottom) / VANILLA_CLOUD_BASE_DEPTH;
+        if (slabHeight > 0.0 && y < tier.bottom + tier.envelope) {
             cloudHeight = saturate(slabHeight);
             groundVisibility = sqr(1.0 - cloudHeight);
         }

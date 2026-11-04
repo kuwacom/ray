@@ -44,6 +44,9 @@
 #define CLOUD_SHADOWS
 #define CLOUD_VANILLA_THICKNESS 16 // [4 6 8 10 12 14 16 20 24] バニラの形の雲の縁のマスの厚さ (ブロック)
 #define CLOUD_VANILLA_TERRACE 1 // [0 1 2] バニラの形の雲の塊の奥のマスを 4 ブロックずつ高く積む段の数 (0 で一様な厚さ)
+#define CLOUD_VANILLA_TIER_COUNT 2 // [0 1 2] バニラの形の雲の上の段 (0 なし / 1 中段 / 2 中段と上段)
+#define CLOUD_VANILLA_TIER_COVERAGE 0.75 // [0.25 0.4 0.5 0.6 0.75 0.9 1.0] 上の段で残すマスの割合
+#define CLOUD_VANILLA_TIER_HEIGHT 0 // [0 1] 上の段の高さ (0 高い / 1 建築の上限以下)
 #define CLOUD_INTERIOR_VISIBILITY 20 // [0 4 6 8 10 12 14 16 18 20 24 28 32 40 48 64] 雲の中の視程 (ブロック。0 で雲の中の霧を掛けない)
 // 雲の層ごとの設定 (高度・厚みは高さテンプレートがカスタムの時だけ。0 = 低層から現実の比率で自動)
 #define CLOUD_LOW_COVERAGE 1.0 // [0.0 0.1 0.2 0.25 0.3 0.4 0.5 0.6 0.7 0.75 0.8 0.9 1.0 1.1 1.2 1.25 1.3 1.4 1.5 1.6 1.7 1.75 1.8 1.9 2.0 2.25 2.5 2.75 3.0] 低層の雲量の倍率
