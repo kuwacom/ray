@@ -122,12 +122,8 @@ const float GLASS_TINT_STRENGTH = 0.65;        // 透過色の濃さ (1 で tint
 /*
  * 屈折の先の画素の白飛び分の輝度 (deferred30 が a = 1 + 割合で書く)。半透明の画素は a を書き直すので、
  * 奥の金属・水たまりの照り返しを透過の分だけ引き継がないと、ガラス越し・水越しでは TAA で潰れる
- * a は線形に補間すると隣の画素の割合と混ざるので、最も近い画素を読む
  */
-float behindSparkleAt(vec2 uv) {
-    vec4 s = texelFetch(colortex0, clamp(ivec2(uv * viewSize()), ivec2(0), ivec2(viewSize()) - 1), 0);
-    return saturate(s.a - 1.0) * luminance(max(s.rgb, 0.0));
-}
+float behindSparkle(vec4 s) { return saturate(s.a - 1.0) * luminance(max(s.rgb, 0.0)); }
 
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
@@ -217,7 +213,7 @@ void main() {
         float pathLen = d1 >= 1.0 ? WATER_SKY_PATH : distance(floorPlayer, surfPlayer);
         if (exitDist > 0.0) pathLen = min(pathLen, exitDist);
         vec3 behind = vec3(0.0);
-        float behindSparkle = 0.0;  // 屈折の先の白飛び分の輝度 (ボクセルで辿った水底は持たない)
+        float behindExcess = 0.0;  // 屈折の先の白飛び分の輝度 (ボクセルで辿った水底は持たない)
         bool refrDone = false;  // 方式 D で屈折先の色と経路長が決まった
 #if WATER_REFRACTION >= 1
         if (F < 1.0) {
@@ -260,15 +256,16 @@ void main() {
                 vec3 vColor = vec3(0.0);
                 float vPath = WATER_SKY_PATH;
                 if (wS < 1.0 && waterRefractVoxel(surfPlayer, refrDir, floorPlayer, d1, lmT.y, vColor, vPath)) {
-                    vec3 sColor = wS > 0.0 ? texture(colortex0, sUv).rgb : vec3(0.0);
-                    behind = mix(vColor, sColor, wS);
-                    if (wS > 0.0) behindSparkle = behindSparkleAt(sUv) * wS;
+                    vec4 sColor = wS > 0.0 ? texture(colortex0, sUv) : vec4(0.0);
+                    behind = mix(vColor, sColor.rgb, wS);
+                    behindExcess = behindSparkle(sColor) * wS;
                     pathLen = mix(vPath, sPath, wS);
                     refrDone = true;
                 } else if (sValid) {
                     // ボクセルの範囲外 (遠景): 画面の像は 1 対 1 の対応なので端でも引き伸ばされない
-                    behind = texture(colortex0, sUv).rgb;
-                    behindSparkle = behindSparkleAt(sUv);
+                    vec4 sColor = texture(colortex0, sUv);
+                    behind = sColor.rgb;
+                    behindExcess = behindSparkle(sColor);
                     pathLen = sPath;
                     refrDone = true;
                 }
@@ -345,15 +342,16 @@ void main() {
         }
 #endif
         if (!refrDone) {
-            behind = texture(colortex0, refrUv).rgb;
-            behindSparkle = behindSparkleAt(refrUv);
+            vec4 sColor = texture(colortex0, refrUv);
+            behind = sColor.rgb;
+            behindExcess = behindSparkle(sColor);
         }
 
         // 吸収と内散乱 (水の上から見た時だけ。水中側は sky のフォグ)
         if (!below) {
             vec3 ext = waterExtinction();
             vec3 T = exp(-ext * pathLen);
-            behindSparkle *= luminance(T);
+            behindExcess *= luminance(T);
             float muView = dot(refrDir, refrDir) > 0.5 ? saturate(-refrDir.y) : saturate(V.y);
             behind = behind * T + waterInscatter(lmT.y, sunVis, WL.block + handIrradiance(WL, vec3(0.0, 1.0, 0.0)), muView, pathLen);
         }
@@ -384,7 +382,7 @@ void main() {
         refl = below ? vec3(0.0) : skyReflectionFallback(R, lmT.y, 0.0);
 #endif
         color = behind * (1.0 - F) + refl * F;
-        sparkleLum = behindSparkle * (1.0 - F);
+        sparkleLum = behindExcess * (1.0 - F);
         if (!below) {
             // 太陽・灯りの照り返しの粗さ: 表した波の斜面は法線が受け持つので、光学的に滑らかな水に、画素より細かい波と画素の中の法線の揺れを足す
             // 側面 (滝) は落ちる水の乱れに任せ、幅のある淡いつやを残す
@@ -440,19 +438,20 @@ void main() {
             if (validRefraction(tuv, d0)) refrUv = tuv;
         }
 #endif
-        vec3 behind = texture(colortex0, refrUv).rgb;
-        float behindSparkle = behindSparkleAt(refrUv);
+        vec4 behindRaw = texture(colortex0, refrUv);
+        vec3 behind = behindRaw.rgb;
+        float behindExcess = behindSparkle(behindRaw);
         if (d1 < 1.0) {
             vec3 env = opaqueEnvSpecular(texel, d1);
             behind += env;
-            behindSparkle += luminance(sparkleExcess(env, getExposure()));
+            behindExcess += luminance(sparkleExcess(env, getExposure()));
         }
 #ifdef CLOUD_INTERIOR
         // 雲の中の霧: ガラスの向こうの背景には、ガラスから奥の面 (空は無限遠) までの分を先に掛ける。ガラスまでの分は fog_apply が全体に掛ける
         if (isEyeInWater == 0) {
             vec4 backFog = cloudInteriorFog(-V, dist, d1 >= 1.0 ? CLOUD_RAY_FAR : length(floorPlayer));
             behind = behind * backFog.a + backFog.rgb;
-            behindSparkle *= backFog.a;
+            behindExcess *= backFog.a;
         }
 #endif
         vec3 transmit = vec3(1.0 - translucent.a);
@@ -476,7 +475,7 @@ void main() {
         // 前方で照らした拡散 (translucent.rgb) は鏡面で反射する F の分を除く (太陽の鏡面を足すので、その分だけ明るくならないように)
         vec3 spec = refl * F + sunSpecular(N, V, GLASS_F0, glassAlpha, glassSunVis) + localLightSpecular(GL, N, V, GLASS_F0, glassAlpha);
         color = behind * transmit * (1.0 - F) + translucent.rgb * (1.0 - F) + spec;
-        float glassSparkle = luminance(sparkleExcess(spec, getExposure())) + behindSparkle * luminance(transmit) * (1.0 - F);
+        float glassSparkle = luminance(sparkleExcess(spec, getExposure())) + behindExcess * luminance(transmit) * (1.0 - F);
         outColor = vec4(color, 1.0 + saturate(glassSparkle / max(luminance(color), 1e-6)));
         return;
     }
