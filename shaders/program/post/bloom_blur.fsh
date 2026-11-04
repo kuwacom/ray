@@ -60,10 +60,9 @@ const float BLOOM_BLUR_OFFSET = 1.25;
 const int STREAK_TAPS = 48;
 
 #if defined LENS_SCREEN_FLARE && defined LENS_FLARE
-// 露出後の閾値を超えた分 (シーン単位)。ソフトニーで閾値の境目に輪郭を出さない
-vec3 flareHighlight(vec3 c, float exposure, float threshold) {
+// 露出後の閾値を超えた分 (シーン単位)。ソフトニー (幅 knee) で閾値の境目に輪郭を出さない
+vec3 flareHighlight(vec3 c, float exposure, float threshold, float knee) {
     float l = luminance(c) * exposure;
-    float knee = threshold * 0.5;
     float x = clamp(l - threshold + knee, 0.0, 2.0 * knee);
     float over = max(l - threshold, x * x / (4.0 * knee));
     return c * (over / max(l, 1e-6));
@@ -73,6 +72,12 @@ vec3 flareHighlight(vec3 c, float exposure, float threshold) {
  * 太陽・月の付近は解析的なフレア (final) が受け持つので、画面ゴーストの元から外す (二重に出さない)
  * 半径はタイルのぼけの広がり分を足す
  */
+/*
+ * 光条とストリークは 1/4 タイル (レベル 2) を読むので、外す半径はそのぼけ (約 3 テクセル x 4 画素) だけ足せば足りる。
+ * 広く外すと、夕方の海で太陽の真下の照り返しの道から光条とストリークが消える
+ */
+const float FLARE_LEVEL2_SPREAD_PX = 3.0 * 4.0;
+
 float sunMask(vec2 uv, float spreadPx) {
 #ifdef HAS_SKY
     if (shadowLightPosition.z >= 0.0) return 1.0;
@@ -96,6 +101,8 @@ float sunMask(vec2 uv, float spreadPx) {
 const int SCREEN_STAR_TAPS = 6;                // 光条 1 本 (片側) のタップ数
 const float LENS_SCREEN_STAR_LENGTH = 0.07;    // 光条の長さの目安 (画面の高さ比, F2.14 の時)
 const float LENS_SCREEN_STAR_THRESHOLD = 1.5;  // 露出後の明るさの閾値 (1/4 タイル)
+// ニーの幅。回折の光条は本来明るさに比例するので、閾値の付近で明るさが揺れる点の光条が点いたり消えたりしないよう、閾値と同じ幅で 0 からなめらかに立ち上げる
+const float LENS_SCREEN_STAR_KNEE = LENS_SCREEN_STAR_THRESHOLD;
 const float LENS_SCREEN_STAR_GAIN = 0.12;
 
 vec3 screenStars(vec2 uv, float exposure, float fNumber) {
@@ -122,7 +129,7 @@ vec3 screenStars(vec2 uv, float exposure, float fNumber) {
                 if (any(lessThan(src, vec2(0.0))) || any(greaterThan(src, vec2(1.0)))) continue;
                 vec3 local = sampleBloomTileLinear(2, src);
                 vec3 surround = sampleBloomTileLinear(4, src);
-                sum += flareHighlight(max(local - surround, 0.0), exposure, LENS_SCREEN_STAR_THRESHOLD) * (w * sunMask(src, 48.0));
+                sum += flareHighlight(max(local - surround, 0.0), exposure, LENS_SCREEN_STAR_THRESHOLD, LENS_SCREEN_STAR_KNEE) * (w * sunMask(src, FLARE_LEVEL2_SPREAD_PX));
             }
         }
     }
@@ -176,7 +183,8 @@ vec3 screenFlare(vec2 uv) {
                 vec3 local = sampleBloomTile(level, src);
                 vec3 surround = sampleBloomTile(min(level + 2, BLOOM_LEVELS), src);
                 // 閾値は光の量 (輝度 x 面積) で比べる。粗いレベルほど小さな光源は薄まるので、その分だけ下げる
-                vec3 hl = flareHighlight(max(local - surround, 0.0), exposure, LENS_SCREEN_THRESHOLD * exp2(-2.0 * float(level - 2)));
+                float threshold = LENS_SCREEN_THRESHOLD * exp2(-2.0 * float(level - 2));
+                vec3 hl = flareHighlight(max(local - surround, 0.0), exposure, threshold, threshold * 0.5);
                 sum[c] += hl[c] * refl[c] * min(1.0 / (sc * sc), LENS_SCREEN_GHOST_MAX_GATHER) * fade * sunMask(src, spreadPx);
             }
         }
@@ -195,7 +203,7 @@ vec3 screenFlare(vec2 uv) {
             wSum += w;
             if (p.x < 0.0 || p.x > 1.0) continue;
             // 太陽・月は final の解析的なストリークが受け持つ
-            streak += flareHighlight(sampleBloomTileLinear(2, p), exposure, LENS_STREAK_THRESHOLD) * (w * sunMask(p, 48.0));
+            streak += flareHighlight(sampleBloomTileLinear(2, p), exposure, LENS_STREAK_THRESHOLD, LENS_STREAK_THRESHOLD * 0.5) * (w * sunMask(p, FLARE_LEVEL2_SPREAD_PX));
         }
         vec3 tint = LP_STREAK_TINT / luminance(LP_STREAK_TINT);
         sum += tint * luminance(streak / wSum) * (LP_STREAK * LENS_STREAK_GAIN);
