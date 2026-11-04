@@ -11,8 +11,8 @@
 //@include "/lib/settings.glsl"
 //@include "/lib/common/color.glsl"
 
-const float SPARKLE_WHITE = 2.0;  // 露出後の輝度。AgX の肩の中 (上限 7) で、ここから上はほぼ白
-const float SPARKLE_KNEE = 1.0;   // 柔らかく切り替える幅 (境目に輪郭を出さない)
+const float SPARKLE_WHITE = 1.0;  // 露出後の輝度。AgX の肩の始まり (上限 7) で、ここから上は線形の短い履歴で積分する
+const float SPARKLE_KNEE = 0.5;   // 柔らかく切り替える幅 (境目に輪郭を出さない)
 
 // 輝度 l (露出後) のうち threshold を超えた分。ソフトニーで境目をなめらかにつなぐ
 float highlightOver(float l, float threshold, float knee) {
