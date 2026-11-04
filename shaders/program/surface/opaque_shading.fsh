@@ -166,7 +166,7 @@ void directSpecular(Material m, vec3 N, vec3 V, LightSample L, float slopeVar, f
  * 自動法線はテクセルの中で一定で、テクセルの境目の照り返しが 1 画素未満になると、TAA を通さない分がジッターで
  * 毎フレーム当たり外れしてちらつく (gbuffers_solid.fsh の鏡面 AA を入れない理由と同じ)。水たまりは滑らかな面なので常に出す
  */
-const vec2 SPARKLE_TEXEL_PX = vec2(0.7, 1.5);  // 1 テクセルの画素数がこの範囲で 0 -> 1
+const vec2 SPARKLE_TEXEL_PX = vec2(0.3, 0.7);  // 1 テクセルの画素数がこの範囲で 0 -> 1
 const float SPARKLE_TEXEL_SIZE = 1.0 / 16.0;
 
 void main() {
