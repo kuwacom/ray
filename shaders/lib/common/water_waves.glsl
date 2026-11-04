@@ -346,6 +346,29 @@ float waterPixelSlopeVar(WaterSea sea, float footprint) {
 }
 
 /*
+ * 表せた層の、1 フレームの露光の間の法線 (傾き) の変化の分散 (シャッターの時間積分)。層の傾きは時間の最も遅い倍音の周期
+ * P (= ループの周期 / WATER_TIME_HARMONIC_LO) で回り、露光 dt の間に a x 2 pi dt / P ほど変わる (一様な時刻の標準偏差は 1 / sqrt(12))
+ * 画素の中の揺れ (waterPixelSlopeVar) と同じく鏡面の alpha^2 に足すと、さざ波の照り返しがフレームごとに別の画素へ跳ばず、
+ * 露光の間の軌跡に沿ってエネルギーを保ったまま広がる。細かく速い層ほど効く
+ */
+const float WATER_EXPOSURE_SHUTTER = 0.5;   // 1 フレームのうち露光している割合 (モーションブラーのシャッターと同じ)
+const float WATER_EXPOSURE_MAX_DT = 0.05;   // 低いフレームレートで照り返しが流れすぎない上限 (秒)
+
+float waterTemporalSlopeVar(WaterSea sea, float footprint) {
+    float dt = min(frameTime, WATER_EXPOSURE_MAX_DT) * WATER_EXPOSURE_SHUTTER;
+    float v = 0.0;
+    for (int i = 0; i < WATER_LAYERS; i++) {
+        float tile = waterLayerTile(i);
+        v += sqr(waterTileResolved(tile, footprint) * sea.amp[i] * WATER_PIXEL_SLOPE_SCALE * dt * WATER_TIME_HARMONIC_LO / waterLayerPeriod(tile));
+    }
+    for (int i = 0; i < WATER_CAPILLARY_LAYERS; i++) {
+        float tile = waterCapillaryTile(i);
+        v += sqr(waterTileResolved(tile, footprint) * sea.capAmp[i] * WATER_PIXEL_SLOPE_SCALE * dt * WATER_TIME_HARMONIC_LO / waterLayerPeriod(tile));
+    }
+    return v;
+}
+
+/*
  * 水面上の 1 画素の大きさ (ブロック)。かすめ角では視線方向に伸びるので、伸びた辺 (1 / NoV) 寄りで測る
  * 波は全方向を向くので、視線方向に伸びた辺で 2 画素を切る波は画面の縦に折り返す。幾何平均 (NoV^-0.5) では
  * 中景 (かすめ角 0.05-0.1) で縦に 2 画素ほどの波が残り、反射が画素ごとに空と水の色で斑になる白い砂目になった

@@ -384,10 +384,10 @@ void main() {
         color = behind * (1.0 - F) + refl * F;
         sparkleLum = behindExcess * (1.0 - F);
         if (!below) {
-            // 太陽・灯りの照り返しの粗さ: 表した波の斜面は法線が受け持つので、光学的に滑らかな水に、画素より細かい波と画素の中の法線の揺れを足す
+            // 太陽・灯りの照り返しの粗さ: 表した波の斜面は法線が受け持つので、光学的に滑らかな水に、画素より細かい波と画素の中・露光の間の法線の揺れを足す
             // 側面 (滝) は落ちる水の乱れに任せ、幅のある淡いつやを残す
             float sunAlpha = side ? sqrt(sqr(WATER_ROUGHNESS) + unresolvedVar)
-                : sqrt(sqr(WATER_SUN_ROUGHNESS) + unresolvedVar + waterPixelSlopeVar(sea, footprint));
+                : sqrt(sqr(WATER_SUN_ROUGHNESS) + unresolvedVar + waterPixelSlopeVar(sea, footprint) + waterTemporalSlopeVar(sea, footprint));
             // 遠い水面は、法線で表せない波の面の数のゆらぎで太陽の照り返しを点に割る (WATER_GLITTER)
             float glitter = 1.0;
 #ifdef WATER_GLITTER
