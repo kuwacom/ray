@@ -56,6 +56,7 @@ const float VANILLA_CLOUD_STEP_MIN = 0.3;          // 雲の近くの歩幅は�
 const float VANILLA_CLOUD_STEP_MAX = 6.0;
 const float VANILLA_CLOUD_STEP_THIN = 0.35;        // 薄い段の歩幅の上限 (厚さに対する割合。段を数歩で渡る)
 const float VANILLA_CLOUD_SKIP_MARGIN = 0.02;      // ブロック: 箱を出る位置からこの分進んで、次の箱に入る (境目の浮動小数の誤差で止まらない)
+const float VANILLA_CLOUD_AXIS_MIN = 1e-6;         // 箱を出る距離を求めるときの方向の成分の大きさの下限 (軸に平行な向きで 0 で割らない)
 const int VANILLA_CLOUD_SHADOW_STEPS = 10;
 const float VANILLA_CLOUD_SHADOW_DEPTH = 4.0;      // ブロック: 地面の雲影の暗さの上限を決める厚み。厚い雲でも影を真っ黒にしない
 // 光源方向と空の光は、日向の頭と日陰の底・側面の差を出すために絞る (CS_* の光の値はスタイルごとの微調整で、これはどのスタイルでもバニラの形に掛かる)
@@ -308,11 +309,13 @@ float vanillaCloudTopMottle(vec2 q) {
 /*
  * 視線が xz の箱 [lo, lo + size) を出るまでの距離 (ブロック)。xz の 2 軸の「次の境目までの距離 / 方向の成分」の小さいほう (Amanatides & Woo の DDA の 1 歩)
  * q: 視線上の今の点の xz, dxz: 視線の方向の xz 成分
+ * 出る側の辺までの距離 (0 以上) を成分の大きさで割る。正午の太陽の x のように、成分がほぼ 0 で符号が行列の丸めで ±1e-8 ほど揺れる向きでも
+ * 分子と分母の符号がそろい、その軸の境目は遠いままになる (符号がずれると距離が負になって 1 歩も進まず、光源方向の影が数えられずに
+ * 雲が内側から光ったり、視点を動かすたびに明るさが切り替わったりする)
  */
 float vanillaCloudBoxExit(vec2 q, vec2 dxz, vec2 lo, vec2 size) {
-    vec2 edge = lo + vec2(dxz.x > 0.0 ? size.x : 0.0, dxz.y > 0.0 ? size.y : 0.0);
-    vec2 axis = vec2(abs(dxz.x) < 1e-6 ? 1e-6 : dxz.x, abs(dxz.y) < 1e-6 ? 1e-6 : dxz.y);
-    vec2 t = (edge - q) / axis;
+    vec2 toEdge = mix(q - lo, lo + size - q, step(0.0, dxz));
+    vec2 t = toEdge / max(abs(dxz), VANILLA_CLOUD_AXIS_MIN);
     return max(min(t.x, t.y), 0.0) + VANILLA_CLOUD_SKIP_MARGIN;
 }
 
