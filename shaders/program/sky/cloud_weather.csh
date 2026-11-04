@@ -177,12 +177,18 @@ const int CLOUD_INTERIOR_TAPS = 3 + 2 * CLOUD_INTERIOR_RING_TAPS; // 中心 + �
 const vec2 CLOUD_INTERIOR_RING_RADIUS = vec2(4.0, 12.0); // ブロック (水平。遠い輪の半径が霧の立ち上がる幅の目安)
 const float CLOUD_INTERIOR_RADIUS_Y = 3.0;        // ブロック (鉛直)
 const vec2 CLOUD_INTERIOR_ENTER = vec2(0.05, 0.35); // この平均の濃さの間で霧を立ち上げる (縁の外の薄いもやでは霧にしない。体積雲の中の平均は 0.4 前後)
-// バニラの形の板は半径 SLAB_RADIUS の円盤の平均の濃さで立ち上げる。縁の外 4 ブロックでは円盤の 2 割しか板に掛からず霧は 0、
-// 縁を 8 ブロック越えると円盤が全部板の中に入って最大になる。壁が見えている間は霧が薄く、縁を越えるあたりから濃くなる
+// バニラの形の板は半径 SLAB_RADIUS の円盤の平均の濃さで立ち上げる (縁の外 4 ブロックで 0.14、縁で 0.44、縁を 3 ブロック越えて 0.66、
+// 8 ブロック越えると円盤が全部板の中に入って 1)。壁が見えている間は霧が薄く、縁を越えるあたりから濃くなり、壁の透け (WALL_OPEN) で
+// 見通しが開けた分を霧が埋めて、縁を越えて見通しが一度大きく開けないようにする
 const float CLOUD_INTERIOR_SLAB_RADIUS = 8.0;     // ブロック
 const int CLOUD_INTERIOR_SLAB_TAPS = 48;          // 円盤の点の数 (1 点が縁をまたぐ段差が霧の濃さに出ない数)
-const vec2 CLOUD_INTERIOR_SLAB_ENTER = vec2(0.2, 0.98);
+const vec2 CLOUD_INTERIOR_SLAB_ENTER = vec2(0.12, 0.8);
 const float CLOUD_INTERIOR_SLAB_FACE = 3.0;       // ブロック: 頭・底の面からこの深さまで霧を立ち上げる
+// 雲のマーチが描く壁を薄くする範囲 (上の円盤の平均の濃さ。縁の外 4 ブロックの 0.14 から、縁を 1.5 ブロック越えた 0.55 まで)。
+// 壁は厚いので、消散がわずかに残るだけでも向こうが見えず白く閉じる。透け方は消散の倍率の対数で決まるので、倍率は指数で下げて (e^-FALLOFF)、
+// 縁の手前の数ブロックに透け方が均等に広がるようにする (線形に下げると、壁が白いままで縁の 1 ブロックだけ急に透ける)
+const vec2 CLOUD_INTERIOR_WALL_OPEN = vec2(0.14, 0.55);
+const float CLOUD_INTERIOR_WALL_FALLOFF = 5.5;
 const float CLOUD_INTERIOR_MID_SHARE = 0.5;       // 中層の雲は薄いので低層より霧を弱める
 const float CLOUD_INTERIOR_MIN_SHARE = 0.5;       // 雲のマーチが濃くても、霧は視程の消散係数のこの割合を下限にする (遠くで空と地形の雲の色の差を残さない)
 const float CLOUD_INTERIOR_SATURATION = 0.3;      // 空の光の彩度の残し方 (雲の中は何度も散乱して色が抜ける。空の青のままだと青い霧に見える)
@@ -277,7 +283,8 @@ void cloudInteriorWrite(CloudContext ctx) {
     float faceDepth = min(camH - span.x, span.y - camH);
     float faceFade = column.x > 0.0 ? smoothstep(0.0, CLOUD_INTERIOR_SLAB_FACE, max(faceDepth, 0.0)) : 1.0;
     // 霧は視線の全長に掛かるので、縁の外のわずかな濃さでも遠景が曇る。2 乗にして縁の手前はごく薄く、縁を越えるあたりから濃くする
-    rho = max(rho, sqr(smoothstep(CLOUD_INTERIOR_SLAB_ENTER.x, CLOUD_INTERIOR_SLAB_ENTER.y, cloudInteriorSlabCover(tier))) * faceFade);
+    float cover = cloudInteriorSlabCover(tier);
+    rho = max(rho, sqr(smoothstep(CLOUD_INTERIOR_SLAB_ENTER.x, CLOUD_INTERIOR_SLAB_ENTER.y, cover)) * faceFade);
     #endif
 
     vec3 sun = vec3(0.0);
@@ -341,8 +348,12 @@ void cloudInteriorWrite(CloudContext ctx) {
     frameData.skyParams[4] = vec4(sun, rho);
     frameData.skyParams[5] = vec4(ambient, fogExtinction);
     #ifdef CLOUD_VANILLA_SHAPE
-    // 霧を掛ける長さの上限になる、カメラのいる板の上面・下面までの高さ (柱の外では 0)
-    frameData.skyParams[7] = vec4(max(span.y - camH, 0.0), max(camH - span.x, 0.0), 0.0, 0.0);
+    // 霧を掛ける長さの上限になる、カメラのいる板の上面・下面までの高さ (柱の外では 0) と、雲のマーチが描く壁の消散の倍率。
+    // 倍率は縁の外から周りの濃さに応じて下がり (CLOUD_INTERIOR_WALL_OPEN)、面から内側へ VANILLA_CLOUD_INSIDE_DEPTH 入るまでに 0 になる
+    // (中の見通しは霧が決める。入る・出るときに壁の消散が白く閉じない)
+    float wallKeep = exp(-CLOUD_INTERIOR_WALL_FALLOFF * saturate((cover - CLOUD_INTERIOR_WALL_OPEN.x) / (CLOUD_INTERIOR_WALL_OPEN.y - CLOUD_INTERIOR_WALL_OPEN.x)))
+                   * (1.0 - smoothstep(0.0, VANILLA_CLOUD_INSIDE_DEPTH, vanillaCloudInsideDepth(tier, vanillaCloudOrigin(tier), cameraPosition.y)));
+    frameData.skyParams[7] = vec4(max(span.y - camH, 0.0), max(camH - span.x, 0.0), wallKeep, 0.0);
     #endif
 }
 #endif

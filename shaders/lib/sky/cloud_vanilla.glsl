@@ -45,8 +45,7 @@ const float VANILLA_CLOUD_TOP_MOTTLE_CELLS = 3.0;  // マス: 同じむらの 1 
 const float VANILLA_CLOUD_TOP_MOTTLE_DEPTH = 3.0;  // ブロック: 柱の頭からこの深さまでだけにかける (側面に縦縞が出ない)
 const float VANILLA_CLOUD_SIGMA = 0.275 * CLOUD_LOW_DENSITY;   // 1 / 参照 m。既定の濃さで 1 ブロックあたり約 1 (参照 m への換算は VANILLA_CLOUD_KREF)
 const float VANILLA_CLOUD_OPACITY = 1.3;           // 視線方向の消散の倍率 (陰の光学的深さには掛けない)。縁の 2 ブロックは半透明になり、光が透けて柔らかく見える
-const float VANILLA_CLOUD_INSIDE_OPACITY = 0.0;    // 同じく、カメラが柱の中にいるときの倍率 (中の見通しは雲の中の霧が決めるので、柱の消散で地形が白く閉じたり暗い影になったりしない)
-const float VANILLA_CLOUD_INSIDE_DEPTH = 3.0;      // ブロック: カメラが柱の面からこの深さまで入ると、倍率が INSIDE_OPACITY になる (縁の透ける幅と、雲の中の霧が立ち上がる深さに合わせる)
+const float VANILLA_CLOUD_INSIDE_DEPTH = 3.0;      // ブロック: カメラが柱の面からこの深さまで入ると、倍率が 0 になる (中の見通しは雲の中の霧が決めるので、柱の消散で地形が白く閉じたり暗い影になったりしない。縁の透ける幅と、霧が立ち上がる深さに合わせる)
 // 陰と内散乱の濃さは既定の濃さで頭打ち (柱はすでに光を通さないので、濃さを上げても底がさらに暗く青灰色になるだけ)
 const float VANILLA_CLOUD_SHADE_SIGMA = 0.275 * min(CLOUD_LOW_DENSITY, 0.25);
 const float VANILLA_CLOUD_LIGHT_REACH = 12.0;      // ブロック: 光源方向の影を数える距離
@@ -78,7 +77,7 @@ const float VANILLA_CLOUD_SKY_SATURATION = 0.7; // 空の光の彩度 (1 で空�
 const float VANILLA_CLOUD_RAIN_SUN = 0.2;         // 直達光の倍率
 const float VANILLA_CLOUD_RAIN_AMBIENT = 1.0;     // 空の光の倍率
 const float VANILLA_CLOUD_RAIN_BASE = 0.8;        // 底の暗さを無くす割合 (層の中から見下ろす底が、霧や地形より暗い影にならないように)
-const float VANILLA_CLOUD_RAIN_FLOOR = 0.9;       // 柱の明るさの下限 (雲の向こうの曇天の灰色の倍率)。日陰の側面や底が真っ黒な影絵にならず、暗い灰色までに収まる
+const float VANILLA_CLOUD_RAIN_FLOOR = 0.9;       // 柱の明るさの下限 (雲の向こうの曇天の灰色の倍率)。日陰の側面や底が真っ黒な影絵にならず、暗い灰色までに収まる。空中遠近で雲の上に戻す灰色の分と合わせて、雲の隙間から見える曇天の灰色と同じ明るさになる値 (ずれると、隙間が明るい・暗い小片に見える)
 // 曇天の下では光が何度も散乱して向きを失うので、散乱の向きを横から見た値へ寄せる割合 (寄せないと、太陽の方向の雲の底が前方散乱の山で白く光る)
 const float VANILLA_CLOUD_RAIN_DIFFUSE = 1.0;
 const float VANILLA_CLOUD_RAIN_SKY = 0.7;          // 雨の空で、雲の上に戻す空の色 (雲の上の空の光 skyRadiance の倍率)

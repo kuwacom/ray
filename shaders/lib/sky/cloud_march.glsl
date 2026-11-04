@@ -149,15 +149,13 @@ CloudAccum cloudMarchVanilla(CloudContext ctx, CloudLighting l, vec3 dir, vec2 s
     // 距離 1 ブロックあたりの画素の大きさ (ブロック)。柔らかさを画素より細かくしない
     float pixel = 2.0 / (gbufferProjection[1][1] * viewHeight) * float(CLOUD_RES);
     vec3 sums = vec3(0.0);
-    // カメラが柱の中にいる間は雲の中の霧が視界を閉じるので、柱は視線の消散を弱める (入る・出るときに一気に白く閉じない)。
-    // 面から内側へ VANILLA_CLOUD_INSIDE_DEPTH 入るまでに弱め切る (霧の濃さではなくカメラの位置の深さで決めるので、縁のすぐ中で白く閉じない)
+    // カメラが柱の縁に近づく・中にいる間は雲の中の霧が視界を閉じるので、柱は視線の消散を弱める (入る・出るときに一気に白く閉じない)。
+    // 倍率は prepare2 がカメラの位置で求める (縁の外 3〜4 ブロックから下がり始め、面から内側へ入ると 0)
     float opacity = VANILLA_CLOUD_OPACITY;
 #ifdef CLOUD_INTERIOR
-    // カメラがその段の高さの中にいるときだけ (どの画素も同じ分岐なので、段の外から見る間は柱の面の距離を求めない)
+    // カメラがその段の高さの中にいるときだけ (どの画素も同じ分岐)
     float cameraHeight = cameraPosition.y - tier.bottom;
-    if (cameraHeight > 0.0 && cameraHeight < tier.envelope) {
-        opacity = mix(opacity, VANILLA_CLOUD_INSIDE_OPACITY, smoothstep(0.0, VANILLA_CLOUD_INSIDE_DEPTH, vanillaCloudInsideDepth(tier, origin, cameraPosition.y)));
-    }
+    if (cameraHeight > 0.0 && cameraHeight < tier.envelope) opacity *= frameData.skyParams[7].z;
 #endif
     float stepMax = min(VANILLA_CLOUD_STEP_MAX, VANILLA_CLOUD_STEP_THIN * tier.envelope);
     float stepRel = VANILLA_CLOUD_STEP_REL;
@@ -426,9 +424,11 @@ vec4 renderClouds(vec3 dir, float maxDist, vec2 dither) {
     // 雲の上から見下ろす視線は、雲の向こうが描画距離の外の虚空 (renderSky が描く青い遠景) なので、雲の縁に戻す空の色も同じにする
     if (dir.y < 0.0 && y0 > cloudLowestBase()) skyColor = skyBelowHorizon(dir, skyColor);
 #ifdef CLOUD_RAIN_KEEPS_SHAPE
-    // 雨の空: 雲の手前の大気の内散乱として雲の上に戻す空の色を、太陽の暈の無い空の光の平均にする (雲の向こうは曇天の灰色に置き換わるので、
-    // 本物の空の色を戻すと、太陽のまわりの暖色の暈が雲の上にだけ茶色く浮く)。曇天の灰色そのものでなく空の光 (青寄り) にして、空中遠近の釣り合いは保つ
-    skyColor = mix(skyColor, l.skyRadiance * VANILLA_CLOUD_RAIN_SKY, cloudRainVeil(ctx, l).a);
+    // 雨の空: 雲の手前の大気の内散乱として雲の上に戻す空の色を、雲の向こうの空を置き換える灰色 (太陽の暈の無い一様な色) にする。
+    // 本物の空の色を戻すと、太陽のまわりの暖色の暈が雲の上にだけ茶色く浮く。灰色と違う色にすると、描く距離の端 (雲を空へ溶かし切る所) で
+    // 雲が向こうの空より暗く、天井の端に暗い弧の線が出る。地形のある画素の手前の雲は置き換えないので、空の光の平均 (青寄り) を戻す
+    vec4 veil = cloudRainVeil(ctx, l);
+    skyColor = mix(skyColor, maxDist > 1e8 ? veil.rgb : l.skyRadiance * VANILLA_CLOUD_RAIN_SKY, veil.a);
 #endif
     vec3 scattering = vec3(0.0);
     float transmittance = 1.0;
@@ -526,7 +526,6 @@ vec4 renderClouds(vec3 dir, float maxDist, vec2 dither) {
     // 雨の空: 雲の向こうの空は、雲の上の見えない雨雲の層の下面 (一様な灰色) にする。雲の形と量は変えず、隙間から晴れの青空や
     // 太陽が見えないようにするだけ。地形のある画素の手前の雲には掛けない。雷雨は雲の側で覆うので掛けない
     if (maxDist > 1e8) {
-        vec4 veil = cloudRainVeil(ctx, l);
         scattering += transmittance * veil.a * veil.rgb;
         transmittance *= 1.0 - veil.a;
     }
