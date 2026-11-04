@@ -143,14 +143,15 @@ float eonRoughness(Material m) { return saturate(m.roughness * EON_ROUGHNESS_SCA
 const float SPECULAR_DISC_PEAK = 1.25;
 
 // 鏡面 BRDF x NoL (光源の見かけの大きさでラフネスを広げる)。照度を掛ける前の値で、円盤の鏡像で頭打ちにする
-vec3 evalSpecularLobe(Material m, vec3 N, vec3 V, vec3 L, float angularSize, float NoL, float NoV, float discScale) {
+// gain: ローブに掛ける倍率 (画素の中の面の数のゆらぎ。頭打ちの前に掛ける)
+vec3 evalSpecularLobe(Material m, vec3 N, vec3 V, vec3 L, float angularSize, float NoL, float NoV, float discScale, float gain) {
     vec3 H = normalize(L + V);
     float NoH = saturate(dot(N, H));
     float VoH = saturate(dot(V, H));
     // 球光源の正規化 (Karis 2013) の簡略形。光源の大きさ分だけローブを広げて点光源の発散を防ぐ
     float a = min(m.roughness + 0.5 * angularSize, 1.0);
     vec3 F = materialFresnel(m, VoH);
-    vec3 lobe = ggxD(NoH, a) * smithVisibilityHC(NoV, NoL, a) * F * specularEnergyCompensation(m, NoV) * NoL;
+    vec3 lobe = ggxD(NoH, a) * smithVisibilityHC(NoV, NoL, a) * F * specularEnergyCompensation(m, NoV) * (NoL * gain);
     return min(lobe, F * (discScale * SPECULAR_DISC_PEAK / (PI * sqr(max(angularSize, 1e-3)))));
 }
 
@@ -165,7 +166,7 @@ vec3 evalDirectLight(Material m, vec3 N, vec3 V, LightSample L, float discScale,
     if (NoL <= 0.0 || maxOf(L.irradiance) <= 0.0) return vec3(0.0);
     float NoV = max(dot(N, V), 1e-3);
     vec3 diffuse = eonDiffuse(m.albedo, eonRoughness(m), NoL, NoV, dot(L.direction, V)) * (1.0 - specularAlbedo(m, NoV));
-    spec = evalSpecularLobe(m, N, V, L.direction, L.angularSize, NoL, NoV, discScale) * L.irradiance;
+    spec = evalSpecularLobe(m, N, V, L.direction, L.angularSize, NoL, NoV, discScale, 1.0) * L.irradiance;
     return diffuse * L.irradiance * NoL;
 }
 
@@ -185,11 +186,15 @@ vec3 evalDirectDiffuse(Material m, vec3 N, vec3 V, LightSample L) {
 }
 
 // 鏡面だけ (水面の太陽ハイライト等)
-vec3 evalDirectSpecular(Material m, vec3 N, vec3 V, LightSample L, float discScale) {
+vec3 evalDirectSpecular(Material m, vec3 N, vec3 V, LightSample L, float discScale, float gain) {
     float NoL = dot(N, L.direction);
     if (NoL <= 0.0) return vec3(0.0);
     float NoV = max(dot(N, V), 1e-3);
-    return evalSpecularLobe(m, N, V, L.direction, L.angularSize, NoL, NoV, discScale) * L.irradiance;
+    return evalSpecularLobe(m, N, V, L.direction, L.angularSize, NoL, NoV, discScale, gain) * L.irradiance;
+}
+
+vec3 evalDirectSpecular(Material m, vec3 N, vec3 V, LightSample L, float discScale) {
+    return evalDirectSpecular(m, N, V, L, discScale, 1.0);
 }
 
 vec3 evalDirectSpecular(Material m, vec3 N, vec3 V, LightSample L) {

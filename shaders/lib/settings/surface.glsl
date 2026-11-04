@@ -60,6 +60,7 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define WATER_CHOPPINESS 1.5 // [0.0 0.5 1.0 1.5 2.0 2.5 3.0 4.0 5.0] 波頭の尖り
 #define WATER_RIPPLES 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0] さざ波 (1 ブロックより短い波) の強さ
 #define WATER_FOAM 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0] 泡 (沖の白波) の量
+//#define WATER_GLITTER // 遠い水面の太陽・月の照り返しを、波の面の数のゆらぎで点に割る (OFF は滑らかな帯)
 #define WATER_LAKE_WAVES 0.6 // [0.0 0.2 0.4 0.6 0.8 1.0 1.5 2.0] 湖 (海・川以外) の風の強さ (海に対する割合)
 #define WATER_RIVER_WAVES 0.4 // [0.0 0.2 0.4 0.6 0.8 1.0 1.5 2.0] 川の風の強さ (海に対する割合)
 #define WATER_PARALLAX // 水面の視差

@@ -91,24 +91,29 @@ LightSample unshadowedSun() {
 }
 
 // 光 L の鏡面だけ。f0 と alpha を与えた誘電体として
-vec3 dielectricSpecular(vec3 N, vec3 V, float f0, float roughness, LightSample L, float discScale) {
+vec3 dielectricSpecular(vec3 N, vec3 V, float f0, float roughness, LightSample L, float discScale, float gain) {
     GBufferData g = gbufferDefault();
     g.f0 = f0;
     g.smoothness = 1.0 - sqrt(roughness);
     g.albedo = vec3(0.0);
-    return evalDirectSpecular(decodeMaterial(g), N, V, L, discScale);
+    return evalDirectSpecular(decodeMaterial(g), N, V, L, discScale, gain);
+}
+
+// gain: 画素の中の面の数のゆらぎ (WATER_GLITTER)。1 でローブのまま
+vec3 sunSpecular(vec3 N, vec3 V, float f0, float roughness, vec3 sunVis, float gain) {
+    LightSample sun = unshadowedSun();
+    sun.irradiance *= sunVis;
+    return dielectricSpecular(N, V, f0, roughness, sun, celestialDiscScale(), gain) * celestialSpecularStrength();
 }
 
 vec3 sunSpecular(vec3 N, vec3 V, float f0, float roughness, vec3 sunVis) {
-    LightSample sun = unshadowedSun();
-    sun.irradiance *= sunVis;
-    return dielectricSpecular(N, V, f0, roughness, sun, celestialDiscScale()) * celestialSpecularStrength();
+    return sunSpecular(N, V, f0, roughness, sunVis, 1.0);
 }
 
 // 手持ち光源とブロックライトの鏡面 (太陽以外の光)。L は gatherSurfaceLights の SL_HAND | SL_BLOCK_SPECULAR_TRACED
 vec3 localLightSpecular(SurfaceLights L, vec3 N, vec3 V, float f0, float roughness) {
-    vec3 s = dielectricSpecular(N, V, f0, roughness, L.handMain, 1.0) + dielectricSpecular(N, V, f0, roughness, L.handOff, 1.0);
-    for (int j = 0; j < L.blockSpecCount; j++) s += dielectricSpecular(N, V, f0, roughness, L.blockSpec[j], 1.0);
+    vec3 s = dielectricSpecular(N, V, f0, roughness, L.handMain, 1.0, 1.0) + dielectricSpecular(N, V, f0, roughness, L.handOff, 1.0, 1.0);
+    for (int j = 0; j < L.blockSpecCount; j++) s += dielectricSpecular(N, V, f0, roughness, L.blockSpec[j], 1.0, 1.0);
     return s * SPECULAR_BLOCK_STRENGTH;
 }
 

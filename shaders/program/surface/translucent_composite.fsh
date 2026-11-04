@@ -54,6 +54,7 @@
 #include "/lib/common/noise.glsl"
 #include "/lib/common/transforms.glsl"
 #include "/lib/common/water_waves.glsl"
+#include "/lib/common/water_glitter.glsl"
 #include "/lib/common/water_normal.glsl"
 #include "/lib/common/water.glsl"
 #include "/lib/common/shadow_space.glsl"
@@ -371,7 +372,16 @@ void main() {
             // 側面 (滝) は落ちる水の乱れに任せ、幅のある淡いつやを残す
             float sunAlpha = side ? sqrt(sqr(WATER_ROUGHNESS) + unresolvedVar)
                 : sqrt(sqr(WATER_SUN_ROUGHNESS) + unresolvedVar + waterPixelSlopeVar(sea, footprint));
-            vec3 spec = refl * F + sunSpecular(N, V, WATER_F0, sunAlpha, sunSpecVis) + localLightSpecular(WL, N, V, WATER_F0, sunAlpha);
+            // 遠い水面は、法線で表せない波の面の数のゆらぎで太陽の照り返しを点に割る (WATER_GLITTER)
+            float glitter = 1.0;
+#ifdef WATER_GLITTER
+            if (N.y > 0.5) {
+                LightSample sun = unshadowedSun();
+                glitter = waterGlitter(surfPlayer.xz + cameraPosition.xz, N, V, sun.direction, unresolvedVar, sun.angularSize,
+                    dist * 2.0 / (gbufferProjection[1][1] * viewSize().y), NoVGeo);
+            }
+#endif
+            vec3 spec = refl * F + sunSpecular(N, V, WATER_F0, sunAlpha, sunSpecVis, glitter) + localLightSpecular(WL, N, V, WATER_F0, sunAlpha);
             color = behind * (1.0 - F) + spec;
             sparkleLum = luminance(sparkleExcess(spec, getExposure()));
 

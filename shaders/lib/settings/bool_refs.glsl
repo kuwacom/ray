@@ -72,6 +72,8 @@
 #endif
 #ifdef WATER_WAVES
 #endif
+#ifdef WATER_GLITTER
+#endif
 #ifdef WATER_PARALLAX
 #endif
 #ifdef WATER_CAUSTICS
