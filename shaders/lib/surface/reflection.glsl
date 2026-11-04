@@ -141,7 +141,12 @@ vec3 skyPixelReflection(vec3 R, float skyLm, vec3 lut) {
 }
 
 const float SSR_MAX_DISTANCE = 128.0;
-const float REFLECTION_MAX_LUMINANCE = 64.0; // VNDF のホタル (太陽の当たった鏡面を拾った 1 サンプル) を抑える
+/*
+ * 粗い反射の明るさの上限 (露出後の輝度)。VNDF の 1 サンプルが太陽の当たった鏡面を拾ったホタルを抑える
+ * 露出後で決めるので昼と夜・洞窟で同じ見え方の所で効く。鏡面 (MIRROR_ROUGHNESS 未満) は確率のサンプルではないので掛けない
+ * (掛けると鏡に映った太陽の照り返しや灯りが削れ、昼だけ映り込みの中の明るい点が潰れる)
+ */
+const float REFLECTION_MAX_EXPOSED = 64.0;
 const float SSR_BACKFACE_EPS = 0.1;          // ヒット面の幾何法線と光線の内積がこれを超えたら裏面とみなす (oct 8 bit の量子化と深度の誤差の余裕)
 const float SSR_SELF_PLANE_DIST = 0.05;      // 始点の平面からこの距離 (ブロック) 以内に当たったら自己交差。距離に比例した分を足す
 const float SSR_SELF_PLANE_DIST_SCALE = 0.004;
@@ -189,12 +194,8 @@ vec4 traceReflectionHit(vec3 viewPos, vec3 playerPos, vec3 Ng, vec3 R, float dis
     return vec4(hit.xy, screenEdgeFade(hit.xy), 1.0);
 }
 
-// 当たった画素の放射輝度 (明るさの上限付き)
-vec3 reflectionHitRadiance(vec2 uv) {
-    vec3 c = textureLod(colortex0, uv, 0.0).rgb;
-    float lum = luminance(c);
-    return lum > REFLECTION_MAX_LUMINANCE ? c * (REFLECTION_MAX_LUMINANCE / lum) : c;
-}
+// 鏡面の当たった画素の放射輝度 (上限は掛けない。REFLECTION_MAX_EXPOSED)
+vec3 reflectionHitRadiance(vec2 uv) { return max(textureLod(colortex0, uv, 0.0).rgb, 0.0); }
 
 ivec2 reflectionLowResSize() { return ivec2(viewSize()) / 2; }
 ivec2 reflectionRegion(int frame) { return (frame & 1) == 0 ? ivec2(0) : ivec2(reflectionLowResSize().x, 0); }

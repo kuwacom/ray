@@ -20,6 +20,7 @@
 //@include "/lib/surface/screen_trace.glsl"
 //@include "/lib/surface/lighting.glsl"
 //@include "/lib/surface/reflection.glsl"
+//@include "/lib/common/exposure.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -104,6 +105,7 @@
 #include "/lib/surface/lighting.glsl"
 #include "/lib/common/joint_bilateral.glsl"
 #include "/lib/surface/reflection.glsl"
+#include "/lib/common/exposure.glsl"
 // END GENERATED includes
 
 layout(local_size_x = 8, local_size_y = 8) in;
@@ -221,8 +223,11 @@ void main() {
         }
     }
 
-    float lum = luminance(radiance);
-    if (lum > REFLECTION_MAX_LUMINANCE) radiance *= REFLECTION_MAX_LUMINANCE / lum;
+    if (s.perceptualRoughness >= MIRROR_ROUGHNESS) {
+        float maxLum = REFLECTION_MAX_EXPOSED / getExposure();
+        float lum = luminance(radiance);
+        if (lum > maxLum) radiance *= maxLum / lum;
+    }
 
 #if REFLECTIONS >= 2
     if (s.perceptualRoughness >= MIRROR_ROUGHNESS) {
