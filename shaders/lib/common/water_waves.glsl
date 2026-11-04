@@ -96,10 +96,29 @@ float waterLayerTile(int i) { return WATER_LAYER0_TILE * WATER_WAVE_LENGTH / pow
 // 層のテクスチャのループの周期 (秒)。gen_water_waves.py の時間の丸めと同じ式
 float waterLayerPeriod(float tile) { return WATER_TIME_HARMONIC_LO * sqrt(TAU * tile / (WATER_TIME_N_LO * WATER_GRAVITY)); }
 
-// 海の状態: 層ごとの傾きの RMS (ブロック/ブロック) と、層より細かい波の傾きの分散
+/*
+ * 表面張力波 (波長 0.11 / 0.038 ブロック) の 2 層。最小の層より短い波は、画素より細かい粗さにしか無く、近くの水面の
+ * 太陽の照り返しが 1 つの柔らかい楕円になっていた。近くで画素より大きい間は法線で表し、照り返しを波の斜面ごとの
+ * 小さな点に割る (表せない遠くは粗さへ回す)。同じ波テクスチャをタイル 0.934 / 0.322 ブロックで引く。
+ * WATER_LAYERS は増やさない (視差・コースティクス・水たまりの波が層の番号に依存するため)
+ */
+const int WATER_CAPILLARY_LAYERS = 2;
+const float WATER_CAPILLARY_ANGLE[WATER_CAPILLARY_LAYERS] = float[](0.23, -0.61);
+const vec2 WATER_CAPILLARY_OFFSET[WATER_CAPILLARY_LAYERS] = vec2[](vec2(0.29, 0.83), vec2(0.71, 0.47));
+float waterCapillaryTile(int i) { return waterLayerTile(WATER_LAYERS - 1) / pow(WATER_LAYER_RATIO, float(i + 1)); }
+
+/*
+ * 傾きの強さの調整 (現実のさざ波の写真に合わせた見た目の値)。細かい層ほど傾きを強めて、うねりの上に細かい
+ * さざ波が重なる見え方にする。照り返しの点は表した波の斜面で決まるので、傾きが弱いと端の点がまばらにも出ない
+ * 傾きの RMS への倍率。層 0-1 (長いうねり) は変えない
+ */
+const float WATER_LAYER_GAIN[WATER_LAYERS] = float[](1.0, 1.0, 1.1, 1.22, 1.38);
+const float WATER_CAPILLARY_GAIN = 1.6;
+
+// 海の状態: 層ごとの傾きの RMS (ブロック/ブロック) と、表面張力波の層の傾きの RMS
 struct WaterSea {
     float amp[WATER_LAYERS];
-    float microVar;
+    float capAmp[WATER_CAPILLARY_LAYERS];
     float wind;                                 // 実効の風速 (白波の量)
     float heightRms;                            // 高さの RMS (ブロック)
 };
@@ -127,12 +146,17 @@ void waterAddSpectrum(inout WaterSea sea, float weight, float U, float fetch, fl
         float r = lambda / peak;
         float v = density * exp(-1.25 * r * r) * (1.0 + WATER_PEAK_BOOST * exp(-sqr(log(r)) / (2.0 * sqr(WATER_PEAK_WIDTH))));
         if (lambda < WATER_RIPPLE_WAVELENGTH) v *= WATER_RIPPLES;
-        sea.amp[i] += v;
+        sea.amp[i] += v * sqr(WATER_LAYER_GAIN[i]);
     }
     sea.amp[0] += WATER_SWELL_VAR0 * swell * weight;
     sea.amp[1] += WATER_SWELL_VAR1 * swell * weight;
-    float smallest = waterLayerTile(WATER_LAYERS - 1) / (WATER_BAND_CENTER * WATER_LAYER_RATIO);
-    sea.microVar += waterSlopeDensity(U) * log(max(smallest / WATER_CAPILLARY_WAVELENGTH, 1.0)) * WATER_RIPPLES * weight;
+    // 表面張力波の帯: 最小の層の次の帯の中心 (波長 smallest) から最短の波長 (WATER_CAPILLARY_WAVELENGTH) まで、2 層で分ける
+    float edge = waterLayerTile(WATER_LAYERS - 1) / (WATER_BAND_CENTER * WATER_LAYER_RATIO);
+    for (int i = 0; i < WATER_CAPILLARY_LAYERS; i++) {
+        float low = max(edge / WATER_LAYER_RATIO, WATER_CAPILLARY_WAVELENGTH);
+        sea.capAmp[i] += waterSlopeDensity(U) * log(max(edge / low, 1.0)) * WATER_RIPPLES * weight * sqr(WATER_CAPILLARY_GAIN);
+        edge /= WATER_LAYER_RATIO;
+    }
     sea.wind += U * weight;
 }
 
@@ -140,7 +164,7 @@ void waterAddSpectrum(inout WaterSea sea, float weight, float U, float fetch, fl
 WaterSea waterSeaState(float skyLm) {
     WaterSea sea;
     for (int i = 0; i < WATER_LAYERS; i++) sea.amp[i] = 0.0;
-    sea.microVar = 0.0;
+    for (int i = 0; i < WATER_CAPILLARY_LAYERS; i++) sea.capAmp[i] = 0.0;
     sea.wind = 0.0;
     float ocean = saturate(distantOcean);
     float river = saturate(waterRiver) * (1.0 - ocean);
@@ -153,7 +177,7 @@ WaterSea waterSeaState(float skyLm) {
         sea.amp[i] = sqrt(sea.amp[i]) * WATER_WAVE_HEIGHT;
         h2 += sqr(sea.amp[i] * waterLayerTile(i) * WATER_TEX_HEIGHT_SIGMA);
     }
-    sea.microVar *= sqr(WATER_WAVE_HEIGHT);
+    for (int i = 0; i < WATER_CAPILLARY_LAYERS; i++) sea.capAmp[i] = sqrt(sea.capAmp[i]) * WATER_WAVE_HEIGHT;
     sea.heightRms = sqrt(h2);
     return sea;
 }
@@ -175,8 +199,44 @@ vec4 waterLayer(vec2 p, int i, float amp, float t) {
 
 // 層が画素の大きさ footprint (ブロック) に対して表せる割合。帯の短い端 (タイルの約 5 テクセル) が 2 画素を切る前に消す
 // (2.5-6 テクセル/画素では、帯の短い側が 1-2 画素の波になって中距離の水面が細かい白い砂目にざらついた)
-float waterLayerResolved(int i, float footprint) {
-    return footprint > 0.0 ? 1.0 - smoothstep(WATER_LOD_FADE_START, WATER_LOD_FADE_END, footprint * WATER_TEX_SIZE / waterLayerTile(i)) : 1.0;
+float waterTileResolved(float tile, float footprint) {
+    return footprint > 0.0 ? 1.0 - smoothstep(WATER_LOD_FADE_START, WATER_LOD_FADE_END, footprint * WATER_TEX_SIZE / tile) : 1.0;
+}
+
+float waterLayerResolved(int i, float footprint) { return waterTileResolved(waterLayerTile(i), footprint); }
+
+// 表面張力波の層 i を引く。戻り値は勾配 (ワールドの 2D)。層の引き方は waterLayer と同じ
+vec2 waterCapillaryLayer(vec2 p, int i, float amp, float t) {
+    float tile = waterCapillaryTile(i);
+    float a = WATER_WIND_ANGLE + WATER_CAPILLARY_ANGLE[i];
+    vec2 dir = vec2(cos(a), sin(a));
+    vec2 side = vec2(-dir.y, dir.x);
+    vec2 q = vec2(dot(p, dir), dot(p, side)) / tile + WATER_CAPILLARY_OFFSET[i];
+    vec4 s = texture(waterWaveTex, vec3(q, t / waterLayerPeriod(tile))) * 2.0 - 1.0;
+    return amp * (dir * s.x + side * s.y) * WATER_TEX_SLOPE_RANGE;
+}
+
+// 表面張力波の勾配の和。画素より細かい層は足さない。表せない距離では 1 回も引かない
+vec2 waterCapillaryGradient(WaterSea sea, vec2 p, float footprint, vec2 flow) {
+    vec2 g = vec2(0.0);
+    float t = frameTimeCounter;
+    bool moving = dot(flow, flow) >= 1e-4;
+    float phase = fract(t / WATER_FLOW_CYCLE);
+    float wa = 1.0 - abs(1.0 - 2.0 * phase);
+    for (int i = 0; i < WATER_CAPILLARY_LAYERS; i++) {
+        float r = waterTileResolved(waterCapillaryTile(i), footprint);
+        if (r <= 0.0) break;
+        float amp = sea.capAmp[i] * r;
+        if (!moving) {
+            g += waterCapillaryLayer(p, i, amp, t);
+        } else {
+            // 流れのある面は waterWaveSumFlow と同じ 2 相
+            vec2 a = waterCapillaryLayer(p - flow * (phase * WATER_FLOW_CYCLE), i, amp, t);
+            vec2 b = waterCapillaryLayer(p - flow * (fract(phase + 0.5) * WATER_FLOW_CYCLE) + 0.37, i, amp, t);
+            g += (a * wa + b * (1.0 - wa)) * inversesqrt(sqr(wa) + sqr(1.0 - wa));
+        }
+    }
+    return g;
 }
 
 // 層 first .. last-1 の和 (高さ, 勾配, 発散)。画素より細かい層は足さない (ちらつきの元になるため)
@@ -216,19 +276,38 @@ vec3 waterChoppy(vec4 w) { return vec3(w.x, w.yz / waterJacobian(w)); }
  * 法線で表せなかった傾きの分散 (GGX の alpha^2 に足す)。画素の中で平均された波は面を粗くする (LEAN / Toksvig と同じ考え)
  * 遠くの水面で太陽の照り返しが縦に広がる帯になるのはこの分
  */
-/*
- * 層より細かい表面張力波 (microVar) は粗さに一部だけ回す。全部回すと近景でも太陽の鏡面の alpha が 0.1 前後に広がり、
- * 波の斜面に柔らかい白い染みが乗ってプラスチックのようなマットな水面に見えた。近景の照り返しは表した波の鋭いきらめきに任せる
- * 遠景の照り返しの帯・空の持ち上げは、落とした層の分散 (下のループ) が受け持つ
- */
-const float WATER_MICRO_ROUGHNESS = 0.2;
-
 float waterUnresolvedSlopeVar(WaterSea sea, float footprint) {
-    float v = sea.microVar * WATER_MICRO_ROUGHNESS;
+    float v = 0.0;
     for (int i = 0; i < WATER_LAYERS; i++) {
         float r = waterLayerResolved(i, footprint);
         // 法線側に r 倍を残すので、分散の合計が保たれるよう 1 - r^2 を回す
         v += (1.0 - r * r) * sqr(sea.amp[i]);
+    }
+    // 表面張力波は近くでは法線で表すので、表せない分だけが粗さになる
+    for (int i = 0; i < WATER_CAPILLARY_LAYERS; i++) {
+        float r = waterTileResolved(waterCapillaryTile(i), footprint);
+        v += (1.0 - r * r) * sqr(sea.capAmp[i]);
+    }
+    return v;
+}
+
+/*
+ * 表せた層の、画素の中での法線 (傾き) の揺れの分散。1 層の傾きは波長 lambda で振幅 a の正弦に近く、画素の幅 f の中で
+ * a x 2 pi f / lambda ほど変わる (画素の中の一様な位置の標準偏差は幅の 1 / sqrt(12))
+ * GGX の alpha^2 に足すと、細い鋭いローブが画素の当たり外れにならず、エネルギーを保ったままジッターのちらつきが消える
+ * 画面微分は使わず (gbuffers_solid.fsh の鏡面 AA を入れない理由と同じ)、層ごとの解析式で足す
+ */
+const float WATER_PIXEL_SLOPE_SCALE = TAU / sqrt(12.0);
+
+float waterPixelSlopeVar(WaterSea sea, float footprint) {
+    float v = 0.0;
+    for (int i = 0; i < WATER_LAYERS; i++) {
+        float tile = waterLayerTile(i);
+        v += sqr(waterTileResolved(tile, footprint) * sea.amp[i] * WATER_PIXEL_SLOPE_SCALE * footprint * WATER_BAND_CENTER / tile);
+    }
+    for (int i = 0; i < WATER_CAPILLARY_LAYERS; i++) {
+        float tile = waterCapillaryTile(i);
+        v += sqr(waterTileResolved(tile, footprint) * sea.capAmp[i] * WATER_PIXEL_SLOPE_SCALE * footprint * WATER_BAND_CENTER / tile);
     }
     return v;
 }

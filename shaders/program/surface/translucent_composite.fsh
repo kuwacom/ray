@@ -367,7 +367,10 @@ void main() {
 #endif
         color = behind * (1.0 - F) + refl * F;
         if (!below) {
-            float sunAlpha = sqrt(sqr(WATER_ROUGHNESS) + unresolvedVar);
+            // 太陽・灯りの照り返しの粗さ: 表した波の斜面は法線が受け持つので、光学的に滑らかな水に、画素より細かい波と画素の中の法線の揺れを足す
+            // 側面 (滝) は落ちる水の乱れに任せ、幅のある淡いつやを残す
+            float sunAlpha = side ? sqrt(sqr(WATER_ROUGHNESS) + unresolvedVar)
+                : sqrt(sqr(WATER_SUN_ROUGHNESS) + unresolvedVar + waterPixelSlopeVar(sea, footprint));
             vec3 spec = refl * F + sunSpecular(N, V, WATER_F0, sunAlpha, sunSpecVis) + localLightSpecular(WL, N, V, WATER_F0, sunAlpha);
             color = behind * (1.0 - F) + spec;
             sparkleLum = luminance(sparkleExcess(spec, getExposure()));
