@@ -82,6 +82,10 @@ const float VANILLA_CLOUD_SKY_SATURATION = 0.7; // 空の光の彩度 (1 で空�
 const float VANILLA_CLOUD_RAIN_SUN = 0.2;         // 直達光の倍率
 const float VANILLA_CLOUD_RAIN_AMBIENT = 1.0;     // 空の光の倍率
 const float VANILLA_CLOUD_RAIN_BASE = 0.8;        // 底の暗さを無くす割合 (層の中から見下ろす底が、霧や地形より暗い影にならないように)
+const float VANILLA_CLOUD_RAIN_FLOOR = 0.35;      // 柱の明るさの下限 (雲の向こうの曇天の灰色の倍率)。塔の根元や日陰の側面が真っ黒な影絵にならず、暗い灰色までに収まる
+// 曇天の下では光が何度も散乱して向きを失うので、散乱の向きを横から見た値へ寄せる割合 (寄せないと、太陽の方向の雲の底が前方散乱の山で白く光る)
+const float VANILLA_CLOUD_RAIN_DIFFUSE = 1.0;
+const float VANILLA_CLOUD_RAIN_SKY = 0.7;          // 雨の空で、雲の上に戻す空の色 (雲の上の空の光 skyRadiance の倍率)
 
 // 上の段。高さは下段の底からのブロック (案 0 = 高い: 中段 約 368・上段 約 592 / 案 1 = 建築の上限以下: 約 256・約 304)。
 // 格子は下段 (24 ブロック) に見合う大きさで、遠くの段ほど見かけが小さくなる分だけ粗くする
@@ -90,7 +94,7 @@ const float VANILLA_TIER_HIGH_BOTTOM = CLOUD_VANILLA_TIER_HEIGHT == 0 ? 400.0 : 
 const float VANILLA_TIER_MID_THICKNESS = 8.0;
 const float VANILLA_TIER_HIGH_THICKNESS = 3.0;
 const vec2 VANILLA_TIER_MID_CELL = vec2(36.0);               // 見かけの幅 約 7 度 (案 0)
-const vec2 VANILLA_TIER_HIGH_CELL = vec2(144.0, 36.0);       // 横に 4 倍引き伸ばした細長いマス
+const vec2 VANILLA_TIER_HIGH_CELL = vec2(96.0, 24.0);        // 横に 4 倍引き伸ばした細長いマス。小さいほど斜めの辺の階段が細かくなる
 const vec2 VANILLA_TIER_MID_SHIFT = vec2(128.0, 64.0) * VANILLA_TIER_MID_CELL;   // 下段と同じ模様に見えないよう、マス単位でずらす
 const vec2 VANILLA_TIER_HIGH_SHIFT = vec2(64.0, 192.0) * VANILLA_TIER_HIGH_CELL;
 // 流れの向きと、下段に対する速さの倍率 (上の段ほど遠いので、見かけの速さは下段より遅い)
@@ -100,12 +104,21 @@ const float VANILLA_TIER_MID_FAR = 2560.0;                   // ブロック: �
 const float VANILLA_TIER_HIGH_FAR = 4096.0;
 // 視線の消散と陰の濃さの、下段に対する倍率。鉛直の光学的深さは中段 約 2.5、上段 約 0.5
 const float VANILLA_TIER_MID_SIGMA = 0.25;
-const float VANILLA_TIER_HIGH_SIGMA = 0.13;
+const float VANILLA_TIER_HIGH_SIGMA = 0.09;
 const float VANILLA_TIER_MID_BASE_DEPTH = 14.0;   // 底の暗さが 1 に戻る高さ。厚さより大きく取って、薄い段の下面を灰色にする
 const float VANILLA_TIER_HIGH_BASE_DEPTH = 6.0;
 const float VANILLA_TIER_MID_SHADE = 1.0;
 const float VANILLA_TIER_HIGH_SHADE = 0.8;
 const float VANILLA_TIER_KEEP_HIGH = 0.8;                    // 上段は中段より更に間引く
+// 上段は間引きを数マスの塊ごとに決める。1 マスずつ抜くと、細長いマスの欠けが不規則に並んで模様のあるガラス板に見える
+const int VANILLA_TIER_HIGH_KEEP_BLOCK = 3;
+const float VANILLA_TIER_HIGH_SOFT_SIDE = 22.0;              // 上段の側面の柔らかさ (ブロック)。斜めの辺の階段のぎざぎざを薄い縁にぼかす
+// 光のむら (面の上の明暗) は下段だけ。薄い上の段に掛けると、薄い板にまだら模様が出る
+const int VANILLA_TIER_UPPER_MOTTLE = 0;
+// 夜は上の段を暗く薄くする (月明かりの分だけ見え、星空より目立たない)。太陽の高さ (sin 高度) がこの範囲で昼から夜へ移る
+const float VANILLA_TIER_NIGHT_GAIN = 0.15;                  // 夜の明るさの倍率
+const float VANILLA_TIER_NIGHT_THIN = 0.5;                   // 夜の濃さの倍率
+const vec2 VANILLA_TIER_NIGHT_SUN = vec2(-0.25, -0.02);
 const vec2 VANILLA_TIER_RAIN_HIDE = vec2(0.1, 0.6);          // 雨雲の層の下にいる度合いがこの間で、上の段が見えなくなる
 const float VANILLA_TIER_SHADOW = 0.5;                       // 上の段が下の雲や地面に落とす影の強さ
 const float VANILLA_TIER_SHADOW_MIN_Y = 0.08;                // 影を落とす光源の高さの下限
@@ -134,6 +147,7 @@ struct VanillaTier {
     vec2 flow;        // 流れ (cloudTime あたりのブロック)
     int turn;         // 1 で模様を 90 度回して鏡映しにする (整数のマスを整数のマスに写す)
     float keep;       // 間引きで残す割合
+    int keepBlock;    // 間引きを決める塊の一辺 (マス)
     float sigma;      // 視線の消散の倍率 (下段 = 1)
     float shade;      // 陰 (光源・空方向の光学的深さ) の倍率。薄い段でも底が灰色に見えるよう、消散ほどは薄めない
     float far;        // 描く距離 (ブロック)
@@ -154,13 +168,14 @@ VanillaTier vanillaTier(int i) {
     t.flow = low ? vec2(1.0, 0.0) : mid ? VANILLA_TIER_MID_FLOW : VANILLA_TIER_HIGH_FLOW;
     t.turn = mid ? 1 : 0;
     t.keep = low ? 1.0 : mid ? CLOUD_VANILLA_TIER_COVERAGE : CLOUD_VANILLA_TIER_COVERAGE * VANILLA_TIER_KEEP_HIGH;
+    t.keepBlock = low || mid ? 1 : VANILLA_TIER_HIGH_KEEP_BLOCK;
     t.sigma = low ? 1.0 : mid ? VANILLA_TIER_MID_SIGMA : VANILLA_TIER_HIGH_SIGMA;
     t.shade = low ? 1.0 : mid ? VANILLA_TIER_MID_SHADE : VANILLA_TIER_HIGH_SHADE;
     t.far = low ? VANILLA_CLOUD_FAR : mid ? VANILLA_TIER_MID_FAR : VANILLA_TIER_HIGH_FAR;
     t.baseDepth = low ? VANILLA_CLOUD_BASE_DEPTH : mid ? VANILLA_TIER_MID_BASE_DEPTH : VANILLA_TIER_HIGH_BASE_DEPTH;
     t.radius = low ? VANILLA_CLOUD_CORNER_RADIUS : min(VANILLA_CLOUD_CORNER_RADIUS, 0.5 * t.envelope);
     t.soft = low ? vec3(VANILLA_CLOUD_SOFT_SIDE, VANILLA_CLOUD_SOFT_TOP, VANILLA_CLOUD_SOFT_BOTTOM)
-                 : mid ? vec3(4.0, 2.5, 2.5) * CLOUD_EDGE_SOFTNESS : vec3(4.0, 1.0, 1.0) * CLOUD_EDGE_SOFTNESS;
+                 : mid ? vec3(4.0, 2.5, 2.5) * CLOUD_EDGE_SOFTNESS : vec3(VANILLA_TIER_HIGH_SOFT_SIDE, 1.0, 1.0) * CLOUD_EDGE_SOFTNESS;
     return t;
 }
 
@@ -197,7 +212,7 @@ vec4 vanillaCloudColumn(VanillaTier t, ivec2 c) {
         return vec4(round(v.rgb * 255.0), v.a);
     }
     ivec2 w = vanillaCloudWrap(t.turn == 1 ? ivec2(c.y, -c.x) : c);
-    bool has = texelFetch(vanillaCloudTex, w, 0).a >= VANILLA_CLOUD_ALPHA_CUT && hash3(uvec3(uvec2(w), 91u + uint(t.index))).x < t.keep;
+    bool has = texelFetch(vanillaCloudTex, w, 0).a >= VANILLA_CLOUD_ALPHA_CUT && hash3(uvec3(uvec2(w / t.keepBlock), 91u + uint(t.index))).x < t.keep;
     return vec4(has ? t.envelope : 0.0, 0.0, 0.0, 1.0);
 }
 
@@ -395,7 +410,7 @@ float vanillaCloudDensity(VanillaTier t, vec2 q, float y, float footprint, out f
     float pixel = VANILLA_CLOUD_SOFT_PIXELS * footprint;
     float pixelSide = VANILLA_CLOUD_SOFT_SIDE_PIXELS * footprint;
     float softMax = min(VANILLA_CLOUD_SOFT_MAX, 0.45 * t.envelope);
-    return smoothstep(0.0, min(max(t.soft.x, pixelSide), VANILLA_CLOUD_SOFT_MAX), min(side.x, side.y))
+    return smoothstep(0.0, min(max(t.soft.x, pixelSide), max(VANILLA_CLOUD_SOFT_MAX, t.soft.x)), min(side.x, side.y))
          * smoothstep(0.0, min(max(t.soft.y, pixel), softMax), up)
          * smoothstep(0.0, min(max(t.soft.z, pixel), softMax), down);
 }

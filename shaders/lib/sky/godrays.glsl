@@ -83,7 +83,8 @@ float evalGodraysScale(float outside) {
     float s = 1.0 - smoothstep(0.0, GODRAYS_OFFSCREEN_RANGE, outside);
     s *= mix(1.0, saturate(frameData.skyParams[3].y), smoothstep(0.0, GODRAYS_EYE_FADE, outside));
     s *= 1.0 - frameData.skyParams[4].a;
-    s *= 1.0 - GODRAYS_RAIN_FADE * rainStrength;
+    // 雲がある空は、雨で太陽が見えない (雲の上の雨雲の層が隠す) ので完全に消す。残すと、雲の上に太陽色のぼんやりした光が茶色く浮く
+    s *= min(1.0 - GODRAYS_RAIN_FADE * rainStrength, getCloudSunDiscVisibility());
     return s;
 }
 

@@ -85,9 +85,24 @@ CloudAccum cloudMarchLow(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, 
     return acc;
 }
 
+#ifdef CLOUD_RAIN_KEEPS_SHAPE
+/*
+ * 雨の日の雲の向こうの空を置き換える、雲の上の見えない雨雲の層の下面 (rgb = 放射輝度, a = 置き換える割合)
+ * 雲のマーチの末尾と、水面などの反射の空 (prepare2 が frameData.skyParams[6] に書き、skyReflectionFallback が使う) で同じ値にする
+ */
+vec4 cloudRainVeil(CloudContext ctx, CloudLighting l) {
+    float veil = saturate(ctx.rainLight) * (1.0 - cloudRainReshape()) * cloudRainBelowDeck();
+    vec3 radiance = (l.skyRadiance + l.lightIrradiance * (CLOUD_RAIN_VEIL_SUN * max(l.lightDir.y, 0.0) * RCP_PI)) * CLOUD_RAIN_VEIL_GAIN;
+    return vec4(radiance, veil);
+}
+#endif
+
 #ifdef CLOUD_VANILLA_SHAPE
 // 光源が低い (朝夕) ほど 1
 float cloudVanillaDusk(CloudLighting l) { return 1.0 - smoothstep(0.0, VANILLA_CLOUD_DUSK_SUN_Y, l.lightDir.y); }
+
+// 夜 (太陽が地平線の十分下) ほど 1。上の段を月明かりの分だけに抑える
+float cloudVanillaNight() { return 1.0 - smoothstep(VANILLA_TIER_NIGHT_SUN.x, VANILLA_TIER_NIGHT_SUN.y, getSunDir().y); }
 
 // 板の光の絞り (cloud_vanilla.glsl の VANILLA_CLOUD_*)
 CloudLighting cloudVanillaLighting(CloudLighting l) {
@@ -113,6 +128,7 @@ CloudLighting cloudVanillaLighting(CloudLighting l) {
     float saturation = mix(VANILLA_CLOUD_SKY_SATURATION, VANILLA_CLOUD_DUSK_SATURATION, dusk);
     l.skyRadiance = mix(vec3(luminance(l.skyRadiance)), l.skyRadiance, saturation);
     l.groundRadiance = mix(vec3(luminance(l.groundRadiance)), l.groundRadiance, saturation);
+    l.cosTheta = mix(l.cosTheta, 0.0, VANILLA_CLOUD_RAIN_DIFFUSE * l.rainDeck);
     return l;
 }
 
@@ -123,6 +139,8 @@ CloudLighting cloudVanillaLighting(CloudLighting l) {
  * 区間の入口は平らな面 (底・上端) との交差で、青ノイズで歩幅の分だけ揺らす (同心円の縞にならない)
  */
 CloudAccum cloudMarchVanilla(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, vec2 dither, float weight, VanillaTier tier) {
+    // 雨雲の層の下から見る柱の明るさの下限。向こうの曇天の灰色 (cloudRainVeil) の一定の割合にして、暗い灰色までに収める
+    vec3 rainFloor = cloudRainVeil(ctx, l).rgb * (VANILLA_CLOUD_RAIN_FLOOR * l.rainDeck);
     l = cloudVanillaLighting(l);
     // 日が低いと底にも横から日が届くので、底の暗さを掛け始める高さを下げる
     float baseLift = VANILLA_CLOUD_BASE_LIFT * (1.0 - cloudVanillaDusk(l));
@@ -135,7 +153,11 @@ CloudAccum cloudMarchVanilla(CloudContext ctx, CloudLighting l, vec3 dir, vec2 s
     // 面から内側へ VANILLA_CLOUD_INSIDE_DEPTH 入るまでに弱め切る (霧の濃さではなくカメラの位置の深さで決めるので、縁のすぐ中で白く閉じない)
     float opacity = VANILLA_CLOUD_OPACITY;
 #ifdef CLOUD_INTERIOR
-    if (tier.index == 0) opacity = mix(opacity, VANILLA_CLOUD_INSIDE_OPACITY, smoothstep(0.0, VANILLA_CLOUD_INSIDE_DEPTH, vanillaCloudInsideDepth(tier, origin, cameraPosition.y)));
+    // カメラがその段の高さの中にいるときだけ (どの画素も同じ分岐なので、段の外から見る間は柱の面の距離を求めない)
+    float cameraHeight = cameraPosition.y - tier.bottom;
+    if (cameraHeight > 0.0 && cameraHeight < tier.envelope) {
+        opacity = mix(opacity, VANILLA_CLOUD_INSIDE_OPACITY, smoothstep(0.0, VANILLA_CLOUD_INSIDE_DEPTH, vanillaCloudInsideDepth(tier, origin, cameraPosition.y)));
+    }
 #endif
     float stepMax = min(VANILLA_CLOUD_STEP_MAX, VANILLA_CLOUD_STEP_THIN * tier.envelope);
     float stepRel = VANILLA_CLOUD_STEP_REL;
@@ -182,13 +204,15 @@ CloudAccum cloudMarchVanilla(CloudContext ctx, CloudLighting l, vec3 dir, vec2 s
         float tRef = cloudRefDistance(ctx, dir, t, altitude);
         float height = saturate((h - vanillaCloudSpan(column, h).x) / tier.baseDepth);
         float extinction = density * weight * VANILLA_CLOUD_SHADE_SIGMA * tier.shade;
-        float odLight = vanillaCloudLightOD(tier, q, y, l.lightDir) * weight * vanillaCloudMottle(q);
+        bool mottled = tier.index == 0 || VANILLA_TIER_UPPER_MOTTLE > 0;
+        float odLight = vanillaCloudLightOD(tier, q, y, l.lightDir) * weight * (mottled ? vanillaCloudMottle(q) : 1.0);
         float odSky = vanillaCloudSkyOD(tier, q, y) * weight;
         if (tier.index == 0 && samples == 1) upperT = vanillaCloudUpperTransmittance(dir.xz * t, y, l.lightDir, weight);
         CloudLighting lit = l;
         lit.ambient *= 1.0 - occlusion;
-        lit.lightIrradiance *= mix(1.0, vanillaCloudTopMottle(q), saturate(1.0 - (vanillaCloudSpan(column, h).y - h) / VANILLA_CLOUD_TOP_MOTTLE_DEPTH));
+        if (mottled) lit.lightIrradiance *= mix(1.0, vanillaCloudTopMottle(q), saturate(1.0 - (vanillaCloudSpan(column, h).y - h) / VANILLA_CLOUD_TOP_MOTTLE_DEPTH));
         vec3 inscatter = cloudInscatter(lit, extinction, odLight, 0.0, odSky, sqr(1.0 - height), upperT, max(height - baseLift, 0.0));
+        inscatter = max(inscatter, rainFloor);
 
         float stepT = exp(-density * weight * VANILLA_CLOUD_SIGMA * tier.sigma * opacity * dt * VANILLA_CLOUD_KREF);
         float w = acc.transmittance * (1.0 - stepT);
@@ -396,18 +420,6 @@ void cloudComposite(CloudContext ctx, inout vec3 scattering, inout float transmi
     transmittance *= layer.transmittance;
 }
 
-#ifdef CLOUD_RAIN_KEEPS_SHAPE
-/*
- * 雨の日の雲の向こうの空を置き換える、雲の上の見えない雨雲の層の下面 (rgb = 放射輝度, a = 置き換える割合)
- * 雲のマーチの末尾と、水面などの反射の空 (prepare2 が frameData.skyParams[6] に書き、skyReflectionFallback が使う) で同じ値にする
- */
-vec4 cloudRainVeil(CloudContext ctx, CloudLighting l) {
-    float veil = saturate(ctx.rainLight) * (1.0 - cloudRainReshape()) * cloudRainBelowDeck();
-    vec3 radiance = (l.skyRadiance + l.lightIrradiance * (CLOUD_RAIN_VEIL_SUN * max(l.lightDir.y, 0.0) * RCP_PI)) * CLOUD_RAIN_VEIL_GAIN;
-    return vec4(radiance, veil);
-}
-#endif
-
 /*
  * 視線 dir の雲 (降水の柱 + 低層 + 中層 + 上層を手前から順に)。maxDist: 地形までの距離 (ワールド, 空なら大きな値)
  * dither: x = 視線方向, y = 光方向のマーチの開始位置
@@ -420,6 +432,11 @@ vec4 renderClouds(vec3 dir, float maxDist, vec2 dither) {
     float y0 = cameraPosition.y;
     // 雲の上から見下ろす視線は、雲の向こうが描画距離の外の虚空 (renderSky が描く青い遠景) なので、雲の縁に戻す空の色も同じにする
     if (dir.y < 0.0 && y0 > cloudLowestBase()) skyColor = skyBelowHorizon(dir, skyColor);
+#ifdef CLOUD_RAIN_KEEPS_SHAPE
+    // 雨の空: 雲の手前の大気の内散乱として雲の上に戻す空の色を、太陽の暈の無い空の光の平均にする (雲の向こうは曇天の灰色に置き換わるので、
+    // 本物の空の色を戻すと、太陽のまわりの暖色の暈が雲の上にだけ茶色く浮く)。曇天の灰色そのものでなく空の光 (青寄り) にして、空中遠近の釣り合いは保つ
+    skyColor = mix(skyColor, l.skyRadiance * VANILLA_CLOUD_RAIN_SKY, cloudRainVeil(ctx, l).a);
+#endif
     vec3 scattering = vec3(0.0);
     float transmittance = 1.0;
 #ifdef CLOUD_VANILLA_SHAPE
@@ -444,8 +461,12 @@ vec4 renderClouds(vec3 dir, float maxDist, vec2 dither) {
         vanillaStarts[idx] = CLOUD_SEG_NONE;
         VanillaTier tier = vanillaTier(idx);
         vec2 seg = vanillaCloudSegment(y0, dir.y, tier.bottom, tier.envelope, min(maxDist, tier.far));
-        float weight = cloudRainDensityScale(ctx) * (idx == 0 ? 1.0 : tierVisible);
-        cloudComposite(ctx, scattering, transmittance, cloudMarchVanilla(ctx, l, dir, seg, dither, weight, tier), dir, skyColor, tier.far * CLOUD_KH);
+        // 夜は上の段を薄く暗くする
+        float nightTier = idx == 0 ? 0.0 : cloudVanillaNight();
+        float weight = cloudRainDensityScale(ctx) * (idx == 0 ? 1.0 : tierVisible * mix(1.0, VANILLA_TIER_NIGHT_THIN, nightTier));
+        CloudAccum layer = cloudMarchVanilla(ctx, l, dir, seg, dither, weight, tier);
+        layer.scattering *= mix(1.0, VANILLA_TIER_NIGHT_GAIN, nightTier);
+        cloudComposite(ctx, scattering, transmittance, layer, dir, skyColor, tier.far * CLOUD_KH);
     }
 #else
     float farLimit = min(maxDist, CLOUD_MAX_DISTANCE_WORLD);

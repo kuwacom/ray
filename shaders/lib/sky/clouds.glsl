@@ -394,9 +394,8 @@ float cloudInteriorPhase(float cosTheta) {
 float cloudInteriorExit(vec3 dir) {
     float y = cameraPosition.y;
     #ifdef CLOUD_VANILLA_SHAPE
-    // 写実の層は描かないので、バニラの形の外形の高さだけ。縁の外では霧の濃さ (prepare2 の円盤の平均) が 0 なので、縁をまたいでも連続する
-    float bottom = vanillaCloudBottom();
-    return y > bottom && y < bottom + vanillaCloudEnvelope() ? CLOUD_INTERIOR_SLAB_LENGTH : 0.0;
+    // 写実の層は描かない。段 (下段・中段) の高さは見ない: 霧の濃さ (prepare2 の円盤の平均) は柱の外では 0 なので、縁をまたいでも連続する
+    return CLOUD_INTERIOR_SLAB_LENGTH;
     #else
     if (y > CLOUD_BASE && y < CLOUD_TOP) return cloudLayerSegment(y, dir.y, CLOUD_BASE, CLOUD_TOP).y;
     #if CLOUDS == 3

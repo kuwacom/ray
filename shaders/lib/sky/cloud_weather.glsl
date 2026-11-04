@@ -49,7 +49,12 @@ const float CLOUD_EVENING_SPREAD = 0.35;
 // 雷雨で中層・上層のベールを減らす割合と、雲の中の曇天の光 (色の抜け・拡散) を減らす割合
 // 0.75 / 0.45 では雷雨の空が明るい灰色に白い綿雲が浮かぶ晴れの日のような見た目になる
 const float CLOUD_THUNDER_VEIL_CUT = 0.45;
+#ifdef CLOUD_VANILLA_SHAPE
+// バニラの形は雷雨も雨と同じ曇天の暗さにする (減らすと、頭上の柱の底と日向の側面が雨の日より白く浮く)
+const float CLOUD_THUNDER_LIGHT_CUT = 0.0;
+#else
 const float CLOUD_THUNDER_LIGHT_CUT = 0.25;
+#endif
 // 雷雨で雲の空中遠近のもやの雨の分を減らす割合 (遠くの積乱雲の塔が見えるように)
 const float CLOUD_THUNDER_HAZE_CUT = 0.6;
 
