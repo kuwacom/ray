@@ -2,7 +2,8 @@
  * composite23: ブルームの縮小タイル生成 (colortex0 のミップ -> colortex14 にタイル配置, lib/post/bloom.glsl)
  * 各レベルは 1 つ上のミップから Jimenez 2014 (COD: AW) の 13 タップで縮小する
  * ハードウェアのミップ (箱フィルタ) を直接使うよりエイリアスとちらつきが少ない
- * レベル 1 だけは 5 つの箱を輝度で重み付けする (Karis average) ことで、1 画素の極端な明るさ (ホタル) が円盤に広がるのを防ぐ
+ * 最初の縮小の輝度の重み付け (Karis average) は使わない。元の colortex0 は TAA で時間方向に均した後なので 1 フレームだけの
+ * ホタルは残らず、重みを掛けると照り返しの小さな明るい点のすぐ周りの滲みだけが削れる
  * 閾値は掛けない (エネルギーを捨てない物理寄りのブルーム。強さは final の混合率で決まる)
  * post モジュール (lib/post)
  */
@@ -65,8 +66,6 @@ vec4 fetchSource(vec2 uv, float lod) {
     return vec4(c * (1.0 + (LAVA_BLOOM_GAIN - 1.0) * lava), luminance(c) * LAVA_BLOOM_GAIN * lava);
 }
 
-float karisWeight(vec3 c) { return 1.0 / (1.0 + luminance(c)); }
-
 void main() {
     ivec4 rect;
     int level = bloomTileLevelAt(ivec2(gl_FragCoord.xy), rect);
@@ -94,21 +93,5 @@ void main() {
     vec4 l = fetchSource(uv + t * vec2(-1.0, -1.0), lod);
     vec4 m = fetchSource(uv + t * vec2(1.0, -1.0), lod);
 
-    vec4 result;
-    if (level == 1) {
-        vec4 box0 = (j + k + l + m) * 0.25;
-        vec4 box1 = (a + b + d + e) * 0.25;
-        vec4 box2 = (b + c + e + f) * 0.25;
-        vec4 box3 = (d + e + g + h) * 0.25;
-        vec4 box4 = (e + f + h + i) * 0.25;
-        float w0 = 0.5 * karisWeight(box0.rgb);
-        float w1 = 0.125 * karisWeight(box1.rgb);
-        float w2 = 0.125 * karisWeight(box2.rgb);
-        float w3 = 0.125 * karisWeight(box3.rgb);
-        float w4 = 0.125 * karisWeight(box4.rgb);
-        result = (box0 * w0 + box1 * w1 + box2 * w2 + box3 * w3 + box4 * w4) / (w0 + w1 + w2 + w3 + w4);
-    } else {
-        result = e * 0.125 + (a + c + g + i) * 0.03125 + (b + d + f + h) * 0.0625 + (j + k + l + m) * 0.125;
-    }
-    outBloom = result;
+    outBloom = e * 0.125 + (a + c + g + i) * 0.03125 + (b + d + f + h) * 0.0625 + (j + k + l + m) * 0.125;
 }
