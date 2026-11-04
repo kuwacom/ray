@@ -360,18 +360,23 @@ void main() {
 #endif
 #ifdef CLOUD_SHADOWS
     vec3 lightDir = getShadowLightDir();
-    vec2 origin = cloudShadowMapOrigin(lightDir);
-    vec2 rel = (origin - cameraPosition.xz) + ((vec2(texel) + 0.5) / CLOUD_SHADOW_RES - 0.5) * CLOUD_SHADOW_EXTENT;
+    // このテクセルが持つ面上のテクセル番号 (窓の中のどれか 1 つ。前フレームの窓と同じ番号なら履歴がそのまま使える)
+    const int SHADOW_RES = int(CLOUD_SHADOW_RES);
+    ivec2 windowLow = ivec2(round(cloudShadowMapOrigin(cameraPosition, lightDir) / CLOUD_SHADOW_TEXEL)) - SHADOW_RES / 2;
+    ivec2 windowLowPrev = ivec2(round(cloudShadowMapOrigin(previousCameraPosition, lightDir) / CLOUD_SHADOW_TEXEL)) - SHADOW_RES / 2;
+    ivec2 plane = windowLow + ((texel - windowLow) & (SHADOW_RES - 1));
+    ivec2 planePrev = windowLowPrev + ((texel - windowLowPrev) & (SHADOW_RES - 1));
+    vec2 rel = (vec2(plane) + 0.5) * CLOUD_SHADOW_TEXEL - cameraPosition.xz;
     // 半影: 円盤の中でずらした位置の透過率をフレームごとに積み重ね、ぼかした雲影にする (iterationT はガウシアン 2 パス)。
     // 1 テクセルずつの読み書きなので同じディスパッチ内で競合せず、別パスも要らない。
-    // 原点がテクセル単位で動いた分は再投影しないが、混合率 CLOUD_SHADOW_BLEND では 1 テクセル (12 m) の遅れがすぐ消える
+    // 面に固定した環状のタイルなので、カメラが動いても履歴は同じ点のまま。窓の端で新しく窓に入ったテクセルだけ履歴を捨てる
     vec2 r2 = fract(float(frameCounter % 256) * vec2(0.7548777, 0.5698403) + interleavedGradientNoise(vec2(texel), 0));
     vec2 jitter = sqrt(r2.x) * vec2(cos(TAU * r2.y), sin(TAU * r2.y)) * (CLOUD_SHADOW_PENUMBRA / CLOUD_KH);
     float dither = interleavedGradientNoise(vec2(texel), frameCounter);
     float current = cloudShadowTransmittance(ctx, rel + jitter, lightDir, dither);
     float history = imageLoad(cloudShadowImg, texel).r;
     // 履歴の無効: 再読み込み・時刻の飛び (prepare の履歴フレーム数) とテレポート
-    bool reset = frameData.skyParams[1].y < 1.5 || distance(cameraPosition, previousCameraPosition) > CLOUD_SHADOW_RESET_DISTANCE || isnan(history) || isinf(history);
+    bool reset = frameData.skyParams[1].y < 1.5 || distance(cameraPosition, previousCameraPosition) > CLOUD_SHADOW_RESET_DISTANCE || any(notEqual(plane, planePrev)) || isnan(history) || isinf(history);
     float shadow = reset ? current : mix(history, current, CLOUD_SHADOW_BLEND);
     imageStore(cloudShadowImg, texel, vec4(saturate(shadow), 0.0, 0.0, 1.0));
 #endif

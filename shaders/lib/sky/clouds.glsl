@@ -402,20 +402,37 @@ vec4 cloudFrontPart(vec4 clouds, vec3 dir, float frontDist, float backDist) {
     return vec4(clouds.rgb * s, t);
 }
 
-// 雲影マップの中心 (ワールド xz)。テクセル単位に丸めて、カメラが動いても影がちらつかないようにする
-vec2 cloudShadowMapOrigin(vec3 lightDir) {
+/*
+ * 雲影マップは雲の下面の面の座標 (ワールド xz) に固定した環状のタイルで、テクセル (i, j) は i, j を 512 で割った余りが同じ面上の点を持つ。
+ * カメラが動いても同じ点は同じテクセルに残るので、履歴を再投影せずにそのまま積み重ねられる (窓の端で新しく窓に入る列だけが入れ替わる)
+ */
+const float CLOUD_SHADOW_TEXEL = CLOUD_SHADOW_EXTENT / CLOUD_SHADOW_RES; // ブロック
+
+// カメラ camera の窓の中心 (面の座標。テクセルの境目に丸める)
+vec2 cloudShadowMapOrigin(vec3 camera, vec3 lightDir) {
     float ly = max(lightDir.y, CLOUD_SHADOW_MIN_LIGHT_Y);
-    vec2 center = cameraPosition.xz + lightDir.xz * ((CLOUD_BASE - cameraPosition.y) / ly);
-    float texel = CLOUD_SHADOW_EXTENT / CLOUD_SHADOW_RES;
-    return (floor(center / texel) + 0.5) * texel;
+    vec2 center = camera.xz + lightDir.xz * ((CLOUD_BASE - camera.y) / ly);
+    return floor(center / CLOUD_SHADOW_TEXEL + 0.5) * CLOUD_SHADOW_TEXEL;
 }
 
-// player 空間の点を光の方向に雲の下面まで延ばした位置の雲影マップ UV
-vec2 cloudShadowUv(vec3 playerPos, vec3 lightDir) {
+// player 空間の点を光の方向に雲の下面まで延ばした面上の点 (ワールド xz)
+vec2 cloudShadowPlanePoint(vec3 playerPos, vec3 lightDir) {
     float ly = max(lightDir.y, CLOUD_SHADOW_MIN_LIGHT_Y);
     float worldY = playerPos.y + cameraPosition.y;
-    vec2 rel = playerPos.xz + lightDir.xz * ((CLOUD_BASE - worldY) / ly) + (cameraPosition.xz - cloudShadowMapOrigin(lightDir));
-    return rel / CLOUD_SHADOW_EXTENT + 0.5;
+    return playerPos.xz + cameraPosition.xz + lightDir.xz * ((CLOUD_BASE - worldY) / ly);
+}
+
+// 面上の点 plane の雲影の透過率 (環状のタイルを 4 点で補間)
+float cloudShadowFetch(vec2 plane) {
+    vec2 q = plane / CLOUD_SHADOW_TEXEL - 0.5;
+    ivec2 i0 = ivec2(floor(q));
+    vec2 f = q - vec2(i0);
+    const int MASK = int(CLOUD_SHADOW_RES) - 1;
+    float a = texelFetch(cloudShadowSampler, i0 & MASK, 0).r;
+    float b = texelFetch(cloudShadowSampler, (i0 + ivec2(1, 0)) & MASK, 0).r;
+    float c = texelFetch(cloudShadowSampler, (i0 + ivec2(0, 1)) & MASK, 0).r;
+    float d = texelFetch(cloudShadowSampler, (i0 + ivec2(1, 1)) & MASK, 0).r;
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
 /*
@@ -427,14 +444,15 @@ float getCloudShadow(vec3 playerPos) {
     vec3 lightDir = getShadowLightDir();
     float strength = smoothstep(CLOUD_SHADOW_MIN_LIGHT_Y, CLOUD_SHADOW_MIN_LIGHT_Y * 3.0, lightDir.y);
     if (strength <= 0.0) return 1.0;
-    vec2 uv = cloudShadowUv(playerPos, lightDir);
+    vec2 plane = cloudShadowPlanePoint(playerPos, lightDir);
+    vec2 uv = (plane - cloudShadowMapOrigin(cameraPosition, lightDir)) / CLOUD_SHADOW_EXTENT + 0.5;
     vec2 edge = saturate((0.5 - abs(uv - 0.5)) * 10.0);
     float worldY = playerPos.y + cameraPosition.y;
     float below = 1.0 - smoothstep(CLOUD_BASE, CLOUD_BASE + 0.5 * CLOUD_DEPTH, worldY);
     // マップの外は天気からの平均の透過率にする。雲が全天の雨雲へ変わる空で 1 (日なた) へ戻すと、遠くの霧の光の筋が
     // マップの四角い範囲の外だけ明るくなり、雷雨の空に直線の縁の白い面が出た (雲の形を保つ雨は晴れと同じ 1)
     float outside = 1.0 - CLOUD_SHADOW_RAIN_OUTSIDE * max(rainStrength, rainWetness) * cloudRainReshape();
-    float transmittance = mix(outside, texture(cloudShadowSampler, uv).r, edge.x * edge.y);
+    float transmittance = mix(outside, cloudShadowFetch(plane), edge.x * edge.y);
     #ifdef CLOUD_RAIN_KEEPS_SHAPE
     // 雲の形を保つ雨は、雲の上の見えない雨雲の層が雲の隙間でも太陽を遮る
     transmittance *= 1.0 - CLOUD_RAIN_DECK_SHADOW * max(rainStrength, rainWetness) * (1.0 - cloudRainReshape());
