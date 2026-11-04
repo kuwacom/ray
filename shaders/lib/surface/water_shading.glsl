@@ -147,12 +147,18 @@ bool waterRefractVoxel(vec3 surfPlayer, vec3 dir, vec3 floorPlayer, float d1, fl
         return true;
     }
 
+    /*
+     * 水底の点はコースティクス (1 点に波テクスチャ 9 回) が照明の費用の大半を占め、画面の外を指す近景の下端と遠景の帯の
+     * 画素ごとに 3 回解いていた。借りる色 (同じ面の画面の画素) には借りた点のコースティクスが既に入っていて、比で
+     * 当たりの点の模様へ移す必要は無い (数ブロックずれた同じ模様になるだけ) ので、比と明るさの基準はコースティクス抜きで照らす
+     */
     vec3 voxelColor;
-    vec3 unitE = shadeSecondaryHit(hitPlayer, hitNormal, vec3(1.0), skyLm);
-    bool hasRef = borrowVoxelFaceColor(hitPlayer, hitNormal, hitBlock, skyLm, unitE, true, voxelColor);
+    vec3 unitE = shadeSecondaryHit(hitPlayer, hitNormal, vec3(1.0), skyLm, false);
+    bool hasRef = borrowVoxelFaceColor(hitPlayer, hitNormal, hitBlock, skyLm, unitE, true, false, voxelColor);
     if (!hasRef) {
         // まっすぐ見た水底の像をそのまま使うと、屈折先が画面に無い所が屈折していない像になった
         // 像は明るさの基準にだけ使い、色はブロックの表の色を照らして作る (模様は写さない)
+        unitE = shadeSecondaryHit(hitPlayer, hitNormal, vec3(1.0), skyLm, true);
         voxelColor = shadeSecondaryHitReflectedFrom(unitE, hitPlayer, hitNormal, getBlockAlbedo(hitBlock, hitNormal), ivec2(-1));
     }
     if (!hasRef && d1 < 1.0 && floorPlayer.y < surfPlayer.y) {
@@ -173,7 +179,8 @@ bool waterRefractVoxel(vec3 surfPlayer, vec3 dir, vec3 floorPlayer, float d1, fl
         // 水底のセルのブロック (表の色の基準)
         ivec3 floorCell = ivec3(floor(playerToVoxel(floorPlayer - g.geoNormal * VOXEL_HIT_INSET)));
         int floorBlock = isInVoxelVolume(floorCell) ? fetchVoxelBlockId(floorCell) : hitBlock;
-        vec3 Efloor = shadeSecondaryHitReflected(floorPlayer, g.geoNormal, getBlockAlbedo(floorBlock, g.geoNormal), g.lightmap.y, ivec2(-1));
+        // 5 タップの平均でコースティクスの模様はならされているので、基準の側もコースティクス抜きで照らす
+        vec3 Efloor = shadeSecondaryHitReflected(floorPlayer, g.geoNormal, getBlockAlbedo(floorBlock, g.geoNormal), g.lightmap.y, ivec2(-1), false);
         if (n > 0.0 && luminance(Efloor) > 1e-6) {
             // 輝度の比だけ (色ごとの比にすると影の 1 タップの色の差で染まる)。表の色と画面の像の明るさの段を消す
             float tone = clamp(luminance(sum / n) / luminance(Efloor), WATER_REFRACT_D_TONE_CLAMP.x, WATER_REFRACT_D_TONE_CLAMP.y);

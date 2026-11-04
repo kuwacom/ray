@@ -61,12 +61,15 @@ vec3 secondaryHitSky(vec3 playerPos, vec3 normal, float skyLm) {
     return gatherSurfaceLights(p, SL_SUN_NONE, SL_BLOCK_NONE, SL_SKY).sky;
 }
 
-vec3 shadeSecondaryHit(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm) {
+// caustics: 水の下の点にコースティクスを掛ける。2 つの点の照明の比だけに使う時は両方 false にして軽くする
+vec3 shadeSecondaryHit(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm, bool caustics) {
     SurfacePoint p = surfacePoint(playerPos, normal);
     p.lightmap.y = skyLm;
-    SurfaceLights L = gatherSurfaceLights(p, SL_SUN_VOLUME, SL_BLOCK_HIT_FLOOD, SL_SKY);
+    SurfaceLights L = gatherSurfaceLights(p, SL_SUN_VOLUME, SL_BLOCK_HIT_FLOOD, caustics ? SL_SKY : SL_SKY | SL_SUN_NO_CAUSTICS);
     return albedo * RCP_PI * (L.sun.irradiance + L.block + L.sky + minAmbientIrradiance());
 }
+
+vec3 shadeSecondaryHit(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm) { return shadeSecondaryHit(playerPos, normal, albedo, skyLm, true); }
 
 /*
  * 多重反射: GI のヒット点の間接光に前フレームの GI (colortex9 = deferred11 の履歴) を使う。
@@ -176,8 +179,12 @@ vec3 shadeSecondaryHitReflectedFrom(vec3 unitE, vec3 playerPos, vec3 normal, vec
     return albedo * (unitE + RCP_PI * secondaryHitBlockLight(playerPos, normal, screenTexel, 1.0, true));
 }
 
+vec3 shadeSecondaryHitReflected(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm, ivec2 screenTexel, bool caustics) {
+    return shadeSecondaryHitReflectedFrom(shadeSecondaryHit(playerPos, normal, vec3(1.0), skyLm, caustics), playerPos, normal, albedo, screenTexel);
+}
+
 vec3 shadeSecondaryHitReflected(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm, ivec2 screenTexel) {
-    return shadeSecondaryHitReflectedFrom(shadeSecondaryHit(playerPos, normal, vec3(1.0), skyLm), playerPos, normal, albedo, screenTexel);
+    return shadeSecondaryHitReflected(playerPos, normal, albedo, skyLm, screenTexel, true);
 }
 
 /*
@@ -292,12 +299,12 @@ bool voxelHitOnScreen(vec3 hitPlayer, vec3 hitNormal, out ivec2 texel, out vec3 
  * 明るさの比は輝度だけで取る (色ごとの比にすると、色付きの影の 1 タップの差で所々が染まった)
  * throughWater: 水越しに映っている点だけ借りる (岸の草ブロックの側面の縁など、水面より上の色を水底に借りない)
  * 借りた色は画面の発光込みなので、発光は足さない
- * Ehit: 当たりの点の shadeSecondaryHit(hitPlayer, hitNormal, vec3(1.0), skyLm)
+ * Ehit: 当たりの点の shadeSecondaryHit(hitPlayer, hitNormal, vec3(1.0), skyLm, caustics)。借りる点も同じ caustics で照らす
  */
 const int VOXEL_BORROW_TRIES = 6;
 const vec2 VOXEL_BORROW_RATIO_CLAMP = vec2(0.0, 4.0);
 
-bool borrowVoxelFaceColor(vec3 hitPlayer, vec3 hitNormal, int hitBlock, float skyLm, vec3 Ehit, bool throughWater, out vec3 color) {
+bool borrowVoxelFaceColor(vec3 hitPlayer, vec3 hitNormal, int hitBlock, float skyLm, vec3 Ehit, bool throughWater, bool caustics, out vec3 color) {
     color = vec3(0.0);
     if (!voxelFaceTowardsCamera(hitPlayer, hitNormal)) return false;
     vec3 nAbs = abs(hitNormal);
@@ -325,7 +332,7 @@ bool borrowVoxelFaceColor(vec3 hitPlayer, vec3 hitNormal, int hitBlock, float sk
         qt = pt;
     }
     if (qt.x < 0) return false;
-    vec3 Eq = shadeSecondaryHit(q, hitNormal, vec3(1.0), skyLm);
+    vec3 Eq = shadeSecondaryHit(q, hitNormal, vec3(1.0), skyLm, caustics);
     if (luminance(Eq) <= 1e-6) return false;
     color = texelFetch(colortex0, qt, 0).rgb * clamp(luminance(Ehit) / luminance(Eq), VOXEL_BORROW_RATIO_CLAMP.x, VOXEL_BORROW_RATIO_CLAMP.y);
     return true;
@@ -362,7 +369,7 @@ vec4 traceVoxelRadiance(vec3 originPlayer, vec3 dir, float maxDist, float skyLm,
         // 借りる処理と代わりのアルベドの照明で、ヒット点の照明 (重い) を共有する
         vec3 unitE = shadeSecondaryHit(hitPlayer, hitNormal, vec3(1.0), skyLm);
         vec3 borrowed;
-        if (borrowVoxelFaceColor(hitPlayer, hitNormal, hitBlock, skyLm, unitE, false, borrowed)) return vec4(borrowed, 1.0);
+        if (borrowVoxelFaceColor(hitPlayer, hitNormal, hitBlock, skyLm, unitE, false, true, borrowed)) return vec4(borrowed, 1.0);
         return vec4(shadeSecondaryHitReflectedFrom(unitE, hitPlayer, hitNormal, albedo, screenTexel)
             + albedo * secondaryHitEmission(emission, hitBlock, hitMaterial), 1.0);
     }

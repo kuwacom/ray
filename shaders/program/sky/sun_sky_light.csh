@@ -11,6 +11,7 @@
  *       (post の composite25 が書く。ここでは触らない), w = 予備
  *   [4] = (カメラの位置の雲の中の太陽の光, 雲の濃さ), [5] = (雲の中の空の光, 霧の消散係数) (prepare2 の cloud_weather.csh が書く。ここでは触らない)
  *   [6] = (雨の日の雲の向こうの空を置き換える灰色の放射輝度, 置き換える割合) (prepare2 の cloud_weather.csh が書く。反射の空が使う)
+ * surfaceParams[0..2] は開けた水面の海の状態 (lib/common/water_waves.glsl の waterSeaStoreOpen)
  * sky モジュール (lib/sky)
  */
 // このプログラムで書く SSBO (lib/buffers。ほかのプログラムでは readonly)
@@ -19,6 +20,7 @@
 //@include "/lib/common/math.glsl"
 //@include "/lib/common/shadow_space.glsl"
 //@include "/lib/common/shadow_volume.glsl"
+//@include "/lib/common/water_waves.glsl"
 //@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/sky/sky.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
@@ -41,12 +43,12 @@
 #include "/lib/common/color.glsl"
 #include "/lib/common/transforms.glsl"
 #include "/lib/common/noise.glsl"
+#include "/lib/buffers/frame_data.glsl"
 #include "/lib/common/water_waves.glsl"
 #include "/lib/common/water_glitter.glsl"
 #include "/lib/common/water_normal.glsl"
 #include "/lib/common/water.glsl"
 #include "/lib/common/shadow_volume.glsl"
-#include "/lib/buffers/frame_data.glsl"
 #include "/lib/sky/sh.glsl"
 #include "/lib/common/phase.glsl"
 #include "/lib/buffers/images.glsl"
@@ -136,6 +138,7 @@ void main() {
     bool timeJump = abs(dt) > WORLD_TIME_JUMP && abs(dt) < 24000 - WORLD_TIME_JUMP;
     historyFrames = timeJump ? 0.0 : min(historyFrames + 1.0, 65535.0);
     frameData.skyParams[1] = vec4(float(worldTime), historyFrames, 0.0, 0.0);
+    waterSeaStoreOpen();
 
 #ifdef HAS_SKY
     vec3 sunDir = getSunDir();

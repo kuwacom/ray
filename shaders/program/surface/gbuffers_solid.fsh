@@ -34,6 +34,7 @@
 #include "/lib/surface/gi.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/common/transforms.glsl"
+#include "/lib/buffers/frame_data.glsl"
 #include "/lib/common/water_waves.glsl"
 #include "/lib/common/water_glitter.glsl"
 #include "/lib/common/water_normal.glsl"

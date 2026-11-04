@@ -12,6 +12,7 @@
 //@include "/lib/common/noise.glsl"
 //@include "/lib/common/transforms.glsl"
 //@include "/lib/common/uniforms.glsl"
+//@include "/lib/buffers/frame_data.glsl"
 
 uniform sampler3D waterWaveTex;
 // カメラのバイオームが川 (shaders.properties の smooth)。海は distantOcean を使う
@@ -58,6 +59,8 @@ const float WATER_RIPPLE_WAVELENGTH = 1.2;
 const float WATER_CAPILLARY_WAVELENGTH = 0.016;
 // 屋根の下・洞窟 (スカイライトが少ない所) は風が当たらない
 const float WATER_SHELTER_WIND = 0.15;
+// 風が弱まり始めるスカイライトと、全部当たるスカイライト
+const vec2 WATER_SHELTER_SKYLM = vec2(0.3, 0.9);
 
 // 波頭・流れ
 const float WATER_JACOBIAN_MIN = 0.3;          // 勾配を割る Jacobian の下限 (勾配は最大でこの逆数倍)
@@ -161,14 +164,14 @@ void waterAddSpectrum(inout WaterSea sea, float weight, float U, float fetch, fl
 }
 
 // skyLm: スカイライト (0-1)。屋根の下や洞窟の水は風が当たらないので凪ぐ
-WaterSea waterSeaState(float skyLm) {
+WaterSea waterSeaStateEval(float skyLm) {
     WaterSea sea;
     for (int i = 0; i < WATER_LAYERS; i++) sea.amp[i] = 0.0;
     for (int i = 0; i < WATER_CAPILLARY_LAYERS; i++) sea.capAmp[i] = 0.0;
     sea.wind = 0.0;
     float ocean = saturate(distantOcean);
     float river = saturate(waterRiver) * (1.0 - ocean);
-    float wind = WATER_WIND_SPEED * mix(WATER_SHELTER_WIND, 1.0, smoothstep(0.3, 0.9, skyLm));
+    float wind = WATER_WIND_SPEED * mix(WATER_SHELTER_WIND, 1.0, smoothstep(WATER_SHELTER_SKYLM.x, WATER_SHELTER_SKYLM.y, skyLm));
     waterAddSpectrum(sea, ocean, wind, WATER_FETCH_OCEAN, 1.0);
     waterAddSpectrum(sea, 1.0 - ocean - river, wind * WATER_LAKE_WAVES, WATER_FETCH_LAKE, 0.0);
     waterAddSpectrum(sea, river, wind * WATER_RIVER_WAVES, WATER_FETCH_RIVER, 0.0);
@@ -181,6 +184,36 @@ WaterSea waterSeaState(float skyLm) {
     sea.heightRms = sqrt(h2);
     return sea;
 }
+
+/*
+ * 開けた水面 (スカイライト WATER_SHELTER_SKYLM.y 以上) の海の状態は uniform だけで決まる。スペクトルは超越関数が多く、
+ * 水の画素ごと (水底のコースティクスでは 1 画素に数回) に解くと重いので、prepare (sun_sky_light.csh) が毎フレーム 1 回
+ * 解いて frameData.surfaceParams に置く。並び: 層の傾き WATER_LAYERS 個, 表面張力波の傾き, 風速, 高さの RMS
+ */
+float waterSeaPacked(int k) { return frameData.surfaceParams[k >> 2][k & 3]; }
+
+WaterSea waterSeaState(float skyLm) {
+    if (skyLm < WATER_SHELTER_SKYLM.y) return waterSeaStateEval(skyLm);
+    WaterSea sea;
+    int k = 0;
+    for (int i = 0; i < WATER_LAYERS; i++) sea.amp[i] = waterSeaPacked(k++);
+    for (int i = 0; i < WATER_CAPILLARY_LAYERS; i++) sea.capAmp[i] = waterSeaPacked(k++);
+    sea.wind = waterSeaPacked(k++);
+    sea.heightRms = waterSeaPacked(k);
+    return sea;
+}
+
+#ifdef SSBO_FRAME_DATA_WRITE
+void waterSeaStoreOpen() {
+    WaterSea sea = waterSeaStateEval(1.0);
+    int k = 0;
+    for (int i = 0; i < WATER_LAYERS; i++, k++) frameData.surfaceParams[k >> 2][k & 3] = sea.amp[i];
+    for (int i = 0; i < WATER_CAPILLARY_LAYERS; i++, k++) frameData.surfaceParams[k >> 2][k & 3] = sea.capAmp[i];
+    frameData.surfaceParams[k >> 2][k & 3] = sea.wind;
+    k++;
+    frameData.surfaceParams[k >> 2][k & 3] = sea.heightRms;
+}
+#endif
 
 /*
  * 層 i を引く。戻り値 x = 高さ (ブロック), yz = 勾配 (ワールドの 2D), w = 水平変位の発散 (Jacobian の 1 次の項)

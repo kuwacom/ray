@@ -18,9 +18,9 @@ float shadowDepthPerBlock() { return abs(shadowProjection[2][2]) * SHADOW_DEPTH_
 
 /*
  * 影マップの 1 点の透過色。半透明の透過色 (ガラス) か水の吸収 + コースティクス
- * receiverPlayer: 受け点, z: 受け点の影深度
+ * receiverPlayer: 受け点, z: 受け点の影深度, caustics: 水の下ならコースティクスを掛ける
  */
-vec3 shadowTranslucentTint(vec2 uv, float z, vec3 receiverPlayer) {
+vec3 shadowTranslucentTint(vec2 uv, float z, vec3 receiverPlayer, bool caustics) {
 #ifdef SHADOW_COLORED
     vec4 kind = texture(shadowcolor1, uv);
     if (kind.a > 0.75) {
@@ -28,7 +28,7 @@ vec3 shadowTranslucentTint(vec2 uv, float z, vec3 receiverPlayer) {
         float depthBelow = max(z - surfaceDepth, 0.0) / shadowDepthPerBlock();
         vec3 L = getShadowLightDir();
         vec3 t = exp(-waterExtinction() * depthBelow);
-        return t * waterCaustics(receiverPlayer + cameraPosition, depthBelow, L);
+        return caustics ? t * waterCaustics(receiverPlayer + cameraPosition, depthBelow, L) : t;
     }
     vec4 c = texture(shadowcolor0, uv);
     return mix(vec3(1.0), srgbToLinear(c.rgb), c.a);
@@ -37,22 +37,27 @@ vec3 shadowTranslucentTint(vec2 uv, float z, vec3 receiverPlayer) {
 #endif
 }
 
+vec3 shadowTranslucentTint(vec2 uv, float z, vec3 receiverPlayer) { return shadowTranslucentTint(uv, z, receiverPlayer, true); }
+
 /*
  * VL 等の体積マーチ用の 1 タップ影 (sky モジュールが使う)。rgb = 色付き透過率
+ * caustics: 水の下の点にコースティクスを掛ける (1 点に波テクスチャを 9 回読む)
  */
-vec3 sampleShadowVolume(vec3 playerPos) {
+vec3 sampleShadowVolume(vec3 playerPos, bool caustics) {
 #ifdef HAS_SUN_SHADOWS
     vec3 s = playerToShadowScreen(playerPos);
     if (any(lessThan(s, vec3(0.0))) || any(greaterThan(s, vec3(1.0)))) return vec3(1.0);
     float opaqueVis = step(s.z, texture(shadowtex1, s.xy).r);
     #ifdef SHADOW_COLORED
         float allVis = step(s.z, texture(shadowtex0, s.xy).r);
-        if (opaqueVis > 0.0 && allVis < 1.0) return shadowTranslucentTint(s.xy, s.z, playerPos);
+        if (opaqueVis > 0.0 && allVis < 1.0) return shadowTranslucentTint(s.xy, s.z, playerPos, caustics);
     #endif
     return vec3(opaqueVis);
 #else
     return vec3(1.0);
 #endif
 }
+
+vec3 sampleShadowVolume(vec3 playerPos) { return sampleShadowVolume(playerPos, true); }
 
 #endif
