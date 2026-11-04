@@ -418,6 +418,13 @@ void main() {
 #endif
         vec3 behind = texture(colortex0, refrUv).rgb;
         if (d1 < 1.0) behind += opaqueEnvSpecular(texel, d1);
+#ifdef CLOUD_INTERIOR
+        // 雲の中の霧: ガラスの向こうの背景には、ガラスから奥の面 (空は無限遠) までの分を先に掛ける。ガラスまでの分は fog_apply が全体に掛ける
+        if (isEyeInWater == 0) {
+            vec4 backFog = cloudInteriorFog(-V, dist, d1 >= 1.0 ? CLOUD_RAY_FAR : length(floorPlayer));
+            behind = behind * backFog.a + backFog.rgb;
+        }
+#endif
         vec3 transmit = vec3(1.0 - translucent.a);
         if (tintIndex > 0) {
             vec4 tint = getTint(tintIndex - 1);

@@ -274,13 +274,11 @@ void main() {
         glint *= frontClouds.a;
 #ifdef CLOUD_INTERIOR
         // カメラが雲の中: 層を出るまで一様な霧として掛ける。手持ちの物・自分の体 (手の深度) には掛けない
-        vec4 interior = frameData.skyParams[4];
-        if (interior.a > 0.0 && !isHandDepth(depth)) {
-            float interiorT = exp(-interior.a * min(dist, cloudInteriorExit(dir)) * frameData.skyParams[5].w);
-            vec3 cloudLightDir = frameData.skyParams[0].a > 0.0 ? getSunDir() : getMoonDir();
-            vec3 interiorLight = interior.rgb * cloudInteriorPhase(dot(dir, cloudLightDir)) + frameData.skyParams[5].rgb;
-            color = color * interiorT + interiorLight * (1.0 - interiorT);
-            glint *= interiorT;
+        // 半透明の向こうの背景の分 (半透明から奥の不透明面まで) は translucent_composite が先に掛けてあり、ここは手前の半透明までの区間
+        if (!isHandDepth(depth)) {
+            vec4 interiorFog = cloudInteriorFog(dir, 0.0, dist);
+            color = color * interiorFog.a + interiorFog.rgb;
+            glint *= interiorFog.a;
         }
 #endif
 #if defined HAS_SKY

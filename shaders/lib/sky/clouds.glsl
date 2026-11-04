@@ -32,6 +32,7 @@
 //@include "/lib/common/samplers.glsl"
 //@include "/lib/common/transforms.glsl"
 //@include "/lib/common/uniforms.glsl"
+//@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/buffers/images.glsl"
 //@include "/lib/sky/cloud_styles.glsl"
 
@@ -356,25 +357,27 @@ float cloudRainBelowDeck() {
  * 視程 = 3 / 消散係数 (WMO の定義)。濃さ・光・マーチの消散を引いた霧の消散係数は、prepare2 がカメラの位置で求める (frameData.skyParams[4] [5])
  */
 const float CLOUD_INTERIOR_EXTINCTION = 3.0 / float(CLOUD_INTERIOR_VISIBILITY);
+// 真横に近い視線の霧の長さの上限 (ブロック)。板の上面・下面を抜ける視線は短く、真横の視線だけ無限に長いと水平線に白い帯が出る。
+// 視程の 2 倍で光は 0.25% まで減るので、ここで打ち切っても見た目は変わらない
+const float CLOUD_INTERIOR_MAX_LENGTH = 2.0 * float(CLOUD_INTERIOR_VISIBILITY);
 // 雲の中の光は何度も散乱して向きを失うので、前方の山を弱めて等方に寄せる (太陽は円盤でなく方向の分かるにじみになる)
 const float CLOUD_INTERIOR_G = 0.6;
 const float CLOUD_INTERIOR_ISO = 0.7;
-// バニラの形の柱の中の霧の長さ (ブロック)。上下へ抜ける視線の霧は水平の視線より短く、水平の視線だけが濃い白い横帯になるので、
-// 柱の中ではどの向きも同じ長さで頭打ちにして、向きによる濃さの差を無くす
-const float CLOUD_INTERIOR_SLAB_LENGTH = 3.0;
-
 // 光源の光の向きによる差 (光源に対して横から見た時を 1 にした位相)
 float cloudInteriorPhase(float cosTheta) {
     return mix(phaseHG(cosTheta, CLOUD_INTERIOR_G), PHASE_ISOTROPIC, CLOUD_INTERIOR_ISO)
          / mix(phaseHG(0.0, CLOUD_INTERIOR_G), PHASE_ISOTROPIC, CLOUD_INTERIOR_ISO);
 }
 
-// 霧を掛ける長さ (ワールド)。カメラを含む雲の層の出口までの距離で、バニラの形の板は向きによらず一定。どの層の中でもなければ 0
+// 霧を掛ける長さ (ワールド)。カメラを含む雲の層の出口までの距離。どの層の中でもなければ 0
+// バニラの形の板は、カメラのいる板の上面までと下面までの高さ (prepare2 が frameData.skyParams[7] に書く) から、板を抜ける視線だけ短くなる
 float cloudInteriorExit(vec3 dir) {
     float y = cameraPosition.y;
     #ifdef CLOUD_VANILLA_SHAPE
-    // 写実の層は描かない。段 (下段・中段) の高さは見ない: 霧の濃さ (prepare2 の円盤の平均) は柱の外では 0 なので、縁をまたいでも連続する
-    return CLOUD_INTERIOR_SLAB_LENGTH;
+    vec2 gap = frameData.skyParams[7].xy;
+    float exitUp = dir.y > 1e-4 ? gap.x / dir.y : CLOUD_INTERIOR_MAX_LENGTH;
+    float exitDown = dir.y < -1e-4 ? gap.y / -dir.y : CLOUD_INTERIOR_MAX_LENGTH;
+    return min(min(exitUp, exitDown), CLOUD_INTERIOR_MAX_LENGTH);
     #else
     if (y > CLOUD_BASE && y < CLOUD_TOP) return cloudLayerSegment(y, dir.y, CLOUD_BASE, CLOUD_TOP).y;
     #if CLOUDS == 3
@@ -382,6 +385,20 @@ float cloudInteriorExit(vec3 dir) {
     #endif
     return 0.0;
     #endif
+}
+
+/*
+ * カメラから距離 from〜to の区間 (視線 dir) の雲の中の霧。rgb = 内散乱, a = 区間の透過率
+ * 距離に比例して濃くなる均一な媒質で、霧を掛ける長さは cloudInteriorExit まで。半透明の向こうの背景は from を半透明までの距離にして掛ける
+ */
+vec4 cloudInteriorFog(vec3 dir, float from, float to) {
+    vec4 interior = frameData.skyParams[4];
+    if (interior.a <= 0.0) return vec4(0.0, 0.0, 0.0, 1.0);
+    float exitLength = cloudInteriorExit(dir);
+    float transmittance = exp(-interior.a * frameData.skyParams[5].w * max(min(to, exitLength) - min(from, exitLength), 0.0));
+    vec3 lightDir = frameData.skyParams[0].a > 0.0 ? getSunDir() : getMoonDir();
+    vec3 light = interior.rgb * cloudInteriorPhase(dot(dir, lightDir)) + frameData.skyParams[5].rgb;
+    return vec4(light * (1.0 - transmittance), transmittance);
 }
 #endif
 
