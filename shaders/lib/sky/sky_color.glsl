@@ -165,6 +165,26 @@ LightSample getCelestialLight() {
     return s;
 }
 
+/*
+ * 天体の鏡面に掛ける円盤の放射輝度の倍率 (specularDiscCap の discScale)。太陽は 1
+ * 夜の月は空に描く円盤を MOON_DISK_SCALE 倍の大きさで MOON_NIGHT_BRIGHTNESS 倍に暗くしてあるので、鏡像も同じ明るさにする
+ * (照度どおりの鏡像は空の月の 1500 倍 x フレネルになり、水面に月より明るい白い塊が出る)
+ * 鏡面のローブの広がりは物理の大きさのままで、上限だけ見えている円盤に合わせる
+ */
+float celestialDiscScale() {
+#ifdef HAS_SKY
+    if (frameData.shadowLightIrradiance.a > 0.5) return 1.0;
+    return mix(MOON_NIGHT_BRIGHTNESS, 1.0, smoothstep(-0.1, 0.1, getSunDir().y)) / sqr(MOON_DISK_SCALE);
+#else
+    return 1.0;
+#endif
+}
+
+// 影を落とす天体の鏡面の強さの設定 (昼は太陽、夜は月。エンドの光も月の側)
+float celestialSpecularStrength() {
+    return frameData.shadowLightIrradiance.a > 0.5 ? SPECULAR_SUN_STRENGTH : SPECULAR_MOON_STRENGTH;
+}
+
 // 法線 n の面が空から受ける拡散照度 (遮蔽なし。AO・スカイライトは受け取り側が掛ける)
 vec3 getSkyIrradiance(vec3 n) { return shEvalIrradiance(n); }
 

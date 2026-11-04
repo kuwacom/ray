@@ -142,22 +142,22 @@ vec3 lavaRadiance(vec3 albedo) {
  * slopeVar > 0 (水たまり): 鏡面の粗さを傾きの分散の分だけ広げる (雨粒の跳ねと画素より細かい波紋)
  * specVis: 光の円盤の見え方 (太陽は雨雲の層の下で隠れる。他の光は 1)。拡散には掛けない
  */
-vec3 directLight(Material m, vec3 N, vec3 V, LightSample L, float slopeVar, float specVis, inout vec3 specSum) {
+vec3 directLight(Material m, vec3 N, vec3 V, LightSample L, float slopeVar, float specVis, float discScale, float strength, inout vec3 specSum) {
     vec3 spec;
-    vec3 diffuse = evalDirectLight(m, N, V, L, spec);
+    vec3 diffuse = evalDirectLight(m, N, V, L, discScale, spec);
     if (slopeVar > 0.0) {
         Material rough = m;
         rough.roughness = sqrt(sqr(m.roughness) + slopeVar);
-        spec = evalDirectSpecular(rough, N, V, L);
+        spec = evalDirectSpecular(rough, N, V, L, discScale);
     }
-    specSum += spec * specVis;
+    specSum += spec * (specVis * strength);
     return diffuse;
 }
 
-void directSpecular(Material m, vec3 N, vec3 V, LightSample L, float slopeVar, inout vec3 specSum) {
+void directSpecular(Material m, vec3 N, vec3 V, LightSample L, float slopeVar, float strength, inout vec3 specSum) {
     Material rough = m;
     rough.roughness = sqrt(sqr(m.roughness) + slopeVar);
-    specSum += evalDirectSpecular(rough, N, V, L);
+    specSum += evalDirectSpecular(rough, N, V, L) * strength;
 }
 
 /*
@@ -221,7 +221,7 @@ void main() {
     SurfaceLights L = gatherSurfaceLights(sp, SL_SUN_SHADOW_MAP_FALLBACK, SL_BLOCK_NONE, SL_SUN_CONTACT | SL_SUN_LEAF | SL_POM);
 
     // 太陽 / 月
-    vec3 color = directLight(m, g.normal, V, L.sun, puddleVar, getCloudSunDiscVisibility(), specSum);
+    vec3 color = directLight(m, g.normal, V, L.sun, puddleVar, getCloudSunDiscVisibility(), celestialDiscScale(), celestialSpecularStrength(), specSum);
     // 葉を透過した分 (拡散だけに使う。鏡面の太陽は葉の隙間を抜けた光だけで照り返す)
     if (maxOf(L.sunLeafVis) > 0.0) {
         LightSample leafLit = L.celestial;
@@ -244,14 +244,14 @@ void main() {
     sp.sunFade = L.sunShadow.fade;
     SurfaceLights H = gatherSurfaceLights(sp, SL_SUN_NONE, SL_BLOCK_NONE, SL_HAND);
 #ifdef SSS
-    color += directLight(m, g.normal, V, H.handMain, puddleVar, 1.0, specSum) + evalTranslucency(m, g.normal, V, H.handMain) * SSS_STRENGTH;
-    color += directLight(m, g.normal, V, H.handOff, puddleVar, 1.0, specSum) + evalTranslucency(m, g.normal, V, H.handOff) * SSS_STRENGTH;
+    color += directLight(m, g.normal, V, H.handMain, puddleVar, 1.0, 1.0, SPECULAR_BLOCK_STRENGTH, specSum) + evalTranslucency(m, g.normal, V, H.handMain) * SSS_STRENGTH;
+    color += directLight(m, g.normal, V, H.handOff, puddleVar, 1.0, 1.0, SPECULAR_BLOCK_STRENGTH, specSum) + evalTranslucency(m, g.normal, V, H.handOff) * SSS_STRENGTH;
 #else
-    color += directLight(m, g.normal, V, H.handMain, puddleVar, 1.0, specSum);
-    color += directLight(m, g.normal, V, H.handOff, puddleVar, 1.0, specSum);
+    color += directLight(m, g.normal, V, H.handMain, puddleVar, 1.0, 1.0, SPECULAR_BLOCK_STRENGTH, specSum);
+    color += directLight(m, g.normal, V, H.handOff, puddleVar, 1.0, 1.0, SPECULAR_BLOCK_STRENGTH, specSum);
 #endif
     SurfaceLights S = gatherSurfaceLights(sp, SL_SUN_NONE, SL_BLOCK_NONE, SL_BLOCK_SPECULAR);
-    for (int j = 0; j < S.blockSpecCount; j++) directSpecular(m, g.normal, V, S.blockSpec[j], puddleVar, specSum);
+    for (int j = 0; j < S.blockSpecCount; j++) directSpecular(m, g.normal, V, S.blockSpec[j], puddleVar, SPECULAR_BLOCK_STRENGTH, specSum);
 
     // 環境光 (空・ブロックライト・GI)
     float ao = g.ao * indirect.a;

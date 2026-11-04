@@ -19,6 +19,7 @@
 //@include "/lib/surface/material.glsl"
 //@include "/lib/surface/reflection.glsl"
 //@include "/lib/sky/clouds.glsl"
+//@include "/lib/sky/sky_color.glsl"
 //@include "/lib/surface/surface_lights.glsl"
 
 // 全画面クアッド (program/common/fullscreen.vsh) の UV。composite1 のような全画面の fragment パスだけが include する
@@ -90,25 +91,25 @@ LightSample unshadowedSun() {
 }
 
 // 光 L の鏡面だけ。f0 と alpha を与えた誘電体として
-vec3 dielectricSpecular(vec3 N, vec3 V, float f0, float roughness, LightSample L) {
+vec3 dielectricSpecular(vec3 N, vec3 V, float f0, float roughness, LightSample L, float discScale) {
     GBufferData g = gbufferDefault();
     g.f0 = f0;
     g.smoothness = 1.0 - sqrt(roughness);
     g.albedo = vec3(0.0);
-    return evalDirectSpecular(decodeMaterial(g), N, V, L);
+    return evalDirectSpecular(decodeMaterial(g), N, V, L, discScale);
 }
 
 vec3 sunSpecular(vec3 N, vec3 V, float f0, float roughness, vec3 sunVis) {
     LightSample sun = unshadowedSun();
     sun.irradiance *= sunVis;
-    return dielectricSpecular(N, V, f0, roughness, sun);
+    return dielectricSpecular(N, V, f0, roughness, sun, celestialDiscScale()) * celestialSpecularStrength();
 }
 
 // 手持ち光源とブロックライトの鏡面 (太陽以外の光)。L は gatherSurfaceLights の SL_HAND | SL_BLOCK_SPECULAR_TRACED
 vec3 localLightSpecular(SurfaceLights L, vec3 N, vec3 V, float f0, float roughness) {
-    vec3 s = dielectricSpecular(N, V, f0, roughness, L.handMain) + dielectricSpecular(N, V, f0, roughness, L.handOff);
-    for (int j = 0; j < L.blockSpecCount; j++) s += dielectricSpecular(N, V, f0, roughness, L.blockSpec[j]);
-    return s;
+    vec3 s = dielectricSpecular(N, V, f0, roughness, L.handMain, 1.0) + dielectricSpecular(N, V, f0, roughness, L.handOff, 1.0);
+    for (int j = 0; j < L.blockSpecCount; j++) s += dielectricSpecular(N, V, f0, roughness, L.blockSpec[j], 1.0);
+    return s * SPECULAR_BLOCK_STRENGTH;
 }
 
 // 手持ち光源が向き n の面に与える照度

@@ -314,6 +314,12 @@ value.REFLECTIONS.1=SSR
 value.REFLECTIONS.2=SSR + ラフ反射
 value.REFLECTIONS.3=SSR + ボクセル
 option.SSR_STEPS=反射のステップ数
+option.SPECULAR_SUN_STRENGTH=太陽の反射光の強さ
+option.SPECULAR_SUN_STRENGTH.comment=昼の太陽が水面・水たまり・ガラス・金属に映る光の明るさ。1 で太陽の円盤の鏡像どおり、0 で映さない
+option.SPECULAR_MOON_STRENGTH=月の反射光の強さ
+option.SPECULAR_MOON_STRENGTH.comment=夜の月 (エンドの光も) が映る光の明るさ。1 で空に描く月の円盤の鏡像どおり、0 で映さない
+option.SPECULAR_BLOCK_STRENGTH=光源の反射光の強さ
+option.SPECULAR_BLOCK_STRENGTH.comment=設置した光源・手持ち・アイテムなどの光が映る光の明るさ。1 で光源の円盤の鏡像どおり、0 で映さない
 option.SPECULAR_SPARKLE=反射光のきらめき
 option.SPECULAR_SPARKLE.comment=水面・ガラス・金属に映った太陽や灯りの白く飛んだ所を、ブルームとレンズの効果に届くまま残す。OFF ではアンチエイリアスで細かい照り返しが弱まる
 

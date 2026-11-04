@@ -435,7 +435,7 @@ void main() {
         gp.texel = texel;
         gp.dither = dither;
         SurfaceLights GL = gatherSurfaceLights(gp, SL_SUN_NONE, SL_BLOCK_NONE, SL_HAND | SL_BLOCK_SPECULAR_TRACED);
-        float glassAlpha = max(roughness * roughness, WATER_ROUGHNESS);
+        float glassAlpha = max(roughness * roughness, MIN_ROUGHNESS);
         // 前方で照らした拡散 (translucent.rgb) は鏡面で反射する F の分を除く (太陽の鏡面を足すので、その分だけ明るくならないように)
         vec3 spec = refl * F + sunSpecular(N, V, GLASS_F0, glassAlpha, glassSunVis) + localLightSpecular(GL, N, V, GLASS_F0, glassAlpha);
         color = behind * transmit * (1.0 - F) + translucent.rgb * (1.0 - F) + spec;

@@ -624,6 +624,7 @@ sky モジュールが提供 (`//@include "/lib/sky/sky.glsl"`):
 |---|---|---|
 | `vec3 getSunIrradiance()` / `vec3 getMoonIrradiance()` | 全員 | 地表での直達照度 (FrameData) |
 | `LightSample getCelestialLight()` | surface (`gatherSurfaceLights`), sky (VL) | 影を落とす天体の光 (昼は太陽, 夜は月) |
+| `float celestialDiscScale()` / `celestialSpecularStrength()` | surface (`composite_specular.glsl`, `opaque_shading.fsh`) | 天体の鏡面の上限に掛ける円盤の明るさの倍率 (夜の月は空に描く円盤に合わせる) と、設定 SPECULAR_SUN_STRENGTH / SPECULAR_MOON_STRENGTH |
 | `vec3 getSkyIrradiance(vec3 n)` | surface (`gatherSurfaceLights`, 反射のフォールバック) | 空からの拡散照度 (SH) |
 | `vec3 getSkyRadiance(vec3 dir)` | surface (反射のフォールバック), post | 方向の空の放射 (太陽円盤なし) |
 | `vec3 renderSky(vec3 dir, vec3 vanillaSky)` | surface (deferred30 の空ピクセル) | 背景の空 (太陽月・星込み) |

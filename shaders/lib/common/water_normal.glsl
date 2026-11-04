@@ -15,16 +15,13 @@
 
 /*
  * 水たまりの鏡面を広げる傾きの分散 (deferred30)
- * 水たまりは滑らかさ 0.99 の鏡なので、太陽・灯りの鏡面は光源の円盤の鏡像になる。傾きの分散は、風のさざ波
- * (吹送距離が水たまりの大きさしか無いので表面張力波から短い波だけ) と雨粒の跳ね
+ * 水たまりは滑らかさ 0.99 の鏡なので、太陽・灯りの鏡面は光源の円盤の鏡像になる。風の揺れは下の小さな波 (法線) が受け持ち、
+ * 粗さへ回すのは雨粒の跳ねと画素より細かい波紋だけ。止んだ後の水たまりは光源の円盤の大きさの鋭い鏡像になる
  */
-const float PUDDLE_WIND_SHELTER = 0.1;       // 地面の水たまりに当たる風 (WATER_WIND_SPEED に対する割合)
-const float PUDDLE_FETCH = 0.25;             // 水たまりに立つ一番長い波 (m)
 const float PUDDLE_RAIN_SLOPE_VAR = 0.002;   // 本降りの雨粒の跳ねと画素より細かい波紋の傾きの分散 (PUDDLE_RIPPLES = 1)
 
 float puddleSlopeVar() {
-    float wind = waterSlopeDensity(WATER_WIND_SPEED * PUDDLE_WIND_SHELTER) * log(PUDDLE_FETCH / WATER_CAPILLARY_WAVELENGTH) * WATER_RIPPLES;
-    return wind + PUDDLE_RAIN_SLOPE_VAR * rainStrength * PUDDLE_RIPPLES;
+    return PUDDLE_RAIN_SLOPE_VAR * rainStrength * PUDDLE_RIPPLES;
 }
 
 /*

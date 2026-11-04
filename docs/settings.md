@@ -140,6 +140,9 @@
 | WATER_TYPE | 0 | 0, 1, 2 |
 | REFLECTIONS | 2 | 0, 1, 2, 3 |
 | SSR_STEPS | 24 | 8, 12, 16, 24, 32, 48, 64 |
+| SPECULAR_SUN_STRENGTH | 1.0 | 0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0, 8.0 |
+| SPECULAR_MOON_STRENGTH | 0.5 | 0.0, 0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0, 8.0, 12.0, 16.0 |
+| SPECULAR_BLOCK_STRENGTH | 1.0 | 0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0, 8.0 |
 | SPECULAR_SPARKLE | ON | ON / OFF |
 
 ## sky (`lib/settings/sky.glsl`)

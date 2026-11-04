@@ -134,39 +134,46 @@ vec3 eonDiffuse(vec3 rho, float r, float NoL, float NoV, float LoV) {
 
 float eonRoughness(Material m) { return saturate(m.roughness * EON_ROUGHNESS_SCALE); }
 
-// 鏡面 BRDF x NoL (光源の見かけの大きさでラフネスを広げる)
-vec3 evalSpecularLobe(Material m, vec3 N, vec3 V, vec3 L, float angularSize, float NoL, float NoV) {
+/*
+ * 鏡面の放射輝度の上限: 光源の円盤の放射輝度 (照度 / 円盤の立体角) x フレネル。鏡像は光源より明るくならない
+ * GGX の正規化は光源の大きさでローブを広げた近似で、粗さの小さい面かつかすめ角では円盤の鏡像より明るく出るので、その上限にもなる
+ * discScale: 見えている円盤の放射輝度が照度から求めた値の何倍か (夜の月は空に描く円盤を暗くしてあるので、その分)
+ * SPECULAR_DISC_PEAK: 周縁減光 (celestial.glsl の SUN_LIMB_DARKENING) の円盤の中心は、平均の 1 / (1 - 0.6 / 3) 倍
+ */
+const float SPECULAR_DISC_PEAK = 1.25;
+
+// 鏡面 BRDF x NoL (光源の見かけの大きさでラフネスを広げる)。照度を掛ける前の値で、円盤の鏡像で頭打ちにする
+vec3 evalSpecularLobe(Material m, vec3 N, vec3 V, vec3 L, float angularSize, float NoL, float NoV, float discScale) {
     vec3 H = normalize(L + V);
     float NoH = saturate(dot(N, H));
     float VoH = saturate(dot(V, H));
     // 球光源の正規化 (Karis 2013) の簡略形。光源の大きさ分だけローブを広げて点光源の発散を防ぐ
     float a = min(m.roughness + 0.5 * angularSize, 1.0);
     vec3 F = materialFresnel(m, VoH);
-    return ggxD(NoH, a) * smithVisibilityHC(NoV, NoL, a) * F * specularEnergyCompensation(m, NoV);
+    vec3 lobe = ggxD(NoH, a) * smithVisibilityHC(NoV, NoL, a) * F * specularEnergyCompensation(m, NoV) * NoL;
+    return min(lobe, F * (discScale * SPECULAR_DISC_PEAK / (PI * sqr(max(angularSize, 1e-3)))));
 }
 
 /*
- * 直接光 1 つの出射放射輝度 (拡散 + 鏡面)。N, V は player 空間の正規化ベクトル (V は着色点 -> カメラ)
+ * 直接光 1 つを拡散と鏡面に分けて返す (鏡面だけ別に集める呼び出し側が GGX を 2 回求めないように)
+ * N, V は player 空間の正規化ベクトル (V は着色点 -> カメラ)。戻り値は拡散の出射放射輝度, spec は鏡面
  * 裏から来る光は evalTranslucency が受け持つ
  */
-vec3 evalDirectLight(Material m, vec3 N, vec3 V, LightSample L) {
-    float NoL = dot(N, L.direction);
-    if (NoL <= 0.0 || maxOf(L.irradiance) <= 0.0) return vec3(0.0);
-    float NoV = max(dot(N, V), 1e-3);
-    vec3 diffuse = eonDiffuse(m.albedo, eonRoughness(m), NoL, NoV, dot(L.direction, V)) * (1.0 - specularAlbedo(m, NoV));
-    vec3 spec = evalSpecularLobe(m, N, V, L.direction, L.angularSize, NoL, NoV);
-    return (diffuse + spec) * L.irradiance * NoL;
-}
-
-// 拡散と鏡面を分けて返す版 (鏡面だけ別に集める呼び出し側が GGX を 2 回求めないように)。戻り値は拡散、spec は鏡面
-vec3 evalDirectLight(Material m, vec3 N, vec3 V, LightSample L, out vec3 spec) {
+vec3 evalDirectLight(Material m, vec3 N, vec3 V, LightSample L, float discScale, out vec3 spec) {
     spec = vec3(0.0);
     float NoL = dot(N, L.direction);
     if (NoL <= 0.0 || maxOf(L.irradiance) <= 0.0) return vec3(0.0);
     float NoV = max(dot(N, V), 1e-3);
     vec3 diffuse = eonDiffuse(m.albedo, eonRoughness(m), NoL, NoV, dot(L.direction, V)) * (1.0 - specularAlbedo(m, NoV));
-    spec = evalSpecularLobe(m, N, V, L.direction, L.angularSize, NoL, NoV) * L.irradiance * NoL;
+    spec = evalSpecularLobe(m, N, V, L.direction, L.angularSize, NoL, NoV, discScale) * L.irradiance;
     return diffuse * L.irradiance * NoL;
+}
+
+// 拡散 + 鏡面
+vec3 evalDirectLight(Material m, vec3 N, vec3 V, LightSample L) {
+    vec3 spec;
+    vec3 diffuse = evalDirectLight(m, N, V, L, 1.0, spec);
+    return diffuse + spec;
 }
 
 // 拡散だけ (前方シェーディングの半透明: 鏡面は composite1 でまとめて掛けるため)
@@ -178,11 +185,15 @@ vec3 evalDirectDiffuse(Material m, vec3 N, vec3 V, LightSample L) {
 }
 
 // 鏡面だけ (水面の太陽ハイライト等)
-vec3 evalDirectSpecular(Material m, vec3 N, vec3 V, LightSample L) {
+vec3 evalDirectSpecular(Material m, vec3 N, vec3 V, LightSample L, float discScale) {
     float NoL = dot(N, L.direction);
     if (NoL <= 0.0) return vec3(0.0);
     float NoV = max(dot(N, V), 1e-3);
-    return evalSpecularLobe(m, N, V, L.direction, L.angularSize, NoL, NoV) * L.irradiance * NoL;
+    return evalSpecularLobe(m, N, V, L.direction, L.angularSize, NoL, NoV, discScale) * L.irradiance;
+}
+
+vec3 evalDirectSpecular(Material m, vec3 N, vec3 V, LightSample L) {
+    return evalDirectSpecular(m, N, V, L, 1.0);
 }
 
 // 拡散照度 (方向を持たない光: 空・GI・floodfill) の出射放射輝度
