@@ -15,7 +15,6 @@
 #define COMMON_WATER_GLSL
 
 //@include "/lib/common/water_waves.glsl"
-//@include "/lib/common/water_glint.glsl"
 //@include "/lib/common/water_normal.glsl"
 
 #endif

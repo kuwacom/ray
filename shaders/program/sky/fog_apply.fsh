@@ -38,7 +38,6 @@
 #include "/lib/common/noise.glsl"
 #include "/lib/common/transforms.glsl"
 #include "/lib/common/water_waves.glsl"
-#include "/lib/common/water_glint.glsl"
 #include "/lib/common/water_normal.glsl"
 #include "/lib/common/water.glsl"
 #include "/lib/buffers/frame_data.glsl"
@@ -181,16 +180,16 @@ void main() {
     vec4 sceneIn = texelFetch(colortex0, texel, 0);
     vec3 color = sceneIn.rgb;
     /*
-     * 水面の輝点 (composite1 が a = 1 + 輝度の割合で書く)。TAA (composite20) が近傍の箱で潰さず後から足すので、
+     * 鏡面の白飛び分 (composite1 / deferred30 が a = 1 + 輝度の割合で書く)。TAA (composite20) が近傍の箱で潰さず後から足すので、
      * フォグで減る分 (透過率) を掛けた輝度を追い、最後に割合へ戻して渡す
      */
-    float glint = saturate(sceneIn.a - 1.0) * luminance(color);
+    float sparkle = saturate(sceneIn.a - 1.0) * luminance(color);
     /*
      * 溶岩の発光も同じ仕組みで追い、a = -割合で渡す (composite23 がブルームの元でだけ明るくする)
-     * 輝点の無い画素は a = 0 (TAA の glintShare はどちらも 0)
+     * 白飛び分の無い画素は a = 0 (TAA の sparkleShare はどちらも 0)
      */
-    bool lavaGlow = glint <= 0.0 && readMaterialId(texel) == MAT_LAVA;
-    if (lavaGlow) glint = luminance(color);
+    bool lavaGlow = sparkle <= 0.0 && readMaterialId(texel) == MAT_LAVA;
+    if (lavaGlow) sparkle = luminance(color);
     float depth = texelFetch(depthtex0, texel, 0).r;
     bool isSky = depth >= 1.0;
     float fixedDepth = isSky ? 1.0 : fixHandDepth(depth);
@@ -203,8 +202,8 @@ void main() {
     // 遠景 (空気中のみ。水中・溶岩の中からは遠景が見えないので媒質のフォグだけで十分)
     if (!isSky && isEyeInWater == 0) {
         color = applyAerialPerspective(color, playerPos);
-        // 空中遠近の透過率 (加わる空の色を除いた分)。輝点のある画素だけ求める
-        if (glint > 0.0) glint *= luminance(applyAerialPerspective(vec3(1.0), playerPos) - applyAerialPerspective(vec3(0.0), playerPos));
+        // 空中遠近の透過率 (加わる空の色を除いた分)。白飛び分のある画素だけ求める
+        if (sparkle > 0.0) sparkle *= luminance(applyAerialPerspective(vec3(1.0), playerPos) - applyAerialPerspective(vec3(0.0), playerPos));
         float borderFog = getBorderFog(playerPos);
         // 水面は描画距離の外へ続く平面で、端の色は地平線の空の映り込みとほぼ同じ。端のフォグで地平線の色へ溶かすと
         // 遠くの水面の雲や島の映り込みが消え、水平線の手前が白い帯になっていた
@@ -212,7 +211,7 @@ void main() {
         decodeTranslucentData(texelFetch(colortex5, texel, 0), nT, lmT, matT);
         if (matT == MAT_WATER && depth < texelFetch(depthtex1, texel, 0).r) borderFog *= WATER_BORDER_FOG;
         color = mix(color, getBorderFogColor(dir), borderFog);
-        glint *= 1.0 - borderFog;
+        sparkle *= 1.0 - borderFog;
 #if CLOUDS >= 2 && defined HAS_SKY
         // 雲の下面より上にいる時だけ、地形の手前の雲を求める (deferred20 は地形までの区間だけを積分している)。
         // 重ねるのは高さフォグの後 (雲の下のもやと霧の層は雲の向こうにあり、雲の上に塗られないように)
@@ -263,7 +262,7 @@ void main() {
         vec4 fog = fogAnalyticSegment(dir, 0.0, dist, fogLightingSetup(dir), sunVisibility, max(outdoor, 0.05));
 #endif
         color = color * fog.a + fog.rgb;
-        glint *= fog.a;
+        sparkle *= fog.a;
 #if defined HAS_SKY
         vec2 localDensity = fogDensityAt(vec3(0.0), fogMedium());
     #ifdef GODRAYS
@@ -271,14 +270,14 @@ void main() {
     #endif
 #endif
         color = color * frontClouds.a + frontClouds.rgb;
-        glint *= frontClouds.a;
+        sparkle *= frontClouds.a;
 #ifdef CLOUD_INTERIOR
         // カメラが雲の中: 層を出るまで一様な霧として掛ける。手持ちの物・自分の体 (手の深度) には掛けない
         // 半透明の向こうの背景の分 (半透明から奥の不透明面まで) は translucent_composite が先に掛けてあり、ここは手前の半透明までの区間
         if (!isHandDepth(depth)) {
             vec4 interiorFog = cloudInteriorFog(dir, 0.0, dist);
             color = color * interiorFog.a + interiorFog.rgb;
-            glint *= interiorFog.a;
+            sparkle *= interiorFog.a;
         }
 #endif
 #if defined HAS_SKY
@@ -297,9 +296,9 @@ void main() {
     if (blindFog > 0.0) {
         float blindT = mix(1.0, exp(-BLINDNESS_FOG_EXTINCTION * max(dist - BLINDNESS_CLEAR_DIST, 0.0)), blindFog);
         color *= blindT;
-        glint *= blindT;
+        sparkle *= blindT;
     }
 
-    float share = saturate(glint / max(luminance(color), 1e-6));
+    float share = saturate(sparkle / max(luminance(color), 1e-6));
     outColor = vec4(color, lavaGlow ? -share : (share > 0.0 ? 1.0 + share : 0.0));
 }

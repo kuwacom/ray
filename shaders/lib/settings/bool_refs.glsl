@@ -78,6 +78,8 @@
 #endif
 #ifdef WATER_TEXTURE
 #endif
+#ifdef SPECULAR_SPARKLE
+#endif
 #ifdef STARS
 #endif
 #ifdef CLOUD_TEMPORAL

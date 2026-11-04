@@ -286,8 +286,6 @@ option.WATER_RIPPLES=さざ波
 option.WATER_RIPPLES.comment=1 ブロックより短い波の強さ
 option.WATER_FOAM=泡
 option.WATER_FOAM.comment=沖で崩れる波頭の白波。風が強いほど増える。水際には出さない
-option.WATER_GLINT=照り返しのきらめき
-option.WATER_GLINT.comment=太陽・月の照り返しのうち、細かい波の面の輝点として描く割合。0 で滑らかな照り返し
 option.WATER_LAKE_WAVES=湖の風
 option.WATER_LAKE_WAVES.comment=湖・池の風の強さ (海に対する割合)。湖は吹送距離が短いので波は小さいまま
 option.WATER_RIVER_WAVES=川の風
@@ -316,6 +314,8 @@ value.REFLECTIONS.1=SSR
 value.REFLECTIONS.2=SSR + ラフ反射
 value.REFLECTIONS.3=SSR + ボクセル
 option.SSR_STEPS=反射のステップ数
+option.SPECULAR_SPARKLE=反射光のきらめき
+option.SPECULAR_SPARKLE.comment=水面・ガラス・金属に映った太陽や灯りの白く飛んだ所を、ブルームとレンズの効果に届くまま残す。OFF ではアンチエイリアスで細かい照り返しが弱まる
 
 # 空
 option.ATMOSPHERE_MODE=大気

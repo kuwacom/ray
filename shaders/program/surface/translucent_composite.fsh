@@ -24,6 +24,7 @@
 //@include "/lib/surface/surface_lights.glsl"
 //@include "/lib/surface/composite_specular.glsl"
 //@include "/lib/surface/water_shading.glsl"
+//@include "/lib/common/specular_sparkle.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -53,7 +54,6 @@
 #include "/lib/common/noise.glsl"
 #include "/lib/common/transforms.glsl"
 #include "/lib/common/water_waves.glsl"
-#include "/lib/common/water_glint.glsl"
 #include "/lib/common/water_normal.glsl"
 #include "/lib/common/water.glsl"
 #include "/lib/common/shadow_space.glsl"
@@ -106,6 +106,7 @@
 #include "/lib/surface/composite_specular.glsl"
 #include "/lib/common/exposure.glsl"
 #include "/lib/surface/water_shading.glsl"
+#include "/lib/common/specular_sparkle.glsl"
 // END GENERATED includes
 
 /* RENDERTARGETS: 0 */
@@ -138,10 +139,10 @@ void main() {
         vec3 env = d1 < 1.0 ? opaqueEnvSpecular(texel, d1) : vec3(0.0);
         color += env;
         vec3 result = color * (1.0 - translucent.a) + translucent.rgb;
-        // 水たまりの輝点 (deferred30 が a = 1 + 割合で渡す) の割合を、足した鏡面と重なった半透明の分だけ直して渡す
-        // 映り込んだ光源が白く飛んでいる所では割合を下げ、TAA に通して潰す (白い面の中の点がブルームの起点になる。エネルギーは残る)
-        float sceneGlint = saturate(sceneIn.a - 1.0) * luminance(scene) * glintWhiteKeep(luminance(env) * getExposure());
-        outColor = vec4(result, 1.0 + saturate(sceneGlint * (1.0 - translucent.a) / max(luminance(result), 1e-6)));
+        // deferred30 が a = 1 + 割合で渡した直接光の鏡面の白飛び分と、ここで足す映り込みの白飛び分を、重なった半透明の分だけ直して渡す
+        // (しきい値は別々に掛けるので、両方が白の手前の時は少なめに出る)
+        float sparkle = saturate(sceneIn.a - 1.0) * luminance(scene) + luminance(sparkleExcess(env, getExposure()));
+        outColor = vec4(result, 1.0 + saturate(sparkle * (1.0 - translucent.a) / max(luminance(result), 1e-6)));
         return;
     }
 
@@ -155,8 +156,8 @@ void main() {
     float NoV = saturate(dot(N, V));
     vec3 floorPlayer = screenToPlayer(vec3(texcoord, d1));
     vec3 color;
-    // 水面の輝点の輝度。TAA (composite20) は輝点を近傍の箱で潰すので、割合を a = 1 + 割合で渡して TAA の後に足させる
-    float glintLum = 0.0;
+    // 鏡面の白飛び分の輝度。TAA (composite20) は明るい点を近傍の箱で潰すので、割合を a = 1 + 割合で渡して TAA の後に足させる
+    float sparkleLum = 0.0;
 
     if (matT == MAT_WATER) {
         bool below = isEyeInWater == 1;
@@ -367,18 +368,9 @@ void main() {
         color = behind * (1.0 - F) + refl * F;
         if (!below) {
             float sunAlpha = sqrt(sqr(WATER_ROUGHNESS) + unresolvedVar);
-            vec3 sunLobe = sunSpecular(N, V, WATER_F0, sunAlpha, sunSpecVis);
-            color += sunLobe + localLightSpecular(WL, N, V, WATER_F0, sunAlpha);
-            // 上向きの水面は照り返しの一部を輝点にする。輝点の傾きの分布は画素より細かい波の全部 (表面張力波を含む)
-            // 近いほど、また滑らかに足した明るさ (映った光源を含む) が白く飛んでいるほど割合を下げる (点を足す前の明るさで測る)
-            float g = N.y > 0.5 ? WATER_GLINT * WATER_GLINT_POINT_SHARE * glintNearFade(dist) : 0.0;
-            g *= glintWhiteKeep(luminance(color) * getExposure());
-            if (g > 0.0) {
-                float glintVar = unresolvedVar + sea.microVar * (1.0 - WATER_MICRO_ROUGHNESS);
-                vec4 glint = sunGlint(surfPlayer, N, V, glintVar, sunSpecVis, dist, NoVGeo);
-                color += (glint.rgb - sunLobe) * g;
-                glintLum = glint.a * g;
-            }
+            vec3 spec = refl * F + sunSpecular(N, V, WATER_F0, sunAlpha, sunSpecVis) + localLightSpecular(WL, N, V, WATER_F0, sunAlpha);
+            color = behind * (1.0 - F) + spec;
+            sparkleLum = luminance(sparkleExcess(spec, getExposure()));
 
             // 上向きの面だけ: 長い 3 層の高さと Jacobian (波頭の透過光と泡)。視差の位置ずれは長い波では画素未満
             if (N.y > 0.5) {
@@ -403,6 +395,7 @@ void main() {
                     * smoothstep(0.3, 0.6, pattern) * offshore;
                 float foam = saturate(cap * WATER_FOAM) * FOAM_OPACITY;
                 if (foam > 0.0) color = mix(color, foamRadiance(surfPlayer, vec3(0.0, 1.0, 0.0), lmT, sunVis, WL), foam);
+                sparkleLum *= 1.0 - foam;
             }
         }
     } else {
@@ -444,14 +437,14 @@ void main() {
         SurfaceLights GL = gatherSurfaceLights(gp, SL_SUN_NONE, SL_BLOCK_NONE, SL_HAND | SL_BLOCK_SPECULAR_TRACED);
         float glassAlpha = max(roughness * roughness, WATER_ROUGHNESS);
         // 前方で照らした拡散 (translucent.rgb) は鏡面で反射する F の分を除く (太陽の鏡面を足すので、その分だけ明るくならないように)
-        color = behind * transmit * (1.0 - F) + translucent.rgb * (1.0 - F) + refl * F
-            + sunSpecular(N, V, GLASS_F0, glassAlpha, glassSunVis) + localLightSpecular(GL, N, V, GLASS_F0, glassAlpha);
-        outColor = vec4(color, 1.0);
+        vec3 spec = refl * F + sunSpecular(N, V, GLASS_F0, glassAlpha, glassSunVis) + localLightSpecular(GL, N, V, GLASS_F0, glassAlpha);
+        color = behind * transmit * (1.0 - F) + translucent.rgb * (1.0 - F) + spec;
+        outColor = vec4(color, 1.0 + saturate(luminance(sparkleExcess(spec, getExposure())) / max(luminance(color), 1e-6)));
         return;
     }
 
     // 水の上に重なった物 (WATER_TEXTURE の水テクスチャ・パーティクル・雨) を重ねる
     vec3 result = color * (1.0 - translucent.a) + translucent.rgb;
-    float glintShare = saturate(glintLum * (1.0 - translucent.a) / max(luminance(result), 1e-6));
-    outColor = vec4(result, 1.0 + glintShare);
+    float sparkleShare = saturate(sparkleLum * (1.0 - translucent.a) / max(luminance(result), 1e-6));
+    outColor = vec4(result, 1.0 + sparkleShare);
 }

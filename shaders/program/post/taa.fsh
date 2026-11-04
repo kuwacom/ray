@@ -88,12 +88,12 @@ vec3 clipToBox(vec3 history, vec3 boxMin, vec3 boxMax) {
 }
 
 /*
- * 水面の輝点の割合 (composite1 / composite19 が colortex0.a = 1 + 割合で渡す)
- * 輝点は 1 画素ほどの HDR の点で、トーンマップ空間の近傍の箱と低い混合率では数十フレームかけないと履歴が追いつかず、
- * ブルームに届く前に平らな灰色へ潰れていた。輝点の分は箱の統計と履歴から外し、TAA の結果に今フレームの値を足す
- * (位置はワールドに固定してあり、ジッターで動かないので TAA を通さなくても静止時はちらつかない)
+ * 鏡面の白飛び分の割合 (deferred30 / composite1 / composite19 が colortex0.a = 1 + 割合で渡す)
+ * 白を超えた分は 1 画素ほどの HDR の点になり、トーンマップ空間の近傍の箱と低い混合率では数十フレームかけないと履歴が追いつかず、
+ * ブルームに届く前に平らな灰色へ潰れる。この分は箱の統計と履歴から外し、TAA の結果に今フレームの値を足す
+ * 位置は法線の反射で決まり、白より下は TAA を通すので輪郭はアンチエイリアスされる
  */
-float glintShare(float a) { return clamp(a - 1.0, 0.0, 1.0); }
+float sparkleShare(float a) { return clamp(a - 1.0, 0.0, 1.0); }
 
 // colortex13.a に書く「このピクセルの距離」
 float historyDistance(vec2 uv, float depth) {
@@ -181,7 +181,7 @@ TaaNeighborhood taaNeighborhood(ivec2 center, ivec2 maxTexel, float exposure, fl
         for (int x = -1; x <= 1; x++) {
             ivec2 p = clamp(center + ivec2(x, y), ivec2(0), maxTexel);
             vec4 s = texelFetch(colortex0, p, 0);
-            vec3 c = rgbToYCoCg(taaCompress(sanitizeColor(s.rgb) * (1.0 - glintShare(s.a)), exposure));
+            vec3 c = rgbToYCoCg(taaCompress(sanitizeColor(s.rgb) * (1.0 - sparkleShare(s.a)), exposure));
             m1 += c;
             m2 += c * c;
             nb.boxMin = min(nb.boxMin, c);
@@ -235,22 +235,22 @@ void taaWarped() {
     float nearWeight = exp(-LENS_WARP_TAA_KERNEL * distOut * distOut);
 
     vec4 nearRaw = texelFetch(colortex0, nearest, 0);
-    vec3 nearColor = sanitizeColor(nearRaw.rgb) * (1.0 - glintShare(nearRaw.a));
+    vec3 nearColor = sanitizeColor(nearRaw.rgb) * (1.0 - sparkleShare(nearRaw.a));
     float centerDepth = texelFetch(depthtex0, nearest, 0).r;
 
-    // 1 フレームの補間 (final で引き伸ばす方式と同じ Catmull-Rom)。輝点は双線形で別に取り出す
+    // 1 フレームの補間 (final で引き伸ばす方式と同じ Catmull-Rom)。白飛び分は双線形で別に取り出す
     vec2 posUv = pos * texelSize();
     vec2 b = pos - 0.5;
     ivec2 b0 = ivec2(floor(b));
     vec2 bf = b - vec2(b0);
-    vec3 glint = vec3(0.0);
+    vec3 sparkle = vec3(0.0);
     for (int i = 0; i < 4; i++) {
         ivec2 o = ivec2(i & 1, i >> 1);
         vec4 s = texelFetch(colortex0, clamp(b0 + o, ivec2(0), maxTexel), 0);
         float w = (o.x == 1 ? bf.x : 1.0 - bf.x) * (o.y == 1 ? bf.y : 1.0 - bf.y);
-        glint += sanitizeColor(s.rgb) * glintShare(s.a) * w;
+        sparkle += sanitizeColor(s.rgb) * sparkleShare(s.a) * w;
     }
-    vec3 smoothColor = max(sanitizeColor(sampleCatmullRom(colortex0, posUv, viewSize())) - glint, 0.0);
+    vec3 smoothColor = max(sanitizeColor(sampleCatmullRom(colortex0, posUv, viewSize())) - sparkle, 0.0);
 
     // 一番近い元の画素の周りの統計と、最も手前の深度 (元画像の座標。歪曲なしの TAA と同じ)
     TaaNeighborhood nb = taaNeighborhood(nearest, maxTexel, exposure, centerDepth);
@@ -293,7 +293,7 @@ void taaWarped() {
     }
 
     vec3 result = sanitizeColor(taaExpand(yCoCgToRgb(resultYcc), exposure));
-    outColor = vec4(result + glint, min(nearRaw.a, 0.0));
+    outColor = vec4(result + sparkle, min(nearRaw.a, 0.0));
     outHistory = vec4(result, historyDistance(src, centerDepth));
 }
 
@@ -310,8 +310,8 @@ void main() {
 
     vec4 centerRaw = texelFetch(colortex0, texel, 0);
     vec3 centerColor = sanitizeColor(centerRaw.rgb);
-    vec3 centerGlint = centerColor * glintShare(centerRaw.a);
-    centerColor -= centerGlint;
+    vec3 centerSparkle = centerColor * sparkleShare(centerRaw.a);
+    centerColor -= centerSparkle;
     float centerDepth = texelFetch(depthtex0, texel, 0).r;
 
     // 3x3 近傍の統計と、最も手前の深度 (エッジでは手前の物体の速度を使うと輪郭のゴーストが減る)
@@ -349,8 +349,8 @@ void main() {
     }
 
     vec3 result = sanitizeColor(taaExpand(yCoCgToRgb(resultYcc), exposure));
-    // 輝点は履歴に入れず、今フレームの値を足す (a は以降のパスでは使わないので 1 に戻す)
+    // 白飛び分は履歴に入れず、今フレームの値を足す (a は以降のパスでは使わないので 1 に戻す)
     // a < 0 は溶岩の発光の割合 (composite19)。モーションブラー・DoF を素通りしてブルームの縮小 (composite23) が読む
-    outColor = vec4(result + centerGlint, min(centerRaw.a, 0.0));
+    outColor = vec4(result + centerSparkle, min(centerRaw.a, 0.0));
     outHistory = vec4(result, historyDistance(unjitteredUv, centerDepth));
 }

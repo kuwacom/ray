@@ -60,7 +60,6 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define WATER_CHOPPINESS 1.5 // [0.0 0.5 1.0 1.5 2.0 2.5 3.0 4.0 5.0] 波頭の尖り
 #define WATER_RIPPLES 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0] さざ波 (1 ブロックより短い波) の強さ
 #define WATER_FOAM 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0] 泡 (沖の白波) の量
-#define WATER_GLINT 1.0 // [0.0 0.25 0.5 0.75 1.0] 太陽・月の照り返しのきらめき (0 = 滑らかな照り返し)
 #define WATER_LAKE_WAVES 0.6 // [0.0 0.2 0.4 0.6 0.8 1.0 1.5 2.0] 湖 (海・川以外) の風の強さ (海に対する割合)
 #define WATER_RIVER_WAVES 0.4 // [0.0 0.2 0.4 0.6 0.8 1.0 1.5 2.0] 川の風の強さ (海に対する割合)
 #define WATER_PARALLAX // 水面の視差
@@ -72,5 +71,6 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define WATER_TYPE 0 // [0 1 2] 0=外洋 (青) 1=沿岸 (緑) 2=澄んだ水
 #define REFLECTIONS 2 // [0 1 2 3] 0=空のみ 1=SSR 2=SSR+ラフ反射 3=SSR+ボクセル補完
 #define SSR_STEPS 24 // [8 12 16 24 32 48 64]
+#define SPECULAR_SPARKLE // 水面・ガラス・金属の照り返しの白く飛んだ所を TAA の外で運び、ブルームとレンズの効果へ届ける
 
 #endif

@@ -79,26 +79,6 @@ const float WATER_REFRACT_D_MATCH = 0.6;        // 画面の点が屈折した�
 const float WATER_REFRACT_D_REF_RADIUS = 6.0;   // ボクセルの色の基準にする水底の平均を取る半径 (画素)
 const float WATER_REFRACT_D_REF_MATCH = 2.0;    // 基準の平均に入れる水底の点の、まっすぐ見た水底からの距離 (ブロック)
 const vec2 WATER_REFRACT_D_TONE_CLAMP = vec2(0.5, 2.0); // 表の色に掛ける明るさの補正の範囲
-// 照り返しのうち輝点に回す割合の上限 (WATER_GLINT = 1 の時)。残りは滑らかなローブのまま光の道の下地の淡い光にする
-const float WATER_GLINT_POINT_SHARE = 0.85;
-
-/*
- * 水面の太陽 (月) の照り返しのきらめき。滑らかなローブ x 輝点の倍率 (lib/common/water.glsl の waterSunGlint)
- * slopeVar: 画素より細かい波の傾きの分散。戻り値 rgb = 足す放射輝度, a = そのうち輝点の輝度 (TAA を通さずに足す分)
- */
-vec4 sunGlint(vec3 surfPlayer, vec3 N, vec3 V, float slopeVar, vec3 sunVis, float dist, float NoVGeo) {
-    LightSample sun = unshadowedSun();
-    vec3 lobe = sunSpecular(N, V, WATER_F0, sqrt(sqr(WATER_ROUGHNESS) + slopeVar), sunVis);
-    if (maxOf(lobe) <= 0.0) return vec4(0.0);
-    float pixelWorld = dist * 2.0 / (gbufferProjection[1][1] * viewSize().y);
-    vec2 gl = waterSunGlint(surfPlayer.xz + cameraPosition.xz, N, V, sun.direction, slopeVar, sun.angularSize, pixelWorld, NoVGeo);
-    vec3 point = lobe * gl.y;
-    // 1 枚の面が映す明るさは太陽の円盤の鏡像まで (GGX の裾と正規分布の裾の違いで出る極端な値を抑える)
-    vec3 H = normalize(V + sun.direction);
-    vec3 mirror = sun.irradiance * sunVis * fresnelSchlick(vec3(WATER_F0), dot(V, H)) / (PI * sqr(sun.angularSize));
-    point = min(point, mirror);
-    return vec4(lobe * (gl.x - gl.y) + point, luminance(point));
-}
 
 // 屈折先 tuv を画面の内側へ収める (元の画素 uv からのずれを縮める)
 vec2 clampRefractUv(vec2 uv, vec2 tuv) {

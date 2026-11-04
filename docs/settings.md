@@ -129,7 +129,6 @@
 | WATER_CHOPPINESS | 1.5 | 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0 |
 | WATER_RIPPLES | 1.0 | 0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0 |
 | WATER_FOAM | 1.0 | 0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0 |
-| WATER_GLINT | 1.0 | 0.0, 0.25, 0.5, 0.75, 1.0 |
 | WATER_LAKE_WAVES | 0.6 | 0.0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.5, 2.0 |
 | WATER_RIVER_WAVES | 0.4 | 0.0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.5, 2.0 |
 | WATER_PARALLAX | ON | ON / OFF |
@@ -141,6 +140,7 @@
 | WATER_TYPE | 0 | 0, 1, 2 |
 | REFLECTIONS | 2 | 0, 1, 2, 3 |
 | SSR_STEPS | 24 | 8, 12, 16, 24, 32, 48, 64 |
+| SPECULAR_SPARKLE | ON | ON / OFF |
 
 ## sky (`lib/settings/sky.glsl`)
 

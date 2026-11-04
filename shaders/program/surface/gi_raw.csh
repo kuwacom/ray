@@ -52,7 +52,6 @@
 #include "/lib/common/noise.glsl"
 #include "/lib/common/transforms.glsl"
 #include "/lib/common/water_waves.glsl"
-#include "/lib/common/water_glint.glsl"
 #include "/lib/common/water_normal.glsl"
 #include "/lib/common/water.glsl"
 #include "/lib/common/shadow_space.glsl"

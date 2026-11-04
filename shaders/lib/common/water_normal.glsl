@@ -14,16 +14,13 @@
 //@include "/lib/common/water_waves.glsl"
 
 /*
- * 水たまりの照り返しのきらめき (deferred30 の puddleSpecular)
- * 水たまりは滑らかさ 0.99 の鏡なので、太陽・灯りの鏡面が光源の大きさの円盤 1 つになり、CG で光源を置いただけの
- * 丸に見えた。水面と同じく、画素より細かい波の傾きの分布で照り返しを輝点に分けて TAA の後に足す (waterSunGlint)
- * 傾きの分散は、風のさざ波 (吹送距離が水たまりの大きさしか無いので表面張力波から短い波だけ) と雨粒の跳ね
+ * 水たまりの鏡面を広げる傾きの分散 (deferred30)
+ * 水たまりは滑らかさ 0.99 の鏡なので、太陽・灯りの鏡面は光源の円盤の鏡像になる。傾きの分散は、風のさざ波
+ * (吹送距離が水たまりの大きさしか無いので表面張力波から短い波だけ) と雨粒の跳ね
  */
 const float PUDDLE_WIND_SHELTER = 0.1;       // 地面の水たまりに当たる風 (WATER_WIND_SPEED に対する割合)
 const float PUDDLE_FETCH = 0.25;             // 水たまりに立つ一番長い波 (m)
 const float PUDDLE_RAIN_SLOPE_VAR = 0.002;   // 本降りの雨粒の跳ねと画素より細かい波紋の傾きの分散 (PUDDLE_RIPPLES = 1)
-// 水たまりは凪いだ鏡なので、海と同じ割合の点は多すぎた
-const float PUDDLE_GLINT_POINT_SHARE = 0.5;  // 照り返しのうち輝点に回す割合 (WATER_GLINT = 1 の時)
 
 float puddleSlopeVar() {
     float wind = waterSlopeDensity(WATER_WIND_SPEED * PUDDLE_WIND_SHELTER) * log(PUDDLE_FETCH / WATER_CAPILLARY_WAVELENGTH) * WATER_RIPPLES;

@@ -158,6 +158,17 @@ vec3 evalDirectLight(Material m, vec3 N, vec3 V, LightSample L) {
     return (diffuse + spec) * L.irradiance * NoL;
 }
 
+// 拡散と鏡面を分けて返す版 (鏡面だけ別に集める呼び出し側が GGX を 2 回求めないように)。戻り値は拡散、spec は鏡面
+vec3 evalDirectLight(Material m, vec3 N, vec3 V, LightSample L, out vec3 spec) {
+    spec = vec3(0.0);
+    float NoL = dot(N, L.direction);
+    if (NoL <= 0.0 || maxOf(L.irradiance) <= 0.0) return vec3(0.0);
+    float NoV = max(dot(N, V), 1e-3);
+    vec3 diffuse = eonDiffuse(m.albedo, eonRoughness(m), NoL, NoV, dot(L.direction, V)) * (1.0 - specularAlbedo(m, NoV));
+    spec = evalSpecularLobe(m, N, V, L.direction, L.angularSize, NoL, NoV) * L.irradiance * NoL;
+    return diffuse * L.irradiance * NoL;
+}
+
 // 拡散だけ (前方シェーディングの半透明: 鏡面は composite1 でまとめて掛けるため)
 vec3 evalDirectDiffuse(Material m, vec3 N, vec3 V, LightSample L) {
     float NoL = dot(N, L.direction);
