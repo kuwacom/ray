@@ -114,7 +114,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 26 | composite13.vsh/fsh | sky | 同 2/3: 中のスパン | colortex16 | colortex16 | 同上 | 同上 |
 | 27 | composite14.vsh/fsh | sky | 同 3/3: 全長のスパン | colortex16 | colortex16 | 同上 | 同上 |
 | 28 | composite19.vsh/fsh | sky | フォグ / VL の適用 (バイラテラルアップサンプル)、水中フォグ、画面空間の光芒の加算 (カメラの位置の霧の濃さで強さを決める)、カメラが雲より上のときの手前の雲 (高さフォグと光芒の後に重ねる。半透明が手前の画素は `cloudFrontPart` でカメラから半透明までの分に割り引く) | colortex0/12/16 | colortex0 | 画面 | 常時 |
-| 29 | composite20.vsh/fsh | post | TAA (LENS_WARP_TAA の時は歪曲・魚眼の組み立ても) | colortex0/13/15 | colortex0, colortex13 | 画面 | TAA |
+| 29 | composite20.vsh/fsh | post | TAA (LENS_WARP_TAA の時は歪曲・魚眼の組み立ても) | colortex0/13/15/17 | colortex0, colortex13, colortex17 | 画面 | TAA |
 | 30 | composite21.vsh/fsh | post | モーションブラー | colortex0/15 | colortex0 | 画面 | MOTION_BLUR |
 | 31 | composite22.vsh/fsh | post | DoF (MIP-Bokeh, colortex0 ミップ) | colortex0, SSBO0 focus | colortex0 | 画面 | DOF |
 | 32 | composite23.vsh/fsh | post | ブルーム縮小タイル | colortex0 ミップ | colortex14 | 画面 | BLOOM |
@@ -133,7 +133,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 
 ## バッファ設計
 
-### colortex (17 枚。正本は `lib/buffers/formats.glsl`)
+### colortex (18 枚。正本は `lib/buffers/formats.glsl`)
 
 | buf | フォーマット | 内容 | 書く | 読む | クリア |
 |---|---|---|---|---|---|
@@ -154,6 +154,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 14 | RGBA16F | post: ブルームタイル | post | post | 毎フレーム |
 | 15 | RGBA16F | 速度: rg = 前フレーム UV - 今の UV, a = 1 なら有効 (エンティティ・手) | surface (gbuffers, post の関数) | post | 毎フレーム |
 | 16 | R16F | sky: 画面空間の光芒 (低解像度 `size.buffer.colortex16` = 1/GODRAYS_RES)。composite12 -> 13 -> 14 で同じバッファをピンポンして読み書きし、composite19 が足す | sky | sky | 毎フレーム |
+| 17 | RGBA16F | post: 鏡面の白飛び分の履歴 (rgb = 露出前の線形, a 予備)。SPECULAR_SPARKLE の時だけ composite20 が読み書きする | post | post | 永続 |
 
 - gbuffers では colortex0-3 を読めない (Iris の仕様)
 - `shadowcolor0` RGBA8: 最も太陽側の面の色 (半透明は透過色 + a 不透明度、不透明は a=1)。`shadowcolor1` RGBA16: rg 法線 (oct), b スカイライト, a 種別 (0 不透明 / 0.2 葉 / 0.5 半透明 / 1 水)。RSM (surface) と色付き影・葉の透過 (surface) と色付き光芒 (sky) が読む
@@ -407,7 +408,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | フォグ / VL | Chocapic13 の指数分布ステップ + 影マップ空間マーチ + 区間解析積分。景色の成分 (上端のある混合層のもや + 空中遠近) は内散乱を空の色から作り (遠景は同じ方位の地平線の空に収束、影の中は太陽の単散乱を引いて光芒)、描画距離 R の端で光学的深さが FOG_EDGE_DEPTH になる距離の写像 d (1 + (d / D)^2) で縮める。局所の成分 (霧の層・地表の霧) は縮めない。高さは FOG_HEIGHT_PRESET (`lib/sky/fog_template.glsl`)、成分の形と比は FOG_STYLE (`lib/sky/fog_styles.glsl`。全体の濃さは LOOK_FOG_DENSITY)、湿地・ジャングルは `fogSwamp` / `fogJungle` (カスタム uniform の smooth 9, 10)、日替わりは `lib/sky/climate.glsl` (雲と同じ種)。地平線の下の虚空は同じ式で仮想の地面まで積み、太陽から 30 度以上の方位では地平線の空の 1.05 倍まで。仮想の地面までの距離が描画距離を超えるほど地面の色 (雪原の白など) を捨てて、見下ろした角度の分だけ上の空 (海は水面の映り) へ溶かし (SKY_VOID_AERIAL_LENGTH)、高所から見下ろした虚空が空の青に溶ける。端 (距離 = 描画距離) では 0 で、地平線のすぐ下は地平線の空とほぼ同じなので地上の見え方は変わらない。DH 対応時は `fogRenderDistance()` を DH の描画距離にし、縮めずに景色の成分の濃さを FOG_EDGE_DEPTH / R まで下げる (下限は晴天 1.5e-4)、虚空は DH の描画距離の外だけ、VL の解析区間と画面空間の光芒は DH の深度も見る。floodfill を VL マーチで読んで光源周りのフォグを照らす (FOG_BLOCKLIGHT)。洞窟の光漏れ防止 (スカイライトに加え、prepare が影マップで求める目の位置の太陽の見え方を、影マップの範囲より遠い光芒と画面の外の太陽のフレアに掛ける)。影マップに写らない遠い壁・山の裏では、画面空間の光芒 (VL_FAR) が画面の外へ出た点も端の画素の深度で判定して範囲内の点にも掛け、VL_FAR の無い構成 (VL なし・LOW) は composite25 が太陽の円盤の深度から求める「範囲より遠い地形に隠れている割合」を霧の太陽方向の光に掛ける。全面のブルーミーフォグは弱く。画面空間の光芒 (GODRAYS、`lib/sky/godrays.glsl`) は VL とは別に、空の画素 (深度 1、手を含まない) x 雲の透過率 x 光源からの角度の重みのマスクを、光源の画面の位置へ向かう放射状のぼかし (3 パスの入れ子で 1 パス N タップ、実効 N^3 タップ。低解像度の colortex16) でのばし、フォグの適用 (composite19) で光源の照度 x カメラの位置の霧の濃さの係数を掛けて足す。半透明は遮蔽にしない。画面の外のタップは 0、光源が画面の外へ出るほど弱め、外にある分には目の位置の太陽の見え方を掛ける。水中・溶岩・粉雪の中・ネザー・エンドでは足さない | sky |
 | 水 | 前方シェーディング + 波 (Gerstner 系) + 視差、composite1 で屈折 (SS / レイトレース) と吸収 (Jerlov 風)、コースティクスは影マップ参照。水の上から見た内散乱は、深さで弱まる水面の照度を屈折した視線に沿って解析積分する。水中の VL は指数分布のステップで、floodfill の照度にライトビンの光源の向きから求めた前方散乱の位相関数を掛ける (光源の周りのにじみ) | surface |
 | 反射 | SSR (階層なし線形 + 二分探索) + ラフ反射 (時間蓄積)、SSR 失敗時はボクセル補完 (REFLECTIONS=3, light の `traceVoxelRay`)、最後は空 (`getSkyRadiance`) | surface |
-| TAA | Halton(2,3) 16 フレームのジッター (`lib/common/jitter.glsl`) + YCoCg 近傍クランプ + Catmull-Rom 履歴 + トーンマップ空間での混合 (HDR フリッカー対策。鏡面の白飛び分 (SPECULAR_SPARKLE、`colortex0.a` = 1 + 割合で deferred30 / composite1 から渡る) だけは箱と履歴から外し、TAA の後に今フレームの値を足してブルームとレンズへ HDR のまま届ける) + 速度は colortex15 か深度再投影 | post |
+| TAA | Halton(2,3) 16 フレームのジッター (`lib/common/jitter.glsl`) + YCoCg 近傍クランプ + Catmull-Rom 履歴 + トーンマップ空間での混合 (HDR フリッカー対策。鏡面の白飛び分 (SPECULAR_SPARKLE、`colortex0.a` = 1 + 割合で deferred30 / composite1 から渡る) だけは箱と本体の履歴から外し、ジッターを外した位置で双線形に集めて、線形のまま専用の短い履歴 colortex17 (混合率 静止 0.4 / 動き 0.7、箱の切り詰めなし) で時間方向に積分してから足し、ブルームとレンズへ HDR のまま届ける。TAA の後の `colortex0.a` は正 = 白飛び分の割合、負 = 溶岩の発光の割合) + 速度は colortex15 か深度再投影 | post |
 | DoF | MIP-Bokeh (サンプル点で CoC を取り直す, 30/50/75 点)、物理カメラ (FOV から焦点距離)、オートフォーカス (速め)、手は除外、HDR 空間で実行。既定はボケ控えめ | post |
 | モーションブラー | 速度ベクトルに沿ったサンプル。既定 ON | post |
 | ブルーム | colortex0 のミップからタイル縮小 -> ぼかし -> final で合成。既定 0.5 (控えめ) | post |
@@ -688,7 +689,7 @@ post モジュールが提供 (`//@include "/lib/post/post.glsl"`):
 | colortex8/9, giRaw, reflection | 読む (8) | 読む | 書く | 読む (debug) |
 | colortex10/11/12/16, sky LUT, cloud*, fogHistory | 読む | 書く | 読む (11, 関数経由) | 読む (debug) |
 | colortex0 | - | 空テクスチャ (gbuffers), composite19 で書く | deferred30 / composite1 で書く | composite20 以降で書く |
-| colortex13/14 | - | - | - | 書く |
+| colortex13/14/17 | - | - | - | 書く |
 | debugImg | 書ける (IMG_DEBUG) | 書ける (IMG_DEBUG) | 書ける (IMG_DEBUG) | 表示 (DEBUG_VIEW=12) |
 
 ---

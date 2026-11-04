@@ -54,9 +54,16 @@
 
 in vec2 texcoord;
 
+#ifdef SPECULAR_SPARKLE
+/* RENDERTARGETS: 0,13,17 */
+layout(location = 0) out vec4 outColor;
+layout(location = 1) out vec4 outHistory;
+layout(location = 2) out vec4 outSparkle;
+#else
 /* RENDERTARGETS: 0,13 */
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec4 outHistory;
+#endif
 
 const float TAA_HISTORY_DEPTH_ABS = 0.05;      // 履歴の距離の許容の固定分 (ブロック)。距離に比例した分を足す
 const float TAA_MOVING_TOLERANCE_SCALE = 4.0;  // 動くエンティティの距離の許容の倍率
@@ -90,10 +97,57 @@ vec3 clipToBox(vec3 history, vec3 boxMin, vec3 boxMax) {
 /*
  * 鏡面の白飛び分の割合 (deferred30 / composite1 / composite19 が colortex0.a = 1 + 割合で渡す)
  * 白を超えた分は 1 画素ほどの HDR の点になり、トーンマップ空間の近傍の箱と低い混合率では数十フレームかけないと履歴が追いつかず、
- * ブルームに届く前に平らな灰色へ潰れる。この分は箱の統計と履歴から外し、TAA の結果に今フレームの値を足す
+ * ブルームに届く前に平らな灰色へ潰れる。この分は箱の統計と本体の履歴から外し、線形のまま専用の短い履歴 (colortex17) で混ぜて足す
  * 位置は法線の反射で決まり、白より下は TAA を通すので輪郭はアンチエイリアスされる
  */
 float sparkleShare(float a) { return clamp(a - 1.0, 0.0, 1.0); }
+
+/*
+ * 鏡面の白飛び分の時間積分。今フレームの値をそのまま足すと、1 画素未満の照り返しはジッターの当たり外れ、影の縁のディザ、
+ * 雨の波紋の入れ替わりのまま毎フレーム点滅し、ブルーム・光条・玉ボケごと明滅する。カメラのシャッターと同じく線形の
+ * 平均で混ぜるので、平均のエネルギーは変わらず点も消えない (トーンマップ空間で混ぜると明るい点ほど潰れる)
+ * 近傍の箱による切り詰めは掛けない (掛けると当たり外れの点が履歴ごと消えて点滅に戻る)。尾は混合率で数フレームに収める
+ * 混合率はフレーム単位 (秒にすると低いフレームレートで 1 に寄って点滅に戻る)
+ */
+const float SPARKLE_HISTORY_BLEND = 0.4;         // 静止時の今フレームの重み (尾は 0.6^n、4 フレームで 13%)
+const float SPARKLE_HISTORY_BLEND_MOVING = 0.7;  // 動きが TAA_BLEND_MOTION_PX の時
+
+/*
+ * 今フレームのバッファの位置 pos (画素) の白飛び分を双線形で集める。ジッターを外した位置で読むので、
+ * 照り返しの点はフレームごとにずれず、サブピクセルの位置へ重みで配られる (4 つの重みの和は 1 で、全体の量は変わらない)
+ */
+vec3 gatherSparkle(vec2 pos, ivec2 maxTexel) {
+    vec2 b = pos - 0.5;
+    ivec2 b0 = ivec2(floor(b));
+    vec2 bf = b - vec2(b0);
+    vec3 sparkle = vec3(0.0);
+    for (int i = 0; i < 4; i++) {
+        ivec2 o = ivec2(i & 1, i >> 1);
+        vec4 s = texelFetch(colortex0, clamp(b0 + o, ivec2(0), maxTexel), 0);
+        float w = (o.x == 1 ? bf.x : 1.0 - bf.x) * (o.y == 1 ? bf.y : 1.0 - bf.y);
+        sparkle += sanitizeColor(s.rgb) * sparkleShare(s.a) * w;
+    }
+    return sparkle;
+}
+
+/*
+ * 白飛び分の履歴と混ぜて、出力の色・a・履歴を書く。a は TAA の後では「正 = 白飛び分の割合、負 = 溶岩の発光の割合」
+ * (同じ画素で両方は起きない。ブルームの縮小は負の側だけを読む)
+ */
+void writeTaaOutput(vec3 result, vec3 sparkleNow, vec2 prevUv, bool valid, float motionPx, float rawA, float historyDist) {
+#ifdef SPECULAR_SPARKLE
+    vec3 sparkleHist = valid ? max(sanitizeColor(textureLod(colortex17, prevUv, 0.0).rgb), 0.0) : vec3(0.0);
+    float sa = valid ? mix(SPARKLE_HISTORY_BLEND, SPARKLE_HISTORY_BLEND_MOVING, saturate(motionPx / TAA_BLEND_MOTION_PX)) : 1.0;
+    vec3 sparkle = mix(sparkleHist, sparkleNow, sa);
+    outSparkle = vec4(sparkle, 0.0);
+#else
+    vec3 sparkle = sparkleNow;
+#endif
+    vec3 color = result + sparkle;
+    float share = saturate(luminance(sparkle) / max(luminance(color), 1e-6));
+    outColor = vec4(color, rawA < 0.0 ? rawA : share);
+    outHistory = vec4(result, historyDist);
+}
 
 // colortex13.a に書く「このピクセルの距離」
 float historyDistance(vec2 uv, float depth) {
@@ -218,6 +272,9 @@ void taaWarped() {
         // 魚眼の「横幅に合わせる」の隅 (描画の範囲外)。final が黒にする
         outColor = vec4(0.0);
         outHistory = vec4(0.0, 0.0, 0.0, TAA_SKY_DISTANCE);
+#ifdef SPECULAR_SPARKLE
+        outSparkle = vec4(0.0);
+#endif
         return;
     }
     float exposure = getExposure();
@@ -240,16 +297,7 @@ void taaWarped() {
 
     // 1 フレームの補間 (final で引き伸ばす方式と同じ Catmull-Rom)。白飛び分は双線形で別に取り出す
     vec2 posUv = pos * texelSize();
-    vec2 b = pos - 0.5;
-    ivec2 b0 = ivec2(floor(b));
-    vec2 bf = b - vec2(b0);
-    vec3 sparkle = vec3(0.0);
-    for (int i = 0; i < 4; i++) {
-        ivec2 o = ivec2(i & 1, i >> 1);
-        vec4 s = texelFetch(colortex0, clamp(b0 + o, ivec2(0), maxTexel), 0);
-        float w = (o.x == 1 ? bf.x : 1.0 - bf.x) * (o.y == 1 ? bf.y : 1.0 - bf.y);
-        sparkle += sanitizeColor(s.rgb) * sparkleShare(s.a) * w;
-    }
+    vec3 sparkle = gatherSparkle(pos, maxTexel);
     vec3 smoothColor = max(sanitizeColor(sampleCatmullRom(colortex0, posUv, viewSize())) - sparkle, 0.0);
 
     // 一番近い元の画素の周りの統計と、最も手前の深度 (元画像の座標。歪曲なしの TAA と同じ)
@@ -293,8 +341,7 @@ void taaWarped() {
     }
 
     vec3 result = sanitizeColor(taaExpand(yCoCgToRgb(resultYcc), exposure));
-    outColor = vec4(result + sparkle, min(nearRaw.a, 0.0));
-    outHistory = vec4(result, historyDistance(src, centerDepth));
+    writeTaaOutput(result, sparkle, prevUv, valid, motionPx, nearRaw.a, historyDistance(src, centerDepth));
 }
 
 void main() {
@@ -349,8 +396,8 @@ void main() {
     }
 
     vec3 result = sanitizeColor(taaExpand(yCoCgToRgb(resultYcc), exposure));
-    // 白飛び分は履歴に入れず、今フレームの値を足す (a は以降のパスでは使わないので 1 に戻す)
+    // 白飛び分は本体の履歴に入れず、ジッターを外した位置で集めて専用の履歴と混ぜて足す
     // a < 0 は溶岩の発光の割合 (composite19)。モーションブラー・DoF を素通りしてブルームの縮小 (composite23) が読む
-    outColor = vec4(result + centerSparkle, min(centerRaw.a, 0.0));
-    outHistory = vec4(result, historyDistance(unjitteredUv, centerDepth));
+    vec3 sparkleNow = gatherSparkle((uv + taaJitterUv()) * viewSize(), maxTexel);
+    writeTaaOutput(result, sparkleNow, prevUv, valid, motionPx, centerRaw.a, historyDistance(unjitteredUv, centerDepth));
 }

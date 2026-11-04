@@ -20,6 +20,7 @@ const int colortex13Format = RGBA16F; // D: TAA 履歴          | composite20 (�
 const int colortex14Format = RGBA16F; // D: ブルームタイル    | composite23 -> composite24 -> final
 const int colortex15Format = RGBA16F; // 速度ベクトル         | gbuffers (エンティティ/手) -> composite20 / 21
 const int colortex16Format = R16F;    // B: 画面空間の光芒 (低解像度) | composite12 -> 13 -> 14 -> composite19
+const int colortex17Format = RGBA16F; // D: 鏡面の白飛び分の履歴 | composite20 (永続, SPECULAR_SPARKLE)
 
 const bool colortex0Clear  = true;
 const bool colortex1Clear  = true;
@@ -38,6 +39,7 @@ const bool colortex13Clear = false;
 const bool colortex14Clear = true;
 const bool colortex15Clear = true;
 const bool colortex16Clear = true;
+const bool colortex17Clear = false;
 
 const vec4 colortex0ClearColor  = vec4(0.0, 0.0, 0.0, 0.0);
 const vec4 colortex1ClearColor  = vec4(0.0, 0.0, 0.0, 0.0);
