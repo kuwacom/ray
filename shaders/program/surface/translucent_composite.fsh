@@ -405,6 +405,8 @@ void main() {
                 vec2 glintPos = screenToPlayer(vec3(removeTaaJitter(texcoord), d0)).xz + cameraPosition.xz;
                 glitter = waterGlitter(glintPos, N, V, unshadowedSun().direction, sqr(sunAlpha), unresolved,
                     dist * 2.0 / (gbufferProjection[1][1] * viewSize().y), NoVGeo, waterGlintCrest(sea, surfWorld.xz, footprint, crest));
+                // 倍率が有限でない画素は滑らかなローブに戻す。鏡面の上限 (min) が NaN を円盤の明るさに置き換え、道が一面に白飛びするため
+                if (isnan(glitter) || isinf(glitter)) glitter = 1.0;
             }
 #endif
             vec3 spec = refl * F + sunSpecular(N, V, WATER_F0, sunAlpha, sunSpecVis, glitter) + localLightSpecular(WL, N, V, WATER_F0, sunAlpha);

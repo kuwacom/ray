@@ -219,9 +219,57 @@ void waterSeaStoreOpen() {
 #endif
 
 /*
+ * 近景の細かさ。最小の層 (波長 0.038 ブロック、帯の短い端 約 0.02) より短い波は表面張力波の下限 (WATER_CAPILLARY_WAVELENGTH)
+ * を下回り、実際の水面では粘性ですぐ消えるので足さない。近づいても波の形 (スペクトル) はワールドで同じままにする
+ * (画面の画素に合わせて細かい層を足すと、近づくほど波の中に波が現れ、同じ模様が縮んで重なってダブって見えた)
+ * その代わり、1 テクセルが画素より大きい近景では、双線形の補間だと傾きがテクセルごとの折れ線になり、照り返しや映り込みが
+ * 角の立った多角形の面に割れて見えるので、3 次の B スプラインで傾きを滑らかにつなぐ (双線形 4 回で引く。時間の軸は線形のまま)
+ * 帯の波長はテクセルの 9 倍以上あるので、B スプラインで弱まる分は 1 割に満たず、スペクトルはほぼ変わらない
+ */
+const vec2 WATER_TEX_CUBIC_TEXELS = vec2(0.5, 1.0);   // 1 画素あたりのテクセル数: この範囲で 3 次から双線形へ移る
+
+vec4 waterWaveTexCubic(vec3 q) {
+    vec2 x = fract(q.xy) * WATER_TEX_SIZE - 0.5;
+    vec2 i = floor(x);
+    vec2 f = x - i;
+    vec2 f2 = f * f;
+    vec2 f3 = f2 * f;
+    vec2 w0 = (1.0 - 3.0 * f + 3.0 * f2 - f3) / 6.0;
+    vec2 w1 = (4.0 - 6.0 * f2 + 3.0 * f3) / 6.0;
+    vec2 w3 = f3 / 6.0;
+    vec2 g0 = w0 + w1;
+    vec2 g1 = 1.0 - g0;
+    // 隣り合う 2 テクセルの重みの比の位置を双線形で引くと、2 つの重み付きの和になる
+    vec2 c0 = (i - 0.5 + w1 / g0) / WATER_TEX_SIZE;
+    vec2 c1 = (i + 1.5 + w3 / g1) / WATER_TEX_SIZE;
+    return g0.y * (g0.x * texture(waterWaveTex, vec3(c0.x, c0.y, q.z)) + g1.x * texture(waterWaveTex, vec3(c1.x, c0.y, q.z)))
+         + g1.y * (g0.x * texture(waterWaveTex, vec3(c0.x, c1.y, q.z)) + g1.x * texture(waterWaveTex, vec3(c1.x, c1.y, q.z)));
+}
+
+// 波テクスチャを引く。texels: 1 画素あたりのテクセル数 (0 以下は双線形のまま)
+vec4 waterWaveTexel(vec3 q, float texels) {
+    float c = texels > 0.0 ? 1.0 - smoothstep(WATER_TEX_CUBIC_TEXELS.x, WATER_TEX_CUBIC_TEXELS.y, texels) : 0.0;
+    vec4 s = c < 1.0 ? texture(waterWaveTex, q) : vec4(0.0);
+    if (c > 0.0) s = mix(s, waterWaveTexCubic(q), c);
+    return s;
+}
+
+/*
  * 層 i を引く。戻り値 x = 高さ (ブロック), yz = 勾配 (ワールドの 2D), w = 水平変位の発散 (Jacobian の 1 次の項)
  * テクスチャの +x を風下に向け、タイルの長さで割った座標で引く。勾配はタイルの大きさによらず振幅 (傾きの RMS) 倍
+ * footprint: 画素の大きさ (ブロック)。正なら近景を 3 次で補間する
  */
+vec4 waterLayer(vec2 p, int i, float amp, float t, float footprint) {
+    float tile = waterLayerTile(i);
+    float a = WATER_WIND_ANGLE + WATER_LAYER_ANGLE[i];
+    vec2 dir = vec2(cos(a), sin(a));
+    vec2 side = vec2(-dir.y, dir.x);
+    vec2 q = vec2(dot(p, dir), dot(p, side)) / tile + WATER_LAYER_OFFSET[i];
+    vec4 s = waterWaveTexel(vec3(q, t / waterLayerPeriod(tile)), footprint * WATER_TEX_SIZE / tile) * 2.0 - 1.0;
+    vec2 g = (dir * s.x + side * s.y) * WATER_TEX_SLOPE_RANGE;
+    return amp * vec4(s.z * WATER_TEX_HEIGHT_RANGE * tile, g, s.w * WATER_TEX_JACOBIAN_RANGE);
+}
+
 vec4 waterLayer(vec2 p, int i, float amp, float t) {
     float tile = waterLayerTile(i);
     float a = WATER_WIND_ANGLE + WATER_LAYER_ANGLE[i];
@@ -243,50 +291,18 @@ float waterTileResolved(float tile, float footprint) {
 float waterLayerResolved(int i, float footprint) { return waterTileResolved(waterLayerTile(i), footprint); }
 
 // 波テクスチャの 1 層の勾配 (ワールドの 2D)。風下から angle ずらして引く
-vec2 waterSlopeLayer(vec2 p, float tile, float angle, vec2 offset, float amp, float t) {
+vec2 waterSlopeLayer(vec2 p, float tile, float angle, vec2 offset, float amp, float t, float footprint) {
     float a = WATER_WIND_ANGLE + angle;
     vec2 dir = vec2(cos(a), sin(a));
     vec2 side = vec2(-dir.y, dir.x);
     vec2 q = vec2(dot(p, dir), dot(p, side)) / tile + offset;
-    vec4 s = texture(waterWaveTex, vec3(q, t / waterLayerPeriod(tile))) * 2.0 - 1.0;
+    vec4 s = waterWaveTexel(vec3(q, t / waterLayerPeriod(tile)), footprint * WATER_TEX_SIZE / tile) * 2.0 - 1.0;
     return amp * (dir * s.x + side * s.y) * WATER_TEX_SLOPE_RANGE;
 }
 
 // 表面張力波の層 i を引く。戻り値は勾配 (ワールドの 2D)。層の引き方は waterLayer と同じ
-vec2 waterCapillaryLayer(vec2 p, int i, float amp, float t) {
-    return waterSlopeLayer(p, waterCapillaryTile(i), WATER_CAPILLARY_ANGLE[i], WATER_CAPILLARY_OFFSET[i], amp, t);
-}
-
-/*
- * 近景の細かい層。最小の層の波長 (0.038 ブロック) より細かい波は無く、接写では最小の層が画素の数十個分に引き伸ばされて
- * 近くの水面が滑らかな塊の模様に見えた。波長が画面で一定の画素数になるタイルを選ぶ (画素の大きさに比例)。タイルは 2 の冪の段に揃えて
- * 隣り合う 2 段をエネルギーを保ったまま混ぜるので、カメラが動いても模様はワールドに付いたまま、段の切り替わりでも跳ばない
- * 画素の大きさが最小の層の波長に近づく所では最小の層が受け持つので、その手前で消す (遠くでは 1 回も引かない)
- */
-const float WATER_DETAIL_TILE_PX = 80.0;                // タイルが画面で占める画素数 (波長はこの 1 / WATER_BAND_CENTER)
-const float WATER_DETAIL_GAIN = 0.8;                   // 最小の層の傾きの RMS に対する倍率
-const vec2 WATER_DETAIL_FADE = vec2(0.0016, 0.0042);   // 消える画素の大きさ (ブロック)
-
-float waterDetailAmp(WaterSea sea, float footprint) {
-    if (footprint <= 0.0) return 0.0;
-    return sea.capAmp[WATER_CAPILLARY_LAYERS - 1] * WATER_DETAIL_GAIN * (1.0 - smoothstep(WATER_DETAIL_FADE.x, WATER_DETAIL_FADE.y, footprint));
-}
-
-// 2 段のタイル (ブロック) と混ぜる重み (重みの 2 乗の和が 1)
-void waterDetailLevels(float footprint, out vec2 tile, out vec2 w) {
-    float e = log2(WATER_DETAIL_TILE_PX * footprint);
-    float lo = floor(e);
-    tile = exp2(vec2(lo, lo + 1.0));
-    float f = fract(e) * 0.5 * PI;
-    w = vec2(cos(f), sin(f));
-}
-
-vec2 waterDetailGradient(WaterSea sea, vec2 p, float footprint, float t) {
-    float amp = waterDetailAmp(sea, footprint);
-    if (amp <= 0.0) return vec2(0.0);
-    vec2 tile, w;
-    waterDetailLevels(footprint, tile, w);
-    return waterSlopeLayer(p, tile.x, 0.71, vec2(0.17, 0.53), amp * w.x, t) + waterSlopeLayer(p, tile.y, -0.52, vec2(0.43, 0.91), amp * w.y, t);
+vec2 waterCapillaryLayer(vec2 p, int i, float amp, float t, float footprint) {
+    return waterSlopeLayer(p, waterCapillaryTile(i), WATER_CAPILLARY_ANGLE[i], WATER_CAPILLARY_OFFSET[i], amp, t, footprint);
 }
 
 // 表面張力波の勾配の和。画素より細かい層は足さない。表せない距離では 1 回も引かない
@@ -294,8 +310,6 @@ vec2 waterCapillaryGradient(WaterSea sea, vec2 p, float footprint, vec2 flow) {
     vec2 g = vec2(0.0);
     float t = frameTimeCounter;
     bool moving = dot(flow, flow) >= 1e-4;
-    // 流れのある面は細かい層を足さない (2 相の混ぜで分散が落ち、流れの継ぎ目に出るため)
-    if (!moving) g += waterDetailGradient(sea, p, footprint, t);
     float phase = fract(t / WATER_FLOW_CYCLE);
     float wa = 1.0 - abs(1.0 - 2.0 * phase);
     for (int i = 0; i < WATER_CAPILLARY_LAYERS; i++) {
@@ -303,24 +317,38 @@ vec2 waterCapillaryGradient(WaterSea sea, vec2 p, float footprint, vec2 flow) {
         if (r <= 0.0) break;
         float amp = sea.capAmp[i] * r;
         if (!moving) {
-            g += waterCapillaryLayer(p, i, amp, t);
+            g += waterCapillaryLayer(p, i, amp, t, footprint);
         } else {
             // 流れのある面は waterWaveSumFlow と同じ 2 相
-            vec2 a = waterCapillaryLayer(p - flow * (phase * WATER_FLOW_CYCLE), i, amp, t);
-            vec2 b = waterCapillaryLayer(p - flow * (fract(phase + 0.5) * WATER_FLOW_CYCLE) + 0.37, i, amp, t);
+            vec2 a = waterCapillaryLayer(p - flow * (phase * WATER_FLOW_CYCLE), i, amp, t, footprint);
+            vec2 b = waterCapillaryLayer(p - flow * (fract(phase + 0.5) * WATER_FLOW_CYCLE) + 0.37, i, amp, t, footprint);
             g += (a * wa + b * (1.0 - wa)) * inversesqrt(sqr(wa) + sqr(1.0 - wa));
         }
     }
     return g;
 }
 
-// 層 first .. last-1 の和 (高さ, 勾配, 発散)。画素より細かい層は足さない (ちらつきの元になるため)
-vec4 waterWaveSum(WaterSea sea, vec2 p, int first, int last, float footprint) {
+/*
+ * 層 first .. last-1 の和 (高さ, 勾配, 発散)。画素より細かい層は足さない (ちらつきの元になるため)
+ * cubicFootprint: 正なら近景を 3 次で補間する (法線だけ。視差・コースティクスは高さの位置しか使わないので双線形のまま)
+ */
+vec4 waterWaveSum(WaterSea sea, vec2 p, int first, int last, float footprint, float cubicFootprint) {
     float t = frameTimeCounter;
     vec4 sum = vec4(0.0);
     for (int i = first; i < last; i++) {
         float r = waterLayerResolved(i, footprint);
         // タイルは単調に小さくなるので、表せない層が出たら残りも全部表せない
+        if (r <= 0.0) break;
+        if (sea.amp[i] > 0.0) sum += waterLayer(p, i, sea.amp[i] * r, t, cubicFootprint);
+    }
+    return sum;
+}
+
+vec4 waterWaveSum(WaterSea sea, vec2 p, int first, int last, float footprint) {
+    float t = frameTimeCounter;
+    vec4 sum = vec4(0.0);
+    for (int i = first; i < last; i++) {
+        float r = waterLayerResolved(i, footprint);
         if (r <= 0.0) break;
         if (sea.amp[i] > 0.0) sum += waterLayer(p, i, sea.amp[i] * r, t);
     }
@@ -332,10 +360,10 @@ vec4 waterWaveSum(WaterSea sea, vec2 p, int first, int last, float footprint) {
  * 無相関な 2 つを重み w, 1 - w で混ぜると分散が w^2 + (1 - w)^2 倍に落ちるので戻す
  */
 vec4 waterWaveSumFlow(WaterSea sea, vec2 p, int first, int last, float footprint, vec2 flow) {
-    if (dot(flow, flow) < 1e-4) return waterWaveSum(sea, p, first, last, footprint);
+    if (dot(flow, flow) < 1e-4) return waterWaveSum(sea, p, first, last, footprint, footprint);
     float phase = fract(frameTimeCounter / WATER_FLOW_CYCLE);
-    vec4 a = waterWaveSum(sea, p - flow * (phase * WATER_FLOW_CYCLE), first, last, footprint);
-    vec4 b = waterWaveSum(sea, p - flow * (fract(phase + 0.5) * WATER_FLOW_CYCLE) + 0.37, first, last, footprint);
+    vec4 a = waterWaveSum(sea, p - flow * (phase * WATER_FLOW_CYCLE), first, last, footprint, footprint);
+    vec4 b = waterWaveSum(sea, p - flow * (fract(phase + 0.5) * WATER_FLOW_CYCLE) + 0.37, first, last, footprint, footprint);
     float wa = 1.0 - abs(1.0 - 2.0 * phase);
     return (a * wa + b * (1.0 - wa)) * inversesqrt(sqr(wa) + sqr(1.0 - wa));
 }
@@ -416,12 +444,6 @@ float waterPixelSlopeVar(WaterSea sea, float footprint) {
     for (int i = 0; i < WATER_CAPILLARY_LAYERS; i++) {
         float tile = waterCapillaryTile(i);
         v += sqr(waterTileResolved(tile, footprint) * sea.capAmp[i] * WATER_PIXEL_SLOPE_SCALE) * waterLayerSlopeChange(tile, footprint, dt);
-    }
-    float detailAmp = waterDetailAmp(sea, footprint);
-    if (detailAmp > 0.0) {
-        vec2 dTile, dW;
-        waterDetailLevels(footprint, dTile, dW);
-        for (int k = 0; k < 2; k++) v += sqr(detailAmp * dW[k] * WATER_PIXEL_SLOPE_SCALE) * waterLayerSlopeChange(dTile[k], footprint, dt);
     }
     return v;
 }
