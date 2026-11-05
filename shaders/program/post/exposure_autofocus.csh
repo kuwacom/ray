@@ -145,6 +145,8 @@ uint flareVisibilityTap(uint index) {
             // 歪曲・魚眼を TAA で組み立てた時は colortex0 が出力の座標なので、光源の出力の位置で読む
             vec2 colorUv = LENS_WARP_TAA ? lensForwardUv(clamped) : clamped;
             float l = luminance(sanitizeColor(textureLod(colortex0, colorUv, 0.0).rgb));
+            // 夜の円盤は白飛びさせるために明るく描いてある。フレアの見え具合は円盤を白飛びさせる前の明るさで比べる
+            if (frameData.shadowLightIrradiance.a <= 0.5) l /= moonDiscBoost(getSunDir().y);
             vis *= saturate(log2(max(l / skyLum, 1.0) / 4.0) / 10.0);
         }
     }

@@ -167,8 +167,9 @@ LightSample getCelestialLight() {
 
 /*
  * 天体の鏡面に掛ける円盤の放射輝度の倍率 (specularDiscCap の discScale)。太陽は 1
- * 夜の月は空に描く円盤を MOON_DISK_SCALE 倍の大きさで MOON_NIGHT_BRIGHTNESS 倍に暗くしてあるので、鏡像も同じ明るさにする
+ * 夜の月は空に描く円盤を MOON_DISK_SCALE 倍の大きさで MOON_NIGHT_BRIGHTNESS 倍に暗くしてあるので、鏡像もこの明るさを基準にする
  * (照度どおりの鏡像は空の月の 1500 倍 x フレネルになり、水面に月より明るい白い塊が出る)
+ * 空の円盤だけは MOON_DISK_NIGHT_GAIN 倍に白飛びさせるが、鏡像の上限には掛けない (強さの設定が決める)
  * 鏡面のローブの広がりは物理の大きさのままで、上限だけ見えている円盤に合わせる
  * 強さの設定 (celestialSpecularStrength、呼び出し側が掛ける) は、太陽では粗い面の照り返しだけを明るくし、水たまりのような鏡に近い面の
  * 鏡像は見えている円盤より明るくしない。上限を 1 より大きい強さで割っておく
@@ -182,7 +183,7 @@ float celestialSpecularStrength() {
 
 float celestialDiscScale() {
 #ifdef HAS_SKY
-    if (frameData.shadowLightIrradiance.a <= 0.5) return mix(MOON_NIGHT_BRIGHTNESS, 1.0, smoothstep(-0.1, 0.1, getSunDir().y)) / sqr(MOON_DISK_SCALE);
+    if (frameData.shadowLightIrradiance.a <= 0.5) return mix(MOON_NIGHT_BRIGHTNESS, 1.0, moonDayMix(getSunDir().y)) / sqr(MOON_DISK_SCALE);
 #endif
     return 1.0 / max(celestialSpecularStrength(), 1.0);
 }

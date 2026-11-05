@@ -254,8 +254,8 @@ const float LENS_STAR_STOPDOWN_RANGE = 1.5;
 const float LENS_STAR_R_MIN = 0.25;
 const float LENS_STAR_R_MAX = 50.0;
 /*
- * 夜の月のフレアの倍率 (全体 / 光条だけ)。月の円盤は夜の露出で白飛びしないよう放射を大きく下げてある
- * (celestial.glsl の MOON_NIGHT_BRIGHTNESS) ので、照度どおりのフレアだと小さな円盤から昼の太陽並みの星形が伸びた
+ * 夜の月のフレアの倍率 (全体 / 光条だけ)。月の円盤は放射を物理より大きく下げてある
+ * (constants.glsl の MOON_NIGHT_BRIGHTNESS) ので、照度どおりのフレアだと小さな円盤から昼の太陽並みの星形が伸びた
  */
 const float LENS_MOON_FLARE = 0.35;
 const float LENS_MOON_STARBURST = 0.12;

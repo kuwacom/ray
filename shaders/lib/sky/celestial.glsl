@@ -20,12 +20,6 @@ const float SUN_LIMB_DARKENING = 0.6;
 const float MOON_EARTHSHINE = 0.004;
 // 月の円盤の見かけの大きさ (atmosphere.glsl の MOON_ANGULAR_RADIUS に対する倍率)
 const float MOON_DISK_SCALE = 2.5;
-/*
- * 夜の月の円盤の明るさの倍率 (見た目の調整)。物理的な放射のままだと、夜の露出では円盤が白飛びして強いブルームと光条の
- * 光る玉になる。昼の月は青空と同じくらいの明るさで淡く見えるのが正しいので 1 にする
- */
-const float MOON_NIGHT_BRIGHTNESS = 0.004;
-
 const float STAR_GRID = 110.0;          // 天球を刻む格子の細かさ (セル 1 つに星は最大 1 個)
 const float STAR_DENSITY = 0.055;       // 星があるセルの割合
 const float STAR_RADIANCE = 0.03;       // 最も明るい星の中心の放射
@@ -119,8 +113,10 @@ vec3 skyMoonDisk(vec3 dir, vec3 moonDir, vec3 illuminanceFull, vec3 viewT) {
 
     // 月面の模様 (海・クレーター) は描かず、一様な白い円盤にする。満ち欠けの陰影だけ残す
     vec3 radiance = illuminanceFull / (PI * radius * radius);
-    radiance *= mix(MOON_NIGHT_BRIGHTNESS, 1.0, smoothstep(-0.1, 0.1, getSunDir().y));
-    return radiance * (lommel + MOON_EARTHSHINE) * viewT * coverage;
+    float sunY = getSunDir().y;
+    radiance *= mix(MOON_NIGHT_BRIGHTNESS, 1.0, moonDayMix(sunY));
+    // 夜は円盤だけ明るくして白飛びさせる。地球照は暗い側の淡い円盤なので倍率を掛けない
+    return radiance * (lommel * moonDiscBoost(sunY) + MOON_EARTHSHINE) * viewT * coverage;
 }
 
 // 星 1 セル分。明るさはべき乗分布 (暗い星ほど多い)、色は黒体放射、瞬きは地平線ほど強い
