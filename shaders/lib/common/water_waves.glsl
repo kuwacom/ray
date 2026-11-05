@@ -43,6 +43,11 @@ const float WATER_TIME_N_LO = 3.0;
 // 層ごとの風向きのずれと位置のずれ。タイルの格子の向きと繰り返しを揃えないため
 const float WATER_LAYER_ANGLE[WATER_LAYERS] = float[](0.0, 0.41, -0.33, 0.57, -0.47);
 const vec2 WATER_LAYER_OFFSET[WATER_LAYERS] = vec2[](vec2(0.0), vec2(0.37, 0.71), vec2(0.13, 0.29), vec2(0.83, 0.51), vec2(0.61, 0.07));
+/*
+ * 層ごとの横の鏡映 (1 か -1)。どの層も同じ波テクスチャの縮小なので、2 つ隔てた層 (タイル 8.4 倍) は向きが 8-9 度しか違わず、
+ * 大きな波の中に同じ形の小さな波が同じ向きで入れ子になって、波が二重に見える。間の 2 層を鏡に映して同じ形にしない
+ */
+const float WATER_LAYER_MIRROR[WATER_LAYERS] = float[](1.0, 1.0, -1.0, -1.0, 1.0);
 const float WATER_WIND_ANGLE = 0.6;            // 風下の向き (ワールド x 軸から, ラジアン)
 
 // スペクトル
@@ -263,7 +268,7 @@ vec4 waterLayer(vec2 p, int i, float amp, float t, float footprint) {
     float tile = waterLayerTile(i);
     float a = WATER_WIND_ANGLE + WATER_LAYER_ANGLE[i];
     vec2 dir = vec2(cos(a), sin(a));
-    vec2 side = vec2(-dir.y, dir.x);
+    vec2 side = vec2(-dir.y, dir.x) * WATER_LAYER_MIRROR[i];
     vec2 q = vec2(dot(p, dir), dot(p, side)) / tile + WATER_LAYER_OFFSET[i];
     vec4 s = waterWaveTexel(vec3(q, t / waterLayerPeriod(tile)), footprint * WATER_TEX_SIZE / tile) * 2.0 - 1.0;
     vec2 g = (dir * s.x + side * s.y) * WATER_TEX_SLOPE_RANGE;
@@ -274,7 +279,7 @@ vec4 waterLayer(vec2 p, int i, float amp, float t) {
     float tile = waterLayerTile(i);
     float a = WATER_WIND_ANGLE + WATER_LAYER_ANGLE[i];
     vec2 dir = vec2(cos(a), sin(a));
-    vec2 side = vec2(-dir.y, dir.x);
+    vec2 side = vec2(-dir.y, dir.x) * WATER_LAYER_MIRROR[i];
     vec2 q = vec2(dot(p, dir), dot(p, side)) / tile + WATER_LAYER_OFFSET[i];
     vec4 s = texture(waterWaveTex, vec3(q, t / waterLayerPeriod(tile))) * 2.0 - 1.0;
     vec2 g = (dir * s.x + side * s.y) * WATER_TEX_SLOPE_RANGE;
