@@ -325,45 +325,36 @@ float waterUnresolvedSlopeVar(WaterSea sea, float footprint) {
 }
 
 /*
- * 表せた層の、画素の中での法線 (傾き) の揺れの分散。1 層の傾きは波長 lambda で振幅 a の正弦に近く、画素の幅 f の中で
+ * 表せた層の、画素の中と露光の間での法線 (傾き) の揺れの分散。1 層の傾きは波長 lambda で振幅 a の正弦に近く、画素の幅 f の中で
  * a x 2 pi f / lambda ほど変わる (画素の中の一様な位置の標準偏差は幅の 1 / sqrt(12))
  * GGX の alpha^2 に足すと、細い鋭いローブが画素の当たり外れにならず、エネルギーを保ったままジッターのちらつきが消える
  * 画面微分は使わず (gbuffers_solid.fsh の鏡面 AA を入れない理由と同じ)、層ごとの解析式で足す
  */
 const float WATER_PIXEL_SLOPE_SCALE = TAU / sqrt(12.0);
 
-float waterPixelSlopeVar(WaterSea sea, float footprint) {
-    float v = 0.0;
-    for (int i = 0; i < WATER_LAYERS; i++) {
-        float tile = waterLayerTile(i);
-        v += sqr(waterTileResolved(tile, footprint) * sea.amp[i] * WATER_PIXEL_SLOPE_SCALE * footprint * WATER_BAND_CENTER / tile);
-    }
-    for (int i = 0; i < WATER_CAPILLARY_LAYERS; i++) {
-        float tile = waterCapillaryTile(i);
-        v += sqr(waterTileResolved(tile, footprint) * sea.capAmp[i] * WATER_PIXEL_SLOPE_SCALE * footprint * WATER_BAND_CENTER / tile);
-    }
-    return v;
-}
-
 /*
- * 表せた層の、1 フレームの露光の間の法線 (傾き) の変化の分散 (シャッターの時間積分)。層の傾きは時間の最も遅い倍音の周期
- * P (= ループの周期 / WATER_TIME_HARMONIC_LO) で回り、露光 dt の間に a x 2 pi dt / P ほど変わる (一様な時刻の標準偏差は 1 / sqrt(12))
- * 画素の中の揺れ (waterPixelSlopeVar) と同じく鏡面の alpha^2 に足すと、さざ波の照り返しがフレームごとに別の画素へ跳ばず、
- * 露光の間の軌跡に沿ってエネルギーを保ったまま広がる。細かく速い層ほど効く
+ * 同じ式で、1 フレームの露光の間の法線の変化も足す (シャッターの時間積分)。層の傾きは時間の最も遅い倍音の周期
+ * P (= ループの周期 / WATER_TIME_HARMONIC_LO) で回り、露光 dt の間に a x 2 pi dt / P ほど変わる (一様な時刻の標準偏差も 1 / sqrt(12))
+ * さざ波の照り返しがフレームごとに別の画素へ跳ばず、露光の間の軌跡に沿ってエネルギーを保ったまま広がる。細かく速い層ほど効く
+ * 画素の幅と露光の間の変化は独立なので分散の和 (層ごとの係数は定数に畳まれる)
  */
 const float WATER_EXPOSURE_SHUTTER = 0.5;   // 1 フレームのうち露光している割合 (モーションブラーのシャッターと同じ)
 const float WATER_EXPOSURE_MAX_DT = 0.05;   // 低いフレームレートで照り返しが流れすぎない上限 (秒)
 
-float waterTemporalSlopeVar(WaterSea sea, float footprint) {
+float waterLayerSlopeChange(float tile, float footprint, float dt) {
+    return sqr(footprint * WATER_BAND_CENTER / tile) + sqr(dt * WATER_TIME_HARMONIC_LO / waterLayerPeriod(tile));
+}
+
+float waterPixelSlopeVar(WaterSea sea, float footprint) {
     float dt = min(frameTime, WATER_EXPOSURE_MAX_DT) * WATER_EXPOSURE_SHUTTER;
     float v = 0.0;
     for (int i = 0; i < WATER_LAYERS; i++) {
         float tile = waterLayerTile(i);
-        v += sqr(waterTileResolved(tile, footprint) * sea.amp[i] * WATER_PIXEL_SLOPE_SCALE * dt * WATER_TIME_HARMONIC_LO / waterLayerPeriod(tile));
+        v += sqr(waterTileResolved(tile, footprint) * sea.amp[i] * WATER_PIXEL_SLOPE_SCALE) * waterLayerSlopeChange(tile, footprint, dt);
     }
     for (int i = 0; i < WATER_CAPILLARY_LAYERS; i++) {
         float tile = waterCapillaryTile(i);
-        v += sqr(waterTileResolved(tile, footprint) * sea.capAmp[i] * WATER_PIXEL_SLOPE_SCALE * dt * WATER_TIME_HARMONIC_LO / waterLayerPeriod(tile));
+        v += sqr(waterTileResolved(tile, footprint) * sea.capAmp[i] * WATER_PIXEL_SLOPE_SCALE) * waterLayerSlopeChange(tile, footprint, dt);
     }
     return v;
 }
