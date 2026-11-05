@@ -108,6 +108,8 @@ float sparkleShare(float a) { return clamp(a - 1.0, 0.0, 1.0); }
  * 平均で混ぜるので、平均のエネルギーは変わらず点も消えない (トーンマップ空間で混ぜると明るい点ほど潰れる)
  * 近傍の箱による切り詰めは掛けない (掛けると当たり外れの点が履歴ごと消えて点滅に戻る)。尾は混合率で数フレームに収める
  * 混合率はフレーム単位 (秒にすると低いフレームレートで 1 に寄って点滅に戻る)
+ * 上だけは今フレームの 3x3 の白飛び分の最大で抑える。波が動いて消えた照り返しの点が、混合率の尾の間だけ残像のように残らない
+ * (画素の中で位置が揺れる点は 3x3 のどこかにあるので抑えられない)
  */
 const float SPARKLE_HISTORY_BLEND = 0.4;         // 静止時の今フレームの重み (尾は 0.6^n、4 フレームで 13%)
 const float SPARKLE_HISTORY_BLEND_MOVING = 0.7;  // 動きが TAA_BLEND_MOTION_PX の時
@@ -134,9 +136,10 @@ vec3 gatherSparkle(vec2 pos, ivec2 maxTexel) {
  * 白飛び分の履歴と混ぜて、出力の色・a・履歴を書く。a は TAA の後では「正 = 白飛び分の割合、負 = 溶岩の発光の割合」
  * (同じ画素で両方は起きない。ブルームの縮小は負の側だけを読む)
  */
-void writeTaaOutput(vec3 result, vec3 sparkleNow, vec2 prevUv, bool valid, float motionPx, float rawA, float historyDist) {
+void writeTaaOutput(vec3 result, vec3 sparkleNow, vec3 sparkleMax, vec2 prevUv, bool valid, float motionPx, float rawA, float historyDist) {
 #ifdef SPECULAR_SPARKLE
     vec3 sparkleHist = valid ? max(sanitizeColor(textureLod(colortex17, prevUv, 0.0).rgb), 0.0) : vec3(0.0);
+    sparkleHist = min(sparkleHist, max(sparkleMax, sparkleNow));
     float sa = valid ? mix(SPARKLE_HISTORY_BLEND, SPARKLE_HISTORY_BLEND_MOVING, saturate(motionPx / TAA_BLEND_MOTION_PX)) : 1.0;
     vec3 sparkle = mix(sparkleHist, sparkleNow, sa);
     outSparkle = vec4(sparkle, 0.0);
@@ -221,6 +224,7 @@ struct TaaNeighborhood {
     vec3 boxMax;
     float closestDepth;
     ivec2 closestOffset;
+    vec3 sparkleMax;    // 白飛び分の最大 (線形)
 };
 
 TaaNeighborhood taaNeighborhood(ivec2 center, ivec2 maxTexel, float exposure, float centerDepth) {
@@ -231,11 +235,14 @@ TaaNeighborhood taaNeighborhood(ivec2 center, ivec2 maxTexel, float exposure, fl
     nb.boxMax = vec3(-1e9);
     nb.closestDepth = centerDepth;
     nb.closestOffset = ivec2(0);
+    nb.sparkleMax = vec3(0.0);
     for (int y = -1; y <= 1; y++) {
         for (int x = -1; x <= 1; x++) {
             ivec2 p = clamp(center + ivec2(x, y), ivec2(0), maxTexel);
             vec4 s = texelFetch(colortex0, p, 0);
-            vec3 c = rgbToYCoCg(taaCompress(sanitizeColor(s.rgb) * (1.0 - sparkleShare(s.a)), exposure));
+            vec3 sc = sanitizeColor(s.rgb);
+            nb.sparkleMax = max(nb.sparkleMax, sc * sparkleShare(s.a));
+            vec3 c = rgbToYCoCg(taaCompress(sc * (1.0 - sparkleShare(s.a)), exposure));
             m1 += c;
             m2 += c * c;
             nb.boxMin = min(nb.boxMin, c);
@@ -341,7 +348,7 @@ void taaWarped() {
     }
 
     vec3 result = sanitizeColor(taaExpand(yCoCgToRgb(resultYcc), exposure));
-    writeTaaOutput(result, sparkle, prevUv, valid, motionPx, nearRaw.a, historyDistance(src, centerDepth));
+    writeTaaOutput(result, sparkle, nb.sparkleMax, prevUv, valid, motionPx, nearRaw.a, historyDistance(src, centerDepth));
 }
 
 void main() {
@@ -399,5 +406,5 @@ void main() {
     // 白飛び分は本体の履歴に入れず、ジッターを外した位置で集めて専用の履歴と混ぜて足す
     // a < 0 は溶岩の発光の割合 (composite19)。モーションブラー・DoF を素通りしてブルームの縮小 (composite23) が読む
     vec3 sparkleNow = gatherSparkle((uv + taaJitterUv()) * viewSize(), maxTexel);
-    writeTaaOutput(result, sparkleNow, prevUv, valid, motionPx, centerRaw.a, historyDistance(unjitteredUv, centerDepth));
+    writeTaaOutput(result, sparkleNow, nb.sparkleMax, prevUv, valid, motionPx, centerRaw.a, historyDistance(unjitteredUv, centerDepth));
 }
