@@ -327,22 +327,31 @@ void main() {
 
 #ifdef SPECULAR_SPARKLE
     /*
-     * レンズ: 点像の裾。白を超えた鏡面の点は 1 画素ほどで、実際のレンズでは収差と散乱の裾 (r^-2) を引いて点光源に見える
+     * レンズ: 点像の芯と裾。白を超えた鏡面の点は 1 画素ほどで、実際のカメラでは回折・センサーの芯 (半径 1-2 px) と、収差と
+     * 散乱の裾 (r^-2) を引いて丸い光の塊に見える。芯は双線形の 3 x 3 の読みで配る (POINT_CORE_SHARE)
      * 白飛び分 (colortex17) のミップは箱の平均でエネルギーを保つので、4 段を同じエネルギーずつ読んで芯から裾へ配る (総量は変えない)
      * DoF の前の値なので、ボケている点には重ねない (玉ボケに任せる)
      */
     if (LENS_POINT_SPREAD_STRENGTH > 0.0) {
-        float spreadAmount = (POINT_SPREAD_BASE + POINT_SPREAD_PER_GLARE * LP_VEILING_GLARE) * LENS_POINT_SPREAD_STRENGTH;
+        float focusFade = LENS_POINT_SPREAD_STRENGTH;
     #ifdef DOF
         float cocDist = depth >= 1.0 ? far * 4.0 : linearizeDepth(fixHandDepth(depth));
         float cocPx = isHandDepth(depth) ? 0.0 : circleOfConfusion(cocDist, max(frameData.focusDistance, 0.1));
-        spreadAmount *= saturate(1.0 - abs(cocPx) / POINT_SPREAD_COC_FADE);
+        focusFade *= saturate(1.0 - abs(cocPx) / POINT_SPREAD_COC_FADE);
     #endif
+        float spreadAmount = (POINT_SPREAD_BASE + POINT_SPREAD_PER_GLARE * LP_VEILING_GLARE) * focusFade;
+        float coreAmount = min(POINT_CORE_SHARE * focusFade, 1.0);
         if (any(greaterThan(textureLod(colortex17, uvL, float(POINT_SPREAD_GATE_LEVEL)).rgb, vec3(0.0)))) {
             vec3 spreadCore = max(textureLod(colortex17, uvL, 0.0).rgb, 0.0);
             vec3 spreadTail = vec3(0.0);
             for (int l = 1; l <= POINT_SPREAD_LEVELS; l++) spreadTail += max(sampleBSplineMip(colortex17, uvL, l), 0.0);
-            hdr = max(hdr + spreadAmount * (spreadTail / float(POINT_SPREAD_LEVELS) - spreadCore), 0.0);
+            vec3 coreBlur = vec3(0.0);
+            for (int i = 0; i < 9; i++) {
+                ivec2 o = ivec2(i % 3, i / 3) - 1;
+                float w = (o.x == 0 ? POINT_CORE_W0 : POINT_CORE_W1) * (o.y == 0 ? POINT_CORE_W0 : POINT_CORE_W1);
+                coreBlur += max(textureLod(colortex17, uvL + vec2(o) * (POINT_CORE_OFFSET * texelSize()), 0.0).rgb, 0.0) * w;
+            }
+            hdr = max(hdr + spreadAmount * (spreadTail / float(POINT_SPREAD_LEVELS) - spreadCore) + coreAmount * (coreBlur - spreadCore), 0.0);
         }
     }
 #endif

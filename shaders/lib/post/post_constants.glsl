@@ -269,15 +269,27 @@ const float LENS_VEIL_SUN_SIGMA = 0.35;
 const float LENS_VEIL_HAZE = 0.03;
 /*
  * 点像の裾: 白飛び分 (colortex17) から周りへ配る割合 = 下限 + ベーリンググレアの強さ x 傾き (散乱の強いレンズほど大きい)
- * 4 段 (半径 約 2, 4, 8, 16 px) へ同じエネルギーずつ配るので裾は r^-2 になる。現代の単焦点で約 0.04
+ * 4 段 (半径 約 2, 4, 8, 16 px) へ同じエネルギーずつ配るので裾は r^-2 になる。現代の単焦点で約 0.07
  */
-const float POINT_SPREAD_BASE = 0.03;
+const float POINT_SPREAD_BASE = 0.06;
 const float POINT_SPREAD_PER_GLARE = 0.035;
 const int POINT_SPREAD_LEVELS = 4;
 // 最も粗い段の手前の段で近くに白飛び分が無い画素は 4 段の読みを省く
 const int POINT_SPREAD_GATE_LEVEL = 5;
 // DoF のボケ半径 (px) がこの値に達すると裾を重ねない (ボケた点は玉ボケに任せる)
 const float POINT_SPREAD_COC_FADE = 6.0;
+/*
+ * 点像の芯: 回折・センサー・現像の滲みで、点のエネルギーの一部が半径 1-2 px に広がる。白を大きく超えた点ほど芯の周りまで
+ * 白く飛び、明るい点ほど大きな光の塊に見える (裾の r^-2 だけでは隣の画素へ行く分が 1% 未満で、点が 1 画素の白い四角に見えた)
+ * 白飛び分のうち POINT_CORE_SHARE をガウス (sigma POINT_CORE_SIGMA px) で配る。3 x 3 の双線形の読みで 5 x 5 の重みにする
+ */
+const float POINT_CORE_SHARE = 0.4;
+const float POINT_CORE_SIGMA = 0.9;
+const float POINT_CORE_G1 = exp(-0.5 / (POINT_CORE_SIGMA * POINT_CORE_SIGMA));   // 1 px 離れた重み
+const float POINT_CORE_G2 = exp(-2.0 / (POINT_CORE_SIGMA * POINT_CORE_SIGMA));   // 2 px 離れた重み
+const float POINT_CORE_W0 = 1.0 / (1.0 + 2.0 * (POINT_CORE_G1 + POINT_CORE_G2)); // 1 軸の中心の重み
+const float POINT_CORE_W1 = (POINT_CORE_G1 + POINT_CORE_G2) * POINT_CORE_W0;     // 1 軸の片側の重み (1 px と 2 px を 1 回で読む)
+const float POINT_CORE_OFFSET = (POINT_CORE_G1 + 2.0 * POINT_CORE_G2) / (POINT_CORE_G1 + POINT_CORE_G2);
 // 汚れ: 光源の周りの散乱光 (照度に対する割合, 広がり tan) と、明るい画素の周りの散乱 (広いブルームに対する割合)
 const float LENS_DIRT_SUN_GAIN = 0.006;
 const float LENS_DIRT_SUN_SIGMA = 0.45;
