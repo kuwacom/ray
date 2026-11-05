@@ -45,7 +45,7 @@ vec3 sampleCatmullRom(sampler2D tex, vec2 uv, vec2 texSize) {
  * 3 次 B スプライン (双線形 4 タップ)。リンギングが無く滑らかなのでブルームのアップサンプルに使う
  * rectMin / rectMax (UV) の外は読まない (タイル配置のバッファ用)
  */
-vec4 sampleBSplineClamped4(sampler2D tex, vec2 uv, vec2 texSize, vec2 rectMin, vec2 rectMax) {
+vec4 sampleBSplineLod4(sampler2D tex, vec2 uv, vec2 texSize, vec2 rectMin, vec2 rectMax, float lod) {
     vec2 pos = uv * texSize;
     vec2 center = floor(pos - 0.5) + 0.5;
     vec2 f = pos - center;
@@ -63,14 +63,23 @@ vec4 sampleBSplineClamped4(sampler2D tex, vec2 uv, vec2 texSize, vec2 rectMin, v
     t0 = clamp(t0, rectMin, rectMax);
     t1 = clamp(t1, rectMin, rectMax);
 
-    return textureLod(tex, vec2(t0.x, t0.y), 0.0) * (s0.x * s0.y)
-         + textureLod(tex, vec2(t1.x, t0.y), 0.0) * (s1.x * s0.y)
-         + textureLod(tex, vec2(t0.x, t1.y), 0.0) * (s0.x * s1.y)
-         + textureLod(tex, vec2(t1.x, t1.y), 0.0) * (s1.x * s1.y);
+    return textureLod(tex, vec2(t0.x, t0.y), lod) * (s0.x * s0.y)
+         + textureLod(tex, vec2(t1.x, t0.y), lod) * (s1.x * s0.y)
+         + textureLod(tex, vec2(t0.x, t1.y), lod) * (s0.x * s1.y)
+         + textureLod(tex, vec2(t1.x, t1.y), lod) * (s1.x * s1.y);
+}
+
+vec4 sampleBSplineClamped4(sampler2D tex, vec2 uv, vec2 texSize, vec2 rectMin, vec2 rectMax) {
+    return sampleBSplineLod4(tex, uv, texSize, rectMin, rectMax, 0.0);
 }
 
 vec3 sampleBSplineClamped(sampler2D tex, vec2 uv, vec2 texSize, vec2 rectMin, vec2 rectMax) {
     return sampleBSplineClamped4(tex, uv, texSize, rectMin, rectMax).rgb;
+}
+
+// ミップの段 lod を B スプラインで読む (箱のミップの角を出さない)。段の大きさは textureSize から取る
+vec3 sampleBSplineMip(sampler2D tex, vec2 uv, int lod) {
+    return sampleBSplineLod4(tex, uv, vec2(textureSize(tex, lod)), vec2(0.0), vec2(1.0), float(lod)).rgb;
 }
 
 #endif

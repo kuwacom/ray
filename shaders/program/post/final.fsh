@@ -1,5 +1,5 @@
 /*
- * final: 歪曲と魚眼の再投影・色収差・シャープ (CAS)・ブルーム合成・球面収差・ベーリンググレア・レンズフレア・口径食・ハレーション・Purkinje・ビネット・露出・
+ * final: 歪曲と魚眼の再投影・色収差・シャープ (CAS)・ブルーム合成・球面収差・ベーリンググレア・点像の裾・レンズフレア・口径食・ハレーション・Purkinje・ビネット・露出・
  *        ホワイトバランス・カラーグレーディング・トーンマップ・ルックの LUT・グレイン・ディザ・デバッグ表示
  * 色に掛ける処理は物理的な順 (レンズ -> センサー -> 現像) に並べる
  * post モジュール
@@ -81,6 +81,10 @@
 #include "/lib/light/light.glsl"
 #include "/lib/buffers/formats.glsl"
 // END GENERATED includes
+
+#ifdef SPECULAR_SPARKLE
+const bool colortex17MipmapEnabled = true;
+#endif
 
 in vec2 texcoord;
 
@@ -273,6 +277,7 @@ void main() {
     float lava = lavaToneMask(texelG);
     // 溶岩のブルームの滲みが占める割合。溶岩と同じ色を保つトーンマップに寄せる (AgX では周りの煙・壁の滲みが淡いサーモン色に抜けた)
     float lavaGlowShare = 0.0;
+    float depth = texelFetch(depthtex0, texelG, 0).r;
 
     // レンズ: ブルーム (PSF の畳み込みとして mix。総エネルギーは変えない)
 #ifdef BLOOM
@@ -296,7 +301,6 @@ void main() {
     lavaGlowShare = saturate(bloomMix * bands.lava / max(luminance(hdr), 1e-6));
 
     // ブルーミーフォグ: 遠くと雨・水中ほど広いブルームで霞ませる (全面の滲みは弱く)
-    float depth = texelFetch(depthtex0, texelG, 0).r;
     float dist = depth >= 1.0 ? far : linearizeDepth(fixHandDepth(depth));
     float fogFactor = (1.0 - exp(-dist / BLOOM_FOG_DISTANCE)) * mix(LK_BLOOM_FOG_CLEAR, 1.0, rainStrength);
     float water = isEyeInWater == 1 ? 1.0 : 0.0;
@@ -319,6 +323,28 @@ void main() {
         // 明るい画素のゴーストと横ストリーク (composite24)
         hdr += sampleFlareTile(uvL);
     #endif
+#endif
+
+#ifdef SPECULAR_SPARKLE
+    /*
+     * レンズ: 点像の裾。白を超えた鏡面の点は 1 画素ほどで、実際のレンズでは収差と散乱の裾 (r^-2) を引いて点光源に見える
+     * 白飛び分 (colortex17) のミップは箱の平均でエネルギーを保つので、4 段を同じエネルギーずつ読んで芯から裾へ配る (総量は変えない)
+     * DoF の前の値なので、ボケている点には重ねない (玉ボケに任せる)
+     */
+    if (LENS_POINT_SPREAD_STRENGTH > 0.0) {
+        float spreadAmount = (POINT_SPREAD_BASE + POINT_SPREAD_PER_GLARE * LP_VEILING_GLARE) * LENS_POINT_SPREAD_STRENGTH;
+    #ifdef DOF
+        float cocDist = depth >= 1.0 ? far * 4.0 : linearizeDepth(fixHandDepth(depth));
+        float cocPx = isHandDepth(depth) ? 0.0 : circleOfConfusion(cocDist, max(frameData.focusDistance, 0.1));
+        spreadAmount *= saturate(1.0 - abs(cocPx) / POINT_SPREAD_COC_FADE);
+    #endif
+        if (any(greaterThan(textureLod(colortex17, uvL, float(POINT_SPREAD_GATE_LEVEL)).rgb, vec3(0.0)))) {
+            vec3 spreadCore = max(textureLod(colortex17, uvL, 0.0).rgb, 0.0);
+            vec3 spreadTail = vec3(0.0);
+            for (int l = 1; l <= POINT_SPREAD_LEVELS; l++) spreadTail += max(sampleBSplineMip(colortex17, uvL, l), 0.0);
+            hdr = max(hdr + spreadAmount * (spreadTail / float(POINT_SPREAD_LEVELS) - spreadCore), 0.0);
+        }
+    }
 #endif
 
     // レンズ: 太陽・月のフレア (ゴースト・スターバースト・ハロー・グレア・汚れ・ストリーク)

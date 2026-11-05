@@ -267,6 +267,17 @@ const float LENS_HALO_GAIN = 0.004;
 const float LENS_VEIL_SUN_GAIN = 0.004;
 const float LENS_VEIL_SUN_SIGMA = 0.35;
 const float LENS_VEIL_HAZE = 0.03;
+/*
+ * 点像の裾: 白飛び分 (colortex17) から周りへ配る割合 = 下限 + ベーリンググレアの強さ x 傾き (散乱の強いレンズほど大きい)
+ * 4 段 (半径 約 2, 4, 8, 16 px) へ同じエネルギーずつ配るので裾は r^-2 になる。現代の単焦点で約 0.04
+ */
+const float POINT_SPREAD_BASE = 0.03;
+const float POINT_SPREAD_PER_GLARE = 0.035;
+const int POINT_SPREAD_LEVELS = 4;
+// 最も粗い段の手前の段で近くに白飛び分が無い画素は 4 段の読みを省く
+const int POINT_SPREAD_GATE_LEVEL = 5;
+// DoF のボケ半径 (px) がこの値に達すると裾を重ねない (ボケた点は玉ボケに任せる)
+const float POINT_SPREAD_COC_FADE = 6.0;
 // 汚れ: 光源の周りの散乱光 (照度に対する割合, 広がり tan) と、明るい画素の周りの散乱 (広いブルームに対する割合)
 const float LENS_DIRT_SUN_GAIN = 0.006;
 const float LENS_DIRT_SUN_SIGMA = 0.45;
