@@ -50,7 +50,19 @@ const float GLINT_CREST_SHORT_MEAN = 0.119; // smoothstep(0, 2 sigma, h)^2 の�
 const float GLINT_CREST_MAX = 4.0;          // 2 つの波頭の重みの積の上限 (1 つの波頭に点が固まって板にならない)
 const float GLINT_WEIGHT_MIN = 1e-4;        // 曲率の裾の一様乱数の下限 (1 つの点は平均の 50 倍まで)
 const float GLINT_RADIUS = 0.75;            // 点を画素へ配る半径 (画素)
-const float GLINT_CELL = 1.5;               // セルの一辺の下限 (視線方向に伸びた画素)。2 x 2 のセルで半径の中の点を全部探せる大きさ
+// セルの一辺の下限 (視線方向に伸びた画素)。2 x 2 のセルで、半径と傾けた点の長軸の中を全部探せる大きさ
+const float GLINT_CELL = 1.8;
+/*
+ * 1 つの点の形。実写の点は丸ではなく、横に長い短冊と、2 つ 3 つがつながったいびつな塊が混ざる (幅 / 高さは低い太陽で 2-3、
+ * 高い太陽の見下ろしで 1-1.3)。細かい波の稜線は横に長く、かすめ角では奥行きが縮むうえ、横に傾いた面も太陽を映し続けるので、
+ * 点は画面の横へ伸びる。伸ばす量は点ごとの乱数で、かすめ角ほど長くできる (セルで探せる 1 / NoV 倍まで)。明るい点
+ * (曲率の小さい面) ほど長く、割れやすい。どの形も重みの面積で割るので、1 つのエネルギーは丸のときと同じ
+ */
+const float GLINT_STRETCH_MAX = 6.0;        // 横に伸ばす倍率の上限
+const float GLINT_STRETCH_DIM = 0.6;        // いちばん暗い点の伸び (明るい点を 1 とした割合)
+const float GLINT_STRETCH_SKEW = 0.6;       // 伸びの乱数の指数 (1 未満で長い点を増やす)
+const float GLINT_TILT = 0.17;              // 長軸の傾きの乱数の幅 (ラジアン)
+const float GLINT_SPLIT = 0.35;             // 2 つの塊に割れる割合 (いちばん明るい点で。暗い点はこの半分)
 /*
  * 傾きの分布の指数 x の上限。ここで exp(-x) は 1e-13 で、点も重みも無いのと同じ。上限が無いと exp(-x) x (1 + x)^2 の
  * 計算の順番をコンパイラが入れ替えた時に 0 x 無限大で NaN になり、鏡面の上限 (min) が NaN を円盤の明るさに置き換えて道が白飛びした
@@ -138,12 +150,34 @@ float waterGlintCrest(vec3 ampLong, vec2 amp, vec2 p, float footprint, float hLo
     return min(w * (1.0 + GLINT_CREST_SHORT * sqrt(var / varAll) * (c * c / GLINT_CREST_SHORT_MEAN - 1.0)), GLINT_CREST_MAX);
 }
 
+// (1 - r^2)^2 の重み (r^2 は点の半径を 1 とした距離の 2 乗)
+float glintKernel(float r2) { return r2 < 1.0 ? sqr(1.0 - r2) : 0.0; }
+
+/*
+ * 1 つの点の重み。面積が丸い点と同じになるよう、伸ばした分で割る
+ * m: 標本から点までの差 (x = 視線の向き, y = 横) を半径の単位にしたもの, stretchMax: 横に伸ばせる倍率,
+ * bright: 0-1 (明るい点ほど 1), hs: 形の乱数
+ */
+float glintShape(vec2 m, float stretchMax, float bright, vec3 hs) {
+    float s = 1.0 + (stretchMax - 1.0) * pow(hs.x, GLINT_STRETCH_SKEW) * mix(GLINT_STRETCH_DIM, 1.0, bright);
+    float a = (hs.y - 0.5) * 2.0 * GLINT_TILT;
+    float ca = cos(a);
+    float sa = sin(a);
+    vec2 p = vec2(m.x * ca - m.y * sa, m.x * sa + m.y * ca);
+    if (s < 1.5 || hs.z >= GLINT_SPLIT * (0.5 + 0.5 * bright)) return glintKernel(p.x * p.x + sqr(p.y / s)) / s;
+    // 割れた点: 長軸に沿って細い 2 つを並べ、明るさの配分も乱数にする (つながったいびつな塊)
+    float s2 = 0.5 * (1.0 + s);
+    float o = s - s2;
+    float e = 0.25 + 0.5 * fract(hs.z * 7.31);
+    return (e * glintKernel(p.x * p.x + sqr((p.y - o) / s2)) + (1.0 - e) * glintKernel(p.x * p.x + sqr((p.y + o) / s2))) / s2;
+}
+
 /*
  * 格子 1 段 (セルの一辺 2^level) の倍率 (期待値 1)
  * pos: 標本の位置, rho: 点の密度 (1 / ブロック^2), axisAlong / axisAcross: ワールドの水平の差を画素の半径の単位へ直す 2 軸,
- * kernelArea: 1 つの点を配る重みの面積 (ブロック^2)
+ * kernelArea: 1 つの点を配る重みの面積 (ブロック^2), stretchMax: 点を横に伸ばせる倍率
  */
-float glintLevel(vec2 pos, float level, float rho, vec2 axisAlong, vec2 axisAcross, float kernelArea) {
+float glintLevel(vec2 pos, float level, float rho, vec2 axisAlong, vec2 axisAcross, float kernelArea, float stretchMax) {
     float cell = exp2(level);
     // 点はこの大きさの波が作るとみなし、その波の周期の半分で入れ替わる
     float wavelength = max(cell, WATER_CAPILLARY_WAVELENGTH);
@@ -189,13 +223,13 @@ float glintLevel(vec2 pos, float level, float rho, vec2 axisAlong, vec2 axisAcro
             if (h.x >= present) continue;
             vec2 d = (vec2(c) + h.yz) * cell - q;
             vec2 m = vec2(dot(d, axisAlong), dot(d, axisAcross));
-            float r2 = dot(m, m);
-            if (r2 >= 1.0) continue;
+            if (dot(m, m) >= 1.0 + sqr(stretchMax)) continue;
             float v = mix(GLINT_WEIGHT_MIN, vMax, h.x / present);
+            float shape = glintShape(m, stretchMax, 1.0 - sqrt(v), hash3(uvec3(uc, slot ^ 0xA511E9B3u)));
             // 三角波を立ち上がり GLINT_FADE の台形にする (2 組の三角波の和は 1 なので、台形の和も 1)
             float tri = 1.0 - abs(2.0 * fract(ts) - 1.0);
             float envelope = saturate((tri - 0.5) / GLINT_FADE + 0.5);
-            sum += envelope * inversesqrt(v) * sqr(1.0 - r2);
+            sum += envelope * inversesqrt(v) * shape;
         }
     }
     return sum / (GLINT_WEIGHT_MEAN * rho * kernelArea) + (1.0 - placed);
@@ -237,10 +271,12 @@ float waterGlitter(vec2 pos, vec3 N, vec3 V, vec3 L, float alpha2, vec2 unresolv
         vec2 axisAcross = vec2(-along.y, along.x) / (pixelWorld * GLINT_RADIUS);
         // (1 - r^2)^2 の重みの面積
         float kernelArea = PI * sqr(GLINT_RADIUS) / 3.0 * pixelArea;
+        // 横の広がり (半径 x 倍率 x 画素の幅) がセルの下限の半分に収まる倍率
+        float stretchMax = clamp(GLINT_CELL / (2.0 * GLINT_RADIUS * NoV), 1.0, GLINT_STRETCH_MAX);
         // どちらの段も期待値は同じなので、混ぜるのは切り替わりの帯だけにし、帯の外は片方の段だけを探す
         float wHi = smoothstep(GLINT_LEVEL_BLEND.x, GLINT_LEVEL_BLEND.y, fract(level));
-        float gLo = wHi < 1.0 ? glintLevel(pos, levelLo, rho, axisAlong, axisAcross, kernelArea) : 0.0;
-        float gHi = wHi > 0.0 ? glintLevel(pos, levelLo + 1.0, rho, axisAlong, axisAcross, kernelArea) : 0.0;
+        float gLo = wHi < 1.0 ? glintLevel(pos, levelLo, rho, axisAlong, axisAcross, kernelArea, stretchMax) : 0.0;
+        float gHi = wHi > 0.0 ? glintLevel(pos, levelLo + 1.0, rho, axisAlong, axisAcross, kernelArea, stretchMax) : 0.0;
         g = mix(mix(gLo, gHi, wHi), 1.0, smoothW);
     }
     /*
