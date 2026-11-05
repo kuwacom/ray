@@ -216,7 +216,7 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 
 | binding | 名前 (アクセサ) | ファイル | サイズ | 内容 | 書くプログラム (`SSBO_<名前>_WRITE`) |
 |---|---|---|---|---|---|
-| 0 | FrameDataBuffer (`frameData`) | `frame_data.glsl` | 4096 | post: exposure, exposureTarget, averageLuminance, focusDistance, histogram[256], postParams[] (4 個) / sky: sunIrradiance, moonIrradiance, shadowLightIrradiance, skySH[9], skyParams[8] (`[3]` = 目の位置の太陽の見え方: x 今フレーム (フレア用)、y 平滑化済み (影マップより遠いフォグ用)、z 太陽が影マップの範囲より遠い地形に隠れている割合 (post が書く)。`[4]` = (カメラの位置の雲の中の太陽の光 rgb, 雲の濃さ。0 なら雲の外)、`[5]` = (雲の中の空の光 rgb, 雲の中の霧の消散係数 1/ブロック)、`[6]` = (雨の日の雲の向こうの空を置き換える灰色の放射輝度 rgb, 置き換える割合)、`[7]` = (カメラのいる板の上面までの高さ, 下面までの高さ。0 なら板の外) (`[4]` `[5]` `[6]` `[7]` は prepare2 が書く)) / light: lightStats / surface: surfaceParams[4] (`[0..2]` = 開けた水面 (スカイライトが風の当たる上限以上) の海の状態。層の傾き 5・表面張力波の傾き 2・風速・高さの RMS。prepare が毎フレーム書く) | `FRAME_DATA`: setup (初期値), begin・deferred_a (lightStats), prepare (sky、surfaceParams[0..2]), prepare2 (skyParams[4..7]), composite25 (post) |
+| 0 | FrameDataBuffer (`frameData`) | `frame_data.glsl` | 4096 | post: exposure, exposureTarget, averageLuminance, focusDistance, histogram[256], postParams[] (4 個) / sky: sunIrradiance, moonIrradiance, shadowLightIrradiance, skySH[9], skyParams[8] (`[3]` = 目の位置の太陽の見え方: x 今フレーム (フレア用)、y 平滑化済み (影マップより遠いフォグ用)、z 太陽が影マップの範囲より遠い地形に隠れている割合 (post が書く)。`[4]` = (カメラの位置の雲の中の太陽の光 rgb, 雲の濃さ。0 なら雲の外)、`[5]` = (雲の中の空の光 rgb, 雲の中の霧の消散係数 1/ブロック)、`[6]` = (雨の日の雲の向こうの空を置き換える灰色の放射輝度 rgb, 置き換える割合)、`[7]` = (カメラのいる板の上面までの高さ, 下面までの高さ。0 なら板の外) (`[4]` `[5]` `[6]` `[7]` は prepare2 が書く)) / light: lightStats / surface: surfaceParams[4] (`[0..2]` = 開けた水面 (スカイライトが風の当たる上限以上) の海の状態。層の傾き 5・表面張力波の傾き 2・風速・高さの RMS。prepare が毎フレーム書く。`[3]` = WATER_GLITTER の点の寿命に使うフレームの長さ (x 平滑化した frameTime, y 半オクターブの段に丸めた長さ (秒), z 段の番号)。WATER_GLITTER の時だけ prepare が書く) | `FRAME_DATA`: setup (初期値), begin・deferred_a (lightStats), prepare (sky、surfaceParams[0..3]), prepare2 (skyParams[4..7]), composite25 (post) |
 | 1 | BlockDataBuffer (`blockData`) | `block_data.glsl` | 65536 | `LightDef lightDefs[256]`, `uvec4 shapes[128]`, `vec4 tints[128]`, `uint albedo[4096]` (ブロックの平均の色), `uint albedoUp[4096]` (上向きの面の色), `uvec4 lightMasks[]` (光るブロックの面の光り方、128 光源 x 上・下・側面・前面の 512 個) | `BLOCK_DATA`: setup のみ |
 | 2 | GlobalLightsBuffer (`globalLights`) | `global_lights.glsl` | 295200 | `count/blockCount/entityCount/overflow`, `cullDistance/culled` + `cullHist[64]` (間引き距離と距離の分布), `LightInstance lights[8192]` (posRadius: ボクセル空間位置 + 到達半径, colorSize: 放射 + 光源半径), `lightPower[]` (揺らぎ前の放射の輝度、8192 個)。使うのは LIGHT_MAX_COUNT 個まで | `GLOBAL_LIGHTS`: setup, begin, deferred, deferred_a |
 | 3 | LightBinsBuffer (`lightBins`) | `light_bins.glsl` | 10944512 (LIGHT_BIN_LIGHTS > 64 で 21430272) | `binCount[40960]`, `entityAcc[32768]` (エンティティ光源の蓄積表), `binLights[]` (40960 x 65 個、> 64 で x 129)。ビン = 8³ ブロック、1 ビン LIGHT_BIN_LIGHTS + 1 枠。枠のキー = 重要度 19 bit + 光源インデックス 13 bit | `LIGHT_BINS`: setup, begin, deferred_a, shadow_entities・shadow_block の gsh と gbuffers_entities・gbuffers_entities_translucent の vsh (蓄積表) |
@@ -626,7 +626,7 @@ sky モジュールが提供 (`//@include "/lib/sky/sky.glsl"`):
 |---|---|---|
 | `vec3 getSunIrradiance()` / `vec3 getMoonIrradiance()` | 全員 | 地表での直達照度 (FrameData) |
 | `LightSample getCelestialLight()` | surface (`gatherSurfaceLights`), sky (VL) | 影を落とす天体の光 (昼は太陽, 夜は月) |
-| `float celestialDiscScale()` / `celestialSpecularStrength()` | surface (`composite_specular.glsl`, `opaque_shading.fsh`) | 天体の鏡面の上限に掛ける円盤の明るさの倍率 (夜の月は空に描く円盤に合わせる。WATER_GLITTER の点は点に集めた分だけ実物の円盤まで上げる) と、設定 SPECULAR_SUN_STRENGTH / SPECULAR_MOON_STRENGTH |
+| `float celestialDiscScale()` / `celestialSpecularStrength()` | surface (`composite_specular.glsl`, `opaque_shading.fsh`) | 天体の鏡面の上限に掛ける円盤の明るさの倍率 (夜の月は空に描く円盤に合わせる。WATER_GLITTER の点は点に集めた分だけ実物の円盤まで上げる。1 より大きい強さで割り、強さを掛けても鏡のような面の鏡像は見えている円盤を超えない) と、設定 SPECULAR_SUN_STRENGTH / SPECULAR_MOON_STRENGTH |
 | `vec3 getSkyIrradiance(vec3 n)` | surface (`gatherSurfaceLights`, 反射のフォールバック) | 空からの拡散照度 (SH) |
 | `vec3 getSkyRadiance(vec3 dir)` | surface (反射のフォールバック), post | 方向の空の放射 (太陽円盤なし) |
 | `vec3 renderSky(vec3 dir, vec3 vanillaSky)` | surface (deferred30 の空ピクセル) | 背景の空 (太陽月・星込み) |
@@ -682,7 +682,7 @@ post モジュールが提供 (`//@include "/lib/post/post.glsl"`):
 | voxelBlock / Entity / Emit | 書く | 読む | 読む | 読む (debug) |
 | floodImgA/B | 書く | 読む (関数経由) | 読む (関数経由) | 読む (debug) |
 | SSBO1 BlockData, SSBO2, SSBO3, SSBO4 | 書く | 読む | 読む | 読む |
-| SSBO0 FrameData | lightStats を書く | sun/moon/SH/skyParams[0..3] と surfaceParams[0..2] (開けた水面の海の状態) を書く (prepare2 が skyParams[4..7] を書く) | surfaceParams[0..2] を読む ([3] は自由) | exposure/focus/histogram/postParams と skyParams[3].z を書く |
+| SSBO0 FrameData | lightStats を書く | sun/moon/SH/skyParams[0..3] と surfaceParams[0..3] (開けた水面の海の状態、きらめきのフレームの長さ) を書く (prepare2 が skyParams[4..7] を書く) | surfaceParams[0..3] を読む | exposure/focus/histogram/postParams と skyParams[3].z を書く |
 | shadowtex / shadowcolor | 書く (shadow パス) | 読む | 読む | - |
 | colortex1/2/3/15 | 読む | 読む | 書く | 読む |
 | colortex4/5 | - | colortex4 に雨を書く | 書く | - |

@@ -103,12 +103,14 @@ vec3 dielectricSpecular(vec3 N, vec3 V, float f0, float roughness, LightSample L
  * gain: 画素より細かい波が光源を映す点の倍率 (WATER_GLITTER)。1 でローブのまま
  * 夜の月は空に描く円盤を暗くしてあり、滑らかな照り返しはその円盤の鏡像で頭打ちにする。点は実物の月の像なので、点に集めた分
  * (gain 倍) だけ上限を実物の円盤まで上げる (上げないと点のエネルギーが頭打ちで消え、月の道が点の無い時より暗くなる)
+ * 強さを掛けた後も実物の円盤を超えないよう、上限を強さで割る (celestialDiscScale と同じ)
  */
 vec3 sunSpecular(vec3 N, vec3 V, float f0, float roughness, vec3 sunVis, float gain) {
     LightSample sun = unshadowedSun();
     sun.irradiance *= sunVis;
-    float discScale = min(celestialDiscScale() * max(gain, 1.0), 1.0);
-    return dielectricSpecular(N, V, f0, roughness, sun, discScale, gain) * celestialSpecularStrength();
+    float strength = celestialSpecularStrength();
+    float discScale = min(celestialDiscScale() * max(gain, 1.0), 1.0 / max(strength, 1.0));
+    return dielectricSpecular(N, V, f0, roughness, sun, discScale, gain) * strength;
 }
 
 vec3 sunSpecular(vec3 N, vec3 V, float f0, float roughness, vec3 sunVis) {
