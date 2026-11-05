@@ -334,15 +334,13 @@ void main() {
      */
     if (LENS_POINT_SPREAD_STRENGTH > 0.0) {
         float focusFade = LENS_POINT_SPREAD_STRENGTH;
-        float coreFade = LENS_POINT_SPREAD_STRENGTH;
     #ifdef DOF
         float cocDist = depth >= 1.0 ? far * 4.0 : linearizeDepth(fixHandDepth(depth));
         float cocPx = isHandDepth(depth) ? 0.0 : circleOfConfusion(cocDist, max(frameData.focusDistance, 0.1));
         focusFade *= saturate(1.0 - abs(cocPx) / POINT_SPREAD_COC_FADE);
-        coreFade *= saturate(1.0 - abs(cocPx) / POINT_CORE_COC_FADE);
     #endif
         float spreadAmount = (POINT_SPREAD_BASE + POINT_SPREAD_PER_GLARE * LP_VEILING_GLARE) * focusFade;
-        float coreAmount = min(POINT_CORE_SHARE * coreFade, 1.0);
+        float coreAmount = min(POINT_CORE_SHARE * focusFade, 1.0);
         if (any(greaterThan(textureLod(colortex17, uvL, float(POINT_SPREAD_GATE_LEVEL)).rgb, vec3(0.0)))) {
             vec3 spreadCore = max(textureLod(colortex17, uvL, 0.0).rgb, 0.0);
             vec3 spreadTail = vec3(0.0);
