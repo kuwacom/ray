@@ -174,7 +174,6 @@ vec3 getWaterNormal(WaterSea sea, vec3 worldPos, vec3 geoNormal, float footprint
     mat3 basis = waterBasis(geoNormal);
     vec2 p = vec2(dot(worldPos, basis[0]), dot(worldPos, basis[1]));
     vec2 g = waterChoppy(waterWaveSumFlow(sea, p, 0, WATER_LAYERS, footprint, flow)).yz;
-    g += waterCapillaryGradient(sea, p, footprint, flow);
     #ifdef HAS_SKY
         if (geoNormal.y > 0.5 && biome_precipitation == 1) g += rainRipples(p, rainStrength);
     #endif
