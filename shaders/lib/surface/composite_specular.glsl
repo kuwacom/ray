@@ -104,13 +104,21 @@ vec3 dielectricSpecular(vec3 N, vec3 V, float f0, float roughness, LightSample L
  * 夜の月は空に描く円盤を暗くしてあり、滑らかな照り返しはその円盤の鏡像で頭打ちにする。点は実物の月の像なので、点に集めた分
  * (gain 倍) だけ上限を実物の円盤まで上げる (上げないと点のエネルギーが頭打ちで消え、月の道が点の無い時より暗くなる)
  * 強さを掛けた後も実物の円盤を超えないよう、上限を強さで割る (celestialDiscScale と同じ)
+ * 円盤の上限を超える点は、像が画素より大きい (近い・曲率の小さい点) という意味なので、上限も gain 倍 (SPECULAR_POINT_SPREAD_MAX
+ * まで) 上げてエネルギーを捨てない。広がりは白飛び分の点像の芯 (final) が受け持つ (明るい点ほど大きな光の塊になる)
+ * 上限で切ると 2-5 m の点のエネルギーが 3 割消えていた
  */
+const float SPECULAR_POINT_SPREAD_MAX = 16.0;
+// シーンのバッファ (RGBA16F、最大 65504) に入る明るさの上限。超えると無限大になり、TAA が 0 に置き換えて点が消える
+const float SPECULAR_HDR_MAX = 32768.0;
+
 vec3 sunSpecular(vec3 N, vec3 V, float f0, float roughness, vec3 sunVis, float gain) {
     LightSample sun = unshadowedSun();
     sun.irradiance *= sunVis;
     float strength = celestialSpecularStrength();
-    float discScale = min(celestialDiscScale() * max(gain, 1.0), 1.0 / max(strength, 1.0));
-    return dielectricSpecular(N, V, f0, roughness, sun, discScale, gain) * strength;
+    float spread = clamp(gain, 1.0, SPECULAR_POINT_SPREAD_MAX);
+    float discScale = min(celestialDiscScale() * max(gain, 1.0), spread / max(strength, 1.0));
+    return min(dielectricSpecular(N, V, f0, roughness, sun, discScale, gain) * strength, vec3(SPECULAR_HDR_MAX));
 }
 
 vec3 sunSpecular(vec3 N, vec3 V, float f0, float roughness, vec3 sunVis) {

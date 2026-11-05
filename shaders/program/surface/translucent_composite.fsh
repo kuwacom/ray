@@ -404,9 +404,14 @@ void main() {
             if (top && maxOf(sunSpecVis) > 0.0) {
                 vec2 glintPos = screenToPlayer(vec3(removeTaaJitter(texcoord), d0)).xz + cameraPosition.xz;
                 glitter = waterGlitter(glintPos, N, V, unshadowedSun().direction, sqr(sunAlpha), unresolved,
-                    dist * 2.0 / (gbufferProjection[1][1] * viewSize().y), NoVGeo, waterGlintCrest(sea, surfWorld.xz, footprint, crest));
-                // 倍率が有限でない画素は滑らかなローブに戻す。鏡面の上限 (min) が NaN を円盤の明るさに置き換え、道が一面に白飛びするため
-                if (isnan(glitter) || isinf(glitter)) glitter = 1.0;
+                    dist * 2.0 / (gbufferProjection[1][1] * viewSize().y), NoVGeo,
+                    waterGlintCrest(vec3(sea.amp[0], sea.amp[1], sea.amp[2]), vec2(sea.amp[GLINT_CREST_SHORT_FIRST], sea.amp[GLINT_CREST_SHORT_FIRST + 1]),
+                        surfWorld.xz, footprint, waves.x));
+                /*
+                 * 念のための保護: 倍率が有限でない画素は滑らかなローブに戻す (鏡面の上限の min が NaN を円盤の明るさに置き換えるため)
+                 * isnan / isinf は最適化で消えることがあるので、指数のビットで調べる
+                 */
+                if (!waterGlintFinite(glitter)) glitter = 1.0;
             }
 #endif
             vec3 spec = refl * F + sunSpecular(N, V, WATER_F0, sunAlpha, sunSpecVis, glitter) + localLightSpecular(WL, N, V, WATER_F0, sunAlpha);
