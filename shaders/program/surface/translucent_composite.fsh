@@ -25,6 +25,7 @@
 //@include "/lib/surface/composite_specular.glsl"
 //@include "/lib/surface/water_shading.glsl"
 //@include "/lib/common/specular_sparkle.glsl"
+//@include "/lib/common/jitter.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -108,6 +109,7 @@
 #include "/lib/common/exposure.glsl"
 #include "/lib/surface/water_shading.glsl"
 #include "/lib/common/specular_sparkle.glsl"
+#include "/lib/common/jitter.glsl"
 // END GENERATED includes
 
 /* RENDERTARGETS: 0 */
@@ -177,7 +179,8 @@ void main() {
         float footprint = waterFootprint(dist, NoVGeo);
         // 側面で上向きの水面の NoV (|V.y|) を使うと、真横から見た側面で画素が無限に大きいとみなされ、海の波の分散が全部
         // 太陽の鏡面の粗さへ回って側面に白っぽい幅広のつやが乗っていた
-        float unresolvedVar = side ? waterFallUnresolvedSlopeVar(footprint) : waterUnresolvedSlopeVar(sea, footprint);
+        vec2 unresolved = side ? vec2(waterFallUnresolvedSlopeVar(footprint), 0.0) : waterUnresolvedSlopeCurvature(sea, footprint);
+        float unresolvedVar = unresolved.x;
         // 上から見た上向きの水面だけ、画素より細かい波の粗さでフレネルと反射方向を均す (composite.csh と同じ)
         float roughVar = !below && N.y > 0.5 ? unresolvedVar : 0.0;
         float F = fresnelDielectric(waterRoughNoV(NoV, roughVar, dist), eta);
@@ -388,24 +391,27 @@ void main() {
             // 側面 (滝) は落ちる水の乱れに任せ、幅のある淡いつやを残す
             float sunAlpha = side ? sqrt(sqr(WATER_ROUGHNESS) + unresolvedVar)
                 : sqrt(sqr(WATER_SUN_ROUGHNESS) + unresolvedVar + waterPixelSlopeVar(sea, footprint));
-            // 遠い水面は、法線で表せない波の面の数のゆらぎで太陽の照り返しを点に割る (WATER_GLITTER)
+            // 上向きの面だけ: 長い 3 層の高さと Jacobian (波頭の透過光・泡・きらめきを寄せる波頭)。視差の位置ずれは長い波では画素未満
+            bool top = N.y > 0.5;
+            vec3 surfWorld = surfPlayer + cameraPosition;
+            vec4 waves = vec4(0.0);
+            if (top) waves = waterWaveSum(sea, surfWorld.xz, 0, 3, footprint);
+            float crest = smoothstep(0.0, 2.0 * sea.heightRms, waves.x);
+            // 粗さへ回した細かい波の分は、太陽 (月) を映す点の集まりとして描く (WATER_GLITTER)
             float glitter = 1.0;
 #ifdef WATER_GLITTER
-            if (N.y > 0.5) {
-                LightSample sun = unshadowedSun();
-                glitter = waterGlitter(surfPlayer.xz + cameraPosition.xz, N, V, sun.direction, unresolvedVar, sun.angularSize,
-                    dist * 2.0 / (gbufferProjection[1][1] * viewSize().y), NoVGeo);
+            // 日陰・雲の影では光源が映らないので探さない
+            if (top && maxOf(sunSpecVis) > 0.0) {
+                vec2 glintPos = screenToPlayer(vec3(removeTaaJitter(texcoord), d0)).xz + cameraPosition.xz;
+                glitter = waterGlitter(glintPos, N, V, unshadowedSun().direction, sqr(sunAlpha), unresolved,
+                    dist * 2.0 / (gbufferProjection[1][1] * viewSize().y), NoVGeo, crest);
             }
 #endif
             vec3 spec = refl * F + sunSpecular(N, V, WATER_F0, sunAlpha, sunSpecVis, glitter) + localLightSpecular(WL, N, V, WATER_F0, sunAlpha);
             color = behind * (1.0 - F) + spec;
             sparkleLum += luminance(sparkleExcess(spec, getExposure()));
 
-            // 上向きの面だけ: 長い 3 層の高さと Jacobian (波頭の透過光と泡)。視差の位置ずれは長い波では画素未満
-            if (N.y > 0.5) {
-                vec3 surfWorld = surfPlayer + cameraPosition;
-                vec4 waves = waterWaveSum(sea, surfWorld.xz, 0, 3, footprint);
-                float crest = smoothstep(0.0, 2.0 * sea.heightRms, waves.x);
+            if (top) {
                 LightSample sun = unshadowedSun();
 
                 // 波頭の透過光: 太陽の側を向いて見た時だけ。真上の太陽では横から波頭へ入る光が無い

@@ -351,19 +351,38 @@ vec3 waterChoppy(vec4 w) { return vec3(w.x, w.yz / waterJacobian(w)); }
  * 法線で表せなかった傾きの分散 (GGX の alpha^2 に足す)。画素の中で平均された波は面を粗くする (LEAN / Toksvig と同じ考え)
  * 遠くの水面で太陽の照り返しが縦に広がる帯になるのはこの分
  */
-float waterUnresolvedSlopeVar(WaterSea sea, float footprint) {
-    float v = 0.0;
+/*
+ * y は同じ層の曲率の 2 乗の和。1 層を振幅 (傾きの RMS) a・波数 k の正弦とみなした (a k)^2 を足す。画素より細かい波が太陽を映す
+ * 点の数 (傾きの確率密度 x ガウス曲率の絶対値の平均) に使う (WATER_GLITTER)。使わない呼び出しでは消える
+ */
+vec2 waterUnresolvedSlopeCurvature(WaterSea sea, float footprint) {
+    vec2 v = vec2(0.0);
     for (int i = 0; i < WATER_LAYERS; i++) {
-        float r = waterLayerResolved(i, footprint);
+        float tile = waterLayerTile(i);
+        float r = waterTileResolved(tile, footprint);
         // 法線側に r 倍を残すので、分散の合計が保たれるよう 1 - r^2 を回す
-        v += (1.0 - r * r) * sqr(sea.amp[i]);
+        float w = (1.0 - r * r) * sqr(sea.amp[i]);
+        v += w * vec2(1.0, sqr(TAU * WATER_BAND_CENTER / tile));
     }
     // 表面張力波は近くでは法線で表すので、表せない分だけが粗さになる
     for (int i = 0; i < WATER_CAPILLARY_LAYERS; i++) {
-        float r = waterTileResolved(waterCapillaryTile(i), footprint);
-        v += (1.0 - r * r) * sqr(sea.capAmp[i]);
+        float tile = waterCapillaryTile(i);
+        float r = waterTileResolved(tile, footprint);
+        float w = (1.0 - r * r) * sqr(sea.capAmp[i]);
+        v += w * vec2(1.0, sqr(TAU * WATER_BAND_CENTER / tile));
     }
     return v;
+}
+
+float waterUnresolvedSlopeVar(WaterSea sea, float footprint) { return waterUnresolvedSlopeCurvature(sea, footprint).x; }
+
+// 表面張力 / 密度 (m^3/s^2)。波長 2 cm 前後より短い波は表面張力で速く進む
+const float WATER_SURFACE_TENSION = 7.28e-5;
+
+// 波長 (ブロック = m) の波の位相の速さ (m/s)。分散関係 omega^2 = g k + (sigma / rho) k^3
+float waterPhaseSpeed(float wavelength) {
+    float k = TAU / wavelength;
+    return sqrt(WATER_GRAVITY / k + WATER_SURFACE_TENSION * k);
 }
 
 /*

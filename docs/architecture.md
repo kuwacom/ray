@@ -585,7 +585,7 @@ DEBUG_VIEW の値 (0-12) と表示内容の対応は `shaders/lang/ja_JP.lang` /
 - 表面の光 (light / sky の関数) は surface の `gatherSurfaceLights` が呼ぶ。deferred30・半透明・composite1・二次ヒットは light / sky の照度の関数を直接呼ばない
 - `program/surface/gbuffers_solid.vsh` から `injectEntityLight`、`program/surface/gbuffers_*` から `encodeVelocity` を呼び出す (関数本体は light / post モジュール)
 - 本体のファイル名は役割名で、Iris のプログラム名との対応は `tools/gen_wrappers.py` の `BODIES` にある (例: composite1 は `program/surface/translucent_composite.fsh`)
-- 大きな処理は 600 行以下を目安にファイルを分ける。体積雲は `lib/sky/cloud_volume.glsl` が `cloud_constants` / `cloud_weather` / `cloud_density` / `cloud_lighting` / `cloud_march` を読む。半透明の合成の水と鏡面は `lib/surface/water_shading.glsl` と `composite_specular.glsl`。水面の `lib/common/water.glsl` は `water_waves` / `water_normal`、鏡面の白飛び分は `lib/common/specular_sparkle.glsl`、レンズの `lib/post/lens.glsl` は `lens_optics` / `lens_flare` を読む。`lib/post/lens_presets.glsl` はレンズごとの値を 1 つの `#if` の連なりで持つ表なので分けない
+- 大きな処理は 600 行以下を目安にファイルを分ける。体積雲は `lib/sky/cloud_volume.glsl` が `cloud_constants` / `cloud_weather` / `cloud_density` / `cloud_lighting` / `cloud_march` を読む。半透明の合成の水と鏡面は `lib/surface/water_shading.glsl` と `composite_specular.glsl`。水面の `lib/common/water.glsl` は `water_waves` / `water_glitter` (画素より細かい波が光源を映す点、WATER_GLITTER) / `water_normal`、鏡面の白飛び分は `lib/common/specular_sparkle.glsl`、レンズの `lib/post/lens.glsl` は `lens_optics` / `lens_flare` を読む。`lib/post/lens_presets.glsl` はレンズごとの値を 1 つの `#if` の連なりで持つ表なので分けない
 - 各モジュールの補助ファイルはそのモジュールのディレクトリに置く (例: DDA は `lib/light/trace.glsl`)
 
 ### モジュール間インターフェース
@@ -626,7 +626,7 @@ sky モジュールが提供 (`//@include "/lib/sky/sky.glsl"`):
 |---|---|---|
 | `vec3 getSunIrradiance()` / `vec3 getMoonIrradiance()` | 全員 | 地表での直達照度 (FrameData) |
 | `LightSample getCelestialLight()` | surface (`gatherSurfaceLights`), sky (VL) | 影を落とす天体の光 (昼は太陽, 夜は月) |
-| `float celestialDiscScale()` / `celestialSpecularStrength()` | surface (`composite_specular.glsl`, `opaque_shading.fsh`) | 天体の鏡面の上限に掛ける円盤の明るさの倍率 (夜の月は空に描く円盤に合わせる) と、設定 SPECULAR_SUN_STRENGTH / SPECULAR_MOON_STRENGTH |
+| `float celestialDiscScale()` / `celestialSpecularStrength()` | surface (`composite_specular.glsl`, `opaque_shading.fsh`) | 天体の鏡面の上限に掛ける円盤の明るさの倍率 (夜の月は空に描く円盤に合わせる。WATER_GLITTER の点は点に集めた分だけ実物の円盤まで上げる) と、設定 SPECULAR_SUN_STRENGTH / SPECULAR_MOON_STRENGTH |
 | `vec3 getSkyIrradiance(vec3 n)` | surface (`gatherSurfaceLights`, 反射のフォールバック) | 空からの拡散照度 (SH) |
 | `vec3 getSkyRadiance(vec3 dir)` | surface (反射のフォールバック), post | 方向の空の放射 (太陽円盤なし) |
 | `vec3 renderSky(vec3 dir, vec3 vanillaSky)` | surface (deferred30 の空ピクセル) | 背景の空 (太陽月・星込み) |
