@@ -5,8 +5,9 @@
 #define POST_SAMPLING_GLSL
 
 // 他のモジュールの出力に NaN / Inf が混ざると TAA 履歴やブルームで画面全体に広がるので入口で止める
+// isnan / isinf はドライバの最適化で常に偽になることがあるので、指数のビット (全部 1 で NaN か無限大) で調べる
 vec3 sanitizeColor(vec3 c) {
-    if (any(isnan(c)) || any(isinf(c))) return vec3(0.0);
+    if (any(equal(floatBitsToUint(c) & 0x7F800000u, uvec3(0x7F800000u)))) return vec3(0.0);
     return max(c, 0.0);
 }
 

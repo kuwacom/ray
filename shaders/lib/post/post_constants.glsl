@@ -278,6 +278,8 @@ const int POINT_SPREAD_LEVELS = 4;
 const int POINT_SPREAD_GATE_LEVEL = 5;
 // DoF のボケ半径 (px) がこの値に達すると裾を重ねない (ボケた点は玉ボケに任せる)
 const float POINT_SPREAD_COC_FADE = 6.0;
+// 芯は半径 1-2 px の鋭い像なので、DoF のボケ半径がこの値に達したら掛けない (ボケて広がった点に鋭い芯が重なり、輪の玉ボケになった)
+const float POINT_CORE_COC_FADE = 2.0;
 /*
  * 点像の芯: 回折・センサー・現像の滲みで、点のエネルギーの一部が半径 1-2 px に広がる。白を大きく超えた点ほど芯の周りまで
  * 白く飛び、明るい点ほど大きな光の塊に見える (裾の r^-2 だけでは隣の画素へ行く分が 1% 未満で、点が 1 画素の白い四角に見えた)

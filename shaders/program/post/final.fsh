@@ -334,13 +334,15 @@ void main() {
      */
     if (LENS_POINT_SPREAD_STRENGTH > 0.0) {
         float focusFade = LENS_POINT_SPREAD_STRENGTH;
+        float coreFade = LENS_POINT_SPREAD_STRENGTH;
     #ifdef DOF
         float cocDist = depth >= 1.0 ? far * 4.0 : linearizeDepth(fixHandDepth(depth));
         float cocPx = isHandDepth(depth) ? 0.0 : circleOfConfusion(cocDist, max(frameData.focusDistance, 0.1));
         focusFade *= saturate(1.0 - abs(cocPx) / POINT_SPREAD_COC_FADE);
+        coreFade *= saturate(1.0 - abs(cocPx) / POINT_CORE_COC_FADE);
     #endif
         float spreadAmount = (POINT_SPREAD_BASE + POINT_SPREAD_PER_GLARE * LP_VEILING_GLARE) * focusFade;
-        float coreAmount = min(POINT_CORE_SHARE * focusFade, 1.0);
+        float coreAmount = min(POINT_CORE_SHARE * coreFade, 1.0);
         if (any(greaterThan(textureLod(colortex17, uvL, float(POINT_SPREAD_GATE_LEVEL)).rgb, vec3(0.0)))) {
             vec3 spreadCore = max(textureLod(colortex17, uvL, 0.0).rgb, 0.0);
             vec3 spreadTail = vec3(0.0);
@@ -351,7 +353,12 @@ void main() {
                 float w = (o.x == 0 ? POINT_CORE_W0 : POINT_CORE_W1) * (o.y == 0 ? POINT_CORE_W0 : POINT_CORE_W1);
                 coreBlur += max(textureLod(colortex17, uvL + vec2(o) * (POINT_CORE_OFFSET * texelSize()), 0.0).rgb, 0.0) * w;
             }
-            hdr = max(hdr + spreadAmount * (spreadTail / float(POINT_SPREAD_LEVELS) - spreadCore) + coreAmount * (coreBlur - spreadCore), 0.0);
+            /*
+             * 芯と裾へ配る分は中心から引く。colortex17 は DoF・色収差の前の値なので、ボケた点や色ごとにずれた点では hdr の中心に
+             * 同じだけの白飛び分が残っておらず、そのまま引くと点の中心が 0 (黒や緑・紫の 1 画素) に抜けた。引くのは残っている分まで
+             */
+            vec3 given = (spreadAmount + coreAmount) * spreadCore;
+            hdr += spreadAmount * spreadTail / float(POINT_SPREAD_LEVELS) + coreAmount * coreBlur - min(given, hdr);
         }
     }
 #endif
