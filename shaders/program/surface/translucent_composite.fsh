@@ -404,7 +404,7 @@ void main() {
             if (top && maxOf(sunSpecVis) > 0.0) {
                 vec2 glintPos = screenToPlayer(vec3(removeTaaJitter(texcoord), d0)).xz + cameraPosition.xz;
                 glitter = waterGlitter(glintPos, N, V, unshadowedSun().direction, sqr(sunAlpha), unresolved,
-                    dist * 2.0 / (gbufferProjection[1][1] * viewSize().y), NoVGeo, crest);
+                    dist * 2.0 / (gbufferProjection[1][1] * viewSize().y), NoVGeo, waterGlintCrest(sea, surfWorld.xz, footprint, crest));
             }
 #endif
             vec3 spec = refl * F + sunSpecular(N, V, WATER_F0, sunAlpha, sunSpecVis, glitter) + localLightSpecular(WL, N, V, WATER_F0, sunAlpha);
