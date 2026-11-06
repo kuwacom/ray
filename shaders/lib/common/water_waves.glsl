@@ -443,15 +443,17 @@ float waterFootprint(float dist, float NoV) {
 // 仰角 0.25 付近の 1 行になり、夕方の雲が上下の切れた四角い縦縞に並んだ
 const float WATER_ROUGH_REFLECT_LIFT = 1.0;
 /*
- * フレネルを均すのは描画距離 (far) に対してこの範囲より遠い水面だけ。近景・中景まで均すと、層を落とし始める
+ * フレネルを均すのは水面の 1 画素 (waterFootprint) がこの範囲 (ブロック) より大きい所だけ。近景・中景まで均すと、層を落とし始める
  * 10-30 ブロックからフレネルが 0.7 -> 0.45 に下がり、つやの無いマットな水面になった。遠くは像を残したまま暗くして、
  * 地平線の手前の明るい帯 (水面が地平線の空と同じ明るさになり水平線が消える) を抑える
+ * 画素の大きさで決めるので、描画距離を変えても同じ水面の見え方は変わらない (目の高さ 2 ブロックで 100-270 ブロック先)
  */
-const vec2 WATER_ROUGH_FRESNEL_RANGE = vec2(0.2, 0.7);
+const vec2 WATER_ROUGH_FRESNEL_RANGE = vec2(8.0, 64.0);
 
-float waterRoughNoV(float NoV, float slopeVar, float dist) {
-    slopeVar *= smoothstep(WATER_ROUGH_FRESNEL_RANGE.x, WATER_ROUGH_FRESNEL_RANGE.y, dist / far);
-    return sqrt(NoV * NoV + slopeVar);
+float waterRoughFar(float footprint) { return smoothstep(WATER_ROUGH_FRESNEL_RANGE.x, WATER_ROUGH_FRESNEL_RANGE.y, footprint); }
+
+float waterRoughNoV(float NoV, float slopeVar, float footprint) {
+    return sqrt(NoV * NoV + slopeVar * waterRoughFar(footprint));
 }
 
 /*
@@ -461,6 +463,30 @@ float waterRoughNoV(float NoV, float slopeVar, float dist) {
 vec3 waterRoughReflectDir(vec3 R, float slopeVar) {
     if (R.y < 0.0) return R;
     return normalize(vec3(R.x, sqrt(R.y * R.y + sqr(WATER_ROUGH_REFLECT_LIFT) * slopeVar), R.z));
+}
+
+/*
+ * 映り込み (物と空) を、画素より細かい波の傾きの分だけ散らす粗さ (知覚の粗さ)。散らさないと遠くとかすめ角の水面は表した長い波だけで
+ * 映り込みの向きが決まり、細かい波の多い湖・川では十数ブロック先から映り込みが揺れない平らな鏡になる
+ * 散らすのは GGX の可視法線 (VNDF) なので、長い裾の分を WATER_REFLECT_ROUGH_SCALE で詰める (傾きの RMS に対する alpha の比)。
+ * かすめ角では散らしが仰角の向きに大きく方位の向きに小さく出るので、映り込みは縦に伸びる
+ * 1 で傾きの分の全部、小さいほど鏡に近い。0.5 以上では池の十数ブロック先の木や海の氷山の映り込みがほぼ消えて、
+ * 空の色の一様なすりガラスになった
+ */
+const float WATER_REFLECT_ROUGH_SCALE = 0.3;
+
+float waterReflectRoughness(float slopeVar) {
+#if REFLECTIONS >= 2
+    return sqrt(sqrt(slopeVar) * WATER_REFLECT_ROUGH_SCALE);
+#else
+    // 粗い反射の経路が無い (SSR だけ) 設定では鏡のまま
+    return 0.0;
+#endif
+}
+
+// 散らした向きで空を引く時に、散らしきらなかった傾きの分だけ仰角を持ち上げる分散
+float waterReflectLiftVar(float slopeVar, bool scattered) {
+    return scattered ? slopeVar * (1.0 - sqr(WATER_REFLECT_ROUGH_SCALE)) : slopeVar;
 }
 
 #endif

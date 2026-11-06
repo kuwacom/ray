@@ -176,7 +176,7 @@ void main() {
         float unresolvedVar = unresolved.x;
         // 上から見た上向きの水面だけ、画素より細かい波の粗さでフレネルと反射方向を均す (composite.csh と同じ)
         float roughVar = !below && N.y > 0.5 ? unresolvedVar : 0.0;
-        float F = fresnelDielectric(waterRoughNoV(NoV, roughVar, dist), eta);
+        float F = fresnelDielectric(waterRoughNoV(NoV, roughVar, footprint), eta);
         vec3 refrDir = refract(-V, N, 1.0 / eta);
         if (dot(refrDir, refrDir) < 0.5) F = 1.0;
         /*
@@ -238,7 +238,7 @@ void main() {
         vec4 rs = sampleWaterReflection(texel, dist, skyWeight);
         vec3 fallback = below ? vec3(0.0) : skyReflectionFallback(R, lmT.y, 0.0);
         if (rs.a > 0.0) {
-            vec3 sky = skyWeight > 0.0 && R.y > 0.0 ? waterSkyReflection(R0, roughVar, lmT.y, dist) : fallback;
+            vec3 sky = skyWeight > 0.0 && R.y > 0.0 ? waterSkyReflection(R0, roughVar, lmT.y, footprint) : fallback;
             refl = mix(fallback, (rs.rgb + sky * skyWeight) / rs.a, saturate(rs.a * 4.0));
         } else {
             refl = fallback;

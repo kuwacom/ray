@@ -114,6 +114,11 @@ const vec2 workGroupsRender = vec2(0.5, 0.5);
 // SSR の当たりの判定と定数 (SSR_MAX_DISTANCE など) は composite2 の鏡面のフル解像度の SSR と共有するため lib/surface/reflection.glsl に置く
 const float VOXEL_REFLECTION_DISTANCE = 64.0;
 const float REFLECTION_ALPHA_MIN = 0.12;     // 最も粗い面の時間蓄積の新しい値の割合
+/*
+ * 映り込みを散らした水面の時間蓄積の新しい値の割合。散らしは粗さが小さくても空と物の境で明暗の差が大きく、粗さに応じた割合
+ * (0.3-0.4) では半分の解像度の砂目が残った
+ */
+const float WATER_REFLECTION_ALPHA = 0.12;
 #if REFLECTIONS == 1
     const float SSR_ROUGHNESS_LIMIT = 0.3;   // SSR のみの設定では粗い面は空のフォールバックで済ませる
 #else
@@ -163,14 +168,16 @@ void main() {
     vec3 skyDir = R;
     // 折り返すのは上向きの水面だけ (側面で折り返すと、少し上から見た滝が足元の地面ではなく空を映して白っぽく光った)
     bool waterTop = s.translucent && s.materialId == MAT_WATER && !underside && abs(N.y) >= 0.5;
-    if (waterTop) {
-        R.y = abs(R.y);
-        skyDir = R;
-        if (N.y > 0.5) {
-            float footprint = waterFootprint(dist, abs(V.y));
-            skyDir = waterRoughReflectDir(R, waterUnresolvedSlopeVar(waterSeaState(s.skyLm), footprint));
-        }
+    /*
+     * 上から見た上向きの水面は、画素より細かい波の傾きの分だけ映り込みの向きを散らす (粗い面と同じ VNDF の 1 本と時間の蓄積)
+     * 散らした水面は空へ抜けた分もここで空の画素を引いて蓄積する (合成で画素ごとに引き直すと散らした向きが平均されない)
+     */
+    float waterSlopeVar = 0.0;
+    if (waterTop && N.y > 0.5) {
+        waterSlopeVar = waterUnresolvedSlopeVar(waterSeaState(s.skyLm), waterFootprint(dist, abs(V.y)));
+        s.perceptualRoughness = waterReflectRoughness(waterSlopeVar);
     }
+    bool waterRough = waterTop && s.perceptualRoughness >= MIRROR_ROUGHNESS;
 #if REFLECTIONS >= 2
     if (s.perceptualRoughness >= MIRROR_ROUGHNESS) {
         float a = max(s.perceptualRoughness * s.perceptualRoughness, MIN_ROUGHNESS);
@@ -180,6 +187,10 @@ void main() {
         if (dot(Rs, N) > 0.0) R = Rs;
     }
 #endif
+    if (waterTop) {
+        R.y = abs(R.y);
+        skyDir = waterRoughReflectDir(R, waterReflectLiftVar(waterSlopeVar, waterRough));
+    }
     /*
      * テクスチャ法線 (特に自動生成法線) の反射と VNDF のサンプルは幾何面の下を向くことがある。そのまま辿ると SSR は
      * 始点のすぐ先の自分の面に、ボクセルは隣の床ブロックに当たり、少しずれた自分のテクスチャを映して
@@ -192,12 +203,13 @@ void main() {
 
     // 水中から見た水面の裏は全反射で水中を映すので空は使わない (外れた分は sky の水中フォグが埋める)
     if (!s.translucent || s.materialId != MAT_WATER) skyDir = R;
-    vec3 radiance = underside ? vec3(0.0) : skyReflectionFallback(skyDir, s.skyLm, s.perceptualRoughness);
+    // 散らした水面は VNDF で既にぼけているので、空の SH へ寄せない
+    vec3 radiance = underside ? vec3(0.0) : skyReflectionFallback(skyDir, s.skyLm, waterRough ? 0.0 : s.perceptualRoughness);
     bool skyMiss = false;
 
-    if (s.perceptualRoughness < SSR_ROUGHNESS_LIMIT) {
-        // 鏡面 (水・ガラス) は遠くの島や岸も映るよう描画距離まで辿る
-        float maxDist = s.perceptualRoughness < MIRROR_ROUGHNESS ? mirrorTraceDistance() : SSR_MAX_DISTANCE;
+    if (s.perceptualRoughness < SSR_ROUGHNESS_LIMIT || waterRough) {
+        // 鏡面 (水・ガラス) と水面は遠くの島や岸も映るよう描画距離まで辿る
+        float maxDist = s.perceptualRoughness < MIRROR_ROUGHNESS || waterRough ? mirrorTraceDistance() : SSR_MAX_DISTANCE;
         vec4 hit = traceReflectionHit(s.viewPos, playerPos, Ng, R, dist, maxDist, !s.translucent, waterTop, noise.z);
         bool found = hit.w > 0.5;
         float edge = hit.z;
@@ -215,10 +227,10 @@ void main() {
         // 何にも当たらず空へ抜けた鏡面の反射は、同じ方向の空の画素 (雲込み) を映す。空は無限遠なので面の位置によらず
         // カメラから見た R 方向の画素と同じ。LUT の空 (雲なし) のままだと、昼の水面の遠くが一様な水色の帯になり
         // 雲の映り込みが無かった
-        if (!found && !underside && s.perceptualRoughness < MIRROR_ROUGHNESS && R.y > 0.0) {
-            // 水面は composite2 が自分の画素の反射方向で空を引き直す (半分の解像度の隣の画素の空では、波の法線と
+        if (!found && !underside && (s.perceptualRoughness < MIRROR_ROUGHNESS || waterRough) && R.y > 0.0) {
+            // 鏡の水面は composite2 が自分の画素の反射方向で空を引き直す (半分の解像度の隣の画素の空では、波の法線と
             // ずれた 2x2 のモザイクになり、中景の水面が白い砂目のつやの無い面に見えた)。空へ抜けた印に距離を負で書く
-            if (s.materialId == MAT_WATER) skyMiss = true;
+            if (s.materialId == MAT_WATER && !waterRough) skyMiss = true;
             else radiance = skyPixelReflection(skyDir, s.skyLm, radiance);
         }
     }
@@ -231,7 +243,7 @@ void main() {
 
 #if REFLECTIONS >= 2
     if (s.perceptualRoughness >= MIRROR_ROUGHNESS) {
-        float alpha = mix(0.5, REFLECTION_ALPHA_MIN, saturate((s.perceptualRoughness - MIRROR_ROUGHNESS) / 0.4));
+        float alpha = waterRough ? WATER_REFLECTION_ALPHA : mix(0.5, REFLECTION_ALPHA_MIN, saturate((s.perceptualRoughness - MIRROR_ROUGHNESS) / 0.4));
         vec2 uv = (vec2(texel) + 0.5) / viewSize();
         vec2 prevUv = getPreviousUv(uv, s.depth);
         if (reprojectionInside(prevUv)) {
