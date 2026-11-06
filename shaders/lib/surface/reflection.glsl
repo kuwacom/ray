@@ -1,5 +1,5 @@
 /*
- * 反射の共有部 (surface モジュール: composite.csh が書き、composite1 が読む)
+ * 反射の共有部 (surface モジュール: composite.csh が書き、composite2 が読む)
  *
  * reflectionImg のレイアウト: 画面の半分の解像度 (lowSize = 画面 / 2) を 2 面持ち、フレームの偶奇で書く面を入れ替える
  *   偶数フレーム: 左の面 [0, lowSize), 奇数フレーム: 右の面 [lowSize.x, 2 lowSize.x)
@@ -162,7 +162,7 @@ const float WATER_REFLECT_HIT_EPS = 0.15;    // 水面の反射が水面より�
 float mirrorTraceDistance() { return max(SSR_MAX_DISTANCE, far * 1.5); }
 
 /*
- * 反射の SSR の当たり (composite.csh の半分の解像度と、composite1 の鏡面のフル解像度で共有)
+ * 反射の SSR の当たり (composite.csh の半分の解像度と、composite2 の鏡面のフル解像度で共有)
  * viewPos / playerPos: 反射面, Ng: 視線側を向いた幾何法線 (始点を浮かせる), opaque: 不透明面 (自己交差の判定),
  * waterTop: 上から見た水面 (水面より下の物への誤検出の判定)
  * 戻り値 xy = 当たりの UV, z = 画面端の重み, w = 1 なら当たり

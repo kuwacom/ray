@@ -1,5 +1,5 @@
 /*
- * 水面の合成 (composite1): 屈折 (方式 A / B / D)・水中の内散乱・水面の反射・側面の水の厚み・太陽のきらめき・白波の泡
+ * 水面の屈折 (composite1) と合成 (composite2): 屈折 (方式 A / B / D)・水中の内散乱・水面の反射・側面の水の厚み・太陽のきらめき・白波の泡
  * surface モジュール。texcoord は composite_specular.glsl が宣言する
  */
 #ifndef SURFACE_WATER_SHADING_GLSL

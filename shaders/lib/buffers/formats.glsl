@@ -7,7 +7,7 @@ const int colortex0Format  = RGBA16F; // シーン HDR          | deferred30 -> 
 const int colortex1Format  = RGBA8;   // G: アルベド + ID    | gbuffers (不透明) -> deferred*
 const int colortex2Format  = RGBA16;  // G: 法線 + ライトマップ | gbuffers (不透明) -> deferred* / composite*
 const int colortex3Format  = RGBA16;  // G: PBR + AO          | gbuffers (不透明) -> deferred*
-const int colortex4Format  = RGBA16F; // 半透明の色 (乗算済み) | gbuffers (半透明) -> composite1
+const int colortex4Format  = RGBA16F; // 半透明の色 (乗算済み) | gbuffers (半透明) -> composite2
 const int colortex5Format  = RGBA16;  // 半透明のデータ       | gbuffers (半透明) -> composite*
 const int colortex6Format  = RGBA16F; // A: ブロックライト    | deferred2 -> deferred30 / composite*
 const int colortex7Format  = RGBA16F; // A: ブロックライト履歴 | deferred2 (永続)
@@ -21,6 +21,8 @@ const int colortex14Format = RGBA16F; // D: ブルームタイル    | composite
 const int colortex15Format = RGBA16F; // 速度ベクトル         | gbuffers (エンティティ/手) -> composite20 / 21
 const int colortex16Format = R16F;    // B: 画面空間の光芒 (低解像度) | composite12 -> 13 -> 14 -> composite19
 const int colortex17Format = RGBA16F; // D: 鏡面の白飛び分の履歴 | composite20 (永続, SPECULAR_SPARKLE)
+const int colortex18Format = RGBA16F; // 水の屈折先の色 + 水の中の経路長 | composite1 -> composite2 (水の画素だけ)
+const int colortex19Format = R16F;    // 水の屈折先の白飛び分の輝度 | composite1 -> composite2 (水の画素だけ)
 
 const bool colortex0Clear  = true;
 const bool colortex1Clear  = true;
@@ -40,6 +42,8 @@ const bool colortex14Clear = true;
 const bool colortex15Clear = true;
 const bool colortex16Clear = true;
 const bool colortex17Clear = false;
+const bool colortex18Clear = false;
+const bool colortex19Clear = false;
 
 const vec4 colortex0ClearColor  = vec4(0.0, 0.0, 0.0, 0.0);
 const vec4 colortex1ClearColor  = vec4(0.0, 0.0, 0.0, 0.0);

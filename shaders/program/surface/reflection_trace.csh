@@ -111,7 +111,7 @@
 layout(local_size_x = 8, local_size_y = 8) in;
 const vec2 workGroupsRender = vec2(0.5, 0.5);
 
-// SSR の当たりの判定と定数 (SSR_MAX_DISTANCE など) は composite1 の鏡面のフル解像度の SSR と共有するため lib/surface/reflection.glsl に置く
+// SSR の当たりの判定と定数 (SSR_MAX_DISTANCE など) は composite2 の鏡面のフル解像度の SSR と共有するため lib/surface/reflection.glsl に置く
 const float VOXEL_REFLECTION_DISTANCE = 64.0;
 const float REFLECTION_ALPHA_MIN = 0.12;     // 最も粗い面の時間蓄積の新しい値の割合
 #if REFLECTIONS == 1
@@ -139,7 +139,7 @@ void main() {
     vec3 N;
     vec3 Ng;
     if (s.translucent) {
-        // 水の波の法線はかすめ角で視線の裏を向くので、表裏は面の向きで決める (composite1 と揃える。ガラスなどの法線は幾何法線)
+        // 水の波の法線はかすめ角で視線の裏を向くので、表裏は面の向きで決める (composite2 と揃える。ガラスなどの法線は幾何法線)
         vec3 faceRef = s.normal;
         if (s.materialId == MAT_WATER) {
             faceRef = abs(s.normal.y) >= 0.5 ? vec3(0.0, sign(s.normal.y), 0.0)
@@ -159,7 +159,7 @@ void main() {
     vec3 R = reflect(-V, N);
     // 波の斜面で下向きに反射した光は隣の波に当たって上へ返る。画面の深度 (depthtex1) は水底なので、そのまま辿ると
     // 水面の下の水底を映して茶色の斑になる。平均水面でもう一度反射させて上向きにする
-    // 空へ抜けた時に引く方向。水面は画素より細かい波の粗さの分だけ高い空を映す (composite1 と揃える。SSR は R のまま)
+    // 空へ抜けた時に引く方向。水面は画素より細かい波の粗さの分だけ高い空を映す (composite2 と揃える。SSR は R のまま)
     vec3 skyDir = R;
     // 折り返すのは上向きの水面だけ (側面で折り返すと、少し上から見た滝が足元の地面ではなく空を映して白っぽく光った)
     bool waterTop = s.translucent && s.materialId == MAT_WATER && !underside && abs(N.y) >= 0.5;
@@ -216,7 +216,7 @@ void main() {
         // カメラから見た R 方向の画素と同じ。LUT の空 (雲なし) のままだと、昼の水面の遠くが一様な水色の帯になり
         // 雲の映り込みが無かった
         if (!found && !underside && s.perceptualRoughness < MIRROR_ROUGHNESS && R.y > 0.0) {
-            // 水面は composite1 が自分の画素の反射方向で空を引き直す (半分の解像度の隣の画素の空では、波の法線と
+            // 水面は composite2 が自分の画素の反射方向で空を引き直す (半分の解像度の隣の画素の空では、波の法線と
             // ずれた 2x2 のモザイクになり、中景の水面が白い砂目のつやの無い面に見えた)。空へ抜けた印に距離を負で書く
             if (s.materialId == MAT_WATER) skyMiss = true;
             else radiance = skyPixelReflection(skyDir, s.skyLm, radiance);

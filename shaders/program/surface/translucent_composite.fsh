@@ -1,13 +1,11 @@
 /*
- * composite1: 半透明の合成 (屈折・水中の吸収・反射を適用して colortex4 を colortex0 に重ねる)
+ * composite2: 半透明の合成 (屈折・水中の吸収・反射を適用して colortex4 を colortex0 に重ねる)
  * surface モジュール (lib/surface)
  *
  * 不透明面: 環境光の鏡面 (反射バッファ or 空) x 方向アルベド x 鏡面遮蔽 を足す
- * 水面: 屈折 (WATER_REFRACTION 1 = 屈折方向に水深分進めて投影 + 深度検証, 2 = 屈折方向のレイマーチ)
- *       上から見た水面の屈折の方式 (WATER_REFRACTION_MODE): A = 波で曲がった分だけ / B = 屈折のまま画面の端で弱める /
- *       D = 屈折のまま、画面に無い屈折先はボクセルで辿る (水底が浅く見える)
+ * 水面: 屈折先の色と水の中の経路長は composite1 (water_refraction.fsh) が colortex18 / colortex19 に書いたもの
  *       屈折した経路長で Jerlov の吸収と内散乱 / 厳密フレネル (水中からは全反射とスネルの窓) / 反射 / 太陽の鏡面 / 岸の泡
- *       側面 (滝・水槽): 水の厚みはボクセルで水を出る所まで / 出る面で空気へもう一度屈折 / 滝の気泡の白さと着水点の泡
+ *       側面 (滝・水槽): 水の厚みと出る面での屈折は composite1 / 滝の気泡の白さと着水点の泡
  *       水中から見上げた水面より上は空気なので吸収しない (カメラと水面の間の水中フォグは sky の composite19)
  * ガラス等: 透過分 (1 - a) に透過色 (block_data の tints) と (1 - F) を掛け、前方で照らした拡散 (colortex4) と反射を足す
  *       平らな板ガラスは光線が平行にずれるだけなので屈折させない。厚い氷・スライムだけ少し歪める
@@ -121,12 +119,6 @@ const float ICE_IOR = 1.31;
 const float THICK_TRANSLUCENT_REFRACTION = 0.02; // 氷・スライムの屈折の UV オフセット
 const float GLASS_TINT_STRENGTH = 0.65;        // 透過色の濃さ (1 で tints 表そのまま)
 
-/*
- * 屈折の先の画素の白飛び分の輝度 (deferred30 が a = 1 + 割合で書く)。半透明の画素は a を書き直すので、
- * 奥の金属・水たまりの照り返しを透過の分だけ引き継がないと、ガラス越し・水越しでは TAA で潰れる
- */
-float behindSparkle(vec4 s) { return saturate(s.a - 1.0) * luminance(max(s.rgb, 0.0)); }
-
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
     vec4 sceneIn = texelFetch(colortex0, texel, 0);
@@ -204,150 +196,15 @@ void main() {
         SurfaceLights WL = gatherSurfaceLights(wp, SL_SUN_NONE, SL_BLOCK_NONE, 0u);
         if (!below) WL = gatherSurfaceLights(wp, SL_SUN_NONE, SL_BLOCK_FORWARD, SL_HAND | SL_BLOCK_SPECULAR_TRACED);
 
-        // 側面から入った光が水を出る所 (水の厚み)
-        vec3 exitOutward = vec3(0.0);
-        float exitDist = -1.0;
-        // 面のすぐ内側 (水のセル)。深度の精度の分だけ遠いほど深く入れる
-        vec3 insidePlayer = surfPlayer - faceN * (0.01 + dist * 0.002);
-        if (!below && side && dot(refrDir, refrDir) > 0.5) exitDist = waterExitDistance(insidePlayer, refrDir, exitOutward);
-
-        // 屈折
-        vec2 refrUv = texcoord;
-        float pathLen = d1 >= 1.0 ? WATER_SKY_PATH : distance(floorPlayer, surfPlayer);
-        if (exitDist > 0.0) pathLen = min(pathLen, exitDist);
+        // 屈折先の色と水の中の経路長は composite1 (water_refraction.fsh) が求める。フレネルが 1 の画素は屈折先を使わない
         vec3 behind = vec3(0.0);
-        float behindExcess = 0.0;  // 屈折の先の白飛び分の輝度 (ボクセルで辿った水底は持たない)
-        bool refrDone = false;  // 方式 D で屈折先の色と経路長が決まった
-#if WATER_REFRACTION >= 1
+        float behindExcess = 0.0;
+        float pathLen = WATER_SKY_PATH;
         if (F < 1.0) {
-            bool checkHeight = !below && N.y > 0.5;
-            vec3 flatRefr = refract(-V, vec3(0.0, 1.0, 0.0), 1.0 / eta);
-    #if WATER_REFRACTION_MODE == 2
-            /*
-             * 方式 D: 上から見た水面は屈折した向きそのもので水底を探す。平らな水面でも視線は水へ入ると下へ折れるので、
-             * 水底は手前 (画面の下側) にずれて浅く見える。画面の像で見つかればその色、画面の外・手前の物の陰・岸の水面より上を
-             * 指した時はボクセルで辿った水底 (waterRefractVoxel)。画面の端に近い屈折先はボクセルの色へ溶かす
-             * 経路長は屈折した光線に沿った水底までの実際の長さ
-             */
-            if (checkHeight) {
-                vec3 refrViewD = playerToViewDir(refrDir);
-                vec2 sUv = texcoord;
-                bool sValid = false;
-        #if WATER_REFRACTION == 2
-                vec4 hitD = traceScreenRay(surfView, refrViewD, WATER_REFRACT_D_DISTANCE, WATER_REFRACT_STEPS, dither);
-                sValid = hitD.w > 0.5;
-                sUv = hitD.xy;
-        #else
-                // 水底が平らだとして、まっすぐ見た水底の高さまで屈折した向きに進めて投影する (外れは下の光線との距離で落とす)
-                float depthBelow = d1 >= 1.0 ? WATER_REFRACT_D_DISTANCE : max(surfPlayer.y - floorPlayer.y, 0.0);
-                sUv = viewToScreen(surfView + refrViewD * min(depthBelow / max(-refrDir.y, 0.05), WATER_REFRACT_D_DISTANCE)).xy;
-                sValid = true;
-        #endif
-                float sPath = WATER_SKY_PATH;
-                if (sValid) sValid = refractionInWater(sUv, d0, surfPlayer.y, true);
-                if (sValid) {
-                    float ds = texture(depthtex1, sUv).r;
-                    if (ds < 1.0) {
-                        // 画面の点が屈折した光線の上にあるか (投影の平らな水底の仮定が外れた所・手前の物を拾わない)
-                        vec3 rel = screenToPlayer(vec3(sUv, ds)) - surfPlayer;
-                        float along = dot(rel, refrDir);
-                        sValid = along > 0.0 && length(rel - refrDir * along) < WATER_REFRACT_D_MATCH * (1.0 + dist * 0.01);
-                        sPath = length(rel);
-                    }
-                }
-                float wS = sValid ? waterRefractScreenWeight(texcoord, sUv) : 0.0;
-                vec3 vColor = vec3(0.0);
-                float vPath = WATER_SKY_PATH;
-                if (wS < 1.0 && waterRefractVoxel(surfPlayer, refrDir, floorPlayer, d1, lmT.y, vColor, vPath)) {
-                    vec4 sColor = wS > 0.0 ? texture(colortex0, sUv) : vec4(0.0);
-                    behind = mix(vColor, sColor.rgb, wS);
-                    behindExcess = behindSparkle(sColor) * wS;
-                    pathLen = mix(vPath, sPath, wS);
-                    refrDone = true;
-                } else if (sValid) {
-                    // ボクセルの範囲外 (遠景): 画面の像は 1 対 1 の対応なので端でも引き伸ばされない
-                    vec4 sColor = texture(colortex0, sUv);
-                    behind = sColor.rgb;
-                    behindExcess = behindSparkle(sColor);
-                    pathLen = sPath;
-                    refrDone = true;
-                }
-                // どちらも無ければ方式 A で写す
-            }
-    #endif
-            if (!refrDone) {
-                /*
-                 * 方式 A: 上から見た水面は、波で曲がった分だけを画面へ写す。平らな水面でも視線は水へ入ると下へ折れ、水底は
-                 * 画面の下側 (手前) へ大きくずれる。画面の下端ではそのずれが画面の外を指し、映っていない所を描けずに
-                 * 端の画素を寄せ直した帯が引き伸ばされて縞に並ぶ。平らな水面の分 (見かけの浅さ) は落として水底を
-                 * 見えている位置のまま波で歪ませ、吸収の経路長だけ屈折した向きの物理的な長さ (水深 / cos) で測る
-                 * 方式 B: 屈折した向きそのままで写し、画面の端へ近いほどずれを弱める (softClampRefractUv)
-                 * 水中から見上げた時 (スネルの窓) と側面の水は、どの方式でも屈折した向きそのもの
-                 */
-    #if WATER_REFRACTION_MODE == 1
-                vec3 bendDir = refrDir;
-    #else
-                vec3 bendDir = checkHeight ? normalize(-V + (refrDir - flatRefr)) : refrDir;
-    #endif
-                vec3 refrView = playerToViewDir(bendDir);
-                bool found = false;
-    #if WATER_REFRACTION == 2
-                // 水を出る所が分かった側面は下の板の近似で写す (屈折した向きのまま奥まで辿ると、薄い滝の向こうが厚い水のように大きくずれる)
-                if (exitDist <= 0.0) {
-                    vec4 hit = traceScreenRay(surfView, refrView, WATER_REFRACT_MAX_DISTANCE * 4.0, WATER_REFRACT_STEPS, dither);
-                    if (hit.w > 0.5 && refractionInWater(hit.xy, d0, surfPlayer.y, checkHeight)) {
-                        refrUv = hit.xy;
-                        found = true;
-                    }
-                }
-    #endif
-                if (!found) {
-                    // 曲げた向きは視線とほぼ同じなので、まっすぐ見た水底までの距離で投影する
-                    float reach = checkHeight ? (d1 >= 1.0 ? WATER_SKY_PATH : distance(floorPlayer, surfPlayer)) : pathLen;
-                    vec3 target = surfView + refrView * min(reach, WATER_REFRACT_MAX_DISTANCE);
-                    if (exitDist > 0.0) {
-                        /*
-                         * 側面の水を出た光は出る面で空気へもう一度屈折する (板・柱の水)。平らな面同士なら視線と平行に戻り、
-                         * 波で傾いた分だけ向きがずれる (薄いプリズム)。奥の物は出た所からその向きに、まっすぐ見た距離の残りだけ進めて写す
-                         */
-                        vec3 exitPos = surfPlayer + refrDir * exitDist;
-                        vec3 exitDir = refract(refrDir, -exitOutward, WATER_IOR);
-                        if (dot(exitDir, exitDir) < 0.5) exitDir = refrDir;
-                        float rest = d1 >= 1.0 ? WATER_SKY_PATH : max(distance(floorPlayer, surfPlayer) - exitDist, 0.0);
-                        target = playerToView(exitPos + exitDir * min(rest, WATER_REFRACT_MAX_DISTANCE));
-                    }
-                    // 画面の外は描けないので、ずれを画面の内側に収まるまで縮める (端の画素を引き伸ばさない)
-    #if WATER_REFRACTION_MODE == 1
-                    vec2 tuv = softClampRefractUv(texcoord, viewToScreen(target).xy);
-    #else
-                    vec2 tuv = clampRefractUv(texcoord, viewToScreen(target).xy);
-    #endif
-                    // 水の外を指したら元の画素の側へ寄せ直す (水際でも少しは歪み、岸の水面より上は拾わない)
-                    for (int k = 0; k < WATER_REFRACT_RETRY; k++) {
-                        if (refractionInWater(tuv, d0, surfPlayer.y, checkHeight)) {
-                            refrUv = tuv;
-                            break;
-                        }
-                        tuv = mix(texcoord, tuv, 0.5);
-                    }
-                }
-                float dr = texture(depthtex1, refrUv).r;
-                if (dr >= 1.0) {
-                    pathLen = WATER_SKY_PATH;
-                } else {
-                    vec3 refrPlayer = screenToPlayer(vec3(refrUv, dr));
-                    // 上から見た水面は、水底から水面まで屈折した向きに進む長さ (水深 / cos(屈折角))
-                    pathLen = checkHeight ? max(surfPlayer.y - refrPlayer.y, 0.0) / max(-flatRefr.y, 0.05)
-                        : distance(refrPlayer, surfPlayer);
-                }
-                if (exitDist > 0.0) pathLen = min(pathLen, exitDist);
-            }
-        }
-#endif
-        if (!refrDone) {
-            vec4 sColor = texture(colortex0, refrUv);
-            behind = sColor.rgb;
-            behindExcess = behindSparkle(sColor);
+            vec4 refr = texelFetch(colortex18, texel, 0);
+            behind = refr.rgb;
+            pathLen = refr.a;
+            behindExcess = texelFetch(colortex19, texel, 0).r;
         }
 
         // 吸収と内散乱 (水の上から見た時だけ。水中側は sky のフォグ)

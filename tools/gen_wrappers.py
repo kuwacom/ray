@@ -80,7 +80,8 @@ BODIES: dict[str, str] = {
     "deferred11.fsh": "surface/gi_denoise.fsh",
     "deferred30.fsh": "surface/opaque_shading.fsh",
     "composite.csh": "surface/reflection_trace.csh",
-    "composite1.fsh": "surface/translucent_composite.fsh",
+    "composite1.fsh": "surface/water_refraction.fsh",
+    "composite2.fsh": "surface/translucent_composite.fsh",
     # post
     "composite20.fsh": "post/taa.fsh",
     "composite21.fsh": "post/motion_blur.fsh",
@@ -156,6 +157,7 @@ PROGRAMS: dict[str, list[str] | dict[str, Body | None]] = {
     # composite
     "composite": ["csh"],
     "composite1": fullscreen("fsh", "csh_a"),
+    "composite2": fullscreen("fsh"),
     # 画面空間の光芒の 3 パス。ラッパーは #define 名前 しか書けないので、パスはマクロの有無で分ける
     "composite12": {"vsh": FULLSCREEN_VSH, "fsh": ("sky/godrays.fsh", ("GODRAYS_PASS_0",))},
     "composite13": {"vsh": FULLSCREEN_VSH, "fsh": ("sky/godrays.fsh", ("GODRAYS_PASS_1",))},

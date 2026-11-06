@@ -1,6 +1,6 @@
 /*
  * 二次光線のヒット点の照明と空のフォールバック (surface モジュール)
- * GI (deferred10)・反射 (composite)・半透明合成 (composite1) で共有する
+ * GI (deferred10)・反射 (composite)・水の屈折 (composite1)・半透明合成 (composite2) で共有する
  * 依存: lib/sky/sky.glsl (B), lib/light/light.glsl (A) を先に include すること
  */
 #ifndef SURFACE_LIGHTING_GLSL

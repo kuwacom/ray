@@ -1,11 +1,12 @@
 /*
- * 半透明の合成 (composite1) の鏡面: 反射の引き直し・不透明面の環境光の鏡面・太陽の可視率・誘電体の鏡面・手持ち光源の照度
+ * 半透明の合成 (composite2) の鏡面: 反射の引き直し・不透明面の環境光の鏡面・太陽の可視率・誘電体の鏡面・手持ち光源の照度
  * surface モジュール
  */
 #ifndef SURFACE_COMPOSITE_SPECULAR_GLSL
 #define SURFACE_COMPOSITE_SPECULAR_GLSL
 
 //@include "/lib/settings.glsl"
+//@include "/lib/common/color.glsl"
 //@include "/lib/common/gbuffer.glsl"
 //@include "/lib/common/math.glsl"
 //@include "/lib/common/noise.glsl"
@@ -22,7 +23,7 @@
 //@include "/lib/sky/sky_color.glsl"
 //@include "/lib/surface/surface_lights.glsl"
 
-// 全画面クアッド (program/common/fullscreen.vsh) の UV。composite1 のような全画面の fragment パスだけが include する
+// 全画面クアッド (program/common/fullscreen.vsh) の UV。composite1 / composite2 のような全画面の fragment パスだけが include する
 in vec2 texcoord;
 
 vec3 reflectionAt(ivec2 texel, float dist, vec3 R, float skyLm, float roughness, vec3 normal) {
@@ -136,5 +137,11 @@ vec3 localLightSpecular(SurfaceLights L, vec3 N, vec3 V, float f0, float roughne
 vec3 handIrradiance(SurfaceLights L, vec3 n) {
     return L.handMain.irradiance * saturate(dot(n, L.handMain.direction)) + L.handOff.irradiance * saturate(dot(n, L.handOff.direction));
 }
+
+/*
+ * 屈折の先の画素の白飛び分の輝度 (deferred30 が a = 1 + 割合で書く)。半透明の画素は a を書き直すので、
+ * 奥の金属・水たまりの照り返しを透過の分だけ引き継がないと、ガラス越し・水越しでは TAA で潰れる
+ */
+float behindSparkle(vec4 s) { return saturate(s.a - 1.0) * luminance(max(s.rgb, 0.0)); }
 
 #endif

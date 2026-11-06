@@ -95,7 +95,7 @@ vec3 clipToBox(vec3 history, vec3 boxMin, vec3 boxMax) {
 }
 
 /*
- * 鏡面の白飛び分の割合 (deferred30 / composite1 / composite19 が colortex0.a = 1 + 割合で渡す)
+ * 鏡面の白飛び分の割合 (deferred30 / composite2 / composite19 が colortex0.a = 1 + 割合で渡す)
  * 白を超えた分は 1 画素ほどの HDR の点になり、トーンマップ空間の近傍の箱と低い混合率では数十フレームかけないと履歴が追いつかず、
  * ブルームに届く前に平らな灰色へ潰れる。この分は箱の統計と本体の履歴から外し、線形のまま専用の短い履歴 (colortex17) で混ぜて足す
  * 位置は法線の反射で決まり、白より下は TAA を通すので輪郭はアンチエイリアスされる

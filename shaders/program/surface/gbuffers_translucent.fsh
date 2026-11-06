@@ -1,11 +1,11 @@
 /*
  * 半透明ジオメトリ共通のフラグメントシェーダー (前方シェーディングして colortex4/5 へ)
- * 屈折・反射・水中フォグは composite1 で合成する
+ * 屈折・反射・水中フォグは composite2 で合成する
  * surface モジュール (lib/surface)
  *
  * 水: 色は書かず (a = 0)、法線とライトマップだけを colortex5 に残す。水の見た目 (屈折・吸収・反射・泡・太陽の鏡面) は
- *     composite1 でまとめて計算する (屈折先の深度と経路長が要るため)
- * ガラス等: 拡散だけを前方で照らす。鏡面 (太陽・手持ち光源・ブロックライト・反射) と透過は composite1 が掛ける
+ *     composite2 でまとめて計算する (屈折先の深度と経路長が要るため)
+ * ガラス等: 拡散だけを前方で照らす。鏡面 (太陽・手持ち光源・ブロックライト・反射) と透過は composite2 が掛ける
  *     透過色は block_data の tints 表 (光源シャドウ・色付き影と同じ色) を使うので、その index を colortex5 に残す
  * 半透明パーティクル: 普通のアルファ合成。colortex5 は書かない (水面の情報を上書きして穴が開くのを防ぐ)
  * 半透明エンティティ / ブロックエンティティ: Iris 26.1 はプレイヤー (スキンが entityTranslucent)・文字・旗の模様などを
@@ -136,7 +136,7 @@ vec4 encodeTranslucentDataTint(vec3 normal, vec2 lightmap, int materialId, int t
 // 前方シェーディングの拡散 (太陽 + 手持ち光源 + 空 + ブロックライト)
 vec3 forwardDiffuse(Material m, vec3 playerPos, vec3 normal, vec3 geoNormal, vec3 V, float dither) {
     // 集める項: 太陽の影 (影マップの外は 1)・手持ち光源・空・ブロックライト
-    // 省く項: 接触影と POM (深度に半透明が無い・POM なし)、鏡面 (composite1 が掛ける)、GI と AO (この経路にバッファが無い。手持ち光源の照り返しが GI の代わり)
+    // 省く項: 接触影と POM (深度に半透明が無い・POM なし)、鏡面 (composite2 が掛ける)、GI と AO (この経路にバッファが無い。手持ち光源の照り返しが GI の代わり)
     // 太陽 -> 手持ち -> 空とブロックライト -> 手持ちの照り返し に分けて集め、拡散を掛ける順番を保つ
     // (まとめて 1 回で集めると、手持ち光源のトレースが太陽の拡散より前に並んでドライバの出す命令の並びが変わる)
 #ifdef GBUF_FORWARD_OPAQUE
@@ -226,7 +226,7 @@ void main() {
 #endif
     int tintIndex = 0;
 #ifdef GBUF_WATER
-    // 光を散乱する割合は a (既定のブレンドで a が掛かる)。残り (1 - a) の透過分に composite1 が透過色を掛ける
+    // 光を散乱する割合は a (既定のブレンドで a が掛かる)。残り (1 - a) の透過分に composite2 が透過色を掛ける
     if (isTintBlock(blockId)) tintIndex = getTintIndex(blockId) + 1;
 #endif
 

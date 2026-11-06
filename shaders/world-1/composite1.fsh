@@ -1,3 +1,3 @@
 #version 460 compatibility
 #define WORLD_NETHER
-#include "/program/surface/translucent_composite.fsh"
+#include "/program/surface/water_refraction.fsh"

@@ -181,7 +181,7 @@ void main() {
     vec4 sceneIn = texelFetch(colortex0, texel, 0);
     vec3 color = sceneIn.rgb;
     /*
-     * 鏡面の白飛び分 (composite1 / deferred30 が a = 1 + 輝度の割合で書く)。TAA (composite20) が近傍の箱で潰さず後から足すので、
+     * 鏡面の白飛び分 (composite2 / deferred30 が a = 1 + 輝度の割合で書く)。TAA (composite20) が近傍の箱で潰さず後から足すので、
      * フォグで減る分 (透過率) を掛けた輝度を追い、最後に割合へ戻して渡す
      */
     float sparkle = saturate(sceneIn.a - 1.0) * luminance(color);

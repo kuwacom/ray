@@ -177,7 +177,7 @@ vec3 evalDirectLight(Material m, vec3 N, vec3 V, LightSample L) {
     return diffuse + spec;
 }
 
-// 拡散だけ (前方シェーディングの半透明: 鏡面は composite1 でまとめて掛けるため)
+// 拡散だけ (前方シェーディングの半透明: 鏡面は composite2 でまとめて掛けるため)
 vec3 evalDirectDiffuse(Material m, vec3 N, vec3 V, LightSample L) {
     float NoL = dot(N, L.direction);
     if (NoL <= 0.0) return vec3(0.0);

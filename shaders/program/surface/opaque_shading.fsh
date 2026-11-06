@@ -6,7 +6,7 @@
  *   ブロックライト: 拡散 (+ 鏡面)、手持ち光源、GI
  * surface モジュール (lib/surface)
  *
- * 環境光の鏡面 (反射バッファ・空) はここでは足さず composite1 で足す (反射パスが colortex0 のこの結果を映すため)
+ * 環境光の鏡面 (反射バッファ・空) はここでは足さず composite2 で足す (反射パスが colortex0 のこの結果を映すため)
  * 合成の考え方
  *   太陽: PCSS の影 (色付き・水底のコースティクス込み) x POM の自己影 x 接触影 x 雲影。影マップの外はスカイライトで近似
  *   SSS: 影のブロッカー探索で得た厚みで減衰させた太陽光を裏面透過として足す。手持ち光源の透過も含め、設定 SSS が無ければ外す
@@ -211,7 +211,7 @@ void main() {
 
     // 集める項: 太陽 (PCSS・POM・接触影・葉の透過。影マップの外はスカイライトで近似)・手持ち光源・ブロックライトの鏡面・
     //   空 (GI が運ぶ分を引く)・ブロックライト・手持ちの照り返し・GI
-    // 省く項: なし (不透明面は全部掛かる)。環境光の鏡面 (反射) は composite1 が足す
+    // 省く項: なし (不透明面は全部掛かる)。環境光の鏡面 (反射) は composite2 が足す
     // 項ごとに分けて、太陽 -> 手持ち -> 鏡面 -> 空 -> ブロックライト -> 手持ちの照り返しの順に集める
     // (1 回にまとめると、トレースが太陽の BRDF より前に並んでドライバの出す命令の並びが変わる)
     sp.pomShadow = pomShadow;
@@ -289,6 +289,6 @@ void main() {
     float texelPx = SPARKLE_TEXEL_SIZE / max(waterFootprint(length(playerPos), abs(dot(g.geoNormal, V))), 1e-5);
     float texelGate = puddleWeight > 0.0 ? 1.0 : smoothstep(SPARKLE_TEXEL_PX.x, SPARKLE_TEXEL_PX.y, texelPx);
     float sparkle = hand ? 0.0 : luminance(sparkleExcess(specSum, getExposure())) * texelGate;
-    // 鏡面の白飛び分を a = 1 + 割合で composite1 -> composite19 -> composite20 (TAA の後に足す) へ渡す
+    // 鏡面の白飛び分を a = 1 + 割合で composite2 -> composite19 -> composite20 (TAA の後に足す) へ渡す
     outColor = vec4(color, 1.0 + saturate(sparkle / max(luminance(color), 1e-6)));
 }
