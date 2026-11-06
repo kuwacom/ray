@@ -3,7 +3,8 @@
  * surface モジュール (lib/surface)
  *
  * 不透明面: 環境光の鏡面 (反射バッファ or 空) x 方向アルベド x 鏡面遮蔽 を足す
- * 水面: 屈折先の色と水の中の経路長、鏡面の映り込みのフル解像度の SSR は composite1 (water_trace.fsh) が colortex18-20 に書いたもの
+ * 水面: 屈折先の色と水の中の経路長、上向きの水面の太陽の可視率、鏡面の映り込みのフル解像度の SSR は composite1 (water_trace.fsh) が
+ *       colortex18-21 に書いたもの
  *       屈折した経路長で Jerlov の吸収と内散乱 / 厳密フレネル (水中からは全反射とスネルの窓) / 反射 / 太陽の鏡面 / 岸の泡
  *       側面 (滝・水槽): 水の厚みと出る面での屈折は composite1 / 滝の気泡の白さと着水点の泡
  *       水中から見上げた水面より上は空気なので吸収しない (カメラと水面の間の水中フォグは sky の composite19)
@@ -182,10 +183,15 @@ void main() {
          * 側面の日向はスカイライトと雲影で近似する (影マップは滝の水柱自身の影に掛かり、PCSS のノイズが泡の白に出て砂嵐のようにざらついた)
          */
         vec3 sunSpecVis = vec3(0.0);
-        vec3 sunVis = below ? vec3(0.0)
-            : side ? vec3(smoothstep(0.6, 0.95, lmT.y)) * getCloudShadow(surfPlayer)
-            : surfaceSunVisibility(surfPlayer, vec3(0.0, 1.0, 0.0), dither, sunSpecVis);
-        if (side) sunSpecVis = sunVis * getCloudSunDiscVisibility();
+        vec3 sunVis = vec3(0.0);
+        if (side && !below) {
+            sunVis = vec3(smoothstep(0.6, 0.95, lmT.y)) * getCloudShadow(surfPlayer);
+            sunSpecVis = sunVis * getCloudSunDiscVisibility();
+        } else if (!below) {
+            // 上向きの水面の影 (PCSS) は composite1 (water_trace.fsh) が求めた可視率
+            sunVis = texelFetch(colortex21, texel, 0).rgb;
+            sunSpecVis = texelFetch(colortex19, texel, 0).rgb;
+        }
 
         // 太陽以外の光: 手持ち光源 (内散乱・泡・鏡面) とブロックライトの鏡面 (光源ごとにトレース)。水中から見た面の裏は掛けない
         // 省く項: 太陽 (上で別に取る)・GI・AO・接触影 (水面の下に不透明面の深度しか無い)
@@ -204,7 +210,7 @@ void main() {
             vec4 refr = texelFetch(colortex18, texel, 0);
             behind = refr.rgb;
             pathLen = refr.a;
-            behindExcess = texelFetch(colortex19, texel, 0).r;
+            behindExcess = texelFetch(colortex19, texel, 0).a;
         }
 
         // 吸収と内散乱 (水の上から見た時だけ。水中側は sky のフォグ)

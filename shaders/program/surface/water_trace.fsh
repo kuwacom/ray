@@ -1,6 +1,6 @@
 /*
- * composite1: 水面の光線を辿る部分。屈折先の色と水の中の経路長 (colortex18 / colortex19) と、鏡面の映り込みの
- * フル解像度の SSR (colortex20) を書き、半透明の合成 (composite2) が読む
+ * composite1: 水面の光線を辿る部分。屈折先の色と水の中の経路長 (colortex18 / colortex19)、上向きの水面の太陽の可視率
+ * (colortex19 / colortex21)、鏡面の映り込みのフル解像度の SSR (colortex20) を書き、半透明の合成 (composite2) が読む
  * surface モジュール (lib/surface)
  *
  * 屈折 (WATER_REFRACTION 1 = 屈折方向に水深分進めて投影 + 深度検証, 2 = 屈折方向のレイマーチ)
@@ -8,7 +8,7 @@
  * D = 屈折のまま、画面に無い屈折先はボクセルで辿る (水底が浅く見える)
  * 側面 (滝・水槽): 水の厚みはボクセルで水を出る所まで / 出る面で空気へもう一度屈折
  *
- * 合成と別のパスにするのは、光線を辿る処理は深度の読みを待つ時間が長く、同時に動くワープの数で速さが決まるため。
+ * 合成と別のパスにするのは、光線を辿る処理と影は深度の読みを待つ時間が長く、同時に動くワープの数で速さが決まるため。
  * 合成のシェーダーに入ると、レジスタの数が合成の重い経路 (影・きらめき・光源のトレース) で決まってワープが減り、
  * 水の画素の全部の処理が何倍も遅くなっていた
  * 水でない画素は書かない (合成は水の画素でだけ読む)
@@ -107,14 +107,15 @@
 // END GENERATED includes
 
 #if REFLECTIONS > 0
-/* RENDERTARGETS: 18,19,20 */
+/* RENDERTARGETS: 18,19,21,20 */
 #else
-/* RENDERTARGETS: 18,19 */
+/* RENDERTARGETS: 18,19,21 */
 #endif
 layout(location = 0) out vec4 outRefraction;
-layout(location = 1) out float outExcess;
+layout(location = 1) out vec4 outSunExcess;
+layout(location = 2) out vec4 outSunVis;
 #if REFLECTIONS > 0
-layout(location = 2) out vec4 outMirror;
+layout(location = 3) out vec4 outMirror;
 #endif
 
 void main() {
@@ -292,7 +293,17 @@ void main() {
         behindExcess = behindSparkle(sColor);
     }
     outRefraction = vec4(behind, pathLen);
-    outExcess = behindExcess;
+
+    /*
+     * 上から見た上向きの水面の太陽の可視率 (影の PCSS + 雲影)。PCSS も影マップの読みを待つ処理なので、合成ではなくここで求める
+     * rgb = 内散乱・泡・波頭の透過光に使う可視率, 太陽の照り返しに使う分 (葉を透過した分を除く) は colortex19 の rgb
+     * 側面と水中から見た面は合成が近似で決める
+     */
+    vec3 sunSpecVis = vec3(0.0);
+    vec3 sunVis = vec3(0.0);
+    if (!below && !side) sunVis = surfaceSunVisibility(surfPlayer, vec3(0.0, 1.0, 0.0), dither, sunSpecVis);
+    outSunExcess = vec4(sunSpecVis, behindExcess);
+    outSunVis = vec4(sunVis, 0.0);
 
 #if REFLECTIONS > 0
     /*
