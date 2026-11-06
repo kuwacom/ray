@@ -91,7 +91,8 @@ const vec2 GLINT_SMOOTH_LAMBDA = vec2(8.0, 32.0);  // 画素の中の点の数�
  * 近くほど道の縁の点が多く消え、距離で道の幅が変わる。低くしすぎると点を探す画素が増えて重くなる (0.05 で +3-5 ms)
  */
 const float GLINT_SKIP = 1.0;
-const vec2 GLINT_LEVEL_BLEND = vec2(0.3, 0.7);     // セルの大きさの 2 段を混ぜる帯 (log2 の端数)
+// セルの大きさの 2 段を混ぜる帯 (log2 の端数)。帯の中は独立な 2 組の点が半分の明るさで重なり、粒が増えて費用も 2 倍になる
+const vec2 GLINT_LEVEL_BLEND = vec2(0.4, 0.6);
 const float GLINT_FRACTION_MIN = 0.01;      // ローブのうち粗さへ回した分がこれより少ない所 (近景) は変えない
 
 // 重み 1 / sqrt(v) (v は [GLINT_WEIGHT_MIN, 1] の一様乱数) の平均
@@ -224,6 +225,11 @@ float glintLevel(vec2 pos, float level, float rho, vec2 axisAlong, vec2 axisAcro
         float phase = hash1(uc.x * 0x9E3779B1u ^ uc.y * 0x85EBCA77u ^ levelTag * 0xC2B2AE3Du);
         for (int s = 0; s < 2; s++) {
             float ts = t / life + phase + 0.5 * float(s);
+            // 三角波を立ち上がり GLINT_FADE の台形にする (2 組の三角波の和は 1 なので、台形の和も 1)
+            // 消えている組 (寿命の 35%) は乱数と形を求めない
+            float tri = 1.0 - abs(2.0 * fract(ts) - 1.0);
+            float envelope = saturate((tri - 0.5) / GLINT_FADE + 0.5);
+            if (envelope <= 0.0) continue;
             uint slot = uint(int(floor(ts))) * 512u + levelTag * 2u + uint(s);
             vec3 h = hash3(uvec3(uc, slot));
             if (h.x >= present) continue;
@@ -232,9 +238,6 @@ float glintLevel(vec2 pos, float level, float rho, vec2 axisAlong, vec2 axisAcro
             if (dot(m, m) >= 1.0 + sqr(stretchMax)) continue;
             float v = mix(GLINT_WEIGHT_MIN, vMax, h.x / present);
             float shape = glintShape(m, stretchMax, 1.0 - sqrt(v), hash3(uvec3(uc, slot ^ 0xA511E9B3u)));
-            // 三角波を立ち上がり GLINT_FADE の台形にする (2 組の三角波の和は 1 なので、台形の和も 1)
-            float tri = 1.0 - abs(2.0 * fract(ts) - 1.0);
-            float envelope = saturate((tri - 0.5) / GLINT_FADE + 0.5);
             sum += envelope * inversesqrt(v) * shape;
         }
     }
