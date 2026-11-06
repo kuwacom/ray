@@ -115,6 +115,7 @@ float waterLayerPeriod(float tile) { return WATER_TIME_HARMONIC_LO * sqrt(TAU * 
  * WATER_LAYERS は増やさない (視差・コースティクス・水たまりの波が層の番号に依存するため)
  */
 const int WATER_CAPILLARY_LAYERS = 2;
+const float WATER_CAPILLARY_NEAR_ROUGH = 0.2;  // 表面張力波が画素より大きい近くで、粗さへ回す傾きの分散の割合
 float waterCapillaryTile(int i) { return waterLayerTile(WATER_LAYERS - 1) / pow(WATER_LAYER_RATIO, float(i + 1)); }
 
 /*
@@ -343,6 +344,16 @@ float waterJacobian(vec4 w) { return max(1.0 - WATER_CHOPPINESS * w.w, WATER_JAC
 vec3 waterChoppy(vec4 w) { return vec3(w.x, w.yz / waterJacobian(w)); }
 
 /*
+ * 表面張力波 1 層の (粗さへ回す傾きの分散, 曲率の 2 乗)。層は 2 つなので、配列をループの添字で引かず定数の添字で 2 回呼ぶ
+ * (添字のループで引く形では、ドライバの最適化の違いで、画面の中心を通る直線の上だけ水面が映り込みで鏡のように光り、ほかの水面の映り込みが
+ * 弱まることがあった。コードの上の未定義の値は見つかっていない)
+ */
+vec2 waterCapillaryUnresolved(float amp, float tile, float footprint) {
+    float r = waterTileResolved(tile, footprint);
+    return sqr(amp) * vec2(1.0 - (1.0 - WATER_CAPILLARY_NEAR_ROUGH) * r * r, sqr(TAU * WATER_BAND_CENTER / tile));
+}
+
+/*
  * 法線で表せなかった傾きの分散 (GGX の alpha^2 に足す)。画素の中で平均された波は面を粗くする (LEAN / Toksvig と同じ考え)
  * 遠くの水面で太陽の照り返しが縦に広がる帯になるのはこの分
  */
@@ -359,10 +370,13 @@ vec2 waterUnresolvedSlopeCurvature(WaterSea sea, float footprint) {
         float w = (1.0 - r * r) * sqr(sea.amp[i]);
         v += w * vec2(1.0, sqr(TAU * WATER_BAND_CENTER / tile));
     }
-    // 表面張力波は法線で描かないので、どの距離でも全部が粗さになる
-    for (int i = 0; i < WATER_CAPILLARY_LAYERS; i++) {
-        v += sqr(sea.capAmp[i]) * vec2(1.0, sqr(TAU * WATER_BAND_CENTER / waterCapillaryTile(i)));
-    }
+    /*
+     * 表面張力波は法線で描かないので、どの距離でも粗さになる。ただし画素がその波より小さい近くでは、1 画素が見るのは波の一部の
+     * 面だけなので、傾きの分散を WATER_CAPILLARY_NEAR_ROUGH まで減らす (全部を回すと、近くの太陽の照り返しが表した波と無関係な
+     * ぼやけた白い塊になった)。曲率 (y、WATER_GLITTER の点の数) は減らさない。近くの点は細くなったローブ (表した波の斜面) に集まる
+     */
+    v += waterCapillaryUnresolved(sea.capAmp[0], waterCapillaryTile(0), footprint);
+    v += waterCapillaryUnresolved(sea.capAmp[1], waterCapillaryTile(1), footprint);
     return v;
 }
 
