@@ -91,13 +91,13 @@ LightSample unshadowedSun() {
     return gatherSurfaceLights(surfacePoint(vec3(0.0), vec3(0.0, 1.0, 0.0)), SL_SUN_NONE, SL_BLOCK_NONE, SL_CELESTIAL).celestial;
 }
 
-// 光 L の鏡面だけ。f0 と alpha を与えた誘電体として
-vec3 dielectricSpecular(vec3 N, vec3 V, float f0, float roughness, LightSample L, float discScale, float gain) {
+// 光 L の鏡面だけ。f0 と alpha を与えた誘電体として。gaussian: 傾きの分布をガウス (Beckmann) にする (水)
+vec3 dielectricSpecular(vec3 N, vec3 V, float f0, float roughness, LightSample L, float discScale, float gain, bool gaussian) {
     GBufferData g = gbufferDefault();
     g.f0 = f0;
     g.smoothness = 1.0 - sqrt(roughness);
     g.albedo = vec3(0.0);
-    return evalDirectSpecular(decodeMaterial(g), N, V, L, discScale, gain);
+    return evalDirectSpecular(decodeMaterial(g), N, V, L, discScale, gain, gaussian);
 }
 
 /*
@@ -113,23 +113,23 @@ const float SPECULAR_POINT_SPREAD_MAX = 16.0;
 // シーンのバッファ (RGBA16F、最大 65504) に入る明るさの上限。超えると無限大になり、TAA が 0 に置き換えて点が消える
 const float SPECULAR_HDR_MAX = 32768.0;
 
-vec3 sunSpecular(vec3 N, vec3 V, float f0, float roughness, vec3 sunVis, float gain) {
+vec3 sunSpecular(vec3 N, vec3 V, float f0, float roughness, vec3 sunVis, float gain, bool gaussian) {
     LightSample sun = unshadowedSun();
     sun.irradiance *= sunVis;
     float strength = celestialSpecularStrength();
     float spread = clamp(gain, 1.0, SPECULAR_POINT_SPREAD_MAX);
     float discScale = min(celestialDiscScale() * max(gain, 1.0), spread / max(strength, 1.0));
-    return min(dielectricSpecular(N, V, f0, roughness, sun, discScale, gain) * strength, vec3(SPECULAR_HDR_MAX));
+    return min(dielectricSpecular(N, V, f0, roughness, sun, discScale, gain, gaussian) * strength, vec3(SPECULAR_HDR_MAX));
 }
 
 vec3 sunSpecular(vec3 N, vec3 V, float f0, float roughness, vec3 sunVis) {
-    return sunSpecular(N, V, f0, roughness, sunVis, 1.0);
+    return sunSpecular(N, V, f0, roughness, sunVis, 1.0, false);
 }
 
 // 手持ち光源とブロックライトの鏡面 (太陽以外の光)。L は gatherSurfaceLights の SL_HAND | SL_BLOCK_SPECULAR_TRACED
-vec3 localLightSpecular(SurfaceLights L, vec3 N, vec3 V, float f0, float roughness) {
-    vec3 s = dielectricSpecular(N, V, f0, roughness, L.handMain, 1.0, 1.0) + dielectricSpecular(N, V, f0, roughness, L.handOff, 1.0, 1.0);
-    for (int j = 0; j < L.blockSpecCount; j++) s += dielectricSpecular(N, V, f0, roughness, L.blockSpec[j], 1.0, 1.0);
+vec3 localLightSpecular(SurfaceLights L, vec3 N, vec3 V, float f0, float roughness, bool gaussian) {
+    vec3 s = dielectricSpecular(N, V, f0, roughness, L.handMain, 1.0, 1.0, gaussian) + dielectricSpecular(N, V, f0, roughness, L.handOff, 1.0, 1.0, gaussian);
+    for (int j = 0; j < L.blockSpecCount; j++) s += dielectricSpecular(N, V, f0, roughness, L.blockSpec[j], 1.0, 1.0, gaussian);
     return s * SPECULAR_BLOCK_STRENGTH;
 }
 

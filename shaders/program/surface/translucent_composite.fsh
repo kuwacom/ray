@@ -283,7 +283,8 @@ void main() {
                 if (!waterGlintFinite(glitter)) glitter = 1.0;
             }
 #endif
-            vec3 spec = refl * F + sunSpecular(N, V, WATER_F0, sunAlpha, sunSpecVis, glitter) + localLightSpecular(WL, N, V, WATER_F0, lightAlpha);
+            // 上面の照り返しは傾きの分布をガウスにする (海面の傾きの分布。WATER_GLITTER の点も同じ分布から置く)。側面は落ちる水の乱れの裾を残す
+            vec3 spec = refl * F + sunSpecular(N, V, WATER_F0, sunAlpha, sunSpecVis, glitter, !side) + localLightSpecular(WL, N, V, WATER_F0, lightAlpha, !side);
             color = behind * (1.0 - F) + spec;
             sparkleLum += luminance(sparkleExcess(spec, getExposure()));
 
@@ -358,7 +359,7 @@ void main() {
         SurfaceLights GL = gatherSurfaceLights(gp, SL_SUN_NONE, SL_BLOCK_NONE, SL_HAND | SL_BLOCK_SPECULAR_TRACED);
         float glassAlpha = max(roughness * roughness, MIN_ROUGHNESS);
         // 前方で照らした拡散 (translucent.rgb) は鏡面で反射する F の分を除く (太陽の鏡面を足すので、その分だけ明るくならないように)
-        vec3 spec = refl * F + sunSpecular(N, V, GLASS_F0, glassAlpha, glassSunVis) + localLightSpecular(GL, N, V, GLASS_F0, glassAlpha);
+        vec3 spec = refl * F + sunSpecular(N, V, GLASS_F0, glassAlpha, glassSunVis) + localLightSpecular(GL, N, V, GLASS_F0, glassAlpha, false);
         color = behind * transmit * (1.0 - F) + translucent.rgb * (1.0 - F) + spec;
         float glassSparkle = luminance(sparkleExcess(spec, getExposure())) + behindExcess * luminance(transmit) * (1.0 - F);
         outColor = vec4(color, 1.0 + saturate(glassSparkle / max(luminance(color), 1e-6)));

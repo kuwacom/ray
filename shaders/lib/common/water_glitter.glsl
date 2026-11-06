@@ -20,8 +20,8 @@
  * - 点の数: 傾きの確率密度 (ガウス) x 曲率 (粗さへ回した層の曲率の 2 乗の和 x GLINT_CURVATURE)
  * - 1 つの明るさ: ローブ / 点の密度 に、曲率の小さい点ほど明るい 2 乗の裾の重みを掛ける。点の位置 (道の芯か端か) によらないので、
  *   道の端は点の数が減るだけで、1 つ 1 つは明るいまま光る
- * - 平均: 点がまばらな遠くは傾きの分布をガウスにしたローブ。GGX の裾にある薄い光 (道の外ののっぺりした滲み) は点にならない。
- *   点が詰まって滑らかな平均へ移る所と、粗さへ回した割合の小さい近景は GGX の裾を残す (道の縁を切り立たせない)
+ * - 平均: 照り返しのローブと同じガウスの傾きの分布 (Beckmann)。点がまばらな所も、点が詰まって滑らかな平均へ移る所も、
+ *   広がりは同じなので、目の高さで道の幅が変わらない
  * - 位置と寿命: セル (2 の冪、ワールドに固定) ごとに点を 1 つ置き、セルの格子を画面で見えている短い波 (無ければその大きさの波)
  *   の位相の速さで流す。寿命はセルの大きさの波の周期の半分 (TAA が積分できる GLINT_MIN_FRAMES より短くしない)。
  *   半周期ずらした 2 組を、立ち上がりの短い台形で交互に光らせる (和は常に 1)
@@ -119,8 +119,8 @@ const int GLINT_SEARCH_MAX = 9;             // 鎖を探すセルの数の上限
 const float GLINT_CHAIN_BRIDGE = 0.5;       // 鎖の光のうち、子の間をつなぐ横長の核へ配る割合
 const float GLINT_BRIDGE_WIDTH = 0.8;       // 横長の核の縦の半径 (子の半径の割合)
 /*
- * 傾きの分布の指数 x の上限。ここで exp(-x) は 1e-13 で、点も重みも無いのと同じ。上限が無いと exp(-x) x (1 + x)^2 の
- * 計算の順番をコンパイラが入れ替えた時に 0 x 無限大で NaN になり、鏡面の上限 (min) が NaN を円盤の明るさに置き換えて道が白飛びした
+ * 傾きの分布の指数 x の上限。ここで exp(-x) は 1e-13 で、点も重みも無いのと同じ。上限が無いと x に掛ける式の計算の順番を
+ * コンパイラが入れ替えた時に 0 x 無限大で NaN になり、鏡面の上限 (min) が NaN を円盤の明るさに置き換えて道が白飛びした
  */
 const float GLINT_X_MAX = 30.0;
 /*
@@ -407,10 +407,9 @@ float waterGlitter(vec2 pos, vec3 N, vec3 V, vec3 L, float alpha2, vec2 unresolv
     if (fraction < GLINT_FRACTION_MIN) return 1.0;
     float NoH = dot(N, normalize(L + V));
     if (NoH <= 0.0) return 1.0;
-    // 傾きの分布をローブと同じ alpha^2 のガウスにする。期待値はガウス / GGX の比で、GGX の長い裾の分は点にならない
+    // 傾きの分布は照り返しのローブ (Beckmann) と同じ alpha^2 のガウス。点の期待値はローブと同じなので、倍率の期待値は 1
     float x = clamp((1.0 / (NoH * NoH) - 1.0) / alpha2, 0.0, GLINT_X_MAX);
     float gauss = exp(-x);
-    float expected = gauss * sqr(1.0 + x);
     // 点の密度はワールドの面積あたりで決まる (画素の大きさによらない)。近づくと画面の中の数が減り、1 つは明るく大きくなる
     float rho = gauss / (PI * alpha2) * GLINT_CURVATURE * unresolved.y;
 
@@ -453,17 +452,8 @@ float waterGlitter(vec2 pos, vec3 N, vec3 V, vec3 L, float alpha2, vec2 unresolv
         float gHi = wHi > 0.0 ? glintLevel(pos, levelLo + 1.0, rho, axisAlong, axisAcross, kernelArea, chainHalf, stretchMax, concentrateMax, base) : 0.0;
         g = mix(mix(gLo, gHi, wHi), 1.0, smoothW);
     }
-    /*
-     * 点がまばらで粗さへ回した割合の大きい所 (gaussian 1) はガウスのローブを点で、点が詰まった所と近景 (0) は GGX のまま。
-     * 間は GGX のうちガウスと重なる分を点にし、GGX の裾 (ガウスを超える分) を滑らかに残す (近景の道の縁を切り立たせない)。
-     * どの値でも GGX と同じエネルギー (ガウスと GGX の重なりは 0.796、残りが裾)
-     */
-    float sparse = 1.0 - smoothW;
-    float gaussian = sparse * fraction;
-    float points = min(expected, 1.0) + gaussian * max(expected - 1.0, 0.0);
-    float tail = (1.0 - gaussian) * max(1.0 - expected, 0.0);
-    // g の期待値は画素ごとに 1
-    return mix(1.0, g * points + tail, fraction);
+    // g の期待値は画素ごとに 1。ローブのうち粗さへ回した分の割合だけ点にする
+    return mix(1.0, g, fraction);
 }
 
 #endif

@@ -27,6 +27,16 @@ float ggxD(float NoH, float a) {
     return a2 / (PI * d * d);
 }
 
+/*
+ * 傾きの分布がガウスの面 (Beckmann)。a^2 は傾きの分散 (2 軸の和)。実際の海面の傾き (Cox-Munk) に近く、GGX のような長い裾が無い
+ * 水の太陽・灯りの照り返しに使う (GGX の裾は遠くの水面一面に薄い光を残し、道を実際より広く白っぽく見せた)
+ */
+float beckmannD(float NoH, float a) {
+    float a2 = a * a;
+    float c2 = max(NoH * NoH, 1e-6);
+    return exp((c2 - 1.0) / (c2 * a2)) / (PI * a2 * c2 * c2);
+}
+
 // 高さ相関 Smith G2 を 4 NoL NoV で割った可視項
 float smithVisibilityHC(float NoV, float NoL, float a) {
     float a2 = a * a;
@@ -143,15 +153,16 @@ float eonRoughness(Material m) { return saturate(m.roughness * EON_ROUGHNESS_SCA
 const float SPECULAR_DISC_PEAK = 1.25;
 
 // 鏡面 BRDF x NoL (光源の見かけの大きさでラフネスを広げる)。照度を掛ける前の値で、円盤の鏡像で頭打ちにする
-// gain: ローブに掛ける倍率 (画素の中の面の数のゆらぎ。頭打ちの前に掛ける)
-vec3 evalSpecularLobe(Material m, vec3 N, vec3 V, vec3 L, float angularSize, float NoL, float NoV, float discScale, float gain) {
+// gain: ローブに掛ける倍率 (画素の中の面の数のゆらぎ。頭打ちの前に掛ける), gaussian: 分布を GGX ではなく Beckmann にする
+vec3 evalSpecularLobe(Material m, vec3 N, vec3 V, vec3 L, float angularSize, float NoL, float NoV, float discScale, float gain, bool gaussian) {
     vec3 H = normalize(L + V);
     float NoH = saturate(dot(N, H));
     float VoH = saturate(dot(V, H));
     // 球光源の正規化 (Karis 2013) の簡略形。光源の大きさ分だけローブを広げて点光源の発散を防ぐ
     float a = min(m.roughness + 0.5 * angularSize, 1.0);
     vec3 F = materialFresnel(m, VoH);
-    vec3 lobe = ggxD(NoH, a) * smithVisibilityHC(NoV, NoL, a) * F * specularEnergyCompensation(m, NoV) * (NoL * gain);
+    float D = gaussian ? beckmannD(NoH, a) : ggxD(NoH, a);
+    vec3 lobe = D * smithVisibilityHC(NoV, NoL, a) * F * specularEnergyCompensation(m, NoV) * (NoL * gain);
     return min(lobe, F * (discScale * SPECULAR_DISC_PEAK / (PI * sqr(max(angularSize, 1e-3)))));
 }
 
@@ -166,7 +177,7 @@ vec3 evalDirectLight(Material m, vec3 N, vec3 V, LightSample L, float discScale,
     if (NoL <= 0.0 || maxOf(L.irradiance) <= 0.0) return vec3(0.0);
     float NoV = max(dot(N, V), 1e-3);
     vec3 diffuse = eonDiffuse(m.albedo, eonRoughness(m), NoL, NoV, dot(L.direction, V)) * (1.0 - specularAlbedo(m, NoV));
-    spec = evalSpecularLobe(m, N, V, L.direction, L.angularSize, NoL, NoV, discScale, 1.0) * L.irradiance;
+    spec = evalSpecularLobe(m, N, V, L.direction, L.angularSize, NoL, NoV, discScale, 1.0, false) * L.irradiance;
     return diffuse * L.irradiance * NoL;
 }
 
@@ -186,15 +197,15 @@ vec3 evalDirectDiffuse(Material m, vec3 N, vec3 V, LightSample L) {
 }
 
 // 鏡面だけ (水面の太陽ハイライト等)
-vec3 evalDirectSpecular(Material m, vec3 N, vec3 V, LightSample L, float discScale, float gain) {
+vec3 evalDirectSpecular(Material m, vec3 N, vec3 V, LightSample L, float discScale, float gain, bool gaussian) {
     float NoL = dot(N, L.direction);
     if (NoL <= 0.0) return vec3(0.0);
     float NoV = max(dot(N, V), 1e-3);
-    return evalSpecularLobe(m, N, V, L.direction, L.angularSize, NoL, NoV, discScale, gain) * L.irradiance;
+    return evalSpecularLobe(m, N, V, L.direction, L.angularSize, NoL, NoV, discScale, gain, gaussian) * L.irradiance;
 }
 
 vec3 evalDirectSpecular(Material m, vec3 N, vec3 V, LightSample L, float discScale) {
-    return evalDirectSpecular(m, N, V, L, discScale, 1.0);
+    return evalDirectSpecular(m, N, V, L, discScale, 1.0, false);
 }
 
 vec3 evalDirectSpecular(Material m, vec3 N, vec3 V, LightSample L) {
