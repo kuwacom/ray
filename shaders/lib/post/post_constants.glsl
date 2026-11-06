@@ -269,10 +269,12 @@ const float LENS_VEIL_SUN_SIGMA = 0.35;
 const float LENS_VEIL_HAZE = 0.03;
 /*
  * 点像の裾: 白飛び分 (colortex17) から周りへ配る割合 = 下限 + ベーリンググレアの強さ x 傾き (散乱の強いレンズほど大きい)
- * 4 段 (半径 約 2, 4, 8, 16 px) へ同じエネルギーずつ配るので裾は r^-2 になる。現代の単焦点で約 0.11
+ * 4 段 (半径 約 2, 4, 8, 16 px) へ同じエネルギーずつ配るので裾は r^-2 になる。現代の単焦点で約 0.41
  * 白く飛ぶ大きさは配る割合の平方根で増えるので、明るい点やつながった塊ほど大きくにじむ (0.06 ではどの点も同じ大きさに見えた)
+ * 水面のきらめきは数を絞って 1 つずつを明るくしているので、0.10 では 1-2 画素の小さな点に留まり、隣のきらめきや波の面と
+ * にじみがつながらなかった
  */
-const float POINT_SPREAD_BASE = 0.10;
+const float POINT_SPREAD_BASE = 0.40;
 const float POINT_SPREAD_PER_GLARE = 0.035;
 const int POINT_SPREAD_LEVELS = 4;
 // 最も粗い段の手前の段で近くに白飛び分が無い画素は 4 段の読みを省く
@@ -286,11 +288,11 @@ const float POINT_SPREAD_COC_FADE = 2.0;
  * 点像の芯: 回折・センサー・現像の滲みで、点のエネルギーの一部が半径 1-2 px に広がる。白を大きく超えた点ほど芯の周りまで
  * 白く飛び、明るい点ほど大きな光の塊に見える (裾の r^-2 だけでは隣の画素へ行く分が 1% 未満で、点が 1 画素の白い四角に見えた)
  * 白飛び分のうち POINT_CORE_SHARE をガウス (sigma POINT_CORE_SIGMA px) で配る。3 x 3 の双線形の読みで 5 x 5 の重みにする
- * 芯が大きいと、白をわずかに超えた暗い点まで 3-5 px の丸になり、明るさによらず同じ大きさの丸い粒が並んだ。暗い点は 1-2 px のまま、
- * 明るい点は裾 (POINT_SPREAD_BASE) で大きく見せる
+ * 芯が大きいと、白をわずかに超えた暗い点まで 3-5 px の丸になり、明るさによらず同じ大きさの丸い粒が並んだ (水面のきらめきが
+ * 多く暗かった時)。きらめきを少数の明るい点にした後は、芯も大きくして 1 つのきらめきを大きく光らせる
  */
-const float POINT_CORE_SHARE = 0.22;
-const float POINT_CORE_SIGMA = 0.7;
+const float POINT_CORE_SHARE = 0.40;
+const float POINT_CORE_SIGMA = 1.1;
 const float POINT_CORE_G1 = exp(-0.5 / (POINT_CORE_SIGMA * POINT_CORE_SIGMA));   // 1 px 離れた重み
 const float POINT_CORE_G2 = exp(-2.0 / (POINT_CORE_SIGMA * POINT_CORE_SIGMA));   // 2 px 離れた重み
 const float POINT_CORE_W0 = 1.0 / (1.0 + 2.0 * (POINT_CORE_G1 + POINT_CORE_G2)); // 1 軸の中心の重み
