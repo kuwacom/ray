@@ -37,6 +37,12 @@
  * 10-105 個、中央 34 個) に合わせた値
  */
 const float GLINT_CURVATURE = 0.03;
+/*
+ * 表面張力波が画素より大きい近く (1-3 m 以下) で点の数に掛ける倍率。上の値は、点が混ざり合って数えられる数の少ない中景の写真に
+ * 合わせたもの。近くでは 1 つ 1 つの面が分かれて見えるので、同じ値だと画面に 10-15 個の点しか無く、1 つが明るすぎて大きな丸い玉に
+ * なった。数を増やすと 1 つは暗く小さくなり、表した波の斜面 (細くしたローブ) に沿って並ぶ。照り返しの平均は変えない
+ */
+const float GLINT_NEAR_DENSITY = 5.0;
 const float GLINT_CREST = 0.5;              // 長い波の波頭へ寄せる強さ (表面張力波は長い波の波頭付近に集まる)
 const float GLINT_CREST_MEAN = 0.18;        // 波頭の重み smoothstep(0, 2 sigma, h) の、正規分布の高さでの平均 (寄せても平均を変えない)
 /*
@@ -58,11 +64,11 @@ const float GLINT_CELL = 1.8;
  * 点は画面の横へ伸びる。伸ばす量は点ごとの乱数で、かすめ角ほど長くできる (セルで探せる 1 / NoV 倍まで)。明るい点
  * (曲率の小さい面) ほど長く、割れやすい。どの形も重みの面積で割るので、1 つのエネルギーは丸のときと同じ
  */
-const float GLINT_STRETCH_MAX = 6.0;        // 横に伸ばす倍率の上限
+const float GLINT_STRETCH_MAX = 8.0;        // 横に伸ばす倍率の上限
 const float GLINT_STRETCH_DIM = 0.6;        // いちばん暗い点の伸び (明るい点を 1 とした割合)
-const float GLINT_STRETCH_SKEW = 0.6;       // 伸びの乱数の指数 (1 未満で長い点を増やす)
+const float GLINT_STRETCH_SKEW = 0.5;       // 伸びの乱数の指数 (1 未満で長い点を増やす)
 const float GLINT_TILT = 0.17;              // 長軸の傾きの乱数の幅 (ラジアン)
-const float GLINT_SPLIT = 0.35;             // 2 つの塊に割れる割合 (いちばん明るい点で。暗い点はこの半分)
+const float GLINT_SPLIT = 0.5;             // 2 つの塊に割れる割合 (いちばん明るい点で。暗い点はこの半分)
 /*
  * 傾きの分布の指数 x の上限。ここで exp(-x) は 1e-13 で、点も重みも無いのと同じ。上限が無いと exp(-x) x (1 + x)^2 の
  * 計算の順番をコンパイラが入れ替えた時に 0 x 無限大で NaN になり、鏡面の上限 (min) が NaN を円盤の明るさに置き換えて道が白飛びした
@@ -256,6 +262,7 @@ float waterGlitter(vec2 pos, vec3 N, vec3 V, vec3 L, float alpha2, vec2 unresolv
 
     float NoV = max(NoVGeo, 0.02);
     float footprint = pixelWorld / NoV;
+    rho0 *= mix(1.0, GLINT_NEAR_DENSITY, 0.5 * (waterTileResolved(waterCapillaryTile(0), footprint) + waterTileResolved(waterCapillaryTile(1), footprint)));
     float pixelArea = pixelWorld * footprint;
     // 滑らかな平均へ移すかは波頭へ寄せる前の数で決める (寄せた所だけ平均へ移ると、点の詰まった波頭が白い板になる)
     float smoothW = smoothstep(GLINT_SMOOTH_LAMBDA.x, GLINT_SMOOTH_LAMBDA.y, rho0 * pixelArea);
