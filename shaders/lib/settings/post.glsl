@@ -35,6 +35,7 @@
 #define LENS_DIRT // レンズの汚れ
 #define LENS_VEILING_GLARE // ベーリンググレア (フレアによるコントラスト低下)
 #define LENS_POINT_SPREAD_STRENGTH 1.0 // [0.0 0.5 1.0 1.5 2.0 3.0 5.0 8.0] 鏡面の白飛びの点がレンズの点像で滲む強さ (鏡面反射の白飛びが必要)
+#define LENS_POINT_SPREAD_SIZE 2 // [0 1 2 3] 鏡面の白飛びの点の滲みの大きさ 0=小 1=中 2=大 3=特大
 #define LENS_DISTORTION // 歪曲収差と魚眼の写像
 #define LENS_DISTORTION_SCALE 1.0 // [0.0 0.5 1.0 1.5 2.0 3.0 4.0] 歪曲収差の強さ (1 = レンズの処方どおり。魚眼の写像には掛からない)
 #define LENS_FISHEYE_FIT 0 // [0 1] 魚眼の画面への合わせ方 0=隅まで埋める 1=横幅を合わせる (隅は黒)

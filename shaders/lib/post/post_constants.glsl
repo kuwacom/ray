@@ -274,7 +274,17 @@ const float LENS_VEIL_HAZE = 0.03;
  * 水面のきらめきは数を絞って 1 つずつを明るくしているので、0.10 では 1-2 画素の小さな点に留まり、隣のきらめきや波の面と
  * にじみがつながらなかった
  */
-const float POINT_SPREAD_BASE = 0.40;
+// 設定 LENS_POINT_SPREAD_SIZE の段 (裾の割合, 芯の割合, 芯の sigma px)。段の大きさ: 小 1-2 px, 中 3-5 px, 大 4-8 px, 特大 7-10 px
+#if LENS_POINT_SPREAD_SIZE == 0
+const vec3 POINT_SPREAD_SHAPE = vec3(0.10, 0.22, 0.7);
+#elif LENS_POINT_SPREAD_SIZE == 1
+const vec3 POINT_SPREAD_SHAPE = vec3(0.22, 0.32, 0.9);
+#elif LENS_POINT_SPREAD_SIZE == 2
+const vec3 POINT_SPREAD_SHAPE = vec3(0.40, 0.40, 1.1);
+#else
+const vec3 POINT_SPREAD_SHAPE = vec3(0.60, 0.35, 1.3);
+#endif
+const float POINT_SPREAD_BASE = POINT_SPREAD_SHAPE.x;
 const float POINT_SPREAD_PER_GLARE = 0.035;
 const int POINT_SPREAD_LEVELS = 4;
 // 最も粗い段の手前の段で近くに白飛び分が無い画素は 4 段の読みを省く
@@ -291,8 +301,8 @@ const float POINT_SPREAD_COC_FADE = 2.0;
  * 芯が大きいと、白をわずかに超えた暗い点まで 3-5 px の丸になり、明るさによらず同じ大きさの丸い粒が並んだ (水面のきらめきが
  * 多く暗かった時)。きらめきを少数の明るい点にした後は、芯も大きくして 1 つのきらめきを大きく光らせる
  */
-const float POINT_CORE_SHARE = 0.40;
-const float POINT_CORE_SIGMA = 1.1;
+const float POINT_CORE_SHARE = POINT_SPREAD_SHAPE.y;
+const float POINT_CORE_SIGMA = POINT_SPREAD_SHAPE.z;
 const float POINT_CORE_G1 = exp(-0.5 / (POINT_CORE_SIGMA * POINT_CORE_SIGMA));   // 1 px 離れた重み
 const float POINT_CORE_G2 = exp(-2.0 / (POINT_CORE_SIGMA * POINT_CORE_SIGMA));   // 2 px 離れた重み
 const float POINT_CORE_W0 = 1.0 / (1.0 + 2.0 * (POINT_CORE_G1 + POINT_CORE_G2)); // 1 軸の中心の重み

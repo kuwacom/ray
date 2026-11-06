@@ -468,12 +468,11 @@ vec3 waterRoughReflectDir(vec3 R, float slopeVar) {
 /*
  * 映り込み (物と空) を、画素より細かい波の傾きの分だけ散らす粗さ (知覚の粗さ)。散らさないと遠くとかすめ角の水面は表した長い波だけで
  * 映り込みの向きが決まり、細かい波の多い湖・川では十数ブロック先から映り込みが揺れない平らな鏡になる
- * 散らすのは GGX の可視法線 (VNDF) なので、長い裾の分を WATER_REFLECT_ROUGH_SCALE で詰める (傾きの RMS に対する alpha の比)。
+ * 散らすのは GGX の可視法線 (VNDF) なので、長い裾の分を設定 WATER_REFLECT_SCATTER で詰める (傾きの RMS に対する alpha の比)。
  * かすめ角では散らしが仰角の向きに大きく方位の向きに小さく出るので、映り込みは縦に伸びる
  * 1 で傾きの分の全部、小さいほど鏡に近い。0.5 以上では池の十数ブロック先の木や海の氷山の映り込みがほぼ消えて、
  * 空の色の一様なすりガラスになった
  */
-const float WATER_REFLECT_ROUGH_SCALE = 0.3;
 /*
  * 散らしの alpha がこの範囲より小さい水面 (凪・風の無い表面張力波だけ・近くの水面) は、フル解像度の鏡のまま辿る
  * (数度より小さいぼけのために半分の解像度へ落とすと、凪の水面の映り込みがぼけて鏡でなくなった)。範囲の中は鏡と散らした映り込みを混ぜる
@@ -482,7 +481,7 @@ const vec2 WATER_REFLECT_MIRROR_ALPHA = vec2(0.02, 0.03);
 
 float waterReflectAlpha(float slopeVar) {
 #if REFLECTIONS >= 2
-    return sqrt(slopeVar) * WATER_REFLECT_ROUGH_SCALE;
+    return sqrt(slopeVar) * WATER_REFLECT_SCATTER;
 #else
     // 粗い反射の経路が無い (SSR だけ) 設定では鏡のまま
     return 0.0;
@@ -502,7 +501,7 @@ float waterReflectMirror(float slopeVar) {
 
 // 散らした向きで空を引く時に、散らしきらなかった傾きの分だけ仰角を持ち上げる分散
 float waterReflectLiftVar(float slopeVar, bool scattered) {
-    return scattered ? slopeVar * (1.0 - sqr(WATER_REFLECT_ROUGH_SCALE)) : slopeVar;
+    return scattered ? slopeVar * (1.0 - sqr(WATER_REFLECT_SCATTER)) : slopeVar;
 }
 
 #endif

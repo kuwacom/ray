@@ -36,6 +36,7 @@
  * 砂目で埋まった。粗さが一様なままでは 0.15 でも露出後 10 前後の暗い点が一面に散って灰色のざらつきになり、0.03 まで下げると
  * 点がまばらで、どの点も白を大きく超えた同じ大きさの丸い塊になって隣とつながらなかった。点は場所ごとのさざ波の強さのむら
  * (waterGlintPatch) で粗い所に集まる。置くのはこのうち GLINT_KEEP の割合だけ
+ * 設定 WATER_GLITTER_DENSITY がこの値に掛かる。1 つの明るさは点の数に反比例するので、光の総量は変わらない
  */
 const float GLINT_CURVATURE = 0.15;
 const float GLINT_CHAIN_MEAN = 3.0;         // 1 つの鎖の子の数の平均の目安 (滑らかな平均へ移すときの画素の中の数に掛ける)
@@ -89,6 +90,7 @@ const float GLINT_CELL = 1.8;
  * 1 つずつ独立に置いた点は、数を増やしても減らしても 1 つずつ浮いた粒のままだった
  * - 鎖は画面の横に並べる。かすめ角では奥行きが縮むので稜線は画面の横に寝る
  * - 鎖の長さは点像のにじみの直径の 2-3 倍。にじみと同じくらいの長さでは、にじむと丸い玉になった
+ * - 鎖の長さは設定 WATER_GLITTER_LENGTH で、子の間隔と長さの上限に掛ける
  * - 子の間隔は画素の単位の乱数で、隣とつながる詰まった間隔と、暗い隙間を挟んで並ぶ間隔が混ざる (横長の光と点の列)。
  *   どちらか 1 種だと、全部つながった 1 本の棒か、等間隔の点線になった。鎖の長さはかすめ角ほど長く (1 / NoV)、
  *   明るい点 (曲率の小さい面) ほど子が多い
@@ -97,7 +99,7 @@ const float GLINT_CELL = 1.8;
  *   並んで雨の筋のように見えた。端の子が白に届かず暗く消える鎖も混ぜて、長さと形をそろえない
  * - 子ごとに光る時刻を少しずらす (1 本の鎖が一斉に光って一斉に消えない)
  * - 置いた点のうち特に明るい (曲率が小さく、大きな 1 つの面が太陽を映す) 点は、稜線に割れずに 1 つの点のまま光ることがある
- *   (GLINT_SINGLE x 置いた点の中での明るさの割合。置いた点の 1-2 割)
+ *   (WATER_GLITTER_SINGLE x 置いた点の中での明るさの割合。既定の 0.55 で置いた点の 1-2 割)
  */
 const int GLINT_CHAIN_MAX = 7;              // 鎖の子の数の上限
 const int GLINT_CHAIN_MIN = 2;
@@ -114,7 +116,6 @@ const float GLINT_CHILD_STRETCH = 0.35;     // 子を横に伸ばす割合 (か�
 const float GLINT_STRETCH_MAX = 8.0;        // 横に伸ばす倍率の上限
 const float GLINT_STRETCH_DIM = 0.8;        // いちばん暗い点の子の数の割合 (明るい点を 1 とした割合)
 const float GLINT_TILT = 0.3;               // 鎖の向きの傾きの乱数の幅 (ラジアン)
-const float GLINT_SINGLE = 0.55;            // 置いた点の中でいちばん明るい点が 1 つの点のまま光る確率
 const int GLINT_SEARCH_MAX = 9;             // 鎖を探すセルの数の上限 (1 軸)
 const float GLINT_CHAIN_BRIDGE = 0.5;       // 鎖の光のうち、子の間をつなぐ横長の核へ配る割合
 const float GLINT_BRIDGE_WIDTH = 0.8;       // 横長の核の縦の半径 (子の半径の割合)
@@ -256,7 +257,7 @@ float glintChain(vec2 m, float chainHalf, float stretchMax, float bright, uvec3 
     vec3 hg = hash3(seed ^ uvec3(0x68E31DA4u, 0xB5297A4Du, 0x1B56C4E9u));
     int n = clamp(int(float(GLINT_CHAIN_MIN) + float(GLINT_CHAIN_MAX + 1 - GLINT_CHAIN_MIN) * hs.x * mix(GLINT_STRETCH_DIM, 1.0, bright)),
         GLINT_CHAIN_MIN, GLINT_CHAIN_MAX);
-    if (hs.z < GLINT_SINGLE * peak) n = 1;
+    if (hs.z < WATER_GLITTER_SINGLE * peak) n = 1;
     /*
      * 間隔は 2 種: 隣とつながる詰まった間隔と、暗い隙間を挟む間隔 (乱数 u の GLINT_CHAIN_APART より下を隙間の側に使う)
      * 子が 2 つだけの鎖はつながる間隔にする (隙間を挟むと、にじんだ同じくらいの 2 つの玉が対に並んで見えた)
@@ -272,7 +273,7 @@ float glintChain(vec2 m, float chainHalf, float stretchMax, float bright, uvec3 
         bool apart = u < GLINT_CHAIN_APART && n > 2;
         float tg = u < GLINT_CHAIN_APART ? u / GLINT_CHAIN_APART : (u - GLINT_CHAIN_APART) / (1.0 - GLINT_CHAIN_APART);
         float g = (apart ? mix(GLINT_CHAIN_GAP_APART.x, GLINT_CHAIN_GAP_APART.y, tg) : mix(GLINT_CHAIN_GAP.x, GLINT_CHAIN_GAP.y, tg))
-            / GLINT_RADIUS;
+            * WATER_GLITTER_LENGTH / GLINT_RADIUS;
         if (total + g > 2.0 * chainHalf) {
             n = j + 1;
             continue;
@@ -283,7 +284,7 @@ float glintChain(vec2 m, float chainHalf, float stretchMax, float bright, uvec3 
     }
     if (n == 2 && firstApart) {
         // 長さの上限で 2 つに切れた鎖も、つながる間隔へ縮める
-        total = mix(GLINT_CHAIN_GAP.x, GLINT_CHAIN_GAP.y, hg.y) / GLINT_RADIUS;
+        total = mix(GLINT_CHAIN_GAP.x, GLINT_CHAIN_GAP.y, hg.y) * WATER_GLITTER_LENGTH / GLINT_RADIUS;
         gaps[0] = total;
     }
     float a = (hs.y - 0.5) * 2.0 * GLINT_TILT;
@@ -411,7 +412,7 @@ float waterGlitter(vec2 pos, vec3 N, vec3 V, vec3 L, float alpha2, vec2 unresolv
     float x = clamp((1.0 / (NoH * NoH) - 1.0) / alpha2, 0.0, GLINT_X_MAX);
     float gauss = exp(-x);
     // 点の密度はワールドの面積あたりで決まる (画素の大きさによらない)。近づくと画面の中の数が減り、1 つは明るく大きくなる
-    float rho = gauss / (PI * alpha2) * GLINT_CURVATURE * unresolved.y;
+    float rho = gauss / (PI * alpha2) * GLINT_CURVATURE * WATER_GLITTER_DENSITY * unresolved.y;
 
     float NoV = max(NoVGeo, 0.02);
     float footprint = pixelWorld / NoV;
@@ -437,7 +438,7 @@ float waterGlitter(vec2 pos, vec3 N, vec3 V, vec3 L, float alpha2, vec2 unresolv
         float kernelArea = PI * sqr(GLINT_RADIUS) / 3.0 * pixelArea;
         // かすめ角の横の伸び (奥行きが縮む分) と、鎖の長さの半分の上限 (半径の単位)
         float stretchMax = clamp(GLINT_CELL / (2.0 * GLINT_RADIUS * NoV), 1.0, GLINT_STRETCH_MAX);
-        float chainHalf = min(GLINT_CHAIN_REACH / NoV, GLINT_CHAIN_HALF_MAX) / GLINT_RADIUS;
+        float chainHalf = min(GLINT_CHAIN_REACH / NoV, GLINT_CHAIN_HALF_MAX) * WATER_GLITTER_LENGTH / GLINT_RADIUS;
         float concentrateMax = mix(GLINT_CONCENTRATE_MAX, GLINT_CONCENTRATE_NEAR, nearShape);
         /*
          * 鎖は画面の横に並べる。視線と直交する水平の向きは、画面の端では透視で傾き、同じ角度の斜めの筋が並んで雨のように見えた

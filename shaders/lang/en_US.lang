@@ -275,6 +275,7 @@ option.LAVA_BLOOM.comment=Strength of the glow around lava. 0 = same bloom as ot
 option.WATER_WAVES=Water Waves
 option.WATER_WAVE_HEIGHT=Wave Height
 screen.WATER_WAVE_OPTIONS=Wave Options
+screen.WATER_GLINT_OPTIONS=Glitter & Reflection Bloom
 option.WATER_WAVE_HEIGHT.comment=Multiplier on the wave height given by the wind speed
 option.WATER_WAVE_LENGTH=Wavelength Scale
 option.WATER_WAVE_LENGTH.comment=Scales the size of every wave
@@ -292,6 +293,14 @@ option.WATER_RIVER_WAVES=River Wind
 option.WATER_RIVER_WAVES.comment=Wind on rivers relative to the sea. Sloped flowing water also moves downstream
 option.WATER_GLITTER=Water Glitter
 option.WATER_GLITTER.comment=Draws the sun and moon mirrored by ripples smaller than a pixel as bright points that drift with the waves and thin out toward the edge of the path. Overall brightness stays about the same. Off keeps a smooth reflection. Slightly heavier
+option.WATER_GLITTER_DENSITY=Glitter Amount
+option.WATER_GLITTER_DENSITY.comment=Number of glitter points on the water. Higher: more, finer points packed close together. Lower: fewer, brighter points spread apart. Overall brightness stays the same. Needs Water Glitter
+option.WATER_GLITTER_LENGTH=Glitter Length
+option.WATER_GLITTER_LENGTH.comment=Length of the horizontal streaks that glitter points form. Higher: longer streaks. Lower: shorter, rounder lumps. Needs Water Glitter
+option.WATER_GLITTER_SINGLE=Round Glitter
+option.WATER_GLITTER_SINGLE.comment=Share of the brightest points that stay one round point instead of splitting into a horizontal streak. 0: every point is a streak. Higher: more round points. Needs Water Glitter
+option.WATER_REFLECT_SCATTER=Reflection Blur
+option.WATER_REFLECT_SCATTER.comment=How much waves smaller than a pixel blur the reflection of objects and sky on water. 0: a perfect mirror. Higher: reflections of distant trees and ice smear vertically and melt into the sky color. Calm water and water close to the camera stay mirrors. Needs Reflections set to SSR + Rough or higher
 option.WATER_PARALLAX=Water Parallax
 option.WATER_REFRACTION=Water Refraction
 value.WATER_REFRACTION.0=Off
@@ -643,6 +652,12 @@ option.LENS_FLARE_STRENGTH=Flare Strength
 option.LENS_FLARE_STRENGTH.comment=Works with every lens. 1 = as designed (ghosts use physically computed reflectance)
 option.LENS_POINT_SPREAD_STRENGTH=Point Spread Strength
 option.LENS_POINT_SPREAD_STRENGTH.comment=Specular highlights brighter than white (sun glints on water, metal, glass) get a lens point-spread glow: the brighter the point, the larger it looks, like a point light. Total light is unchanged. Scales with the lens's veiling glare. 0 = off. Needs Reflection Sparkle. Costs about 0.2 ms
+option.LENS_POINT_SPREAD_SIZE=Point Spread Size
+option.LENS_POINT_SPREAD_SIZE.comment=Size of the glow around blown-out reflection points (about 1-2 px Small, 3-5 px Medium, 4-8 px Large, 7-10 px Extra Large). Larger glows merge neighboring glints and wave surfaces into one lump and look hazier. Strength sets how much light goes into the glow. Needs Reflection Sparkle
+value.LENS_POINT_SPREAD_SIZE.0=Small
+value.LENS_POINT_SPREAD_SIZE.1=Medium
+value.LENS_POINT_SPREAD_SIZE.2=Large
+value.LENS_POINT_SPREAD_SIZE.3=Extra Large
 option.LENS_PRESET=Lens
 option.LENS_PRESET.comment=Picks the lens character (flare colors and shapes, starburst rays, aberrations). Individual strengths only apply with Custom (see Custom Lens). Toggles always apply. Sonnar and later are computed from the patent prescriptions of real lenses. Sonnar = high contrast, few ghosts, slight pincushion. Summilux 35 = glow wide open, cat's eye bokeh, dark corners. Canon 50/1.2 = soft and low contrast wide open, background smears toward the edges, strong corner falloff. Hologon = straight lines across 110 degrees, strong corner falloff, fixed f/8 (FOV 68). Flektogon = wavy mustache distortion (FOV 54). Fish-eye = fisheye projection, straight lines bend (FOV 110, Fisheye Framing = Fit Width matches the real lens). Gyogyotto = near-orthographic fisheye, edges squeezed harder than the Rokkor, fixed f/8. Ultra Wide-Heliar 12 = 121 degrees, plain barrel distortion, very dark corners even stopped down. New FD 14 = 114 degrees, barrel distortion that eases off at the corners, dark corners wide open that recover when stopped down. STF 135 = apodization filter, out-of-focus highlights melt away without a rim. FA 28 Soft = soft focus halo wide open that disappears by f/5.6 (set the aperture with Depth of Field). Canon 50/0.95 = the darkest corners, glow only wide open. The FOV in a lens name fits the 36 mm width of the 35 mm frame to the screen width: vertical FOV = 2 atan(18 / f x 9 / 16) (35 mm = 32, 20 mm = 54, 15 mm = 68). 50 mm and longer would need less than the game's minimum, so use 30 (still wider than the real lens)
 value.LENS_PRESET.0=Custom
