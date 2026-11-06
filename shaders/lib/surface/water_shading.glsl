@@ -276,13 +276,17 @@ vec4 sampleWaterReflection(ivec2 texel, float dist, out float skyWeight) {
  * 粗い水面の空の反射 (R0 = 持ち上げる前の反射方向, slopeVar = 均す傾きの分散)。持ち上げた仰角の上下に傾きの広がりの分ずらした
  * 3 方向の空の平均。1 方向だけだと、かすめ角では持ち上げた仰角が R0 によらずほぼ一定になり、同じ高さの空の 1 行が縦に
  * 引き伸ばされて、地平線の手前に雲の縁で切れた四角い縦縞が並んだ
+ * 持ち上げも均すのと同じ遠い水面だけに掛ける。近景・中景で持ち上げだけを掛けると、反射の仰角が R0 によらず 1 つの値に寄り、
+ * 雲の下面の一様な色が波と関係なく平らな面になって、波の等高線で切れた角ばった明るい斑が水面を流れた (バニラの形の雲で目立つ)。
+ * 近景・中景も持ち上げと同じ幅で均すと斑は消えるが、反射がかすんで、3 方向をずらす画素ごとの砂目が残った
  */
 const float WATER_SKY_SPREAD = 1.2;             // 傾きの RMS あたりの上下のずらし幅 (仰角の sin)
 
 vec3 waterSkyReflection(vec3 R0, float slopeVar, float skyLm, float dist) {
-    vec3 R = waterRoughReflectDir(R0, slopeVar);
     // 近景・中景の雲の映り込みはぼかさない (フレネルを均す範囲と揃える)
-    float spread = WATER_SKY_SPREAD * sqrt(slopeVar) * smoothstep(WATER_ROUGH_FRESNEL_RANGE.x, WATER_ROUGH_FRESNEL_RANGE.y, dist / far);
+    slopeVar *= smoothstep(WATER_ROUGH_FRESNEL_RANGE.x, WATER_ROUGH_FRESNEL_RANGE.y, dist / far);
+    vec3 R = waterRoughReflectDir(R0, slopeVar);
+    float spread = WATER_SKY_SPREAD * sqrt(slopeVar);
     if (spread < 0.005) return skyPixelReflection(R, skyLm, skyReflectionFallback(R, skyLm, 0.0));
     vec3 sum = vec3(0.0);
     for (int k = -1; k <= 1; k++) {
