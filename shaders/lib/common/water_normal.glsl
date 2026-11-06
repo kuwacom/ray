@@ -211,7 +211,18 @@ const float WATER_PARALLAX_RANGE = 2.5;
 const float WATER_PARALLAX_MAX = 1.5;          // 視線に沿って探す最大距離 (ブロック)
 // 視差に使う長い層の数。3 番目 (波長 1-8 ブロック) の高さは 0.03 ブロック前後で、足すと全画面の水で 1 ms 近く重くなる (GTX 1070, 1080p)
 const int WATER_PARALLAX_LAYERS = 2;
+/*
+ * 高さの差が画素のこの倍率 (x = 0, y = 全部) の間で視差を 0 へ寄せる。画素に満たない所で打ち切るだけだと、その距離の弧を境に
+ * 法線を引く位置が最大 WATER_PARALLAX_MAX 跳び、うねりの山と谷の所で波の模様が弧の線で食い違った
+ */
+const vec2 WATER_PARALLAX_FADE = vec2(0.5, 1.0);
 
+/*
+ * 探す幅は高さの RMS の +-WATER_PARALLAX_RANGE 倍なので、うねりの山がそれより高いと始点ですでに視線が波の下にあり、
+ * 谷がそれより深いとどの段でも交わらない。前者を外挿し、後者を平らな位置に戻していた頃は、その山と谷の周りの楕円の中だけ
+ * 法線を引く位置が最大 WATER_PARALLAX_MAX 跳び、別の位置の波が楕円の縁で食い違ってうねりと一緒に流れた。
+ * 始点で下なら始点、交わらなければ終点を当たりにする (外れの境で当たりがちょうど始点・終点に来るので、位置がつながる)
+ */
 vec3 waterParallax(WaterSea sea, vec3 worldPos, vec3 viewDir, float footprint) {
 #if defined WATER_WAVES && defined WATER_PARALLAX
     float h2 = 0.0;
@@ -220,23 +231,25 @@ vec3 waterParallax(WaterSea sea, vec3 worldPos, vec3 viewDir, float footprint) {
     float scale = min(1.0, WATER_PARALLAX_MAX * -viewDir.y / max(range, 1e-5));
     range *= scale;
     // 高さの差が画素に満たなければ探さない
-    if (viewDir.y >= -0.01 || range < footprint * 0.5) return worldPos;
+    float fade = smoothstep(WATER_PARALLAX_FADE.x, WATER_PARALLAX_FADE.y, range / max(footprint, 1e-6));
+    if (viewDir.y >= -0.01 || fade <= 0.0) return worldPos;
     float t0 = range / viewDir.y;
     float t1 = -t0;
     // 視線の高さ - 波の高さ。始点では視線が波の上 (正)
     float prevT = t0;
     float prevD = viewDir.y * t0 - scale * waterWaveSum(sea, worldPos.xz + viewDir.xz * t0, 0, WATER_PARALLAX_LAYERS, footprint).x;
+    if (prevD <= 0.0) return worldPos + viewDir * (t0 * fade);
     for (int i = 1; i <= WATER_PARALLAX_STEPS; i++) {
         float t = mix(t0, t1, float(i) / float(WATER_PARALLAX_STEPS));
         float d = viewDir.y * t - scale * waterWaveSum(sea, worldPos.xz + viewDir.xz * t, 0, WATER_PARALLAX_LAYERS, footprint).x;
         if (d <= 0.0) {
             float hit = mix(prevT, t, prevD / max(prevD - d, 1e-5));
-            return worldPos + viewDir * hit;
+            return worldPos + viewDir * (hit * fade);
         }
         prevT = t;
         prevD = d;
     }
-    return worldPos;
+    return worldPos + viewDir * (t1 * fade);
 #else
     return worldPos;
 #endif
