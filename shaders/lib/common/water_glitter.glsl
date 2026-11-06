@@ -100,8 +100,9 @@ const vec2 GLINT_SMOOTH_LAMBDA = vec2(4.0, 16.0);
 /*
  * 点の密度 (1 / ブロック^2) がこれより少ない所は平均のまま (道の外。道の芯の 1-2%)。画素の中の数で切ると、画素の小さい
  * 近くほど道の縁の点が多く消え、距離で道の幅が変わる。低くしすぎると点を探す画素が増えて重くなる (0.05 で +3-5 ms)
+ * 点の数 (GLINT_CURVATURE) に比例させ、道の芯に対する割合を保つ
  */
-const float GLINT_SKIP = 1.0;
+const float GLINT_SKIP = 5.0;
 // セルの大きさの 2 段を混ぜる帯 (log2 の端数)。帯の中は独立な 2 組の点が半分の明るさで重なり、粒が増えて費用も 2 倍になる
 const vec2 GLINT_LEVEL_BLEND = vec2(0.4, 0.6);
 const float GLINT_FRACTION_MIN = 0.01;      // ローブのうち粗さへ回した分がこれより少ない所 (近景) は変えない
