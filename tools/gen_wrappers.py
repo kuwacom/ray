@@ -80,7 +80,7 @@ BODIES: dict[str, str] = {
     "deferred11.fsh": "surface/gi_denoise.fsh",
     "deferred30.fsh": "surface/opaque_shading.fsh",
     "composite.csh": "surface/reflection_trace.csh",
-    "composite1.fsh": "surface/water_refraction.fsh",
+    "composite1.fsh": "surface/water_trace.fsh",
     "composite2.fsh": "surface/translucent_composite.fsh",
     # post
     "composite20.fsh": "post/taa.fsh",

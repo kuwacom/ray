@@ -1,5 +1,6 @@
 /*
- * composite1: 水面の屈折先の色と水の中の経路長を求めて colortex18 / colortex19 に書く (半透明の合成 composite2 が読む)
+ * composite1: 水面の光線を辿る部分。屈折先の色と水の中の経路長 (colortex18 / colortex19) と、鏡面の映り込みの
+ * フル解像度の SSR (colortex20) を書き、半透明の合成 (composite2) が読む
  * surface モジュール (lib/surface)
  *
  * 屈折 (WATER_REFRACTION 1 = 屈折方向に水深分進めて投影 + 深度検証, 2 = 屈折方向のレイマーチ)
@@ -7,15 +8,18 @@
  * D = 屈折のまま、画面に無い屈折先はボクセルで辿る (水底が浅く見える)
  * 側面 (滝・水槽): 水の厚みはボクセルで水を出る所まで / 出る面で空気へもう一度屈折
  *
- * 合成と別のパスにするのは、ボクセルを辿る屈折が合成のシェーダーに入るとレジスタの数がその経路で決まり、
- * 反射・太陽の鏡面・泡など水の画素の全部の処理が少ないワープ数で動いて何倍も遅くなるため
+ * 合成と別のパスにするのは、光線を辿る処理は深度の読みを待つ時間が長く、同時に動くワープの数で速さが決まるため。
+ * 合成のシェーダーに入ると、レジスタの数が合成の重い経路 (影・きらめき・光源のトレース) で決まってワープが減り、
+ * 水の画素の全部の処理が何倍も遅くなっていた
  * 水でない画素は書かない (合成は水の画素でだけ読む)
  */
 //@include "/lib/common/common.glsl"
 //@include "/lib/surface/surface.glsl"
 //@include "/lib/sky/sky.glsl"
 //@include "/lib/light/light.glsl"
+//@include "/lib/common/water_normal.glsl"
 //@include "/lib/surface/screen_trace.glsl"
+//@include "/lib/surface/reflection.glsl"
 //@include "/lib/surface/composite_specular.glsl"
 //@include "/lib/surface/water_shading.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
@@ -93,18 +97,25 @@
 #include "/lib/light/blocklight.glsl"
 #include "/lib/light/light.glsl"
 #include "/lib/surface/screen_trace.glsl"
+#include "/lib/common/joint_bilateral.glsl"
 #include "/lib/surface/surface_lights.glsl"
 #include "/lib/surface/lighting.glsl"
-#include "/lib/common/joint_bilateral.glsl"
 #include "/lib/surface/reflection.glsl"
 #include "/lib/surface/composite_specular.glsl"
 #include "/lib/common/exposure.glsl"
 #include "/lib/surface/water_shading.glsl"
 // END GENERATED includes
 
+#if REFLECTIONS > 0
+/* RENDERTARGETS: 18,19,20 */
+#else
 /* RENDERTARGETS: 18,19 */
+#endif
 layout(location = 0) out vec4 outRefraction;
 layout(location = 1) out float outExcess;
+#if REFLECTIONS > 0
+layout(location = 2) out vec4 outMirror;
+#endif
 
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
@@ -282,4 +293,16 @@ void main() {
     }
     outRefraction = vec4(behind, pathLen);
     outExcess = behindExcess;
+
+#if REFLECTIONS > 0
+    /*
+     * 鏡面の物の映り込みのフル解像度の SSR (composite.csh の半分の解像度の結果を合成が引き伸ばすと、映り込みの輪郭が
+     * ぼけて角張る)。反射方向は合成と同じ (下向きの反射は上向きの水面で平均水面にもう一度反射させる)
+     * 当たりの色に画面端の重みを掛けた rgb と重み a を書き、合成が半分の解像度の反射に a で重ねる
+     */
+    vec3 R0 = reflect(-V, below ? N : waterReflectNormal(N, V));
+    if (!below && !side) R0.y = abs(R0.y);
+    vec4 hit = traceReflectionHit(surfView, surfPlayer, N, R0, dist, mirrorTraceDistance(), false, !below && !side, dither);
+    outMirror = hit.w > 0.5 ? vec4(reflectionHitRadiance(hit.xy) * hit.z, hit.z) : vec4(0.0);
+#endif
 }

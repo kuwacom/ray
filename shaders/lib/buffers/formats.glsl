@@ -23,6 +23,7 @@ const int colortex16Format = R16F;    // B: 画面空間の光芒 (低解像度)
 const int colortex17Format = RGBA16F; // D: 鏡面の白飛び分の履歴 | composite20 (永続, SPECULAR_SPARKLE)
 const int colortex18Format = RGBA16F; // 水の屈折先の色 + 水の中の経路長 | composite1 -> composite2 (水の画素だけ)
 const int colortex19Format = R16F;    // 水の屈折先の白飛び分の輝度 | composite1 -> composite2 (水の画素だけ)
+const int colortex20Format = RGBA16F; // 水の鏡面の SSR (当たりの色 x 重み + 重み) | composite1 -> composite2 (水の画素だけ, REFLECTIONS > 0)
 
 const bool colortex0Clear  = true;
 const bool colortex1Clear  = true;
@@ -44,6 +45,7 @@ const bool colortex16Clear = true;
 const bool colortex17Clear = false;
 const bool colortex18Clear = false;
 const bool colortex19Clear = false;
+const bool colortex20Clear = false;
 
 const vec4 colortex0ClearColor  = vec4(0.0, 0.0, 0.0, 0.0);
 const vec4 colortex1ClearColor  = vec4(0.0, 0.0, 0.0, 0.0);

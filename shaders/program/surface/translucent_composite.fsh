@@ -3,7 +3,7 @@
  * surface モジュール (lib/surface)
  *
  * 不透明面: 環境光の鏡面 (反射バッファ or 空) x 方向アルベド x 鏡面遮蔽 を足す
- * 水面: 屈折先の色と水の中の経路長は composite1 (water_refraction.fsh) が colortex18 / colortex19 に書いたもの
+ * 水面: 屈折先の色と水の中の経路長、鏡面の映り込みのフル解像度の SSR は composite1 (water_trace.fsh) が colortex18-20 に書いたもの
  *       屈折した経路長で Jerlov の吸収と内散乱 / 厳密フレネル (水中からは全反射とスネルの窓) / 反射 / 太陽の鏡面 / 岸の泡
  *       側面 (滝・水槽): 水の厚みと出る面での屈折は composite1 / 滝の気泡の白さと着水点の泡
  *       水中から見上げた水面より上は空気なので吸収しない (カメラと水面の間の水中フォグは sky の composite19)
@@ -196,7 +196,7 @@ void main() {
         SurfaceLights WL = gatherSurfaceLights(wp, SL_SUN_NONE, SL_BLOCK_NONE, 0u);
         if (!below) WL = gatherSurfaceLights(wp, SL_SUN_NONE, SL_BLOCK_FORWARD, SL_HAND | SL_BLOCK_SPECULAR_TRACED);
 
-        // 屈折先の色と水の中の経路長は composite1 (water_refraction.fsh) が求める。フレネルが 1 の画素は屈折先を使わない
+        // 屈折先の色と水の中の経路長は composite1 (water_trace.fsh) が求める。フレネルが 1 の画素は屈折先を使わない
         vec3 behind = vec3(0.0);
         float behindExcess = 0.0;
         float pathLen = WATER_SKY_PATH;
@@ -237,7 +237,9 @@ void main() {
         } else {
             refl = fallback;
         }
-        refl = mirrorReflection(refl, surfView, surfPlayer, N, R0, dist, false, !below && !side, dither);
+        // 物の映り込みのフル解像度の SSR は composite1 (water_trace.fsh) が辿った当たり (rgb = 色 x 重み, a = 重み)
+        vec4 mirror = texelFetch(colortex20, texel, 0);
+        refl = refl * (1.0 - mirror.a) + mirror.rgb;
 #else
         refl = below ? vec3(0.0) : skyReflectionFallback(R, lmT.y, 0.0);
 #endif
