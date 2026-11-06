@@ -257,9 +257,14 @@ void main() {
             float lightAlpha = side ? sqrt(sqr(WATER_ROUGHNESS) + unresolvedVar)
                 : sqrt(sqr(WATER_SUN_ROUGHNESS) + unresolvedVar + waterPixelSlopeVar(sea, footprint));
             float sunAlpha = lightAlpha;
-            // 上向きの面だけ: 長い 3 層の高さと Jacobian (波頭の透過光・泡・さざ波の強さのむら)。視差の位置ずれは長い波では画素未満
+            // 上向きの面だけ: 長い 3 層の高さと Jacobian (波頭の透過光・泡・さざ波の強さのむら)
             bool top = N.y > 0.5;
-            vec3 surfWorld = surfPlayer + cameraPosition;
+            /*
+             * 波は法線と同じ、視差でずらした位置で引く (gbuffers_water が colortex5.a に残した視線に沿った距離)。平らな位置で引くと、
+             * きらめきのむらの短い波が、法線の短い波から長いうねりの高さに比例してずれ (最大 1.5 ブロック)、見えている波の谷に別の波の光が乗った
+             */
+            vec3 waveShift = -V * waterParallaxDecode(unpack2x8(data.a).y);
+            vec3 surfWorld = surfPlayer + waveShift + cameraPosition;
             vec4 waves = vec4(0.0);
             if (top) waves = waterWaveSum(sea, surfWorld.xz, 0, 3, footprint);
             float crest = smoothstep(0.0, 2.0 * sea.heightRms, waves.x);
@@ -272,7 +277,7 @@ void main() {
                 float ripple = waterGlintPatch(vec3(sea.amp[0], sea.amp[1], sea.amp[2]), vec2(sea.amp[GLINT_SHORT_FIRST], sea.amp[GLINT_SHORT_FIRST + 1]),
                     surfWorld.xz, footprint, waves.x);
                 sunAlpha = sqrt(sqr(lightAlpha) + (ripple - 1.0) * unresolvedVar);
-                vec2 glintPos = screenToPlayer(vec3(removeTaaJitter(texcoord), d0)).xz + cameraPosition.xz;
+                vec2 glintPos = screenToPlayer(vec3(removeTaaJitter(texcoord), d0)).xz + waveShift.xz + cameraPosition.xz;
                 glitter = waterGlitter(glintPos, N, V, unshadowedSun().direction, sqr(sunAlpha), unresolved * ripple,
                     dist * 2.0 / (gbufferProjection[1][1] * viewSize().y), NoVGeo);
                 /*
