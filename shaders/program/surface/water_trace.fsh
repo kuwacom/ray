@@ -311,15 +311,14 @@ void main() {
      * ぼけて角張る)。反射方向は合成と同じ (下向きの反射は上向きの水面で平均水面にもう一度反射させる)
      * 当たりの色に画面端の重みを掛けた rgb と重み a を書き、合成が半分の解像度の反射に a で重ねる
      */
-    // 画素より細かい波で映り込みを散らす水面は、半分の解像度の粗い反射 (reflection_trace.csh) だけを使う
+    // 画素より細かい波で映り込みを散らす水面は、半分の解像度の粗い反射 (reflection_trace.csh) だけを使う (鏡との境は重みで混ぜる)
     outMirror = vec4(0.0);
-    bool rough = !below && !side && N.y > 0.5
-        && waterReflectRoughness(waterUnresolvedSlopeVar(waterSeaState(lmT.y), waterFootprint(dist, abs(V.y)))) >= MIRROR_ROUGHNESS;
-    if (!rough) {
+    float mirrorW = !below && !side && N.y > 0.5 ? waterReflectMirror(waterUnresolvedSlopeVar(waterSeaState(lmT.y), waterFootprint(dist, abs(V.y)))) : 1.0;
+    if (mirrorW > 0.0) {
         vec3 R0 = reflect(-V, below ? N : waterReflectNormal(N, V));
         if (!below && !side) R0.y = abs(R0.y);
         vec4 hit = traceReflectionHit(surfView, surfPlayer, N, R0, dist, mirrorTraceDistance(), false, !below && !side, dither);
-        if (hit.w > 0.5) outMirror = vec4(reflectionHitRadiance(hit.xy) * hit.z, hit.z);
+        if (hit.w > 0.5) outMirror = vec4(reflectionHitRadiance(hit.xy), 1.0) * (hit.z * mirrorW);
     }
 #endif
 }

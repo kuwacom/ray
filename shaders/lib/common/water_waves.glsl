@@ -474,14 +474,30 @@ vec3 waterRoughReflectDir(vec3 R, float slopeVar) {
  * 空の色の一様なすりガラスになった
  */
 const float WATER_REFLECT_ROUGH_SCALE = 0.3;
+/*
+ * 散らしの alpha がこの範囲より小さい水面 (凪・風の無い表面張力波だけ・近くの水面) は、フル解像度の鏡のまま辿る
+ * (数度より小さいぼけのために半分の解像度へ落とすと、凪の水面の映り込みがぼけて鏡でなくなった)。範囲の中は鏡と散らした映り込みを混ぜる
+ */
+const vec2 WATER_REFLECT_MIRROR_ALPHA = vec2(0.02, 0.03);
 
-float waterReflectRoughness(float slopeVar) {
+float waterReflectAlpha(float slopeVar) {
 #if REFLECTIONS >= 2
-    return sqrt(sqrt(slopeVar) * WATER_REFLECT_ROUGH_SCALE);
+    return sqrt(slopeVar) * WATER_REFLECT_ROUGH_SCALE;
 #else
     // 粗い反射の経路が無い (SSR だけ) 設定では鏡のまま
     return 0.0;
 #endif
+}
+
+// 映り込みの知覚の粗さ。鏡のまま辿る水面は 0
+float waterReflectRoughness(float slopeVar) {
+    float a = waterReflectAlpha(slopeVar);
+    return a < WATER_REFLECT_MIRROR_ALPHA.x ? 0.0 : sqrt(a);
+}
+
+// フル解像度の鏡の映り込みの重み (1 で鏡のまま、0 で散らした映り込みだけ)
+float waterReflectMirror(float slopeVar) {
+    return 1.0 - smoothstep(WATER_REFLECT_MIRROR_ALPHA.x, WATER_REFLECT_MIRROR_ALPHA.y, waterReflectAlpha(slopeVar));
 }
 
 // 散らした向きで空を引く時に、散らしきらなかった傾きの分だけ仰角を持ち上げる分散
