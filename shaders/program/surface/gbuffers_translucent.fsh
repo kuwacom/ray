@@ -126,10 +126,10 @@ const float HAND_LIGHT_BOUNCE = 2.5;
 // WATER_TEXTURE でバニラの水テクスチャを重ねる不透明度
 const float WATER_TEXTURE_OPACITY = 0.3;
 
-// colortex5.a の予備 8bit (extra は 0-1)。ガラス等は透過色の index (+1, 0 = なし)、水は視差の距離 (waterParallaxEncode)
-vec4 encodeTranslucentDataExtra(vec3 normal, vec2 lightmap, int materialId, float extra) {
+// colortex5.a の予備 8bit に透過色の index (+1, 0 = なし) を入れる
+vec4 encodeTranslucentDataTint(vec3 normal, vec2 lightmap, int materialId, int tintIndex) {
     vec4 d = encodeTranslucentData(normal, lightmap, materialId);
-    d.a = pack2x8(vec2(float(materialId) / UNORM8_MAX, extra));
+    d.a = pack2x8(vec2(float(materialId), float(tintIndex)) / 255.0);
     return d;
 }
 
@@ -204,9 +204,9 @@ void main() {
         vec3 faceNormal = normalize(cross(dFdx(playerPos), dFdy(playerPos)));
         if (dot(faceNormal, geoNormal) < 0.0) faceNormal = -faceNormal;
         vec2 flow = waterFlowVelocity(faceNormal, geoNormal);
-        float parallax = geoNormal.y > 0.5 && dot(flow, flow) < 1e-4 ? waterParallaxDistance(sea, worldPos, -V, footprint) : 0.0;
-        vec3 normal = getWaterNormal(sea, worldPos - V * parallax, geoNormal, footprint, flow);
-        outData = encodeTranslucentDataExtra(normal, lmcoord, MAT_WATER, waterParallaxEncode(parallax));
+        if (geoNormal.y > 0.5 && dot(flow, flow) < 1e-4) worldPos = waterParallax(sea, worldPos, -V, footprint);
+        vec3 normal = getWaterNormal(sea, worldPos, geoNormal, footprint, flow);
+        outData = encodeTranslucentDataTint(normal, lmcoord, MAT_WATER, 0);
     #ifdef WATER_TEXTURE
         outColor = vec4(forwardDiffuse(m, playerPos, geoNormal, geoNormal, V, dither), albedo.a * WATER_TEXTURE_OPACITY);
     #else
@@ -232,7 +232,7 @@ void main() {
 
     outColor = vec4(color, albedo.a);
 #ifndef GBUF_PARTICLES_TRANSLUCENT
-    outData = encodeTranslucentDataExtra(geoNormal, lmcoord, materialId, float(tintIndex) / UNORM8_MAX);
+    outData = encodeTranslucentDataTint(geoNormal, lmcoord, materialId, tintIndex);
 #endif
 #ifdef GBUF_ENTITIES_TRANSLUCENT
     // 半透明の描画は距離順に並べ替えられて頂点の対応が崩れ、at_velocity が使えない (三人称の自分が大きくぶれる)
