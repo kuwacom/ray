@@ -262,7 +262,8 @@ void main() {
             vec3 surfWorld = surfPlayer + cameraPosition;
             vec4 waves = vec4(0.0);
             if (top) waves = waterWaveSum(sea, surfWorld.xz, 0, 3, footprint);
-            float crest = smoothstep(0.0, 2.0 * sea.heightRms, waves.x);
+            // 波頭は絶対の高さで測る (高さの RMS だけで割ると、ほぼ平らな湖も海と同じだけ光る)
+            float crest = smoothstep(0.0, max(2.0 * sea.heightRms, WATER_CREST_HEIGHT), waves.x);
             // 粗さへ回した細かい波の分は、太陽 (月) を映す点の集まりとして描く (WATER_GLITTER)
             float glitter = 1.0;
 #ifdef WATER_GLITTER
@@ -289,10 +290,13 @@ void main() {
             if (top) {
                 LightSample sun = unshadowedSun();
 
-                // 波頭の透過光: 太陽の側を向いて見た時だけ。真上の太陽では横から波頭へ入る光が無い
-                vec2 toSun = sun.direction.xz;
-                float back = dot(toSun, toSun) > 1e-4 ? saturate(dot(normalize(-V.xz), normalize(toSun))) : 0.0;
-                float sss = WATER_CREST_SSS * crest * sqr(sqr(back)) * (1.0 - sqr(sun.direction.y)) * (1.0 - F);
+                /*
+                 * 波頭の透過光: 太陽の側を低く見た時だけ (視線が薄い波頭を横切る)。見下ろすと水に入った光は下へ進み、上へ返るのは
+                 * 内散乱の後方散乱だけ。視線の水平の向きだけで決めると、真下を見た時にカメラの真下を頂点にして太陽の方へ開く扇になった
+                 */
+                float back = saturate(dot(-V, sun.direction));
+                float grazing = 1.0 - smoothstep(WATER_CREST_GRAZE.x, WATER_CREST_GRAZE.y, NoVGeo);
+                float sss = WATER_CREST_SSS * crest * sqr(sqr(back)) * grazing * (1.0 - F);
                 color += sun.irradiance * sunVis * waterScattering() / waterExtinction() * sss;
 
                 // 泡: 崩れかけた波頭の白波 (沖だけ。視線に沿った水の厚みが薄い水際には出さない)

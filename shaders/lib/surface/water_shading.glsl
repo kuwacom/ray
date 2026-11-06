@@ -64,6 +64,8 @@ const float WHITECAP_WIND1 = 10.0;
 const int WATER_EXIT_STEPS = 12;
 // 波頭の透過光 (太陽へ向かって見た時に薄い波頭を抜けた光が水の散乱色で光る, Sea of Thieves 2018)
 const float WATER_CREST_SSS = 0.04;
+const vec2 WATER_CREST_GRAZE = vec2(0.05, 0.35); // 平均水面と視線の cos がこの範囲で透過光を 1 -> 0 へ (低く見た時だけ)
+const float WATER_CREST_HEIGHT = 0.3;          // 透過光が最大になる波頭の高さの下限 (ブロック)。波の小さい湖は波頭が低いので弱い
 // 屈折先が水面よりこれ以上高ければ水の外 (岸のブロックの水面から出た部分)
 const float WATER_REFRACT_SURFACE_EPS = 0.02;
 const int WATER_REFRACT_RETRY = 3;             // 水の外を指した屈折を手前へ半分ずつ寄せ直す回数
