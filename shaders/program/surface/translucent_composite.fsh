@@ -254,9 +254,10 @@ void main() {
         if (!below) {
             // 太陽・灯りの照り返しの粗さ: 表した波の斜面は法線が受け持つので、光学的に滑らかな水に、画素より細かい波と画素の中・露光の間の法線の揺れを足す
             // 側面 (滝) は落ちる水の乱れに任せ、幅のある淡いつやを残す
-            float sunAlpha = side ? sqrt(sqr(WATER_ROUGHNESS) + unresolvedVar)
+            float lightAlpha = side ? sqrt(sqr(WATER_ROUGHNESS) + unresolvedVar)
                 : sqrt(sqr(WATER_SUN_ROUGHNESS) + unresolvedVar + waterPixelSlopeVar(sea, footprint));
-            // 上向きの面だけ: 長い 3 層の高さと Jacobian (波頭の透過光・泡・きらめきを寄せる波頭)。視差の位置ずれは長い波では画素未満
+            float sunAlpha = lightAlpha;
+            // 上向きの面だけ: 長い 3 層の高さと Jacobian (波頭の透過光・泡・さざ波の強さのむら)。視差の位置ずれは長い波では画素未満
             bool top = N.y > 0.5;
             vec3 surfWorld = surfPlayer + cameraPosition;
             vec4 waves = vec4(0.0);
@@ -267,11 +268,13 @@ void main() {
 #ifdef WATER_GLITTER
             // 日陰・雲の影では光源が映らないので探さない
             if (top && maxOf(sunSpecVis) > 0.0) {
+                // 太陽 (月) の照り返しの粗さだけに、場所ごとのさざ波の強さのむらを掛ける (灯りの照り返しと反射の向きは一様のまま)
+                float ripple = waterGlintPatch(vec3(sea.amp[0], sea.amp[1], sea.amp[2]), vec2(sea.amp[GLINT_SHORT_FIRST], sea.amp[GLINT_SHORT_FIRST + 1]),
+                    surfWorld.xz, footprint, waves.x);
+                sunAlpha = sqrt(sqr(lightAlpha) + (ripple - 1.0) * unresolvedVar);
                 vec2 glintPos = screenToPlayer(vec3(removeTaaJitter(texcoord), d0)).xz + cameraPosition.xz;
-                glitter = waterGlitter(glintPos, N, V, unshadowedSun().direction, sqr(sunAlpha), unresolved,
-                    dist * 2.0 / (gbufferProjection[1][1] * viewSize().y), NoVGeo,
-                    waterGlintCrest(vec3(sea.amp[0], sea.amp[1], sea.amp[2]), vec2(sea.amp[GLINT_CREST_SHORT_FIRST], sea.amp[GLINT_CREST_SHORT_FIRST + 1]),
-                        surfWorld.xz, footprint, waves.x));
+                glitter = waterGlitter(glintPos, N, V, unshadowedSun().direction, sqr(sunAlpha), unresolved * ripple,
+                    dist * 2.0 / (gbufferProjection[1][1] * viewSize().y), NoVGeo);
                 /*
                  * 念のための保護: 倍率が有限でない画素は滑らかなローブに戻す (鏡面の上限の min が NaN を円盤の明るさに置き換えるため)
                  * isnan / isinf は最適化で消えることがあるので、指数のビットで調べる
@@ -279,7 +282,7 @@ void main() {
                 if (!waterGlintFinite(glitter)) glitter = 1.0;
             }
 #endif
-            vec3 spec = refl * F + sunSpecular(N, V, WATER_F0, sunAlpha, sunSpecVis, glitter) + localLightSpecular(WL, N, V, WATER_F0, sunAlpha);
+            vec3 spec = refl * F + sunSpecular(N, V, WATER_F0, sunAlpha, sunSpecVis, glitter) + localLightSpecular(WL, N, V, WATER_F0, lightAlpha);
             color = behind * (1.0 - F) + spec;
             sparkleLum += luminance(sparkleExcess(spec, getExposure()));
 

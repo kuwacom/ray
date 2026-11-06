@@ -26,14 +26,14 @@
  *   の位相の速さで流す。寿命はセルの大きさの波の周期の半分 (TAA が積分できる GLINT_MIN_FRAMES より短くしない)。
  *   半周期ずらした 2 組を、立ち上がりの短い台形で交互に光らせる (和は常に 1)
  * - 密度: ワールドの面積あたりで決まり、画素の大きさによらない。画素の中に数が多い所だけ滑らかな平均へ移す
- * - 波頭: 点の数を波頭の重み (waterGlintCrest) で寄せ、1 つの明るさは寄せた密度で割る (照り返しの平均は変えない)
+ * - むら: 粗さへ回した波の強さは場所ごとに違う (waterGlintPatch)。凪いだ所は細いローブのまま波の面が白く光り、粗い所に点が集まる
  * - 画素へは、標本の位置 (TAA のジッター込み) から半径 GLINT_RADIUS 画素の中の点を集める。TAA が画素の中の位置を積分する
  * 1 つのセルに置く点は 1 組 1 つまでなので、点の多い所は明るい点から順に置き、残りの暗い点の分は滑らかな平均として足す
  */
 /*
  * ガウス曲率の絶対値の平均 / 曲率の 2 乗の和。一様な正規分布の面の理論の目安は 0.5 だが、それでは 2-10 m 先の道が白い点の
  * 砂目で埋まり、0.15 でも露出後 10 前後の暗い点が一面に散って灰色のざらつきになった。実際の表面張力波は風の息で場所ごとに
- * 途切れ、点が局所に偏る (波頭へ寄せる分は GLINT_CREST_SHORT)。実写の海の白く飛んだ点の数 (いちばん密な所で 100x100 画素に
+ * 途切れ、点が局所に偏る (偏りは waterGlintPatch)。実写の海の白く飛んだ点の数 (いちばん密な所で 100x100 画素に
  * 10-105 個、中央 34 個) に合わせた値
  */
 const float GLINT_CURVATURE = 0.03;
@@ -43,17 +43,23 @@ const float GLINT_CURVATURE = 0.03;
  * なった。数を増やすと 1 つは暗く小さくなり、表した波の斜面 (細くしたローブ) に沿って並ぶ。照り返しの平均は変えない
  */
 const float GLINT_NEAR_DENSITY = 5.0;
-const float GLINT_CREST = 0.5;              // 長い波の波頭へ寄せる強さ (表面張力波は長い波の波頭付近に集まる)
-const float GLINT_CREST_MEAN = 0.18;        // 波頭の重み smoothstep(0, 2 sigma, h) の、正規分布の高さでの平均 (寄せても平均を変えない)
+const int GLINT_SHORT_FIRST = 3;            // 画面で波と分かる短い層 (0.93 / 0.32 ブロック) の最初の番号 (この層と次の層の 2 つ)
 /*
- * 画面で波と分かる短い層 (0.93 / 0.32 ブロック) の波頭へ寄せる強さ。表面張力波は短い重力波の波頭の前の面に乗る (寄生さざ波) ので、
- * 2-5 m 先の点は細かい波の稜線に沿って並ぶ。重みは smoothstep(0, 2 sigma, h)^2 を平均で割ったもの (谷では 1 - 強さ まで減る)
- * 0.85 では谷の 6 割の面積が 0.2 倍以下になり、点の詰まった道の芯が白い板と暗い谷の斑に割れた
+ * 場所ごとのさざ波の強さのむら (waterGlintPatch)。倍率は対数正規で、GLINT_PATCH_SIGMA はその対数の標準偏差
+ * 重みは元にする量の割合 (長い 3 層の高さ / 短い 2 層の高さ / 風の息の値ノイズ)。2 乗の和で割って使う
+ * 波の高さだけでは、むらが波テクスチャのタイルの繰り返しに沿って並ぶので、風下へ流れる値ノイズ (風の息) を混ぜる
  */
-const float GLINT_CREST_SHORT = 0.45;
-const int GLINT_CREST_SHORT_FIRST = 3;      // 短い層の最初の番号 (この層と次の層の 2 つ)
-const float GLINT_CREST_SHORT_MEAN = 0.119; // smoothstep(0, 2 sigma, h)^2 の正規分布の高さでの平均 (波テクスチャの高さでも 0.119)
-const float GLINT_CREST_MAX = 4.0;          // 2 つの波頭の重みの積の上限 (1 つの波頭に点が固まって板にならない)
+const float GLINT_PATCH_SIGMA = 1.2;
+const float GLINT_PATCH_LONG = 0.4;
+const float GLINT_PATCH_SHORT = 0.5;
+const float GLINT_PATCH_GUST = 0.3;
+const float GLINT_PATCH_NORM = inversesqrt(GLINT_PATCH_LONG * GLINT_PATCH_LONG + GLINT_PATCH_SHORT * GLINT_PATCH_SHORT
+    + GLINT_PATCH_GUST * GLINT_PATCH_GUST);
+const float GLINT_GUST_SIZE = 4.0;          // 風の息の大きさ (ブロック)
+const float GLINT_GUST_DRIFT = 1.5;         // 風の息が風下へ流れる速さ (ブロック/秒)
+const float GLINT_GUST_RATE = 0.08;         // 風の息の形が変わる速さ (1/秒)
+const float GLINT_GUST_SIGMA = 0.185;       // 値ノイズ (valueNoise3d) の標準偏差
+const float GLINT_PATCH_MAX = 8.0;          // 倍率の上限 (正規分布の 3 sigma の先。1 つの粗い所が道の外まで広がらない)
 const float GLINT_WEIGHT_MIN = 1e-4;        // 曲率の裾の一様乱数の下限 (1 つの点は平均の 50 倍まで)
 const float GLINT_RADIUS = 0.75;            // 点を画素へ配る半径 (画素)
 // セルの一辺の下限 (視線方向に伸びた画素)。2 x 2 のセルで、半径と傾けた点の長軸の中を全部探せる大きさ
@@ -125,36 +131,62 @@ float waterGlintFrameStep() { return max(frameData.surfaceParams[3].y, 1.0 / 240
 bool waterGlintFinite(float v) { return (floatBitsToUint(v) & 0x7F800000u) != 0x7F800000u; }
 
 /*
- * 点を寄せる重み (場所の平均 1)。長い 3 層の波頭 crest (0-1) と、画面で表せている短い層の波頭
- * 短い層が表せていない遠くは長い波の重みだけ
+ * 場所ごとのさざ波の強さの倍率 (場所の平均 1)。太陽の照り返しの粗さへ回した細かい波の分散と曲率に掛ける
+ * 実際の水面では、表面張力波の強さは長い波の変調と寄生さざ波で場所ごとに違う。凪いだ所はゆるやかな波の面が太陽をそのまま
+ * 映して波の形のまま白く飛び、さざ波の強い所には点が密に出て隣とつながる。粗さが場所によらず一様だと、照り返しの光が
+ * どこでも同じように薄まり、「広く薄いローブ」か「同じ大きさの孤立した点」のどちらかになっていた
+ * - 長い 3 層の高さ: 短い波は長い波の波頭の側に集まる (数 m-20 m のむら)
+ * - 短い 2 層の高さ: 寄生さざ波は短い重力波の波頭の前の面に乗る (0.3-1 m の、波の筋に沿ったむら)
+ * - 風の息: 突風の当たった所だけさざ波が立つ (数 m の、風下へ流れるむら)
+ * 倍率は exp(s g - s^2 v / 2)。g はそれぞれの高さを標準偏差で割って重みを掛けた和 (分散 v) なので、場所の平均は 1
+ * 画素より細かい層は画素の中で平均されるので、表せている分散の割合で g も v も薄める (表せる層の無い遠くは 1)
+ * ローブは正規化したまま粗さだけを変えるので、照り返しの量は場所の平均で変わらない (平均のローブは芯が尖り裾が長い。
+ * 海面の傾きの分布の尖り (Cox-Munk) と同じ向き)
+ * ampLong / ampShort: 長い 3 層と短い 2 層の傾きの RMS (海の状態の配列を丸ごと渡さず、使う値だけ受ける),
+ * hLong: 長い 3 層の高さ (waterWaveSum の 0-3、表せる割合を掛けた和)
  */
-/*
- * ampLong / amp: 長い 3 層と短い 2 層の傾きの RMS (海の状態の配列を丸ごと渡さず、使う値だけ受ける), hLong: 長い 3 層の高さ
- * (waterWaveSum の 0-3、表せる割合を掛けた和)。波頭の判定はその和の標準偏差で割る (全部の層の RMS で割ると、層を落とした
- * 中景・遠景で判定が低く出て重みの平均が 0.8 に落ち、照り返しが暗くなった)
- */
-float waterGlintCrest(vec3 ampLong, vec2 amp, vec2 p, float footprint, float hLong) {
+float waterGlintPatch(vec3 ampLong, vec2 ampShort, vec2 p, float footprint, float hLong) {
+    float g = 0.0;
+    float v = 0.0;
     float varLong = 0.0;
-    for (int i = 0; i < 3; i++) varLong += sqr(ampLong[i] * waterLayerResolved(i, footprint) * waterLayerTile(i) * WATER_TEX_HEIGHT_SIGMA);
-    float crest = varLong > 0.0 ? smoothstep(0.0, 2.0 * sqrt(varLong), hLong) : GLINT_CREST_MEAN;
-    float w = 1.0 + GLINT_CREST * 2.0 * (crest - GLINT_CREST_MEAN);
+    float varLongAll = 0.0;
+    for (int i = 0; i < 3; i++) {
+        float s2 = sqr(ampLong[i] * waterLayerTile(i) * WATER_TEX_HEIGHT_SIGMA);
+        varLongAll += s2;
+        varLong += s2 * sqr(waterLayerResolved(i, footprint));
+    }
+    if (varLong > 0.0) {
+        float w = GLINT_PATCH_LONG * GLINT_PATCH_NORM * sqrt(varLong / varLongAll);
+        g += w * hLong * inversesqrt(varLong);
+        v += w * w;
+    }
     float t = frameTimeCounter;
     float h = 0.0;
     float var = 0.0;
     float varAll = 0.0;
     for (int k = 0; k < 2; k++) {
-        int i = GLINT_CREST_SHORT_FIRST + k;
+        int i = GLINT_SHORT_FIRST + k;
         float r = waterLayerResolved(i, footprint);
-        float s2 = sqr(amp[k] * waterLayerTile(i) * WATER_TEX_HEIGHT_SIGMA);
+        float s2 = sqr(ampShort[k] * waterLayerTile(i) * WATER_TEX_HEIGHT_SIGMA);
         varAll += s2;
-        if (r > 0.0 && amp[k] > 0.0) {
+        if (r > 0.0 && ampShort[k] > 0.0) {
             var += s2 * r * r;
-            h += waterLayer(p, i, amp[k] * r, t).x;
+            h += waterLayer(p, i, ampShort[k] * r, t).x;
         }
     }
-    if (var <= 0.0 || varAll <= 0.0) return w;
-    float c = smoothstep(0.0, 2.0 * sqrt(var), h);
-    return min(w * (1.0 + GLINT_CREST_SHORT * sqrt(var / varAll) * (c * c / GLINT_CREST_SHORT_MEAN - 1.0)), GLINT_CREST_MAX);
+    if (var > 0.0) {
+        float w = GLINT_PATCH_SHORT * GLINT_PATCH_NORM * sqrt(var / varAll);
+        g += w * h * inversesqrt(var);
+        v += w * w;
+    }
+    // 風の息は、その大きさを波長とする波と同じ割合で画素の中で平均する
+    float gust = GLINT_PATCH_GUST * GLINT_PATCH_NORM * waterTileResolved(GLINT_GUST_SIZE * WATER_BAND_CENTER, footprint);
+    if (gust > 0.0) {
+        vec2 q = p - vec2(cos(WATER_WIND_ANGLE), sin(WATER_WIND_ANGLE)) * (GLINT_GUST_DRIFT * t);
+        g += gust * (valueNoise3d(vec3(q / GLINT_GUST_SIZE, t * GLINT_GUST_RATE)) - 0.5) / GLINT_GUST_SIGMA;
+        v += gust * gust;
+    }
+    return min(exp(GLINT_PATCH_SIGMA * g - 0.5 * sqr(GLINT_PATCH_SIGMA) * v), GLINT_PATCH_MAX);
 }
 
 // (1 - r^2)^2 の重み (r^2 は点の半径を 1 とした距離の 2 乗)
@@ -198,7 +230,7 @@ float glintLevel(vec2 pos, float level, float rho, vec2 axisAlong, vec2 axisAcro
     vec2 drift = vec2(cos(WATER_WIND_ANGLE), sin(WATER_WIND_ANGLE)) * speed;
     float levelFootprint = cell / GLINT_CELL;
     for (int k = 1; k >= 0; k--) {
-        int i = GLINT_CREST_SHORT_FIRST + k;
+        int i = GLINT_SHORT_FIRST + k;
         if (waterLayerResolved(i, levelFootprint) >= 0.5) {
             float a = WATER_WIND_ANGLE + WATER_LAYER_ANGLE[i];
             drift = vec2(cos(a), sin(a)) * waterPhaseSpeed(waterLayerTile(i) / WATER_BAND_CENTER);
@@ -248,9 +280,10 @@ float glintLevel(vec2 pos, float level, float rho, vec2 axisAlong, vec2 axisAcro
  * 太陽 (月) の照り返しのローブに掛ける倍率。ローブのうち粗さへ回した分の割合だけ効かせる (近景は表した波の法線のまま)
  * pos: 標本の位置 (ワールドの水平, TAA のジッター込み), N: 表した波の法線, L: 太陽 (月) の向き, alpha2: 照り返しのローブの alpha^2,
  * unresolved: 粗さへ回した (傾きの分散, 曲率の 2 乗の和), pixelWorld: 水面上の画素の幅 (視線と直交する向き, ブロック),
- * NoVGeo: 平均水面と視線の cos, crestWeight: 波頭へ寄せる重み (waterGlintCrest, 場所の平均 1)
+ * NoVGeo: 平均水面と視線の cos
+ * alpha2 と unresolved には、場所ごとのさざ波の強さのむら (waterGlintPatch) を掛けた値を渡す
  */
-float waterGlitter(vec2 pos, vec3 N, vec3 V, vec3 L, float alpha2, vec2 unresolved, float pixelWorld, float NoVGeo, float crestWeight) {
+float waterGlitter(vec2 pos, vec3 N, vec3 V, vec3 L, float alpha2, vec2 unresolved, float pixelWorld, float NoVGeo) {
     if (alpha2 <= 0.0 || pixelWorld <= 0.0) return 1.0;
     float fraction = saturate(unresolved.x / alpha2);
     if (fraction < GLINT_FRACTION_MIN) return 1.0;
@@ -261,15 +294,13 @@ float waterGlitter(vec2 pos, vec3 N, vec3 V, vec3 L, float alpha2, vec2 unresolv
     float gauss = exp(-x);
     float expected = gauss * sqr(1.0 + x);
     // 点の密度はワールドの面積あたりで決まる (画素の大きさによらない)。近づくと画面の中の数が減り、1 つは明るく大きくなる
-    float rho0 = gauss / (PI * alpha2) * GLINT_CURVATURE * unresolved.y;
+    float rho = gauss / (PI * alpha2) * GLINT_CURVATURE * unresolved.y;
 
     float NoV = max(NoVGeo, 0.02);
     float footprint = pixelWorld / NoV;
-    rho0 *= mix(1.0, GLINT_NEAR_DENSITY, 0.5 * (waterTileResolved(waterCapillaryTile(0), footprint) + waterTileResolved(waterCapillaryTile(1), footprint)));
+    rho *= mix(1.0, GLINT_NEAR_DENSITY, 0.5 * (waterTileResolved(waterCapillaryTile(0), footprint) + waterTileResolved(waterCapillaryTile(1), footprint)));
     float pixelArea = pixelWorld * footprint;
-    // 滑らかな平均へ移すかは波頭へ寄せる前の数で決める (寄せた所だけ平均へ移ると、点の詰まった波頭が白い板になる)
-    float smoothW = smoothstep(GLINT_SMOOTH_LAMBDA.x, GLINT_SMOOTH_LAMBDA.y, rho0 * pixelArea);
-    float rho = rho0 * crestWeight;
+    float smoothW = smoothstep(GLINT_SMOOTH_LAMBDA.x, GLINT_SMOOTH_LAMBDA.y, rho * pixelArea);
     float level = log2(GLINT_CELL * footprint);
     float levelLo = floor(level) + 1.0;
     float g = 1.0;
@@ -298,11 +329,7 @@ float waterGlitter(vec2 pos, vec3 N, vec3 V, vec3 L, float alpha2, vec2 unresolv
     float gaussian = sparse * fraction;
     float points = min(expected, 1.0) + gaussian * max(expected - 1.0, 0.0);
     float tail = (1.0 - gaussian) * max(1.0 - expected, 0.0);
-    /*
-     * g の期待値は画素ごとに 1 (点の数は波頭へ寄せ、1 つの明るさは寄せた密度で割る)。寄せた分を明るさに戻さないのは、
-     * 照り返しのローブは太陽を向いた斜面 (波頭の手前) にあり、波頭の重みと逆に相関するため。戻すとローブの所で重みの平均が
-     * 0.85 に落ち、照り返しが暗くなった。点が詰まって滑らかな平均へ移った所は寄せた形も残らない (道の芯が斑に割れない)
-     */
+    // g の期待値は画素ごとに 1
     return mix(1.0, g * points + tail, fraction);
 }
 
