@@ -62,6 +62,7 @@ const float GLINT_GUST_DRIFT = 1.5;         // 風の息が風下へ流れる速
 const float GLINT_GUST_RATE = 0.08;         // 風の息の形が変わる速さ (1/秒)
 const float GLINT_GUST_SIGMA = 0.185;       // 値ノイズ (valueNoise3d) の標準偏差
 const float GLINT_PATCH_MAX = 8.0;          // 倍率の上限 (正規分布の 3 sigma の先。1 つの粗い所が道の外まで広がらない)
+const float GLINT_PATCH_FLOOR = 0.4;        // 波の面が画素より細かい中景の倍率の下限
 /*
  * 曲率の裾の一様乱数の下限 (1 つの点は平均の 16 倍まで)。裾が長いと、光の多くが少数のとても明るい点に入って丸い大きな塊になり、
  * 残りの点は白に届かず、白く飛ぶ点がまばらになった
@@ -71,12 +72,14 @@ const float GLINT_WEIGHT_MIN = 1e-3;
  * 置く点の割合 (明るい側から)。置かない暗い点の光は置いた点へ寄せる (光の総量は同じ)。理論の数のまま置くと、白に届かない
  * 小さな点が道一面に散って数えきれない粒に見えた。1 組のセルに置き切れない分を平均へ回すと、道の芯がのっぺりした白い板になった
  * - GLINT_PRESENT_MAX: 1 組のセルに点を置く確率の上限 (点の詰まった道の芯でも数えられるほどにする)
- * - GLINT_CONCENTRATE_MAX: 寄せて明るくする倍率の上限。上限で寄せ切れない分は平均 (滑らかな照り返し) になるので、
+ * - 寄せて明るくする倍率の上限: 波の形が画素より細かい中景は GLINT_CONCENTRATE_MAX、波の形が見える近くは GLINT_CONCENTRATE_NEAR
+ *   (近くは寄せ切らない分が波の形の白い面として光る)。上限で寄せ切れない分は平均 (滑らかな照り返し) になるので、
  *   点が画素より細かく詰まる遠くは滑らかなまま
  */
 const float GLINT_KEEP = 0.04;
 const float GLINT_PRESENT_MAX = 0.15;
 const float GLINT_CONCENTRATE_MAX = 8.0;
+const float GLINT_CONCENTRATE_NEAR = 4.0;
 const float GLINT_RADIUS = 0.75;            // 点を画素へ配る半径 (画素)
 // セルの一辺の下限 (視線方向に伸びた画素)。縦は 2 つのセルで半径の中を全部探せる大きさ (横は鎖の長さの分だけ広く探す)
 const float GLINT_CELL = 1.8;
@@ -122,6 +125,7 @@ const float GLINT_MIN_FRAMES = 3.0;
 const float GLINT_FADE = 0.3;
 // 画素の中の点の数がこの範囲で滑らかな平均へ移す
 const vec2 GLINT_SMOOTH_LAMBDA = vec2(4.0, 16.0);
+const float GLINT_SMOOTH_NEAR = 1.0;         // 近くで数える点の割合 (1 で置く前の全部の点)
 /*
  * 点の密度 (1 / ブロック^2) がこれより少ない所は平均のまま (道の外。道の芯の 1-2%)。画素の中の数で切ると、画素の小さい
  * 近くほど道の縁の点が多く消え、距離で道の幅が変わる。低くしすぎると点を探す画素が増えて重くなる (0.05 で +3-5 ms)
@@ -216,7 +220,9 @@ float waterGlintPatch(vec3 ampLong, vec2 ampShort, vec2 p, float footprint, floa
         g += gust * (valueNoise3d(vec3(q / GLINT_GUST_SIZE, t * GLINT_GUST_RATE)) - 0.5) / GLINT_GUST_SIGMA;
         v += gust * gust;
     }
-    return min(exp(GLINT_PATCH_SIGMA * g - 0.5 * sqr(GLINT_PATCH_SIGMA) * v), GLINT_PATCH_MAX);
+    float m = min(exp(GLINT_PATCH_SIGMA * g - 0.5 * sqr(GLINT_PATCH_SIGMA) * v), GLINT_PATCH_MAX);
+    // 最短の層が画素より細かい中景は、凪いだ所の細いローブが波の形を持たずに隣とつながり、道の芯が一面の白い板になるので、凪に下限を付ける
+    return max(m, GLINT_PATCH_FLOOR * (1.0 - waterLayerResolved(GLINT_SHORT_FIRST + 1, footprint)));
 }
 
 // (1 - r^2)^2 の重み (r^2 は点の半径を 1 とした距離の 2 乗)
@@ -372,8 +378,13 @@ float waterGlitter(vec2 pos, vec3 N, vec3 V, vec3 L, float alpha2, vec2 unresolv
     float footprint = pixelWorld / NoV;
     rho *= mix(1.0, GLINT_NEAR_DENSITY, 0.5 * (waterTileResolved(waterCapillaryTile(0), footprint) + waterTileResolved(waterCapillaryTile(1), footprint)));
     float pixelArea = pixelWorld * footprint;
-    // 置いた鎖の子の数で見る
-    float smoothW = smoothstep(GLINT_SMOOTH_LAMBDA.x, GLINT_SMOOTH_LAMBDA.y, rho * pixelArea * GLINT_KEEP * GLINT_CHAIN_MEAN);
+    /*
+     * 波の形が画素に見える近くは、点の詰まった所を滑らかな照り返し (波の形の白い面) にする。波が画素より細かい中景は、
+     * 置いた鎖の子の数で見て点のまま残す (滑らかにすると波の形の無い白い板が道の芯に広がった)
+     */
+    float nearShape = waterLayerResolved(GLINT_SHORT_FIRST + 1, footprint);
+    float smoothDensity = mix(GLINT_KEEP * GLINT_CHAIN_MEAN, GLINT_SMOOTH_NEAR, nearShape);
+    float smoothW = smoothstep(GLINT_SMOOTH_LAMBDA.x, GLINT_SMOOTH_LAMBDA.y, rho * pixelArea * smoothDensity);
     float level = log2(GLINT_CELL * footprint);
     float levelLo = floor(level) + 1.0;
     float g = 1.0;
@@ -388,7 +399,7 @@ float waterGlitter(vec2 pos, vec3 N, vec3 V, vec3 L, float alpha2, vec2 unresolv
         // かすめ角の横の伸び (奥行きが縮む分) と、鎖の長さの半分の上限 (半径の単位)
         float stretchMax = clamp(GLINT_CELL / (2.0 * GLINT_RADIUS * NoV), 1.0, GLINT_STRETCH_MAX);
         float chainHalf = min(GLINT_CHAIN_REACH / NoV, GLINT_CHAIN_HALF_MAX) / GLINT_RADIUS;
-        float concentrateMax = GLINT_CONCENTRATE_MAX;
+        float concentrateMax = mix(GLINT_CONCENTRATE_MAX, GLINT_CONCENTRATE_NEAR, nearShape);
         // どちらの段も期待値は同じなので、混ぜるのは切り替わりの帯だけにし、帯の外は片方の段だけを探す
         float wHi = smoothstep(GLINT_LEVEL_BLEND.x, GLINT_LEVEL_BLEND.y, fract(level));
         float gLo = wHi < 1.0 ? glintLevel(pos, levelLo, rho, axisAlong, axisAcross, kernelArea, chainHalf, stretchMax, concentrateMax) : 0.0;
