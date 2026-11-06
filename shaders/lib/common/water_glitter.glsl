@@ -77,7 +77,7 @@ const float GLINT_WEIGHT_MIN = 1e-3;
  *   点が画素より細かく詰まる遠くは滑らかなまま
  */
 const float GLINT_KEEP = 0.04;
-const float GLINT_PRESENT_MAX = 0.15;
+const float GLINT_PRESENT_MAX = 0.10;
 const float GLINT_CONCENTRATE_MAX = 8.0;
 const float GLINT_CONCENTRATE_NEAR = 4.0;
 const float GLINT_RADIUS = 0.75;            // 点を画素へ配る半径 (画素)
@@ -91,21 +91,29 @@ const float GLINT_CELL = 1.8;
  * - 子の間隔は画素の単位の乱数で、隣とつながる詰まった間隔と、暗い隙間を挟んで並ぶ間隔が混ざる (横長の光と点の列)。
  *   どちらか 1 種だと、全部つながった 1 本の棒か、等間隔の点線になった。鎖の長さはかすめ角ほど長く (1 / NoV)、
  *   明るい点 (曲率の小さい面) ほど子が多い
- * - 子の明るさは乱数で分け、和は 1 つの点と同じ (重みの面積で割るので、伸ばした子も丸の子と同じエネルギー)
+ * - 子の明るさは乱数で分け、和は 1 つの点と同じ (重みの面積で割るので、伸ばした子・大きさを変えた子も丸の子と同じエネルギー)
+ * - 子の明るさ・大きさ・間隔・鎖の向きのばらつきが小さいと、同じ大きさの点が同じ間隔で並ぶ点線になり、隣の鎖と平行に
+ *   並んで雨の筋のように見えた。端の子が白に届かず暗く消える鎖も混ぜて、長さと形をそろえない
+ * - 子ごとに光る時刻を少しずらす (1 本の鎖が一斉に光って一斉に消えない)
+ * - 置いた点のうち特に明るい (曲率が小さく、大きな 1 つの面が太陽を映す) 点は、稜線に割れずに 1 つの点のまま光ることがある
+ *   (GLINT_SINGLE x 置いた点の中での明るさの割合。置いた点の 1-2 割)
  */
 const int GLINT_CHAIN_MAX = 5;              // 鎖の子の数の上限
 const int GLINT_CHAIN_MIN = 2;
 const vec2 GLINT_CHAIN_GAP = vec2(1.0, 1.6); // 隣とつながる間隔の範囲 (画素)
-const vec2 GLINT_CHAIN_GAP_APART = vec2(2.4, 3.2); // 暗い隙間を挟んで並ぶ間隔の範囲 (画素)
-const float GLINT_CHAIN_APART = 0.6;        // 隙間を挟む間隔の割合
+const vec2 GLINT_CHAIN_GAP_APART = vec2(2.0, 4.5); // 暗い隙間を挟んで並ぶ間隔の範囲 (画素)
+const float GLINT_CHAIN_APART = 0.35;       // 隙間を挟む間隔の割合 (残りはつながる間隔)
 const float GLINT_CHAIN_REACH = 3.5;        // 鎖の長さの半分の上限 x NoV (画素)
 const float GLINT_CHAIN_HALF_MAX = 8.0;     // 鎖の長さの半分の上限 (画素。夕日のかすめ角)
 const float GLINT_CHAIN_JITTER = 0.5;       // 子の縦のずれの幅 (画素)
-const float GLINT_CHAIN_WEIGHT_MIN = 0.5;   // 子の明るさの乱数 (0-1) に足す下限 (どの子も消えない)
+const float GLINT_CHAIN_WEIGHT_MIN = 0.15;  // 子の明るさ (0-1 の乱数の 2 乗) に足す下限
+const vec2 GLINT_CHILD_SIZE = vec2(0.7, 1.3); // 子の半径の倍率の乱数の範囲
+const float GLINT_CHILD_PHASE = 0.12;       // 子の光る時刻のずれの幅 (寿命の割合)
 const float GLINT_CHILD_STRETCH = 0.35;     // 子を横に伸ばす割合 (かすめ角の 1 / NoV 倍の伸びに対して)
 const float GLINT_STRETCH_MAX = 8.0;        // 横に伸ばす倍率の上限
 const float GLINT_STRETCH_DIM = 0.8;        // いちばん暗い点の子の数の割合 (明るい点を 1 とした割合)
-const float GLINT_TILT = 0.17;              // 鎖の向きの傾きの乱数の幅 (ラジアン)
+const float GLINT_TILT = 0.3;               // 鎖の向きの傾きの乱数の幅 (ラジアン)
+const float GLINT_SINGLE = 0.55;            // 置いた点の中でいちばん明るい点が 1 つの点のまま光る確率
 const int GLINT_SEARCH_MAX = 5;             // 鎖を探すセルの数の上限 (1 軸)
 /*
  * 傾きの分布の指数 x の上限。ここで exp(-x) は 1e-13 で、点も重みも無いのと同じ。上限が無いと exp(-x) x (1 + x)^2 の
@@ -229,15 +237,23 @@ float waterGlintPatch(vec3 ampLong, vec2 ampShort, vec2 p, float footprint, floa
 float glintKernel(float r2) { return r2 < 1.0 ? sqr(1.0 - r2) : 0.0; }
 
 /*
+ * 寿命の中の時刻 age (0-1) の明滅。三角波を立ち上がり GLINT_FADE の台形にする (半周期ずらした 2 組の三角波の和は 1 なので、
+ * 台形の和も 1)。寿命の両端の (1 - GLINT_FADE) / 4 ずつは消えている
+ */
+float glintEnvelope(float age) { return saturate((0.5 - abs(2.0 * age - 1.0)) / GLINT_FADE + 0.5); }
+
+/*
  * 1 つの点 (鎖) の重み。子の明るさの和で割るので、面積は丸い点 1 つと同じ
  * m: 標本から点までの差 (x = 視線の向き, y = 横) を半径の単位にしたもの, chainHalf: 鎖の長さの半分の上限 (半径の単位),
- * stretchMax: かすめ角の横の伸びの倍率, bright: 0-1 (明るい点ほど 1), seed: 点ごとの乱数の種
+ * stretchMax: かすめ角の横の伸びの倍率, bright: 0-1 (明るい点ほど 1), seed: 点ごとの乱数の種, age: 寿命の中の時刻 (0-1),
+ * peak: 置いた点の中での明るさの割合 (いちばん明るい点で 1)
  */
-float glintChain(vec2 m, float chainHalf, float stretchMax, float bright, uvec3 seed) {
+float glintChain(vec2 m, float chainHalf, float stretchMax, float bright, uvec3 seed, float age, float peak) {
     vec3 hs = hash3(seed);
     vec3 hg = hash3(seed ^ uvec3(0x68E31DA4u, 0xB5297A4Du, 0x1B56C4E9u));
     int n = clamp(int(float(GLINT_CHAIN_MIN) + float(GLINT_CHAIN_MAX + 1 - GLINT_CHAIN_MIN) * hs.x * mix(GLINT_STRETCH_DIM, 1.0, bright)),
         GLINT_CHAIN_MIN, GLINT_CHAIN_MAX);
+    if (hs.z < GLINT_SINGLE * peak) n = 1;
     // 間隔は 2 種: 隣とつながる詰まった間隔と、暗い隙間を挟む間隔 (乱数 u の GLINT_CHAIN_APART より下を隙間の側に使う)
     vec4 u = vec4(hg, fract(hg.x * 7.31 + hg.y * 3.17));
     bvec4 apart = lessThan(u, vec4(GLINT_CHAIN_APART));
@@ -264,10 +280,13 @@ float glintChain(vec2 m, float chainHalf, float stretchMax, float bright, uvec3 
         if (j >= n) break;
         if (j > 0) o += gaps[j - 1];
         vec3 hc = hash3(seed ^ uvec3(uint(j + 1) * 0x9E3779B1u, uint(j + 1) * 0x85EBCA77u, 0xC2B2AE3Du));
-        float e = GLINT_CHAIN_WEIGHT_MIN + hc.x;
+        float e = GLINT_CHAIN_WEIGHT_MIN + sqr(hc.x);
         float s = 1.0 + (stretchMax - 1.0) * GLINT_CHILD_STRETCH * hc.y;
-        vec2 p = m - dir * o - side * ((hc.z - 0.5) * GLINT_CHAIN_JITTER / GLINT_RADIUS);
-        sumK += e * glintKernel(sqr(dot(p, side)) + sqr(dot(p, dir) / s)) / s;
+        float r = mix(GLINT_CHILD_SIZE.x, GLINT_CHILD_SIZE.y, fract(hc.x * 13.17 + hc.y * 5.71));
+        float shift = (fract(hc.z * 11.3 + hc.y * 2.9) - 0.5) * 2.0 * GLINT_CHILD_PHASE;
+        vec2 p = (m - dir * o - side * ((hc.z - 0.5) * GLINT_CHAIN_JITTER / GLINT_RADIUS)) / r;
+        // 半径 r 倍の核は面積が r^2 倍なので割る。光る時刻をずらしても、寿命の中の光の量は同じ
+        sumK += e * glintEnvelope(age + shift) * glintKernel(sqr(dot(p, side)) + sqr(dot(p, dir) / s)) / (s * r * r);
         sumE += e;
     }
     return sumK / sumE;
@@ -315,8 +334,8 @@ float glintLevel(vec2 pos, float level, float rho, vec2 axisAlong, vec2 axisAcro
      * 鎖の届く範囲 (半径の単位): 横は鎖の半分の長さと子の伸び、縦は 1 つの半径と鎖の傾き・子の縦のずれ
      * その範囲を囲むセルを探す (鎖の向きはワールドの格子と揃わないので、範囲に掛からないセルは乱数を引く前に外す)
      */
-    float reachAcross = chainHalf + 1.0 + (stretchMax - 1.0) * GLINT_CHILD_STRETCH;
-    float reachAlong = 1.0 + chainHalf * GLINT_TILT + 0.5 * GLINT_CHAIN_JITTER / GLINT_RADIUS;
+    float reachAcross = chainHalf + GLINT_CHILD_SIZE.y * (1.0 + (stretchMax - 1.0) * GLINT_CHILD_STRETCH);
+    float reachAlong = GLINT_CHILD_SIZE.y + chainHalf * GLINT_TILT + 0.5 * GLINT_CHAIN_JITTER / GLINT_RADIUS;
     vec2 ext = abs(axisAlong) * (reachAlong / dot(axisAlong, axisAlong)) + abs(axisAcross) * (reachAcross / dot(axisAcross, axisAcross));
     ivec2 lo = ivec2(floor((q - ext) / cell));
     ivec2 hi = min(ivec2(floor((q + ext) / cell)), lo + (GLINT_SEARCH_MAX - 1));
@@ -334,11 +353,9 @@ float glintLevel(vec2 pos, float level, float rho, vec2 axisAlong, vec2 axisAcro
             float phase = hash1(uc.x * 0x9E3779B1u ^ uc.y * 0x85EBCA77u ^ levelTag * 0xC2B2AE3Du);
             for (int s = 0; s < 2; s++) {
                 float ts = t / life + phase + 0.5 * float(s);
-                // 三角波を立ち上がり GLINT_FADE の台形にする (2 組の三角波の和は 1 なので、台形の和も 1)
-                // 消えている組 (寿命の 35%) は乱数と形を求めない
-                float tri = 1.0 - abs(2.0 * fract(ts) - 1.0);
-                float envelope = saturate((tri - 0.5) / GLINT_FADE + 0.5);
-                if (envelope <= 0.0) continue;
+                // どの子も消えている組 (寿命の両端) は乱数と形を求めない。子の時刻のずれは寿命の中に収まる
+                float age = fract(ts);
+                if (abs(2.0 * age - 1.0) >= 0.5 + 0.5 * GLINT_FADE + 2.0 * GLINT_CHILD_PHASE) continue;
                 uint slot = uint(int(floor(ts))) * 512u + levelTag * 2u + uint(s);
                 vec3 h = hash3(uvec3(uc, slot));
                 if (h.x >= present) continue;
@@ -346,8 +363,8 @@ float glintLevel(vec2 pos, float level, float rho, vec2 axisAlong, vec2 axisAcro
                 vec2 m = vec2(dot(d, axisAlong), dot(d, axisAcross));
                 if (abs(m.x) >= reachAlong || abs(m.y) >= reachAcross) continue;
                 float v = mix(GLINT_WEIGHT_MIN, vMax, h.x / present);
-                float shape = glintChain(m, chainHalf, stretchMax, 1.0 - sqrt(v), uvec3(uc, slot ^ 0xA511E9B3u));
-                sum += envelope * inversesqrt(v) * shape;
+                sum += inversesqrt(v) * glintChain(m, chainHalf, stretchMax, 1.0 - sqrt(v), uvec3(uc, slot ^ 0xA511E9B3u), age,
+                    sqrt(GLINT_WEIGHT_MIN / v));
             }
         }
     }
