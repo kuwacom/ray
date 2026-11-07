@@ -220,8 +220,13 @@ void main() {
 #endif
 
 #if defined GBUF_ENTITIES_TRANSLUCENT && defined WATER_SELF_REFRACTION
-    // 水の中の自分は composite1 (water_trace.fsh) が屈折した視線を自分の三角形に当てて描くので、ここでは描かない (二重の像になる)
-    if (entityId == ENTITY_CURRENT_PLAYER && isEyeInWater == 0 && waterSelfDepth(playerPos) > 0.0) discard;
+    /*
+     * 水の中の自分は composite1 (water_trace.fsh) が屈折した視線を自分の三角形に当てて描くので、ここでは描かない (二重の像になる)
+     * カメラが水の中の時は逆に、水面より上の体を水面越しに描く (ここで描くと水面の手前に貼り付き、水の中の色と霧が掛かる)
+     */
+    if (entityId == ENTITY_CURRENT_PLAYER) {
+        if (isEyeInWater == 0 ? waterSelfDepth(playerPos) > 0.0 : isEyeInWater == 1 && waterSelfHeight(playerPos) > 0.0) discard;
+    }
 #endif
 
     vec3 color = forwardDiffuse(m, playerPos, geoNormal, geoNormal, V, dither);

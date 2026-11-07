@@ -302,24 +302,43 @@ void main() {
      * 水に入った自分 (lib/surface/water_self.glsl): 屈折した視線を、影のパスで毎フレーム持っている自分の三角形に当てる
      * 自分の水の中の画素は gbuffers_entities_translucent が捨てるので、ここで水底の代わりに描く。色は三角形ごとの平均のアルベドを
      * 当たった点で照らしたもの (水の中の太陽の影・コースティクス・空)。体を描かない一人称では当てない
+     * カメラが水の中の時は、水面の上へ屈折した視線を水面より上の体 (半透明の層が捨てた所) に当てる。全反射の画素は
+     * 反射した視線を水の中の体に当て、鏡面の映り込み (colortex20) に重ねる (画面の像に体が無く、SSR では映らない)
      */
-    if (!below && refracts && !firstPersonCamera) {
+    #if REFLECTIONS > 0
+    bool selfMirror = below && !refracts;
+    #else
+    const bool selfMirror = false;
+    #endif
+    vec3 selfColor = vec3(0.0);
+    float selfT = -1.0;
+    if ((refracts || selfMirror) && !firstPersonCamera) {
+        vec3 selfDir = selfMirror ? reflect(-V, N) : refrDir;
         vec3 eye = getEyePlayerPos();
-        vec3 boxT0 = (eye + WATER_SELF_BOX_LO - surfPlayer) / refrDir;
-        vec3 boxT1 = (eye + WATER_SELF_BOX_HI - surfPlayer) / refrDir;
-        float reach = min(pathLen, WATER_SELF_TRACE_MAX);
+        vec3 boxT0 = (eye + WATER_SELF_BOX_LO - surfPlayer) / selfDir;
+        vec3 boxT1 = (eye + WATER_SELF_BOX_HI - surfPlayer) / selfDir;
+        float reach = selfMirror ? WATER_SELF_TRACE_MAX : min(pathLen, WATER_SELF_TRACE_MAX);
         if (max(maxOf(min(boxT0, boxT1)), 0.0) <= min(minOf(max(boxT0, boxT1)), reach)) {
             float tHit;
-            uint tri = traceEntityTrianglesClosest(playerToVoxel(surfPlayer), refrDir, 0.0, reach, 0, tHit);
-            vec3 hitPlayer = surfPlayer + refrDir * tHit;
-            // 半透明の層が捨てた所だけ描く (同じ判定。捨てずに残した体と二重にならない)
-            if (tri != ENTITY_TRI_NONE && waterSelfDepth(hitPlayer) > 0.0) {
+            uint tri = traceEntityTrianglesClosest(playerToVoxel(surfPlayer), selfDir, 0.0, reach, 0, tHit);
+            vec3 hitPlayer = surfPlayer + selfDir * tHit;
+            /*
+             * 半透明の層が捨てた所だけ描く (同じ判定。捨てずに残した体と二重にならない)
+             * 全反射は水面から下へ戻った視線なので、当たるのは水の中の体だけ (判定は要らない)
+             */
+            bool drawn = selfMirror || (below ? waterSelfHeight(hitPlayer) > 0.0 : waterSelfDepth(hitPlayer) > 0.0);
+            if (tri != ENTITY_TRI_NONE && drawn) {
                 vec3 n = entityTriNormal(tri);
-                behind = shadeSecondaryHit(hitPlayer, dot(n, refrDir) > 0.0 ? -n : n, entityTriAlbedo(tri), lmT.y);
-                behindExcess = 0.0;
-                pathLen = tHit;
+                selfColor = shadeSecondaryHit(hitPlayer, dot(n, selfDir) > 0.0 ? -n : n, entityTriAlbedo(tri), lmT.y);
+                selfT = tHit;
             }
         }
+    }
+    if (selfT >= 0.0 && !selfMirror) {
+        behind = selfColor;
+        behindExcess = 0.0;
+        // 水の中から見上げた時の経路長は合成で使わない (水の中の霧は sky のフォグが水面まで掛ける)
+        pathLen = selfT;
     }
 #endif
     outRefraction = vec4(behind, pathLen);
@@ -349,6 +368,13 @@ void main() {
         if (!below && !side) R0.y = abs(R0.y);
         vec4 hit = traceReflectionHit(surfView, surfPlayer, N, R0, dist, mirrorTraceDistance(), false, !below && !side, dither);
         if (hit.w > 0.5) outMirror = vec4(reflectionHitRadiance(hit.xy), 1.0) * (hit.z * mirrorW);
+    #ifdef WATER_SELF_REFRACTION
+        // 水面の裏に映る自分。SSR の当たりが体より手前ならそちら (体と水面の間の壁)
+        if (selfT >= 0.0 && selfMirror) {
+            bool nearer = hit.w < 0.5 || distance(screenToPlayer(vec3(hit.xy, texture(depthtex1, hit.xy).r)), surfPlayer) > selfT;
+            if (nearer) outMirror = vec4(selfColor, 1.0);
+        }
+    #endif
     }
 #endif
 }

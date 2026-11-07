@@ -15,6 +15,8 @@ const float WATER_SELF_SURFACE = 8.0 / 9.0;
 // 水面を探して上へ辿るセルの数。これより深い所は辿った分の深さとみなす (吸収はそこで飽和している)
 // 自分の三角形を辿る長さ (WATER_SELF_TRACE_MAX) より深くまで水の中と判定できる数にする
 const int WATER_SELF_SEARCH = 6;
+// 水面を探して下へ辿るセルの数 (水面より上の体)。立った体の高さ (1.8) と跳んだ分が入る数
+const int WATER_SELF_ABOVE_SEARCH = 3;
 // 目からこれより下を足の側とみなす。足のあるセルだけは水でないブロック (水の入ったハーフブロック・階段) でも上の水を探す
 const float WATER_SELF_FEET_BELOW_EYE = 1.0;
 // 視線の上向きの cos の下限 (かすめ角で水の中の長さが無限にならない)
@@ -58,6 +60,30 @@ float waterSelfDepth(vec3 playerPos) {
     }
     if (top < 0 || flowing) return -1.0;
     return float(cell.y + top) + WATER_SELF_SURFACE - v.y;
+}
+
+/*
+ * 水面からの高さ (ブロック)。真下に辿った空気の先が水源の水面でなければ負
+ * カメラが水の中の時、水面より上の体は水面越し (スネルの窓の屈折) に見えるはずなので、半透明の層で捨てて composite1 が描く
+ * 水の中のセルの上の端 (水面と上のセルの間) と、その上の空気のセルだけを対象にする。足場のブロック・流れる水の上は対象外
+ */
+float waterSelfHeight(vec3 playerPos) {
+    if (isRiding) return -1.0;
+    vec3 v = playerToVoxel(playerPos);
+    ivec3 cell = ivec3(floor(v));
+    for (int k = 0; k <= WATER_SELF_ABOVE_SEARCH; k++) {
+        ivec3 c = cell - ivec3(0, k, 0);
+        if (!isInVoxelVolume(c)) break;
+        uint data = fetchVoxelBlockData(c);
+        int id = unpackVoxelBlockId(data);
+        if (id == BLOCK_WATER || id == BLOCK_UNDERWATER_PLANT) {
+            // 上に水のある水のセルはボクセルで空気なので、水のセルが見つかればそれが一番上
+            if ((data >> 12u) == VOXEL_WATER_FLOWING) return -1.0;
+            return v.y - (float(c.y) + WATER_SELF_SURFACE);
+        }
+        if (id != BLOCK_AIR) break;
+    }
+    return -1.0;
 }
 
 #endif
