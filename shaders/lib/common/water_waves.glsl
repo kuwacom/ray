@@ -126,6 +126,10 @@ const int WATER_MEDIUM_SLOT = 4;
 vec3 waterAbsorption() { return frameData.surfaceParams[WATER_MEDIUM_SLOT].rgb; }
 vec3 waterScattering() { return frameData.surfaceParams[WATER_MEDIUM_SLOT + 1].rgb; }
 vec3 waterExtinction() { return waterAbsorption() + waterScattering(); }
+const float WATER_MULTI_SCATTER = 2.0;         // 水の内散乱の多重散乱分の持ち上げ
+// 上から見た水の内散乱は、水面から入った光が視線側 (上) へ戻る後方散乱だけ。海の粒子の位相関数は前方に強く尖っていて
+// 後方散乱は散乱全体の数 % しかないので、等方散乱のままだと深い所が暗い紺にならず明るい水色に浮く
+const float WATER_BACKSCATTER = 0.08;
 float waterChoppiness() { return frameData.surfaceParams[WATER_MEDIUM_SLOT].a; }
 float waterReflectScatter() { return frameData.surfaceParams[WATER_MEDIUM_SLOT + 1].a; }
 

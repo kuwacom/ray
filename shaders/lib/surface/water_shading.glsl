@@ -38,10 +38,6 @@ const float WATER_SKY_PATH = 64.0;             // 屈折先が空 (描画距離�
 const float WATER_F0 = 0.02;                   // 水の垂直入射の反射率
 const float WATER_ROUGHNESS = 0.02;            // 側面の水の太陽の鏡面の alpha
 const float WATER_SUN_ROUGHNESS = MIN_ROUGHNESS; // 上面の水は表面張力波より細かい所では光学的に滑らか
-const float WATER_MULTI_SCATTER = 2.0;         // 内散乱の多重散乱分の持ち上げ
-// 上から見た水の内散乱は、水面から入った光が視線側 (上) へ戻る後方散乱だけ。海の粒子の位相関数は前方に強く尖っていて
-// 後方散乱は散乱全体の数 % しかないので、等方散乱のままだと深い所が暗い紺にならず明るい水色に浮く
-const float WATER_BACKSCATTER = 0.08;
 /*
  * 水際の水面の白い表現は要らないので岸の泡は出さず、水の厚みが薄い帯では白波も出さない
  * 厚みは「視線に沿った水の厚み」で測る。鉛直の水深で測ると、岸のブロックの側面 (水深 0 から下へ続く壁) が

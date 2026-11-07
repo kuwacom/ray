@@ -17,6 +17,7 @@
 //@include "/lib/sky/sky.glsl"
 //@include "/lib/light/light.glsl"
 //@include "/lib/surface/surface_lights.glsl"
+//@include "/lib/surface/water_self.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -94,6 +95,7 @@
 #include "/lib/light/blocklight.glsl"
 #include "/lib/light/light.glsl"
 #include "/lib/surface/surface_lights.glsl"
+#include "/lib/surface/water_self.glsl"
 // END GENERATED includes
 
 in vec2 texcoord;
@@ -223,6 +225,25 @@ void main() {
     // G バッファ経路 (solid.fsh の estimateEmission) と同じく、発光エンティティは明るい画素だけ光らせる
     if (materialId == MAT_EMISSIVE_ENTITY) {
         color += m.albedo * smoothstep(0.55, 0.9, maxOf(albedo.rgb)) * getVisibleEmissionLuminance() * EMISSION_STRENGTH;
+    }
+#endif
+#ifdef GBUF_ENTITIES_TRANSLUCENT
+    /*
+     * 水に入った自分 (lib/surface/water_self.glsl): カメラが水の上なら、水面より下の画素に水の吸収と内散乱を掛ける (屈折は付かない)
+     * 視線に沿った水の中の長さは、水面からの深さを視線の上向きの cos で割った長さ。内散乱は composite2 の深い水と同じ式で、
+     * 水面の照度は空と、影を掛けない太陽 (月) の上向きの面への照度 (前方シェーディングをもう 1 回呼ぶとプログラムが 1.5 倍に膨らむ)
+     */
+    if (entityId == ENTITY_CURRENT_PLAYER && isEyeInWater == 0) {
+        float below = waterSelfDepth(playerPos);
+        if (below > 0.0) {
+            vec3 T = exp(-waterExtinction() * (below / max(V.y, WATER_SELF_MIN_COS)));
+            SurfacePoint sp = surfacePoint(playerPos, vec3(0.0, 1.0, 0.0));
+            sp.lightmap = lmcoord;
+            SurfaceLights SL = gatherSurfaceLights(sp, SL_SUN_NONE, SL_BLOCK_NONE, SL_SKY | SL_CELESTIAL);
+            vec3 E = SL.sky + SL.celestial.irradiance * saturate(SL.celestial.direction.y);
+            vec3 inscatter = E * waterScattering() / waterExtinction() * ((0.25 * RCP_PI) * WATER_MULTI_SCATTER * WATER_BACKSCATTER);
+            color = color * T + inscatter * (1.0 - T);
+        }
     }
 #endif
     int tintIndex = 0;
