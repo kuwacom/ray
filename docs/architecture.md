@@ -128,7 +128,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 - Iris は同じパスの compute (composite1_a) を fragment (composite1) の前に走らせる。VL の有効条件は `program.<world>/composite1_a.enabled` で、composite1 の fragment (水の光線を辿る処理) は止まらない
 - ネザー・エンドは大気 LUT と雲のパスを外す (shaders.properties)。shadow パスはボクセル化のため全ディメンションで回す
 - `particles.ordering = mixed`: 不透明パーティクルは G バッファ (gbuffers_particles)、半透明は前方 (gbuffers_particles_translucent)
-- DH (Distant Horizons) は未対応 (dh_* プログラムなし)。DH の水 (dh_water) を足す時の入口は `lib/common/water_lod.glsl` の `waterLod`: DH の深度から求めた距離と視線の cos を渡し (1 画素の角度は dhProjection も同じ画角なので `waterPixelAngle()` のまま)、返った `WaterLod` で `getWaterNormal` と合成 (composite2) の粗さ・フレネル・鏡の重みを決める。描画距離の先も遠い層 (`farAmp`) が残るので鏡にはならない。遠景を軽くする段 (層を読まない・視差なし・鏡の SSR を辿らない) とその移り変わりも、waterLod に足して決める。波頭・泡・WATER_GLITTER のむらの高さの読みは `heights` を 0 にすると止まる
+- DH (Distant Horizons) は未対応 (dh_* プログラムなし)。DH の水 (dh_water) を足す時の入口は `lib/common/water_lod.glsl` の `waterLod`: DH の深度から求めた距離と視線の cos を渡し (1 画素の角度は dhProjection も同じ画角なので `waterPixelAngle()` のまま)、返った `WaterLod` で `getWaterNormal` と合成 (composite2) の粗さ・フレネル・鏡の重みを決める。描画距離の先も遠い層 (`farAmp`) が残るので鏡にはならない。遠景を軽くする段 (層を読まない・視差なし・鏡の SSR を辿らない) とその移り変わりも、waterLod に足して決める。層 0-4 を読まない段でも遠い層 (`WaterLod.farAmp`) は残す (止めると鏡に戻る。読むのは遠い層の 2 本、移り変わりで 3 本だけ)。波頭・泡・WATER_GLITTER のむらの高さの読みは `heights` を 0 にすると止まる
 
 ---
 
