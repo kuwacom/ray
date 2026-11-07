@@ -282,6 +282,7 @@ BLOCK_CONSTS: list[tuple] = [
     ("const", 0, "BLOCK_SLIME", 204, "", True),
     ("const", 0, "BLOCK_HONEY", 205, "", True),
     ("const", 0, "BLOCK_TINTED_GLASS", 206, "", True),
+    ("const", 42, "BLOCK_WATER_FLOWING", 207, "上面が水源より低い流れる水。頂点で BLOCK_WATER に戻し、ボクセルには印だけ残す", True),
     ("const", 42, "BLOCK_STAINED_GLASS", 210, "210-225 (white, orange, magenta, light_blue, yellow, lime, pink, gray, light_gray, cyan, purple, blue, brown, green, red, black)", True),
     ("const", 42, "BLOCK_STAINED_GLASS_PANE", 230, "230-245 (同順)", True),
     ("raw", ""),

@@ -49,6 +49,7 @@ const int BLOCK_GLASS_PANE = 203;
 const int BLOCK_SLIME = 204;
 const int BLOCK_HONEY = 205;
 const int BLOCK_TINTED_GLASS = 206;
+const int BLOCK_WATER_FLOWING = 207;      // 上面が水源より低い流れる水。頂点で BLOCK_WATER に戻し、ボクセルには印だけ残す
 const int BLOCK_STAINED_GLASS = 210;      // 210-225 (white, orange, magenta, light_blue, yellow, lime, pink, gray, light_gray, cyan, purple, blue, brown, green, red, black)
 const int BLOCK_STAINED_GLASS_PANE = 230; // 230-245 (同順)
 

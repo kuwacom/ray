@@ -104,7 +104,7 @@ void main() {
     normalPlayer = viewToPlayerDir(normalize(gl_NormalMatrix * gl_Normal));
     tangentPlayer = vec4(viewToPlayerDir(normalize(gl_NormalMatrix * at_tangent.xyz)), at_tangent.w);
 #ifdef GBUF_WATER
-    blockId = int(round(mc_Entity.x));
+    blockId = terrainBlockId(int(round(mc_Entity.x)));
 #else
     blockId = 0;
 #endif

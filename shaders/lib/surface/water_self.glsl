@@ -34,6 +34,7 @@ const vec3 WATER_SELF_BOX_HI = vec3(1.5, 0.5, 1.5);
  * 水面からの深さ (ブロック)。水の中でなければ負
  * 上に水のある水のセルは面がすべて隠れて描かれず、ボクセルには空気として残る。水の下に空気のセルは長く残らないので、
  * 空気は上に水がある限り水とみなして水面まで辿る
+ * 一番上の水が流れる水なら水の中とみなさない (上面が水源より低く高さが分からない。捨てた体の水面より上の部分が欠ける)。
  * 乗り物の中も水の中とみなさない (ボートの中は水を描かないので、捨てた脚が消える)
  */
 float waterSelfDepth(vec3 playerPos) {
@@ -42,17 +43,20 @@ float waterSelfDepth(vec3 playerPos) {
     ivec3 cell = ivec3(floor(v + vec3(0.0, WATER_SELF_FLOOR_EPS, 0.0)));
     bool feet = playerPos.y < -relativeEyePosition.y - WATER_SELF_FEET_BELOW_EYE;
     int top = -1;
+    bool flowing = false;
     for (int k = 0; k <= WATER_SELF_SEARCH; k++) {
         ivec3 c = cell + ivec3(0, k, 0);
         if (!isInVoxelVolume(c)) break;
-        int id = fetchVoxelBlockId(c);
+        uint data = fetchVoxelBlockData(c);
+        int id = unpackVoxelBlockId(data);
         if (id == BLOCK_WATER || id == BLOCK_UNDERWATER_PLANT) {
             top = k;
+            flowing = (data >> 12u) == VOXEL_WATER_FLOWING;
         } else if (id != BLOCK_AIR && !(k == 0 && feet)) {
             break;
         }
     }
-    if (top < 0) return -1.0;
+    if (top < 0 || flowing) return -1.0;
     return float(cell.y + top) + WATER_SELF_SURFACE - v.y;
 }
 

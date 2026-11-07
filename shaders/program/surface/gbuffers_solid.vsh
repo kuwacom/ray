@@ -111,7 +111,7 @@ void main() {
     tangentPlayer = vec4(viewToPlayerDir(normalize(gl_NormalMatrix * at_tangent.xyz)), at_tangent.w);
 
 #ifdef GBUF_TERRAIN
-    blockId = int(round(mc_Entity.x));
+    blockId = terrainBlockId(int(round(mc_Entity.x)));
     /*
      * Iris 1.11 + Sodium 0.9 (26.1) では、頂点バッファの mid UV (u * 32768 の整数を float にした値) を Iris が
      * uvec2 として読み直すため、float のビット列を 1/32768 倍した巨大な値 (~3.6e4) が来る (実機で確認)。

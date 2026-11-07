@@ -155,7 +155,9 @@ BLOCKS: list[tuple[int, str, list[str]]] = [
     (109, "sugar cane / bamboo", ["sugar_cane", "bamboo", "bamboo_sapling"]),
     (110, "underwater plants", ["seagrass", "tall_seagrass", "kelp", "kelp_plant"]),
 
-    (200, "water", ["water", "bubble_column"]),
+    # 水の level は 0 が水源、1-7 が流れる水 (上面が低い)、8 以上が落ちる水 (上面は水源と同じ)
+    (200, "water", ["water:level=0", *[f"water:level={k}" for k in range(8, 16)], "bubble_column"]),
+    (207, "flowing water", [f"water:level={k}" for k in range(1, 8)]),
     (201, "ice", ["ice", "frosted_ice"]),
     (202, "glass", ["glass"]),
     (203, "glass pane", ["glass_pane"]),

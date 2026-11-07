@@ -17,6 +17,9 @@ int blockIdToVoxelId(int blockId) {
     return (blockId <= 0 || blockId > 4095) ? BLOCK_SOLID : blockId;
 }
 
+// mc_Entity.x の流れる水を水に戻す (流れる水の ID はボクセルの印 VOXEL_WATER_FLOWING にだけ使う)
+int terrainBlockId(int blockId) { return blockId == BLOCK_WATER_FLOWING ? BLOCK_WATER : blockId; }
+
 // 光を通さない普通の固体 (未登録 = BLOCK_SOLID と、色の表に載せた 2000 番台)
 bool isPlainSolidBlock(int blockId) { return blockId == BLOCK_SOLID || blockId >= BLOCK_COLOR_FIRST; }
 

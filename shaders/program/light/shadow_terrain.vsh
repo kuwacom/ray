@@ -90,7 +90,8 @@ void main() {
     vec2 lm = (gl_TextureMatrix[1] * gl_MultiTexCoord1).xy;
     skyLight = saturate((lm.y - 1.0 / LIGHTMAP_TEXELS) * LIGHTMAP_TEXELS / LIGHTMAP_RANGE);
     normalPlayer = mat3(shadowModelViewInverse) * normalize(gl_NormalMatrix * gl_Normal);
-    blockId = int(round(mc_Entity.x));
+    int rawBlockId = int(round(mc_Entity.x));
+    blockId = terrainBlockId(rawBlockId);
     // 色付き影はブロックライト (floodfill / 光源シャドウ) と同じ透過色の表を使う
     tintTransmittance = isTintBlock(blockId) ? floodCellTransmittance(blockId) : vec3(1.0);
 
@@ -102,7 +103,9 @@ void main() {
         || renderStage == MC_RENDER_STAGE_TERRAIN_TRANSLUCENT;
     if (isTerrain) {
         // ボクセルは揺れ適用前のブロック中心で書く
-        voxelizeTerrainVertex(playerPos, at_midBlock.xyz / 64.0, blockId, at_midBlock.w);
+        // 流れる水は水として書き、発光の欄 (水は光らないので空いている) に印を残す
+        float emission = rawBlockId == BLOCK_WATER_FLOWING ? float(VOXEL_WATER_FLOWING) : at_midBlock.w;
+        voxelizeTerrainVertex(playerPos, at_midBlock.xyz / 64.0, blockId, emission);
     }
 
     playerPos = applyWaving(playerPos, blockId, at_midBlock.y < 0.0, skyLight);
