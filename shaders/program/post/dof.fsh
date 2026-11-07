@@ -235,6 +235,17 @@ void main() {
     float centerFiltered = saturate(max(coc03.r, max(coc03.g, coc03.b)) / (DOF_MAX_RADIUS * viewHeight) - 1.0);
     vec3 bgSum = sanitizeColor(centerRaw.rgb);
     if (centerFiltered > 0.0) bgSum = mix(bgSum, sanitizeColor(textureLod(colortex0, uv, lod).rgb), centerFiltered);
+#if defined LENS_AXIAL_CA && defined SPECULAR_SPARKLE && defined TAA
+    /*
+     * 白飛び分 (TAA の後の a = 白飛び分の割合) は軸上色収差で色ごとに広げない (緑のボケ半径で全部の色を集める)
+     * 白を大きく超えた点は、緑だけ鋭く赤と青が周りへ広がり、トーンマップで中心が緑・周りが紫の 1-2 px になった
+     * (実際のセンサーは白で頭打ちになるので、明るい点の芯は白のまま縁だけ色付く)。白より下の縁の色付きは残る
+     */
+    float sparkleShare0 = saturate(centerRaw.a);
+    vec3 sparkleSum = bgSum * sparkleShare0;
+    float sparkleWeight = 1.0;
+    bgSum -= sparkleSum;
+#endif
     /*
      * 中心自体が前ボケの時は、同じ面 (と手前) のサンプルも前景層に入れ、奥のサンプルは「半透明にボケた前景の向こうの背景」
      * として円板全体から集める。中心の生の画素は背景層に入れない (前景の色なので、輪郭の内側が前景の色で固まる)
@@ -246,6 +257,10 @@ void main() {
     if (centerNear) {
         bgSum *= 1e-3;
         bgWeight *= 1e-3;
+#if defined LENS_AXIAL_CA && defined SPECULAR_SPARKLE && defined TAA
+        sparkleSum *= 1e-3;
+        sparkleWeight *= 1e-3;
+#endif
     }
     vec3 nearSum = vec3(0.0);
     vec3 nearWeight = vec3(0.0);
@@ -285,7 +300,8 @@ void main() {
         float cocSignedS = clamp(circleOfConfusion(distS, focus) * cocMag + cocBias, -maxRadius, maxRadius);
         float cocS = abs(cocSignedS);
         vec3 cocS3 = abs(cocSignedS + lca);
-        vec3 colorS = sanitizeColor(textureLod(colortex0, uvS, lod).rgb);
+        vec4 rawS = textureLod(colortex0, uvS, lod);
+        vec3 colorS = sanitizeColor(rawS.rgb);
         /*
          * 球面収差: ボケの縁が明るい (正) / 中心が明るい (負)。円板全体の平均の重みは 1 のまま
          * LP_SA_RIM は後ボケの値で、前ボケでは符号が逆になる (補正不足のレンズは後ボケが柔らかく前ボケの縁が立つ)
@@ -305,12 +321,21 @@ void main() {
         } else {
             vec3 cocEff = distS > dist0 ? (centerNear ? coc03 : min(cocS3, coc03)) : cocS3;
             vec3 coverage = saturate((cocEff - rDisc) / spacing + 0.5) * rim;
+#if defined LENS_AXIAL_CA && defined SPECULAR_SPARKLE && defined TAA
+            vec3 sparkleS = colorS * saturate(rawS.a);
+            sparkleSum += sparkleS * coverage.g;
+            sparkleWeight += coverage.g;
+            colorS -= sparkleS;
+#endif
             bgSum += colorS * coverage;
             bgWeight += coverage;
         }
     }
 
     vec3 result = bgSum / bgWeight;
+#if defined LENS_AXIAL_CA && defined SPECULAR_SPARKLE && defined TAA
+    result += sparkleSum / sparkleWeight;
+#endif
     if (nearCount > 0.0) {
         // 前景のボケ円板の内側に入るはずのサンプル数に対して、実際に覆っていた割合 = 前景の不透明度
         float nearRadius = nearCocSum / nearCount;

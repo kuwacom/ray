@@ -166,6 +166,9 @@ vec3 fetchScene(ivec2 p) {
     return sanitizeColor(texelFetch(colortex0, clamp(p, ivec2(0), ivec2(viewSize()) - 1), 0).rgb);
 }
 
+// CAS の知覚空間で白 (露出後 1) に当たる値。近傍にこれを超える点があれば暗い側へのはみ出しを止める
+const float CAS_HALO_WHITE = 0.5;
+
 // CAS を掛ける知覚空間 (露出込みのチャンネル別 Reinhard, 可逆)
 vec3 casEncode(vec3 c, float exposure) { c *= exposure; return c / (1.0 + c); }
 vec3 casDecode(vec3 c, float exposure) { c = min(c, 0.999); return c / (1.0 - c) / exposure; }
@@ -188,6 +191,8 @@ vec3 casDelta(ivec2 texel, vec3 center, float exposure) {
     vec3 amp = sqrt(saturate(min(mn, 1.0 - mx) / max(mx, 1e-4)));
     vec3 wgt = amp * (-1.0 / mix(8.0, 5.0, CAS_STRENGTH));
     vec3 sharp = saturate((c + (n + s + e + w) * wgt) / (1.0 + 4.0 * wgt));
+    // 白を超えた点の隣は近傍の最小より暗く沈めない (暗い水の上のきらめきの縁が黒く見えた)。テクスチャの細部は今までどおり鋭くする
+    sharp = max(sharp, mn * step(CAS_HALO_WHITE, mx));
     return casDecode(sharp, exposure) - center;
 }
 
@@ -279,6 +284,47 @@ void main() {
     float lavaGlowShare = 0.0;
     float depth = texelFetch(depthtex0, texelG, 0).r;
 
+#ifdef SPECULAR_SPARKLE
+    /*
+     * レンズ: 点像の芯と裾。白を超えた鏡面の点は 1 画素ほどで、実際のカメラでは回折・センサーの芯 (半径 1-2 px) と、収差と
+     * 散乱の裾 (r^-2) を引いて丸い光の塊に見える。芯は双線形の 3 x 3 の読みで配る (POINT_CORE_SHARE)
+     * 白飛び分 (colortex17) のミップは箱の平均でエネルギーを保つので、4 段を同じエネルギーずつ読んで芯から裾へ配る (総量は変えない)
+     * DoF の前の値なので、ボケている点には重ねない (玉ボケに任せる)
+     * 球面収差・ブルーム・ヘイズの mix より前に掛ける。後に掛けると、mix で縮んだ hdr から縮む前の白飛び分を引き、点の中心が地まで削られて黒く抜けた
+     */
+    if (LENS_POINT_SPREAD_STRENGTH > 0.0) {
+        float focusFade = LENS_POINT_SPREAD_STRENGTH;
+    #ifdef DOF
+        float cocDist = depth >= 1.0 ? far * 4.0 : linearizeDepth(fixHandDepth(depth));
+        float cocPx = isHandDepth(depth) ? 0.0 : circleOfConfusion(cocDist, max(frameData.focusDistance, 0.1));
+        focusFade *= saturate(1.0 - abs(cocPx) / POINT_SPREAD_COC_FADE);
+    #endif
+        // 配るのは点の光の全部まで。強さで先に裾を増やし、芯は残りの分 (和が 1 を超えると中心の地まで引かれて黒く抜けた)
+        float spreadAmount = min((POINT_SPREAD_BASE + POINT_SPREAD_PER_GLARE * LP_VEILING_GLARE) * focusFade, 1.0);
+        float coreAmount = min(POINT_CORE_SHARE * focusFade, 1.0 - spreadAmount);
+        if (any(greaterThan(textureLod(colortex17, uvL, float(POINT_SPREAD_GATE_LEVEL)).rgb, vec3(0.0)))) {
+            vec3 spreadCore = max(textureLod(colortex17, uvL, 0.0).rgb, 0.0);
+            vec3 spreadTail = vec3(0.0);
+            for (int l = 1; l <= POINT_SPREAD_LEVELS; l++) spreadTail += max(sampleBSplineMip(colortex17, uvL, l), 0.0);
+            vec3 coreBlur = vec3(0.0);
+            for (int i = 0; i < 25; i++) {
+                ivec2 o = ivec2(i % 5, i / 5) - 2;
+                ivec2 a = abs(o);
+                vec2 offset = vec2(sign(o)) * vec2(POINT_CORE_TAP_X[a.x], POINT_CORE_TAP_X[a.y]);
+                coreBlur += max(textureLod(colortex17, uvL + offset * texelSize(), 0.0).rgb, 0.0) * (POINT_CORE_TAP_W[a.x] * POINT_CORE_TAP_W[a.y]);
+            }
+            /*
+             * 芯と裾へ配る分は中心から引く。colortex17 は DoF・モーションブラー・色収差の前の値なので、ボケた点や色ごとにずれた点では
+             * hdr の中心に同じだけの白飛び分が残っていない。引くのは、TAA の出した白飛び分の外の色 (colortex13) を超えて残っている分まで
+             * (ピントの前後で中心だけ地まで引かれ、周りが光って中心が黒・緑・紫の 1 画素に抜けた)
+             */
+            vec3 given = (spreadAmount + coreAmount) * spreadCore;
+            vec3 remain = max(hdr - textureLod(colortex13, uvL, 0.0).rgb, 0.0);
+            hdr += spreadAmount * spreadTail / float(POINT_SPREAD_LEVELS) + coreAmount * coreBlur - min(given, remain);
+        }
+    }
+#endif
+
     // レンズ: ブルーム (PSF の畳み込みとして mix。総エネルギーは変えない)
 #ifdef BLOOM
     BloomBands bands;
@@ -323,42 +369,6 @@ void main() {
         // 明るい画素のゴーストと横ストリーク (composite24)
         hdr += sampleFlareTile(uvL);
     #endif
-#endif
-
-#ifdef SPECULAR_SPARKLE
-    /*
-     * レンズ: 点像の芯と裾。白を超えた鏡面の点は 1 画素ほどで、実際のカメラでは回折・センサーの芯 (半径 1-2 px) と、収差と
-     * 散乱の裾 (r^-2) を引いて丸い光の塊に見える。芯は双線形の 3 x 3 の読みで配る (POINT_CORE_SHARE)
-     * 白飛び分 (colortex17) のミップは箱の平均でエネルギーを保つので、4 段を同じエネルギーずつ読んで芯から裾へ配る (総量は変えない)
-     * DoF の前の値なので、ボケている点には重ねない (玉ボケに任せる)
-     */
-    if (LENS_POINT_SPREAD_STRENGTH > 0.0) {
-        float focusFade = LENS_POINT_SPREAD_STRENGTH;
-    #ifdef DOF
-        float cocDist = depth >= 1.0 ? far * 4.0 : linearizeDepth(fixHandDepth(depth));
-        float cocPx = isHandDepth(depth) ? 0.0 : circleOfConfusion(cocDist, max(frameData.focusDistance, 0.1));
-        focusFade *= saturate(1.0 - abs(cocPx) / POINT_SPREAD_COC_FADE);
-    #endif
-        float spreadAmount = (POINT_SPREAD_BASE + POINT_SPREAD_PER_GLARE * LP_VEILING_GLARE) * focusFade;
-        float coreAmount = min(POINT_CORE_SHARE * focusFade, 1.0);
-        if (any(greaterThan(textureLod(colortex17, uvL, float(POINT_SPREAD_GATE_LEVEL)).rgb, vec3(0.0)))) {
-            vec3 spreadCore = max(textureLod(colortex17, uvL, 0.0).rgb, 0.0);
-            vec3 spreadTail = vec3(0.0);
-            for (int l = 1; l <= POINT_SPREAD_LEVELS; l++) spreadTail += max(sampleBSplineMip(colortex17, uvL, l), 0.0);
-            vec3 coreBlur = vec3(0.0);
-            for (int i = 0; i < 9; i++) {
-                ivec2 o = ivec2(i % 3, i / 3) - 1;
-                float w = (o.x == 0 ? POINT_CORE_W0 : POINT_CORE_W1) * (o.y == 0 ? POINT_CORE_W0 : POINT_CORE_W1);
-                coreBlur += max(textureLod(colortex17, uvL + vec2(o) * (POINT_CORE_OFFSET * texelSize()), 0.0).rgb, 0.0) * w;
-            }
-            /*
-             * 芯と裾へ配る分は中心から引く。colortex17 は DoF・色収差の前の値なので、ボケた点や色ごとにずれた点では hdr の中心に
-             * 同じだけの白飛び分が残っておらず、そのまま引くと点の中心が 0 (黒や緑・紫の 1 画素) に抜けた。引くのは残っている分まで
-             */
-            vec3 given = (spreadAmount + coreAmount) * spreadCore;
-            hdr += spreadAmount * spreadTail / float(POINT_SPREAD_LEVELS) + coreAmount * coreBlur - min(given, hdr);
-        }
-    }
 #endif
 
     // レンズ: 太陽・月のフレア (ゴースト・スターバースト・ハロー・グレア・汚れ・ストリーク)

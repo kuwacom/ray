@@ -297,17 +297,21 @@ const float POINT_SPREAD_COC_FADE = 2.0;
 /*
  * 点像の芯: 回折・センサー・現像の滲みで、点のエネルギーの一部が半径 1-2 px に広がる。白を大きく超えた点ほど芯の周りまで
  * 白く飛び、明るい点ほど大きな光の塊に見える (裾の r^-2 だけでは隣の画素へ行く分が 1% 未満で、点が 1 画素の白い四角に見えた)
- * 白飛び分のうち POINT_CORE_SHARE をガウス (sigma POINT_CORE_SIGMA px) で配る。3 x 3 の双線形の読みで 5 x 5 の重みにする
+ * 白飛び分のうち POINT_CORE_SHARE をガウス (sigma POINT_CORE_SIGMA px) で配る。1 軸 5 回 (中心、1-2 px と 3-4 px をそれぞれ双線形で
+ * 1 回) の読みを掛け合わせた 9 x 9 の重みにする。2 px で切ると (3 x 3 の読み)、白を大きく超えた点では 2 px の重み (中心の 2 割) でも
+ * 白く飛び、3 px で 0 になるので、点や鎖の周りに縁の立った四角い光が出て、その外が黒い枠に見えた
  * 芯が大きいと、白をわずかに超えた暗い点まで 3-5 px の丸になり、明るさによらず同じ大きさの丸い粒が並んだ (水面のきらめきが
  * 多く暗かった時)。きらめきを少数の明るい点にした後は、芯も大きくして 1 つのきらめきを大きく光らせる
  */
 const float POINT_CORE_SHARE = POINT_SPREAD_SHAPE.y;
 const float POINT_CORE_SIGMA = POINT_SPREAD_SHAPE.z;
-const float POINT_CORE_G1 = exp(-0.5 / (POINT_CORE_SIGMA * POINT_CORE_SIGMA));   // 1 px 離れた重み
-const float POINT_CORE_G2 = exp(-2.0 / (POINT_CORE_SIGMA * POINT_CORE_SIGMA));   // 2 px 離れた重み
-const float POINT_CORE_W0 = 1.0 / (1.0 + 2.0 * (POINT_CORE_G1 + POINT_CORE_G2)); // 1 軸の中心の重み
-const float POINT_CORE_W1 = (POINT_CORE_G1 + POINT_CORE_G2) * POINT_CORE_W0;     // 1 軸の片側の重み (1 px と 2 px を 1 回で読む)
-const float POINT_CORE_OFFSET = (POINT_CORE_G1 + 2.0 * POINT_CORE_G2) / (POINT_CORE_G1 + POINT_CORE_G2);
+// x px 離れた重み (中心で 1)
+#define POINT_CORE_G(x) exp(-0.5 * (x) * (x) / (POINT_CORE_SIGMA * POINT_CORE_SIGMA))
+const float POINT_CORE_NORM = 1.0 / (1.0 + 2.0 * (POINT_CORE_G(1.0) + POINT_CORE_G(2.0) + POINT_CORE_G(3.0) + POINT_CORE_G(4.0)));
+// 1 軸の読みの重み (中心、1-2 px、3-4 px) と位置 (px)。片側の 2 画素を、重みの比の位置の双線形の 1 回で読む
+const vec3 POINT_CORE_TAP_W = vec3(1.0, POINT_CORE_G(1.0) + POINT_CORE_G(2.0), POINT_CORE_G(3.0) + POINT_CORE_G(4.0)) * POINT_CORE_NORM;
+const vec3 POINT_CORE_TAP_X = vec3(0.0, (POINT_CORE_G(1.0) + 2.0 * POINT_CORE_G(2.0)) / (POINT_CORE_G(1.0) + POINT_CORE_G(2.0)),
+    (3.0 * POINT_CORE_G(3.0) + 4.0 * POINT_CORE_G(4.0)) / (POINT_CORE_G(3.0) + POINT_CORE_G(4.0)));
 // 汚れ: 光源の周りの散乱光 (照度に対する割合, 広がり tan) と、明るい画素の周りの散乱 (広いブルームに対する割合)
 const float LENS_DIRT_SUN_GAIN = 0.006;
 const float LENS_DIRT_SUN_SIGMA = 0.45;
