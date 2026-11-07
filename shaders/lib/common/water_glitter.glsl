@@ -28,7 +28,7 @@
  * - 密度: ワールドの面積あたりで決まり、画素の大きさによらない。画素の中に数が多い所だけ滑らかな平均へ移す
  * - むら: 粗さへ回した波の強さは場所ごとに違う (waterGlintPatch)。凪いだ所は細いローブのまま波の面が白く光り、粗い所に点が集まる
  * - 置く点: 理論の数のうち明るい側の一部だけを置き、置かない暗い点の光は置いた点へ寄せる (GLINT_KEEP)
- * - 形: 1 つの点は画面の横に並ぶ 2-7 個の子と、子の間をつなぐ細い横の光の鎖 (glintChain)
+ * - 形: 1 つの点は波の稜線に沿って並ぶ 2-7 個の子と、子の間をつなぐ細い光の鎖 (glintChain)
  * - 画素へは、標本の位置 (TAA のジッター込み) から鎖の子の半径 GLINT_RADIUS 画素の中を集める。TAA が画素の中の位置を積分する
  */
 /*
@@ -88,7 +88,7 @@ const float GLINT_CELL = 1.8;
  * 1 つの点の形: 横に並ぶ短い鎖。実写の点は、表面張力波の稜線のうち太陽へ向く傾きの所が稜線に沿っていくつも並んで光るので、
  * 2-7 個が横に並んで隣と接し、横長の光や点の列になる (幅 / 高さは低い太陽で 2-3、高い太陽の見下ろしで 1-1.3)。
  * 1 つずつ独立に置いた点は、数を増やしても減らしても 1 つずつ浮いた粒のままだった
- * - 鎖は画面の横に並べる。かすめ角では奥行きが縮むので稜線は画面の横に寝る
+ * - 鎖は波の稜線に沿って並べる (GLINT_CREST_SCALE)。かすめ角では奥行きが縮むので稜線は画面の横に寝る
  * - 鎖の長さは点像のにじみの直径の 2-3 倍。にじみと同じくらいの長さでは、にじむと丸い玉になった
  * - 鎖の長さは設定 WATER_GLITTER_LENGTH で、子の間隔と長さの上限に掛ける
  * - 子の間隔は画素の単位の乱数で、隣とつながる詰まった間隔と、暗い隙間を挟んで並ぶ間隔が混ざる (横長の光と点の列)。
@@ -117,6 +117,15 @@ const float GLINT_STRETCH_MAX = 8.0;        // 横に伸ばす倍率の上限
 const float GLINT_STRETCH_DIM = 0.8;        // いちばん暗い点の子の数の割合 (明るい点を 1 とした割合)
 const float GLINT_TILT = 0.3;               // 鎖の向きの傾きの乱数の幅 (ラジアン)
 const int GLINT_SEARCH_MAX = 9;             // 鎖を探すセルの数の上限 (1 軸)
+/*
+ * 鎖の向きは、点を生んだ面の波の稜線 (高さの等高線) に沿わせる。表した波の傾きは稜線に沿ってほぼ一定なので、照り返しの白い帯も
+ * 稜線と平行に走り、稜線に沿う鎖は帯の上に乗る。画面の横に固定すると、波を横から見た時に縦に走る波の筋と直交する線が並んだ
+ * - 向きの元は鎖より長い波だけ (層の波長が鎖の長さの約 1.3-3 倍で入れる。画素の大きさに GLINT_CREST_SCALE を掛けて表せる層)
+ * - 勾配の小さい所 (山の頂・谷・凪) は向きが定まらないので画面の横へ混ぜる (傾きの RMS に対する勾配の大きさ GLINT_CREST_FLAT)
+ * - かすめ角では奥行きが NoV 倍に縮むので、どの向きの稜線も画面の横に寝る。視線に沿う稜線だけが縦寄りの短い列になる
+ */
+const float GLINT_CREST_SCALE = 8.0;
+const vec2 GLINT_CREST_FLAT = vec2(0.1, 0.5);
 const float GLINT_CHAIN_BRIDGE = 0.5;       // 鎖の光のうち、子の間をつなぐ横長の核へ配る割合
 const float GLINT_BRIDGE_WIDTH = 0.8;       // 横長の核の縦の半径 (子の半径の割合)
 /*
@@ -189,27 +198,32 @@ bool waterGlintFinite(float v) { return (floatBitsToUint(v) & 0x7F800000u) != 0x
  * ローブは正規化したまま粗さだけを変えるので、照り返しの量は場所の平均で変わらない (平均のローブは芯が尖り裾が長い。
  * 海面の傾きの分布の尖り (Cox-Munk) と同じ向き)
  * ampLong / ampShort: 長い 3 層と短い 2 層の傾きの RMS (海の状態の配列を丸ごと渡さず、使う値だけ受ける),
- * hLong: 長い 3 層の高さ (waterWaveSum の 0-3、表せる割合を掛けた和)
+ * longWave: 長い 3 層の高さと勾配 (waterWaveSum の 0-3 の xyz、表せる割合を掛けた和)
+ * crest: 点の鎖を並べる稜線の向きを決める勾配 (鎖より長い波だけの和を、その傾きの RMS で割ったもの。平らな所は 0 に近い)
  */
-float waterGlintPatch(vec3 ampLong, vec2 ampShort, vec2 p, float footprint, float hLong) {
+float waterGlintPatch(vec3 ampLong, vec2 ampShort, vec2 p, float footprint, vec3 longWave, out vec2 crest) {
     float g = 0.0;
     float v = 0.0;
     float varLong = 0.0;
     float varLongAll = 0.0;
+    float slopeVar = 0.0;
     for (int i = 0; i < 3; i++) {
         float s2 = sqr(ampLong[i] * waterLayerTile(i) * WATER_TEX_HEIGHT_SIGMA);
+        float r2 = sqr(waterLayerResolved(i, footprint));
         varLongAll += s2;
-        varLong += s2 * sqr(waterLayerResolved(i, footprint));
+        varLong += s2 * r2;
+        slopeVar += sqr(ampLong[i]) * r2;
     }
     if (varLong > 0.0) {
         float w = GLINT_PATCH_LONG * GLINT_PATCH_NORM * sqrt(varLong / varLongAll);
-        g += w * hLong * inversesqrt(varLong);
+        g += w * longWave.x * inversesqrt(varLong);
         v += w * w;
     }
     float t = frameTimeCounter;
     float h = 0.0;
     float var = 0.0;
     float varAll = 0.0;
+    vec2 grad = longWave.yz;
     for (int k = 0; k < 2; k++) {
         int i = GLINT_SHORT_FIRST + k;
         float r = waterLayerResolved(i, footprint);
@@ -217,9 +231,15 @@ float waterGlintPatch(vec3 ampLong, vec2 ampShort, vec2 p, float footprint, floa
         varAll += s2;
         if (r > 0.0 && ampShort[k] > 0.0) {
             var += s2 * r * r;
-            h += waterLayer(p, i, ampShort[k] * r, t).x;
+            vec3 layer = waterLayer(p, i, ampShort[k] * r, t).xyz;
+            h += layer.x;
+            // 鎖の長さより短い波は鎖の中で向きが変わり、画素ごとに鎖の形がずれて折れるので、稜線の向きには入れない
+            float rc = waterLayerResolved(i, footprint * GLINT_CREST_SCALE);
+            grad += layer.yz * (rc / r);
+            slopeVar += sqr(ampShort[k] * rc);
         }
     }
+    crest = slopeVar > 0.0 ? grad * inversesqrt(slopeVar) : vec2(0.0);
     if (var > 0.0) {
         float w = GLINT_PATCH_SHORT * GLINT_PATCH_NORM * sqrt(var / varAll);
         g += w * h * inversesqrt(var);
@@ -358,7 +378,8 @@ float glintLevel(vec2 pos, float level, float rho, vec2 axisAlong, vec2 axisAcro
      * 鎖の届く範囲 (半径の単位): 横は鎖の半分の長さと子の伸び、縦は 1 つの半径と鎖の傾き・子の縦のずれ
      * その範囲を囲むセルを探す (鎖の向きはワールドの格子と揃わないので、範囲に掛からないセルは乱数を引く前に外す)
      */
-    float reachAcross = chainHalf + GLINT_CHILD_SIZE.y * (1.0 + (stretchMax - 1.0) * GLINT_CHILD_STRETCH);
+    float reachAcross = GLINT_CHILD_SIZE.y * (1.0 + (stretchMax - 1.0) * GLINT_CHILD_STRETCH) + chainHalf * min(abs(base.y) + GLINT_TILT, 1.0)
+        + 0.5 * GLINT_CHAIN_JITTER / GLINT_RADIUS;
     float reachAlong = GLINT_CHILD_SIZE.y + chainHalf * min(abs(base.x) + GLINT_TILT, 1.0) + 0.5 * GLINT_CHAIN_JITTER / GLINT_RADIUS;
     vec2 ext = abs(axisAlong) * (reachAlong / dot(axisAlong, axisAlong)) + abs(axisAcross) * (reachAcross / dot(axisAcross, axisAcross));
     ivec2 lo = ivec2(floor((q - ext) / cell));
@@ -399,10 +420,10 @@ float glintLevel(vec2 pos, float level, float rho, vec2 axisAlong, vec2 axisAcro
  * 太陽 (月) の照り返しのローブに掛ける倍率。ローブのうち粗さへ回した分の割合だけ効かせる (近景は表した波の法線のまま)
  * pos: 標本の位置 (ワールドの水平, TAA のジッター込み), N: 表した波の法線, L: 太陽 (月) の向き, alpha2: 照り返しのローブの alpha^2,
  * unresolved: 粗さへ回した (傾きの分散, 曲率の 2 乗の和), pixelWorld: 水面上の画素の幅 (視線と直交する向き, ブロック),
- * NoVGeo: 平均水面と視線の cos
+ * NoVGeo: 平均水面と視線の cos, crest: 稜線の向きを決める勾配 (waterGlintPatch)
  * alpha2 と unresolved には、場所ごとのさざ波の強さのむら (waterGlintPatch) を掛けた値を渡す
  */
-float waterGlitter(vec2 pos, vec3 N, vec3 V, vec3 L, float alpha2, vec2 unresolved, float pixelWorld, float NoVGeo) {
+float waterGlitter(vec2 pos, vec3 N, vec3 V, vec3 L, float alpha2, vec2 unresolved, float pixelWorld, float NoVGeo, vec2 crest) {
     if (alpha2 <= 0.0 || pixelWorld <= 0.0) return 1.0;
     float fraction = saturate(unresolved.x / alpha2);
     if (fraction < GLINT_FRACTION_MIN) return 1.0;
@@ -441,12 +462,28 @@ float waterGlitter(vec2 pos, vec3 N, vec3 V, vec3 L, float alpha2, vec2 unresolv
         float chainHalf = min(GLINT_CHAIN_REACH / NoV, GLINT_CHAIN_HALF_MAX) * WATER_GLITTER_LENGTH / GLINT_RADIUS;
         float concentrateMax = mix(GLINT_CONCENTRATE_MAX, GLINT_CONCENTRATE_NEAR, nearShape);
         /*
-         * 鎖は画面の横に並べる。視線と直交する水平の向きは、画面の端では透視で傾き、同じ角度の斜めの筋が並んで雨のように見えた
+         * 稜線の向きが定まらない所は画面の横に並べる。視線と直交する水平の向きは、画面の端では透視で傾き、同じ角度の斜めの筋が並んで雨のように見えた
          * (横に回さないカメラでは、水平の水面の上で画面の横へ動く向きは、どの画素でもカメラの右の向き)
          */
         vec2 right = gbufferModelViewInverse[0].xz;
         vec2 base = vec2(dot(right, axisAlong), dot(right, axisAcross));
         base = dot(base, base) > 1e-8 ? normalize(base) : vec2(0.0, 1.0);
+        /*
+         * 稜線の向きへ回す (GLINT_CREST_SCALE の説明)。ワールドの稜線 t を点の座標へ写すと、縦 (視線の向き) は NoV 倍に縮む
+         * 鎖の長さはワールドの長さに合わせ、写した長さの比 (画面の横の向きで 1、視線に沿う向きで NoV) を掛ける
+         * 子の横の伸びはかすめ角で小さな面が縦につぶれる分なので、鎖が横に寝ている分だけ掛ける (縦の列の子を縦に伸ばすと雨の筋になる)
+         */
+        float crestW = smoothstep(GLINT_CREST_FLAT.x, GLINT_CREST_FLAT.y, length(crest));
+        if (crestW > 0.0) {
+            vec2 t = normalize(vec2(-crest.y, crest.x));
+            vec2 b = vec2(dot(t, axisAlong), dot(t, axisAcross));
+            float scale = length(b) * pixelWorld * GLINT_RADIUS;
+            b = normalize(b);
+            vec2 dir = mix(base, dot(b, base) < 0.0 ? -b : b, crestW);
+            base = dot(dir, dir) > 1e-8 ? normalize(dir) : b;
+            chainHalf *= mix(1.0, scale, crestW);
+            stretchMax = 1.0 + (stretchMax - 1.0) * sqr(base.y);
+        }
         // どちらの段も期待値は同じなので、混ぜるのは切り替わりの帯だけにし、帯の外は片方の段だけを探す
         float wHi = smoothstep(GLINT_LEVEL_BLEND.x, GLINT_LEVEL_BLEND.y, fract(level));
         float gLo = wHi < 1.0 ? glintLevel(pos, levelLo, rho, axisAlong, axisAcross, kernelArea, chainHalf, stretchMax, concentrateMax, base) : 0.0;

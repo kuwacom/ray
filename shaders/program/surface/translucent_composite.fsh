@@ -270,12 +270,13 @@ void main() {
             // 日陰・雲の影では光源が映らないので探さない
             if (top && maxOf(sunSpecVis) > 0.0) {
                 // 太陽 (月) の照り返しの粗さだけに、場所ごとのさざ波の強さのむらを掛ける (灯りの照り返しと反射の向きは一様のまま)
+                vec2 crestGrad;
                 float ripple = waterGlintPatch(vec3(sea.amp[0], sea.amp[1], sea.amp[2]), vec2(sea.amp[GLINT_SHORT_FIRST], sea.amp[GLINT_SHORT_FIRST + 1]),
-                    surfWorld.xz, footprint, waves.x);
+                    surfWorld.xz, footprint, waves.xyz, crestGrad);
                 sunAlpha = sqrt(sqr(lightAlpha) + (ripple - 1.0) * unresolvedVar);
                 vec2 glintPos = screenToPlayer(vec3(removeTaaJitter(texcoord), d0)).xz + cameraPosition.xz;
                 glitter = waterGlitter(glintPos, N, V, unshadowedSun().direction, sqr(sunAlpha), unresolved * ripple,
-                    dist * 2.0 / (gbufferProjection[1][1] * viewSize().y), NoVGeo);
+                    dist * 2.0 / (gbufferProjection[1][1] * viewSize().y), NoVGeo, crestGrad);
                 /*
                  * 念のための保護: 倍率が有限でない画素は滑らかなローブに戻す (鏡面の上限の min が NaN を円盤の明るさに置き換えるため)
                  * isnan / isinf は最適化で消えることがあるので、指数のビットで調べる
