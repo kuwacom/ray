@@ -187,6 +187,11 @@ const float DOF_MAX_LOD_LARGE = 6.0;
 const float DOF_LARGE_LOD_BIAS = 0.75;
 // 絞り羽根の回転 (rad)
 const float DOF_BLADE_ROTATION = 0.2;
+/*
+ * 縁の明るいボケ (LP_BOKEH_RIM / LP_SA_RIM) を効かせるボケ半径 (px) の範囲。実際の縁は円板の数 % の細い輪で、数 px の小さなボケでは
+ * 画素と回折でならされて見えない。小さなボケにもそのまま掛けると、白飛びの点が中心の暗い 2-4 px の輪になり、点の中心が黒く抜けて見えた
+ */
+const vec2 DOF_RIM_COC = vec2(1.5, 4.0);
 // 絞り羽根の丸みはレンズプリセット (LP_BLADE_ROUNDNESS)
 
 // ブルーム

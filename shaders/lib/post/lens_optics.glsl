@@ -366,6 +366,8 @@ vec2 lensFieldDefocus(float rho) {
  * 倍率色収差
  * 波長ごとに像の倍率が違う (画面の端ほど虹色にずれる)。波長を LENS_SPECTRAL_SAMPLES 個サンプルし、
  * 各サンプルの色をその波長の RGB 重みで積分する。平坦な面の色は変わらず、縁だけが紫 / 緑に色付く
+ * TAA の後の画面 (a = 鏡面の白飛び分の割合) では白飛び分をずらさない。実際のセンサーは白で頭打ちになり、明るい点の芯は白のまま
+ * 縁だけ色付く。白を大きく超えた 1-2 px の点ごとずらすと、トーンマップで中心が緑・両側が赤と青の点になった
  */
 vec3 lensChromaticSample(sampler2D tex, vec2 uv, float amount) {
     vec2 d = uv - 0.5;
@@ -376,10 +378,19 @@ vec3 lensChromaticSample(sampler2D tex, vec2 uv, float amount) {
         float l = lensWavelength(k, LENS_SPECTRAL_SAMPLES);
         vec3 w = wavelengthToRgb(l);
         float scale = 1.0 + amount * LENS_CA_SCALE * ((l - LENS_REF_WAVELENGTH) / LENS_CA_WAVELENGTH_RANGE) * r2;
-        sum += sanitizeColor(textureLod(tex, 0.5 + d * scale, 0.0).rgb) * w;
+        vec4 s = textureLod(tex, 0.5 + d * scale, 0.0);
+#if defined SPECULAR_SPARKLE && defined TAA
+        s.rgb *= 1.0 - saturate(s.a);
+#endif
+        sum += sanitizeColor(s.rgb) * w;
         wSum += w;
     }
-    return sum / max(wSum, 1e-6);
+    vec3 result = sum / max(wSum, 1e-6);
+#if defined SPECULAR_SPARKLE && defined TAA
+    vec4 c = textureLod(tex, uv, 0.0);
+    result += sanitizeColor(c.rgb) * saturate(c.a);
+#endif
+    return result;
 }
 
 #if LENS_PROJECTION == 1

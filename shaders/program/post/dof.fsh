@@ -306,7 +306,8 @@ void main() {
          * 球面収差: ボケの縁が明るい (正) / 中心が明るい (負)。円板全体の平均の重みは 1 のまま
          * LP_SA_RIM は後ボケの値で、前ボケでは符号が逆になる (補正不足のレンズは後ボケが柔らかく前ボケの縁が立つ)
          */
-        float rim = 1.0 + (LP_BOKEH_RIM + (cocSignedS >= 0.0 ? LP_SA_RIM : -LP_SA_RIM)) * (2.0 * r * r - 1.0);
+        float rim = 1.0 + (LP_BOKEH_RIM + (cocSignedS >= 0.0 ? LP_SA_RIM : -LP_SA_RIM)) * (2.0 * r * r - 1.0)
+            * smoothstep(DOF_RIM_COC.x, DOF_RIM_COC.y, cocS);
         // アポダイゼーション (STF): ボケの円板の中での位置 rDisc / cocS を瞳の半径にして、周辺ほど暗くする
         if (LP_APODIZATION > 0.0) rim *= exp(-apodBeta * sqr(min(rDisc / max(cocS, 0.5), 1.0))) * apodNorm;
 
