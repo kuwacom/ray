@@ -158,6 +158,36 @@ def set_fov(value) -> int:
     return get_fov()
 
 
+def set_render_distance(value) -> int:
+    """
+    ### set_render_distance
+    描画距離 (チャンク) を実行時だけ切り替える。options.txt は保存しない
+    シングルプレイの内部サーバーの送る距離も同じ値にする (クライアントの値だけでは遠くのチャンクが届かない)
+
+    @param value - チャンク数。"restore" で変更前へ戻す
+    @returns 変更後の値
+    """
+    with JavaScope() as j:
+        options, options_cls = j.options()
+        inst = j.call(options, options_cls, "renderDistance")
+        inst_cls = j.cls("net.minecraft.client.OptionInstance")
+        current = int(m.java_to_string(j.call(inst, inst_cls, "get")))
+        if value == "restore":
+            if "render_distance" not in SAVED:
+                return current
+            value = SAVED.pop("render_distance")
+        else:
+            SAVED.setdefault("render_distance", current)
+        j.call(inst, inst_cls, "set", j.keep(m.java_int(int(value))))
+        mc_cls = j.cls("net.minecraft.client.Minecraft")
+        server = j.call(j.call(0, mc_cls, "getInstance"), mc_cls, "getSingleplayerServer")
+        if server:
+            server_cls = j.cls("net.minecraft.server.MinecraftServer")
+            players = j.call(server, server_cls, "getPlayerList")
+            j.call(players, j.cls("net.minecraft.server.players.PlayerList"), "setViewDistance", j.keep(m.java_int(int(value))))
+        return int(m.java_to_string(j.call(inst, inst_cls, "get")))
+
+
 def set_cloud_status(value) -> str:
     """
     ### set_cloud_status
@@ -347,6 +377,9 @@ def run_step(step: dict):
     if "fov" in step:
         # 数値で設定、"restore" で最初に変更する前の値に戻す
         return set_fov(step["fov"])
+    if "render_distance" in step:
+        # 例: {"render_distance": 48} 描画距離 (チャンク)。"restore" で最初に変更する前の値に戻す
+        return set_render_distance(step["render_distance"])
     if "hud" in step:
         # false で F1 相当 (HUD と一人称の手を隠す)
         return set_hud(bool(step["hud"]))
