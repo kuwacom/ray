@@ -52,6 +52,7 @@
 #include "/lib/buffers/frame_data.glsl"
 #include "/lib/common/water_waves.glsl"
 #include "/lib/common/water_glitter.glsl"
+#include "/lib/common/water_lod.glsl"
 #include "/lib/common/water_normal.glsl"
 #include "/lib/common/water.glsl"
 #include "/lib/common/shadow_space.glsl"
@@ -313,7 +314,7 @@ void main() {
      */
     // 画素より細かい波で映り込みを散らす水面は、半分の解像度の粗い反射 (reflection_trace.csh) だけを使う (鏡との境は重みで混ぜる)
     outMirror = vec4(0.0);
-    float mirrorW = !below && !side && N.y > 0.5 ? waterReflectMirror(waterUnresolvedSlopeVar(waterSeaState(lmT.y), waterFootprint(dist, abs(V.y)))) : 1.0;
+    float mirrorW = !below && !side && N.y > 0.5 ? waterLod(waterSeaState(lmT.y), dist, abs(V.y)).mirror : 1.0;
     if (mirrorW > 0.0) {
         vec3 R0 = reflect(-V, below ? N : waterReflectNormal(N, V));
         if (!below && !side) R0.y = abs(R0.y);

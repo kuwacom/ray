@@ -128,7 +128,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 - Iris は同じパスの compute (composite1_a) を fragment (composite1) の前に走らせる。VL の有効条件は `program.<world>/composite1_a.enabled` で、composite1 の fragment (水の光線を辿る処理) は止まらない
 - ネザー・エンドは大気 LUT と雲のパスを外す (shaders.properties)。shadow パスはボクセル化のため全ディメンションで回す
 - `particles.ordering = mixed`: 不透明パーティクルは G バッファ (gbuffers_particles)、半透明は前方 (gbuffers_particles_translucent)
-- DH (Distant Horizons) は未対応 (dh_* プログラムなし)
+- DH (Distant Horizons) は未対応 (dh_* プログラムなし)。DH の水 (dh_water) を足す時の入口は `lib/common/water_lod.glsl` の `waterLod`: DH の深度から求めた距離と視線の cos を渡し (1 画素の角度は dhProjection も同じ画角なので `waterPixelAngle()` のまま)、返った `WaterLod` で `getWaterNormal` と合成 (composite2) の粗さ・フレネル・鏡の重みを決める。遠景を軽くする段 (層を読まない・視差なし・鏡の SSR を辿らない) とその移り変わりも、waterLod に足して決める
 
 ---
 
@@ -590,7 +590,7 @@ DEBUG_VIEW の値 (0-12) と表示内容の対応は `shaders/lang/ja_JP.lang` /
 - 表面の光 (light / sky の関数) は surface の `gatherSurfaceLights` が呼ぶ。deferred30・半透明・composite2・二次ヒットは light / sky の照度の関数を直接呼ばない
 - `program/surface/gbuffers_solid.vsh` から `injectEntityLight`、`program/surface/gbuffers_*` から `encodeVelocity` を呼び出す (関数本体は light / post モジュール)
 - 本体のファイル名は役割名で、Iris のプログラム名との対応は `tools/gen_wrappers.py` の `BODIES` にある (例: composite2 は `program/surface/translucent_composite.fsh`)
-- 大きな処理は 600 行以下を目安にファイルを分ける。体積雲は `lib/sky/cloud_volume.glsl` が `cloud_constants` / `cloud_weather` / `cloud_density` / `cloud_lighting` / `cloud_march` を読む。半透明の合成の水と鏡面は `lib/surface/water_shading.glsl` と `composite_specular.glsl`。水面の `lib/common/water.glsl` は `water_waves` / `water_glitter` (画素より細かい波が光源を映す点、WATER_GLITTER) / `water_normal`、鏡面の白飛び分は `lib/common/specular_sparkle.glsl`、レンズの `lib/post/lens.glsl` は `lens_optics` / `lens_flare` を読む。`lib/post/lens_presets.glsl` はレンズごとの値を 1 つの `#if` の連なりで持つ表なので分けない
+- 大きな処理は 600 行以下を目安にファイルを分ける。体積雲は `lib/sky/cloud_volume.glsl` が `cloud_constants` / `cloud_weather` / `cloud_density` / `cloud_lighting` / `cloud_march` を読む。半透明の合成の水と鏡面は `lib/surface/water_shading.glsl` と `composite_specular.glsl`。水面の `lib/common/water.glsl` は `water_waves` / `water_glitter` (画素より細かい波が光源を映す点、WATER_GLITTER) / `water_lod` (距離の判断) / `water_normal`、鏡面の白飛び分は `lib/common/specular_sparkle.glsl`、レンズの `lib/post/lens.glsl` は `lens_optics` / `lens_flare` を読む。`lib/post/lens_presets.glsl` はレンズごとの値を 1 つの `#if` の連なりで持つ表なので分けない
 - 各モジュールの補助ファイルはそのモジュールのディレクトリに置く (例: DDA は `lib/light/trace.glsl`)
 
 ### モジュール間インターフェース
@@ -652,7 +652,8 @@ surface モジュールが提供 (`//@include "/lib/surface/surface.glsl"`):
 | `vec3 sampleShadowVolume(vec3 playerPos)` (`lib/common/shadow_volume.glsl`) | sky (VL), light (floodfill のスカイライト等) | 1 タップの色付き影 |
 | `vec4 getIndirectLight(ivec2 texel)` | surface | rgb 間接光, a AO |
 | `vec3 applyWaving(vec3 playerPos, int blockId, bool isTopVertex, float skyLight)` | gbuffers, shadow.vsh (light) | 植物の揺れ (影と一致させる) |
-| `vec3 getWaterNormal(vec3 worldPos, vec3 geoNormal)` (`lib/common/water_normal.glsl`) | surface, sky (水中の光芒等) | 水面の法線 |
+| `WaterLod waterLod(WaterSea sea, float dist, float NoV[, float pixelAngle])` (`lib/common/water_lod.glsl`) | surface (gbuffers_water・composite1・composite2・反射) | 水面の距離の判断: 層ごとの法線の振幅・粗さへ回す傾き・画素の中の傾きの揺れ・フレネルと空の均し・視差の段・鏡の映り込みの重み |
+| `vec3 getWaterNormal(WaterLod lod, vec3 worldPos, vec3 geoNormal, vec2 flow)` (`lib/common/water_normal.glsl`) | surface | 水面の法線 |
 
 表面の光の集め方 (`gatherSurfaceLights`)。呼ぶ側は使う取り方と項を const で書き、省く項をコメントに残す:
 

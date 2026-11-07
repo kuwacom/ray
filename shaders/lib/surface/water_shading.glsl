@@ -281,10 +281,11 @@ vec4 sampleWaterReflection(ivec2 texel, float dist, out float skyWeight) {
  */
 const float WATER_SKY_SPREAD = 1.2;             // 傾きの RMS あたりの上下のずらし幅 (仰角の sin)
 
-vec3 waterSkyReflection(vec3 R0, float slopeVar, float skyLm, float footprint) {
+// roughFar: 空を均す割合 (WaterLod の roughFar)
+vec3 waterSkyReflection(vec3 R0, float slopeVar, float skyLm, float roughFar) {
     vec3 R = waterRoughReflectDir(R0, slopeVar);
     // 近景・中景の雲の映り込みはぼかさない (フレネルを均す範囲と揃える)
-    float spread = WATER_SKY_SPREAD * sqrt(slopeVar) * waterRoughFar(footprint);
+    float spread = WATER_SKY_SPREAD * sqrt(slopeVar) * roughFar;
     if (spread < 0.005) return skyPixelReflection(R, skyLm, skyReflectionFallback(R, skyLm, 0.0));
     vec3 sum = vec3(0.0);
     for (int k = -1; k <= 1; k++) {

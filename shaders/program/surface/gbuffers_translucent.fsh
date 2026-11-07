@@ -48,6 +48,7 @@
 #include "/lib/common/transforms.glsl"
 #include "/lib/common/water_waves.glsl"
 #include "/lib/common/water_glitter.glsl"
+#include "/lib/common/water_lod.glsl"
 #include "/lib/common/water_normal.glsl"
 #include "/lib/common/water.glsl"
 #include "/lib/common/shadow_space.glsl"
@@ -199,13 +200,13 @@ void main() {
     if (materialId == MAT_WATER) {
         vec3 worldPos = playerPos + cameraPosition;
         WaterSea sea = waterSeaState(lmcoord.y);
-        float footprint = waterFootprint(length(playerPos), abs(dot(geoNormal, V)));
+        WaterLod lod = waterLod(sea, length(playerPos), abs(dot(geoNormal, V)));
         // 流れる水の上面は傾いているが、頂点の法線は真上のままなので三角形の向きは画面微分から取る
         vec3 faceNormal = normalize(cross(dFdx(playerPos), dFdy(playerPos)));
         if (dot(faceNormal, geoNormal) < 0.0) faceNormal = -faceNormal;
         vec2 flow = waterFlowVelocity(faceNormal, geoNormal);
-        if (geoNormal.y > 0.5 && dot(flow, flow) < 1e-4) worldPos = waterParallax(sea, worldPos, -V, footprint);
-        vec3 normal = getWaterNormal(sea, worldPos, geoNormal, footprint, flow);
+        if (geoNormal.y > 0.5 && dot(flow, flow) < 1e-4) worldPos = waterParallax(sea, lod, worldPos, -V);
+        vec3 normal = getWaterNormal(lod, worldPos, geoNormal, flow);
         outData = encodeTranslucentDataTint(normal, lmcoord, MAT_WATER, 0);
     #ifdef WATER_TEXTURE
         outColor = vec4(forwardDiffuse(m, playerPos, geoNormal, geoNormal, V, dither), albedo.a * WATER_TEXTURE_OPACITY);

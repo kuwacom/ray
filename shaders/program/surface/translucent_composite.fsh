@@ -56,6 +56,7 @@
 #include "/lib/buffers/frame_data.glsl"
 #include "/lib/common/water_waves.glsl"
 #include "/lib/common/water_glitter.glsl"
+#include "/lib/common/water_lod.glsl"
 #include "/lib/common/water_normal.glsl"
 #include "/lib/common/water.glsl"
 #include "/lib/common/shadow_space.glsl"
@@ -169,14 +170,15 @@ void main() {
         bool side = abs(N.y) < 0.5;
         vec3 faceN = side ? waterSideFaceNormal(N) : vec3(0.0, 1.0, 0.0);
         float NoVGeo = abs(dot(V, faceN));
-        float footprint = waterFootprint(dist, NoVGeo);
+        WaterLod lod = waterLod(sea, dist, NoVGeo);
+        float footprint = lod.footprint;
         // 側面で上向きの水面の NoV (|V.y|) を使うと、真横から見た側面で画素が無限に大きいとみなされ、海の波の分散が全部
         // 太陽の鏡面の粗さへ回って側面に白っぽい幅広のつやが乗っていた
-        vec2 unresolved = side ? vec2(waterFallUnresolvedSlopeVar(footprint), 0.0) : waterUnresolvedSlopeCurvature(sea, footprint);
+        vec2 unresolved = side ? vec2(waterFallUnresolvedSlopeVar(footprint), 0.0) : lod.unresolved;
         float unresolvedVar = unresolved.x;
         // 上から見た上向きの水面だけ、画素より細かい波の粗さでフレネルと反射方向を均す (composite.csh と同じ)
         float roughVar = !below && N.y > 0.5 ? unresolvedVar : 0.0;
-        float F = fresnelDielectric(waterRoughNoV(NoV, roughVar, footprint), eta);
+        float F = fresnelDielectric(waterRoughNoV(NoV, roughVar, lod.roughFar), eta);
         vec3 refrDir = refract(-V, N, 1.0 / eta);
         if (dot(refrDir, refrDir) < 0.5) F = 1.0;
         /*
@@ -238,7 +240,7 @@ void main() {
         vec4 rs = sampleWaterReflection(texel, dist, skyWeight);
         vec3 fallback = below ? vec3(0.0) : skyReflectionFallback(R, lmT.y, 0.0);
         if (rs.a > 0.0) {
-            vec3 sky = skyWeight > 0.0 && R.y > 0.0 ? waterSkyReflection(R0, roughVar, lmT.y, footprint) : fallback;
+            vec3 sky = skyWeight > 0.0 && R.y > 0.0 ? waterSkyReflection(R0, roughVar, lmT.y, lod.roughFar) : fallback;
             refl = mix(fallback, (rs.rgb + sky * skyWeight) / rs.a, saturate(rs.a * 4.0));
         } else {
             refl = fallback;
@@ -255,7 +257,7 @@ void main() {
             // 太陽・灯りの照り返しの粗さ: 表した波の斜面は法線が受け持つので、光学的に滑らかな水に、画素より細かい波と画素の中・露光の間の法線の揺れを足す
             // 側面 (滝) は落ちる水の乱れに任せ、幅のある淡いつやを残す
             float lightAlpha = side ? sqrt(sqr(WATER_ROUGHNESS) + unresolvedVar)
-                : sqrt(sqr(WATER_SUN_ROUGHNESS) + unresolvedVar + waterPixelSlopeVar(sea, footprint));
+                : sqrt(sqr(WATER_SUN_ROUGHNESS) + unresolvedVar + lod.pixelSlopeVar);
             float sunAlpha = lightAlpha;
             // 上向きの面だけ: 長い 3 層の高さと Jacobian (波頭の透過光・泡・さざ波の強さのむら)。視差の位置ずれは長い波では画素未満
             bool top = N.y > 0.5;

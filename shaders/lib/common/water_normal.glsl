@@ -12,6 +12,7 @@
 //@include "/lib/common/noise.glsl"
 //@include "/lib/common/uniforms.glsl"
 //@include "/lib/common/water_waves.glsl"
+//@include "/lib/common/water_lod.glsl"
 
 /*
  * 水たまりの鏡面を広げる傾きの分散 (deferred30)
@@ -166,14 +167,40 @@ vec3 waterFallNormal(vec3 worldPos, vec3 geoNormal, float footprint) {
 }
 
 /*
- * 水面の法線 (player 空間)。worldPos は cameraPosition を足したワールド座標, footprint は waterFootprint, flow は waterFlowVelocity
+ * 法線で描く層の和 (高さ, 勾配, 発散)。振幅は WaterLod が距離で決めた値 (画素より細かい層は 0)
+ * 近景は 3 次で補間する (法線だけ。視差・コースティクスは高さの位置しか使わないので双線形のまま)
  */
-vec3 getWaterNormal(WaterSea sea, vec3 worldPos, vec3 geoNormal, float footprint, vec2 flow) {
+vec4 waterWaveSum(WaterLod lod, vec2 p) {
+    float t = frameTimeCounter;
+    vec4 sum = vec4(0.0);
+    for (int i = 0; i < WATER_LAYERS; i++) {
+        if (lod.amp[i] > 0.0) sum += waterLayer(p, i, lod.amp[i], t, lod.footprint);
+    }
+    return sum;
+}
+
+/*
+ * 流れのある面: 2 つの位相で流れの向きへずらした波を交互に混ぜる (flow map の定番)。flow は速度 (ブロック/秒)
+ * 無相関な 2 つを重み w, 1 - w で混ぜると分散が w^2 + (1 - w)^2 倍に落ちるので戻す
+ */
+vec4 waterWaveSumFlow(WaterLod lod, vec2 p, vec2 flow) {
+    if (dot(flow, flow) < 1e-4) return waterWaveSum(lod, p);
+    float phase = fract(frameTimeCounter / WATER_FLOW_CYCLE);
+    vec4 a = waterWaveSum(lod, p - flow * (phase * WATER_FLOW_CYCLE));
+    vec4 b = waterWaveSum(lod, p - flow * (fract(phase + 0.5) * WATER_FLOW_CYCLE) + 0.37);
+    float wa = 1.0 - abs(1.0 - 2.0 * phase);
+    return (a * wa + b * (1.0 - wa)) * inversesqrt(sqr(wa) + sqr(1.0 - wa));
+}
+
+/*
+ * 水面の法線 (player 空間)。worldPos は cameraPosition を足したワールド座標, lod は waterLod, flow は waterFlowVelocity
+ */
+vec3 getWaterNormal(WaterLod lod, vec3 worldPos, vec3 geoNormal, vec2 flow) {
 #ifdef WATER_WAVES
-    if (abs(geoNormal.y) <= 0.5) return waterFallNormal(worldPos, geoNormal, footprint);
+    if (abs(geoNormal.y) <= 0.5) return waterFallNormal(worldPos, geoNormal, lod.footprint);
     mat3 basis = waterBasis(geoNormal);
     vec2 p = vec2(dot(worldPos, basis[0]), dot(worldPos, basis[1]));
-    vec2 g = waterChoppy(waterWaveSumFlow(sea, p, 0, WATER_LAYERS, footprint, flow)).yz;
+    vec2 g = waterChoppy(waterWaveSumFlow(lod, p, flow)).yz;
     #ifdef HAS_SKY
         if (geoNormal.y > 0.5 && biome_precipitation == 1) g += rainRipples(p, rainStrength);
     #endif
@@ -208,16 +235,8 @@ vec3 waterReflectNormal(vec3 N, vec3 V) {
  * かすめ角では探す距離が WATER_PARALLAX_MAX に収まるよう高さを縮める。そのままだと手前の大きな波の斜面が画面の大半に
  * 引き伸ばされてぼやけ、探す範囲を切った所で視差が途切れて段差が出た
  */
+// 探す幅 (WATER_PARALLAX_RANGE)・縮め (WATER_PARALLAX_MAX)・画素に満たない所の打ち切り (WATER_PARALLAX_FADE) は waterLod が決める
 const int WATER_PARALLAX_STEPS = 5;
-const float WATER_PARALLAX_RANGE = 2.5;
-const float WATER_PARALLAX_MAX = 1.5;          // 視線に沿って探す最大距離 (ブロック)
-// 視差に使う長い層の数。3 番目 (波長 1-8 ブロック) の高さは 0.03 ブロック前後で、足すと全画面の水で 1 ms 近く重くなる (GTX 1070, 1080p)
-const int WATER_PARALLAX_LAYERS = 2;
-/*
- * 高さの差が画素のこの倍率 (x = 0, y = 全部) の間で視差を 0 へ寄せる。画素に満たない所で打ち切るだけだと、その距離の弧を境に
- * 法線を引く位置が最大 WATER_PARALLAX_MAX 跳び、うねりの山と谷の所で波の模様が弧の線で食い違った
- */
-const vec2 WATER_PARALLAX_FADE = vec2(0.5, 1.0);
 
 /*
  * 探す幅は高さの RMS の +-WATER_PARALLAX_RANGE 倍なので、うねりの山がそれより高いと始点ですでに視線が波の下にあり、
@@ -225,15 +244,12 @@ const vec2 WATER_PARALLAX_FADE = vec2(0.5, 1.0);
  * 法線を引く位置が最大 WATER_PARALLAX_MAX 跳び、別の位置の波が楕円の縁で食い違ってうねりと一緒に流れた。
  * 始点で下なら始点、交わらなければ終点を当たりにする (外れの境で当たりがちょうど始点・終点に来るので、位置がつながる)
  */
-vec3 waterParallax(WaterSea sea, vec3 worldPos, vec3 viewDir, float footprint) {
+vec3 waterParallax(WaterSea sea, WaterLod lod, vec3 worldPos, vec3 viewDir) {
 #if defined WATER_WAVES && defined WATER_PARALLAX
-    float h2 = 0.0;
-    for (int i = 0; i < WATER_PARALLAX_LAYERS; i++) h2 += sqr(sea.amp[i] * waterLayerTile(i) * WATER_TEX_HEIGHT_SIGMA);
-    float range = WATER_PARALLAX_RANGE * sqrt(h2);
-    float scale = min(1.0, WATER_PARALLAX_MAX * -viewDir.y / max(range, 1e-5));
-    range *= scale;
-    // 高さの差が画素に満たなければ探さない
-    float fade = smoothstep(WATER_PARALLAX_FADE.x, WATER_PARALLAX_FADE.y, range / max(footprint, 1e-6));
+    float footprint = lod.footprint;
+    float range = lod.parallaxRange;
+    float scale = lod.parallaxScale;
+    float fade = lod.parallax;
     if (viewDir.y >= -0.01 || fade <= 0.0) return worldPos;
     float t0 = range / viewDir.y;
     float t1 = -t0;

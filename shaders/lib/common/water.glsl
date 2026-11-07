@@ -16,6 +16,7 @@
 
 //@include "/lib/common/water_waves.glsl"
 //@include "/lib/common/water_glitter.glsl"
+//@include "/lib/common/water_lod.glsl"
 //@include "/lib/common/water_normal.glsl"
 
 #endif

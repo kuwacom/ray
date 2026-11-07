@@ -52,6 +52,7 @@
 #include "/lib/buffers/frame_data.glsl"
 #include "/lib/common/water_waves.glsl"
 #include "/lib/common/water_glitter.glsl"
+#include "/lib/common/water_lod.glsl"
 #include "/lib/common/water_normal.glsl"
 #include "/lib/common/water.glsl"
 #include "/lib/common/shadow_space.glsl"
@@ -174,7 +175,7 @@ void main() {
      */
     float waterSlopeVar = 0.0;
     if (waterTop && N.y > 0.5) {
-        waterSlopeVar = waterUnresolvedSlopeVar(waterSeaState(s.skyLm), waterFootprint(dist, abs(V.y)));
+        waterSlopeVar = waterLod(waterSeaState(s.skyLm), dist, abs(V.y)).unresolved.x;
         s.perceptualRoughness = waterReflectRoughness(waterSlopeVar);
     }
     bool waterRough = waterTop && s.perceptualRoughness >= MIRROR_ROUGHNESS;

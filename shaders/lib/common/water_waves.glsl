@@ -343,7 +343,7 @@ float waterTileResolved(float tile, float footprint) {
 /*
  * 法線で描く 5 層を薄める範囲 (1 画素あたりのテクセル数)。帯の中心の波長 (15 テクセル) が画面で 3.8 画素から 1.5 画素になる間で消す
  * 表面張力波と同じ 1.5-4 テクセル (中心の波長 10-3.8 画素) で落とすと、中景〜遠景は数画素より大きい波の形だけになり、波の列ごとの
- * 照り返しがのっぺりした面に均された。画素に近い波の傾きの揺れは照り返しの粗さ (waterPixelSlopeVar) と映り込みの散らし
+ * 照り返しがのっぺりした面に均された。画素に近い波の傾きの揺れは照り返しの粗さ (WaterLod の pixelSlopeVar) と映り込みの散らし
  * (waterReflectAlpha) が受け持つので、ここまで描いても白い砂目やちらつきにならない
  */
 const vec2 WATER_LAYER_FADE = vec2(4.0, 10.0);
@@ -353,43 +353,19 @@ float waterLayerResolved(int i, float footprint) {
 }
 
 /*
- * 層 first .. last-1 の和 (高さ, 勾配, 発散)。画素より細かい層は足さない (ちらつきの元になるため)
- * cubicFootprint: 正なら近景を 3 次で補間する (法線だけ。視差・コースティクスは高さの位置しか使わないので双線形のまま)
+ * 層 first .. last-1 の高さ (と勾配, 発散) の和。画素より細かい層は足さない (ちらつきの元になるため)
+ * 視差・波頭・コースティクスの高さの位置に使う。法線は WaterLod の振幅で引く (lib/common/water_normal.glsl の waterWaveSum)
  */
-vec4 waterWaveSum(WaterSea sea, vec2 p, int first, int last, float footprint, float cubicFootprint) {
+vec4 waterWaveSum(WaterSea sea, vec2 p, int first, int last, float footprint) {
     float t = frameTimeCounter;
     vec4 sum = vec4(0.0);
     for (int i = first; i < last; i++) {
         float r = waterLayerResolved(i, footprint);
         // タイルは単調に小さくなるので、表せない層が出たら残りも全部表せない
         if (r <= 0.0) break;
-        if (sea.amp[i] > 0.0) sum += waterLayer(p, i, sea.amp[i] * r, t, cubicFootprint);
-    }
-    return sum;
-}
-
-vec4 waterWaveSum(WaterSea sea, vec2 p, int first, int last, float footprint) {
-    float t = frameTimeCounter;
-    vec4 sum = vec4(0.0);
-    for (int i = first; i < last; i++) {
-        float r = waterLayerResolved(i, footprint);
-        if (r <= 0.0) break;
         if (sea.amp[i] > 0.0) sum += waterLayer(p, i, sea.amp[i] * r, t);
     }
     return sum;
-}
-
-/*
- * 流れのある面: 2 つの位相で流れの向きへずらした波を交互に混ぜる (flow map の定番)。flow は速度 (ブロック/秒)
- * 無相関な 2 つを重み w, 1 - w で混ぜると分散が w^2 + (1 - w)^2 倍に落ちるので戻す
- */
-vec4 waterWaveSumFlow(WaterSea sea, vec2 p, int first, int last, float footprint, vec2 flow) {
-    if (dot(flow, flow) < 1e-4) return waterWaveSum(sea, p, first, last, footprint, footprint);
-    float phase = fract(frameTimeCounter / WATER_FLOW_CYCLE);
-    vec4 a = waterWaveSum(sea, p - flow * (phase * WATER_FLOW_CYCLE), first, last, footprint, footprint);
-    vec4 b = waterWaveSum(sea, p - flow * (fract(phase + 0.5) * WATER_FLOW_CYCLE) + 0.37, first, last, footprint, footprint);
-    float wa = 1.0 - abs(1.0 - 2.0 * phase);
-    return (a * wa + b * (1.0 - wa)) * inversesqrt(sqr(wa) + sqr(1.0 - wa));
 }
 
 /*
@@ -398,45 +374,6 @@ vec4 waterWaveSumFlow(WaterSea sea, vec2 p, int first, int last, float footprint
  */
 float waterJacobian(vec4 w) { return max(1.0 - waterChoppiness() * w.w, WATER_JACOBIAN_MIN); }
 vec3 waterChoppy(vec4 w) { return vec3(w.x, w.yz / waterJacobian(w)); }
-
-/*
- * 表面張力波 1 層の (粗さへ回す傾きの分散, 曲率の 2 乗)。層は 2 つなので、配列をループの添字で引かず定数の添字で 2 回呼ぶ
- * (添字のループで引く形では、ドライバの最適化の違いで、画面の中心を通る直線の上だけ水面が映り込みで鏡のように光り、ほかの水面の映り込みが
- * 弱まることがあった。コードの上の未定義の値は見つかっていない)
- */
-vec2 waterCapillaryUnresolved(float amp, float tile, float footprint) {
-    float r = waterTileResolved(tile, footprint);
-    return sqr(amp) * vec2(1.0 - (1.0 - WATER_CAPILLARY_NEAR_ROUGH) * r * r, sqr(TAU * WATER_BAND_CENTER / tile));
-}
-
-/*
- * 法線で表せなかった傾きの分散 (GGX の alpha^2 に足す)。画素の中で平均された波は面を粗くする (LEAN / Toksvig と同じ考え)
- * 遠くの水面で太陽の照り返しが縦に広がる帯になるのはこの分
- */
-/*
- * y は同じ層の曲率の 2 乗の和。1 層を振幅 (傾きの RMS) a・波数 k の正弦とみなした (a k)^2 を足す。画素より細かい波が太陽を映す
- * 点の数 (傾きの確率密度 x ガウス曲率の絶対値の平均) に使う (WATER_GLITTER)。使わない呼び出しでは消える
- */
-vec2 waterUnresolvedSlopeCurvature(WaterSea sea, float footprint) {
-    vec2 v = vec2(0.0);
-    for (int i = 0; i < WATER_LAYERS; i++) {
-        float tile = waterLayerTile(i);
-        float r = waterLayerResolved(i, footprint);
-        // 法線側に r 倍を残すので、分散の合計が保たれるよう 1 - r^2 を回す
-        float w = (1.0 - r * r) * sqr(sea.amp[i]);
-        v += w * vec2(1.0, sqr(TAU * WATER_BAND_CENTER / tile));
-    }
-    /*
-     * 表面張力波は法線で描かないので、どの距離でも粗さになる。ただし画素がその波より小さい近くでは、1 画素が見るのは波の一部の
-     * 面だけなので、傾きの分散を WATER_CAPILLARY_NEAR_ROUGH まで減らす (全部を回すと、近くの太陽の照り返しが表した波と無関係な
-     * ぼやけた白い塊になった)。曲率 (y、WATER_GLITTER の点の数) は減らさない。近くの点は細くなったローブ (表した波の斜面) に集まる
-     */
-    v += waterCapillaryUnresolved(sea.capAmp[0], waterCapillaryTile(0), footprint);
-    v += waterCapillaryUnresolved(sea.capAmp[1], waterCapillaryTile(1), footprint);
-    return v;
-}
-
-float waterUnresolvedSlopeVar(WaterSea sea, float footprint) { return waterUnresolvedSlopeCurvature(sea, footprint).x; }
 
 // 表面張力 / 密度 (m^3/s^2)。波長 2 cm 前後より短い波は表面張力で速く進む
 const float WATER_SURFACE_TENSION = 7.28e-5;
@@ -448,68 +385,17 @@ float waterPhaseSpeed(float wavelength) {
 }
 
 /*
- * 表せた層の、画素の中と露光の間での法線 (傾き) の揺れの分散。1 層の傾きは波長 lambda で振幅 a の正弦に近く、画素の幅 f の中で
- * a x 2 pi f / lambda ほど変わる (画素の中の一様な位置の標準偏差は幅の 1 / sqrt(12))
- * GGX の alpha^2 に足すと、細い鋭いローブが画素の当たり外れにならず、エネルギーを保ったままジッターのちらつきが消える
- * 画面微分は使わず (gbuffers_solid.fsh の鏡面 AA を入れない理由と同じ)、層ごとの解析式で足す
- */
-const float WATER_PIXEL_SLOPE_SCALE = TAU / sqrt(12.0);
-
-/*
- * 同じ式で、1 フレームの露光の間の法線の変化も足す (シャッターの時間積分)。層の傾きは時間の最も遅い倍音の周期
- * P (= ループの周期 / WATER_TIME_HARMONIC_LO) で回り、露光 dt の間に a x 2 pi dt / P ほど変わる (一様な時刻の標準偏差も 1 / sqrt(12))
- * さざ波の照り返しがフレームごとに別の画素へ跳ばず、露光の間の軌跡に沿ってエネルギーを保ったまま広がる。細かく速い層ほど効く
- * 画素の幅と露光の間の変化は独立なので分散の和 (層ごとの係数は定数に畳まれる)
- */
-const float WATER_EXPOSURE_SHUTTER = 0.5;   // 1 フレームのうち露光している割合 (モーションブラーのシャッターと同じ)
-const float WATER_EXPOSURE_MAX_DT = 0.05;   // 低いフレームレートで照り返しが流れすぎない上限 (秒)
-
-float waterLayerSlopeChange(float tile, float footprint, float dt) {
-    return sqr(footprint * WATER_BAND_CENTER / tile) + sqr(dt * WATER_TIME_HARMONIC_LO / waterLayerPeriod(tile));
-}
-
-float waterPixelSlopeVar(WaterSea sea, float footprint) {
-    float dt = min(frameTime, WATER_EXPOSURE_MAX_DT) * WATER_EXPOSURE_SHUTTER;
-    float v = 0.0;
-    for (int i = 0; i < WATER_LAYERS; i++) {
-        float tile = waterLayerTile(i);
-        v += sqr(waterLayerResolved(i, footprint) * sea.amp[i] * WATER_PIXEL_SLOPE_SCALE) * waterLayerSlopeChange(tile, footprint, dt);
-    }
-    return v;
-}
-
-/*
- * 水面上の 1 画素の大きさ (ブロック)。かすめ角では視線方向に伸びるので、伸びた辺 (1 / NoV) 寄りで測る
- * 波は全方向を向くので、視線方向に伸びた辺で 2 画素を切る波は画面の縦に折り返す。幾何平均 (NoV^-0.5) では
- * 中景 (かすめ角 0.05-0.1) で縦に 2 画素ほどの波が残り、反射が画素ごとに空と水の色で斑になる白い砂目になった
- */
-const float WATER_FOOTPRINT_STRETCH = 1.0;
-
-float waterFootprint(float dist, float NoV) {
-    float pixelAngle = 2.0 / (gbufferProjection[1][1] * viewSize().y);
-    return dist * pixelAngle * pow(max(NoV, 0.02), -WATER_FOOTPRINT_STRETCH);
-}
-
-/*
- * 画素より細かい波で粗くなった水面の反射 (slopeVar = waterUnresolvedSlopeVar)。画素の中で見える微小面は視線の側へ傾くので、
+ * 画素より細かい波で粗くなった水面の反射 (slopeVar = WaterLod の unresolved.x)。画素の中で見える微小面は視線の側へ傾くので、
  * かすめ角でも実効の NoV は傾きの RMS ほどに留まり (フレネルが 1 に張り付かない)、反射は傾きの分だけ高い空を映す。
  * 平らな鏡のままだと、遠くの水面が地平線の空をそのまま映して地平線の手前に明るい帯ができ、水平線が消えていた
  */
 // 反射の仰角の持ち上げ (傾きの RMS あたり)。1.6 では中景 (層を落とした傾きの RMS 0.15 前後) の空の反射が R によらず
 // 仰角 0.25 付近の 1 行になり、夕方の雲が上下の切れた四角い縦縞に並んだ
 const float WATER_ROUGH_REFLECT_LIFT = 1.0;
-/*
- * フレネルを均すのは水面の 1 画素 (waterFootprint) がこの範囲 (ブロック) より大きい所だけ。近景・中景まで均すと、層を落とし始める
- * 10-30 ブロックからフレネルが 0.7 -> 0.45 に下がり、つやの無いマットな水面になった。遠くは像を残したまま暗くして、
- * 地平線の手前の明るい帯 (水面が地平線の空と同じ明るさになり水平線が消える) を抑える
- * 画素の大きさで決めるので、描画距離を変えても同じ水面の見え方は変わらない (目の高さ 2 ブロックで 100-270 ブロック先)
- */
-const vec2 WATER_ROUGH_FRESNEL_RANGE = vec2(8.0, 64.0);
 
-float waterRoughFar(float footprint) { return smoothstep(WATER_ROUGH_FRESNEL_RANGE.x, WATER_ROUGH_FRESNEL_RANGE.y, footprint); }
-
-float waterRoughNoV(float NoV, float slopeVar, float footprint) {
-    return sqrt(NoV * NoV + slopeVar * waterRoughFar(footprint));
+// roughFar: フレネルを均す割合 (WaterLod の roughFar)
+float waterRoughNoV(float NoV, float slopeVar, float roughFar) {
+    return sqrt(NoV * NoV + slopeVar * roughFar);
 }
 
 /*
