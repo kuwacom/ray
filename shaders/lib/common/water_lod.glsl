@@ -80,6 +80,15 @@ const int WATER_PARALLAX_LAYERS = 2;
  */
 const vec2 WATER_PARALLAX_FADE = vec2(0.5, 1.0);
 
+/*
+ * 遠くで法線に残す傾きの割合 (5 層の傾きの RMS に対して)。細かい層を画素の大きさで落とすと、傾きの多くが短い層にある湖・川は
+ * 数十ブロック先から法線の傾きが 0 になり、映り込みが揺れない平らな鏡になる。落とした傾きを映り込みの散らしに回すと、すりガラスの
+ * ようにぼける。足りない分をその距離で描ける最も細かい層の振幅に足し、画面で縦に数画素の波の帯で映り込みを揺らす
+ * (足した分は粗さから引いて傾きの分散の合計を保つ)。足す層は帯の中心の波長が画面で 4 画素ほど以上なので、細かい砂目にならない
+ * 長いうねりの残る海は、ふつうの距離ではこの割合を上回っていて変わらない
+ */
+const float WATER_FAR_SLOPE_KEEP = 0.35;
+
 struct WaterLod {
     float footprint;            // 水面の 1 画素の大きさ (ブロック)
     float amp[WATER_LAYERS];    // 層ごとに法線で描く傾きの RMS
@@ -107,16 +116,28 @@ WaterLod waterLod(WaterSea sea, float dist, float NoV, float pixelAngle) {
      * y は同じ層の曲率の 2 乗の和。1 層を振幅 (傾きの RMS) a・波数 k の正弦とみなした (a k)^2 を足す。画素より細かい波が太陽を映す
      * 点の数 (傾きの確率密度 x ガウス曲率の絶対値の平均) に使う (WATER_GLITTER)。使わない呼び出しでは消える
      */
+    float r[WATER_LAYERS + 1];
+    float total = 0.0;
+    float drawn = 0.0;
+    for (int i = 0; i < WATER_LAYERS; i++) {
+        r[i] = waterLayerResolved(i, footprint);
+        total += sqr(sea.amp[i]);
+        drawn += sqr(r[i] * sea.amp[i]);
+    }
+    r[WATER_LAYERS] = 0.0;
+    float lack = max(sqr(WATER_FAR_SLOPE_KEEP) * total - drawn, 0.0);
     vec2 unresolved = vec2(0.0);
     float dt = min(frameTime, WATER_EXPOSURE_MAX_DT) * WATER_EXPOSURE_SHUTTER;
     float pixelVar = 0.0;
     for (int i = 0; i < WATER_LAYERS; i++) {
         float tile = waterLayerTile(i);
-        float r = waterLayerResolved(i, footprint);
-        lod.amp[i] = r * sea.amp[i];
-        // 法線側に r 倍を残すので、分散の合計が保たれるよう 1 - r^2 を回す
-        float w = (1.0 - r * r) * sqr(sea.amp[i]);
+        // 足りない傾きは、描ける層のうち最も細かい層へ (隣の層との重みの差なので、距離に対して連続に移る)
+        float add = (sqr(r[i]) - sqr(r[i + 1])) * lack;
+        lod.amp[i] = sqrt(sqr(r[i] * sea.amp[i]) + add);
+        // 法線側に r 倍を残すので、分散の合計が保たれるよう 1 - r^2 を回す (遠くで法線に戻した分は引く)
+        float w = (1.0 - r[i] * r[i]) * sqr(sea.amp[i]);
         unresolved += w * vec2(1.0, sqr(TAU * WATER_BAND_CENTER / tile));
+        unresolved.x -= add;
         pixelVar += sqr(lod.amp[i] * WATER_PIXEL_SLOPE_SCALE) * waterLayerSlopeChange(tile, footprint, dt);
     }
     /*
