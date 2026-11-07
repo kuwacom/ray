@@ -190,7 +190,9 @@ vec3 getWaterNormal(WaterSea sea, vec3 worldPos, vec3 geoNormal, float footprint
  */
 // 0.3 では中景の反射が地平線のもやを一様に映す白っぽい面になった。画素より細かい波は層ごと落とすようになり
 // (waterFootprint を伸びた辺で測る)、中景に残るのは長い波だけで斑にならないので、傾きを多めに残して雲を映させる
-const float WATER_REFLECT_GRAZING_KEEP = 0.6; // 真横から見た時に残す傾きの割合
+// 画素より細かい波を法線に残さず映り込みの散らし (waterReflectAlpha) へ回す今は、斑の元が法線に無いので傾きを全部残す
+// (0.6 では中景〜遠景の映り込みの向きの揺れが減り、波ごとに明るい空と暗い空を交互に映す細かい明暗が弱まった)
+const float WATER_REFLECT_GRAZING_KEEP = 1.0; // 真横から見た時に残す傾きの割合
 const float WATER_REFLECT_GRAZING_NOV = 0.4;  // 視線と水面の cos がこれ以上なら傾きをそのまま使う
 
 vec3 waterReflectNormal(vec3 N, vec3 V) {

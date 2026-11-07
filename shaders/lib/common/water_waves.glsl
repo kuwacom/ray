@@ -289,12 +289,23 @@ vec4 waterLayer(vec2 p, int i, float amp, float t) {
 
 // 層が画素の大きさ footprint (ブロック) に対して表せる割合。帯の短い端 (タイルの約 5 テクセル) が 2 画素を切る前に消す
 // (2.5-6 テクセル/画素では、帯の短い側が 1-2 画素の波になって中距離の水面が細かい白い砂目にざらついた)
+// 表面張力波と風の息に使う。法線で描く 5 層は waterLayerResolved
 float waterTileResolved(float tile, float footprint) {
     float fadeStart = mix(WATER_WAVE_FADE_START, WATER_LOD_FADE_START, smoothstep(WATER_WAVE_NEAR.x, WATER_WAVE_NEAR.y, footprint));
     return footprint > 0.0 ? 1.0 - smoothstep(fadeStart, WATER_LOD_FADE_END, footprint * WATER_TEX_SIZE / tile) : 1.0;
 }
 
-float waterLayerResolved(int i, float footprint) { return waterTileResolved(waterLayerTile(i), footprint); }
+/*
+ * 法線で描く 5 層を薄める範囲 (1 画素あたりのテクセル数)。帯の中心の波長 (15 テクセル) が画面で 3.8 画素から 1.5 画素になる間で消す
+ * 表面張力波と同じ 1.5-4 テクセル (中心の波長 10-3.8 画素) で落とすと、中景〜遠景は数画素より大きい波の形だけになり、波の列ごとの
+ * 照り返しがのっぺりした面に均された。画素に近い波の傾きの揺れは照り返しの粗さ (waterPixelSlopeVar) と映り込みの散らし
+ * (waterReflectAlpha) が受け持つので、ここまで描いても白い砂目やちらつきにならない
+ */
+const vec2 WATER_LAYER_FADE = vec2(4.0, 10.0);
+
+float waterLayerResolved(int i, float footprint) {
+    return footprint > 0.0 ? 1.0 - smoothstep(WATER_LAYER_FADE.x, WATER_LAYER_FADE.y, footprint * WATER_TEX_SIZE / waterLayerTile(i)) : 1.0;
+}
 
 /*
  * 層 first .. last-1 の和 (高さ, 勾配, 発散)。画素より細かい層は足さない (ちらつきの元になるため)
@@ -365,7 +376,7 @@ vec2 waterUnresolvedSlopeCurvature(WaterSea sea, float footprint) {
     vec2 v = vec2(0.0);
     for (int i = 0; i < WATER_LAYERS; i++) {
         float tile = waterLayerTile(i);
-        float r = waterTileResolved(tile, footprint);
+        float r = waterLayerResolved(i, footprint);
         // 法線側に r 倍を残すので、分散の合計が保たれるよう 1 - r^2 を回す
         float w = (1.0 - r * r) * sqr(sea.amp[i]);
         v += w * vec2(1.0, sqr(TAU * WATER_BAND_CENTER / tile));
@@ -417,7 +428,7 @@ float waterPixelSlopeVar(WaterSea sea, float footprint) {
     float v = 0.0;
     for (int i = 0; i < WATER_LAYERS; i++) {
         float tile = waterLayerTile(i);
-        v += sqr(waterTileResolved(tile, footprint) * sea.amp[i] * WATER_PIXEL_SLOPE_SCALE) * waterLayerSlopeChange(tile, footprint, dt);
+        v += sqr(waterLayerResolved(i, footprint) * sea.amp[i] * WATER_PIXEL_SLOPE_SCALE) * waterLayerSlopeChange(tile, footprint, dt);
     }
     return v;
 }
