@@ -212,7 +212,7 @@ vec3 screenFlare(vec2 uv) {
 #if defined LENS_STARBURST && LENS_BLADES > 0
     sum += screenStars(uv, exposure, fNumber);
 #endif
-    return sum * LENS_FLARE_STRENGTH;
+    return sum * FLARE_GAIN;
 }
 #endif
 

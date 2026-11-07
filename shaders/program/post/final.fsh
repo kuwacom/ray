@@ -292,8 +292,8 @@ void main() {
      * DoF の前の値なので、ボケている点には重ねない (玉ボケに任せる)
      * 球面収差・ブルーム・ヘイズの mix より前に掛ける。後に掛けると、mix で縮んだ hdr から縮む前の白飛び分を引き、点の中心が地まで削られて黒く抜けた
      */
-    if (LENS_POINT_SPREAD_STRENGTH > 0.0) {
-        float focusFade = LENS_POINT_SPREAD_STRENGTH;
+    if (POINT_SPREAD_GAIN > 0.0) {
+        float focusFade = POINT_SPREAD_GAIN;
     #ifdef DOF
         float cocDist = depth >= 1.0 ? far * 4.0 : linearizeDepth(fixHandDepth(depth));
         float cocPx = isHandDepth(depth) ? 0.0 : circleOfConfusion(cocDist, max(frameData.focusDistance, 0.1));
@@ -331,18 +331,18 @@ void main() {
     vec3 bloom = sampleBloom(uvL, bands);
     #ifdef LENS_SOFT_FOCUS
         // 球面収差: ピントが合っていても低い周波数の滲みが乗る (開放ほど強い)
-        hdr = mix(hdr, bands.narrow, saturate(LP_SOFT_FOCUS * LENS_SOFT_FOCUS_AMOUNT * lensApertureFactor()));
+        hdr = mix(hdr, bands.narrow, saturate(LP_SOFT_FOCUS * LENS_SOFT_FOCUS_AMOUNT * lensApertureFactor() * GLOW_GAIN));
         #ifdef LENS_SOFT_HALO_TABLE
             // 処方の球面収差のハロー (FA 28 Soft など)。半径と割合は F 値で変わり、絞ると消える
             vec4 softHalo = lensSoftHalo(uvL);
-            hdr = mix(hdr, softHalo.rgb, saturate(softHalo.a * LENS_SOFT_HALO_GAIN));
+            hdr = mix(hdr, softHalo.rgb, saturate(softHalo.a * LENS_SOFT_HALO_GAIN * GLOW_GAIN));
         #endif
     #endif
     /*
      * 溶岩の上は自分のブルーム (LAVA_BLOOM_GAIN 倍) が一様に乗って暗い殻が持ち上がり、模様が平らになる
      * 溶岩の画素だけ混合率を下げ、滲みは周りに出す
      */
-    float bloomMix = saturate(LOOK_BLOOM_STRENGTH * BLOOM_AMOUNT) * (1.0 - LAVA_SELF_BLOOM_CUT * lava);
+    float bloomMix = saturate(LOOK_BLOOM_STRENGTH * BLOOM_AMOUNT * GLOW_GAIN) * (1.0 - LAVA_SELF_BLOOM_CUT * lava);
     hdr = mix(hdr, bloom, bloomMix);
     lavaGlowShare = saturate(bloomMix * bands.lava / max(luminance(hdr), 1e-6));
 
@@ -352,17 +352,17 @@ void main() {
     float water = isEyeInWater == 1 ? 1.0 : 0.0;
     float wideAmount = LOOK_BLOOM_FOG * mix(fogFactor, 1.0, water)
                      + LOOK_BLOOM_STRENGTH * BLOOM_AMOUNT * (rainStrength * BLOOM_RAIN_BOOST + water * BLOOM_WATER_BOOST);
-    hdr = mix(hdr, bands.wide, saturate(wideAmount));
+    hdr = mix(hdr, bands.wide, saturate(wideAmount * GLOW_GAIN));
 
     #ifdef LENS_VEILING_GLARE
         // ベーリンググレア: レンズ面と鏡筒の散乱で画面全体に薄いヘイズが乗り、暗部が持ち上がる
-        hdr = mix(hdr, bands.widest, saturate(LP_VEILING_GLARE * LENS_VEIL_HAZE));
+        hdr = mix(hdr, bands.widest, saturate(LP_VEILING_GLARE * LENS_VEIL_HAZE * GLOW_GAIN));
     #endif
     #ifdef LENS_DIRT
         // 汚れは近くの明るい光を散乱して光る (明るい物の周りだけ模様が浮かぶ)
         if (LP_DIRT > 0.0) {
             vec3 lit = max(bands.wide - LENS_SCREEN_THRESHOLD * 0.3 / exposure, 0.0);
-            hdr += lit * (lensDirt(uvFlare) * LP_DIRT * LENS_DIRT_BLOOM_GAIN * LENS_FLARE_STRENGTH);
+            hdr += lit * (lensDirt(uvFlare) * LP_DIRT * LENS_DIRT_BLOOM_GAIN * FLARE_GAIN);
         }
     #endif
     #if defined LENS_SCREEN_FLARE && defined LENS_FLARE
@@ -384,7 +384,7 @@ void main() {
             float day = smoothstep(-0.1, 0.1, getSunDir().y);
             float gain = mix(LENS_MOON_FLARE, 1.0, day);
             float starGain = mix(LENS_MOON_STARBURST, 1.0, day);
-            hdr += lensFlare(uvFlare, lightUv, lightTint, starGain) * lightColor * (vis * gain * LENS_FLARE_STRENGTH);
+            hdr += lensFlare(uvFlare, lightUv, lightTint, starGain) * lightColor * (vis * gain * FLARE_GAIN);
         }
     }
 #endif
@@ -409,7 +409,7 @@ void main() {
 #if defined BLOOM && defined LENS_HALATION
     if (LP_HALATION > 0.0) {
         float halation = max(luminance(bands.mid) * exposure - LENS_HALATION_THRESHOLD, 0.0) / exposure;
-        hdr += LENS_HALATION_TINT / luminance(LENS_HALATION_TINT) * (halation * LP_HALATION * LENS_HALATION_GAIN);
+        hdr += LENS_HALATION_TINT / luminance(LENS_HALATION_TINT) * (halation * LP_HALATION * LENS_HALATION_GAIN * GLOW_GAIN);
     }
 #endif
 

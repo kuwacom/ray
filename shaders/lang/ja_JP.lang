@@ -687,6 +687,8 @@ option.DOF_FOCUS_WATER.comment=水の外から水面を見たとき、オート�
 option.MOTION_BLUR=モーションブラー
 option.MOTION_BLUR_STRENGTH=モーションブラーの強さ
 # レンズ
+option.LENS_GLOW_STRENGTH=にじみ全体の強さ
+option.LENS_GLOW_STRENGTH.comment=明るい物の周りに光が広がる効果をまとめて強めたり弱めたりする。1 = そのまま、0 = すべて消える、2 = 倍。対象: ブルーム・ブルーミーフォグ・点像の滲み (白を超えた鏡面の点)・太陽と月のフレア (ゴースト・光条・ハロー・グレア・汚れ・ストリーク)・明るい画素のゴーストと光条・ベーリンググレア・球面収差の滲み・ハレーション・玉ボケの縁の明るさ。各効果の個別の強さにそのまま掛かる。点像の滲みは光の総量を変えず、配る割合にだけ掛かる (配れるのは点の光の全部まで)
 option.LENS_FLARE=レンズフレア
 option.LENS_FLARE.comment=太陽・月のフレア (ゴースト・光条・ハロー・グレア・汚れ・ストリーク) の主スイッチ
 option.LENS_FLARE_STRENGTH=フレア全体の倍率

@@ -26,6 +26,7 @@
 */
 #define LENS_PRESET 1 // [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18] 0=カスタム 1=現代の単焦点 2=Helios 44-2 3=Super Takumar 50/1.4 4=Petzval 5=Canon FD 50/1.4 6=アナモルフィック 7=Sonnar 50/1.5 8=Summilux 35/1.4 9=Canon 50/1.2 10=Hologon 15/8 11=Flektogon 20/4 12=Fish-eye Rokkor 16/2.8 13=Gyogyotto 20/8 14=Ultra Wide-Heliar 12/5.6 15=New FD 14/2.8L 16=STF 135/2.8 17=FA 28/2.8 Soft 18=Canon 50/0.95
 #define LENS_QUALITY 2 // [0 1 2 3] ゴースト数と波長サンプル数
+#define LENS_GLOW_STRENGTH 1.0 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0] 明るい物の周りに光が広がる効果 (ブルーム・点像の滲み・フレア・ゴースト・光条・ハロー・グレア・ハレーション・玉ボケの縁) 全体の強さ
 #define LENS_FLARE // 太陽・月のレンズフレア
 #define LENS_FLARE_STRENGTH 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 5.0 7.5 10.0] フレア全体の倍率
 #define LENS_GHOSTS // 内面反射のゴースト (レンズ設計から計算)

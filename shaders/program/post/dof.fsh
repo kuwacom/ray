@@ -85,6 +85,8 @@ const bool CATS_EYE = LP_CATS_EYE > 0.0;
 #else
 const bool CATS_EYE = false;
 #endif
+// 縁の明るさの偏りにも掛ける。偏りの合計が 1 を超えると円板の縁か中心の重みが負になるので、そこまでで止める
+const float RIM_GAIN = min(GLOW_GAIN, 1.0 / max(abs(LP_BOKEH_RIM) + abs(LP_SA_RIM), 1e-3));
 
 float dofDistance(float depth) {
     return depth >= 1.0 ? far * 4.0 : linearizeDepth(depth);
@@ -306,7 +308,7 @@ void main() {
          * 球面収差: ボケの縁が明るい (正) / 中心が明るい (負)。円板全体の平均の重みは 1 のまま
          * LP_SA_RIM は後ボケの値で、前ボケでは符号が逆になる (補正不足のレンズは後ボケが柔らかく前ボケの縁が立つ)
          */
-        float rim = 1.0 + (LP_BOKEH_RIM + (cocSignedS >= 0.0 ? LP_SA_RIM : -LP_SA_RIM)) * (2.0 * r * r - 1.0)
+        float rim = 1.0 + (LP_BOKEH_RIM + (cocSignedS >= 0.0 ? LP_SA_RIM : -LP_SA_RIM)) * (2.0 * r * r - 1.0) * RIM_GAIN
             * smoothstep(DOF_RIM_COC.x, DOF_RIM_COC.y, cocS);
         // アポダイゼーション (STF): ボケの円板の中での位置 rDisc / cocS を瞳の半径にして、周辺ほど暗くする
         if (LP_APODIZATION > 0.0) rim *= exp(-apodBeta * sqr(min(rDisc / max(cocS, 0.5), 1.0))) * apodNorm;

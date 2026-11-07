@@ -687,6 +687,8 @@ option.DOF_FOCUS_WATER.comment=Autofocus lands on the water surface when seen fr
 option.MOTION_BLUR=Motion Blur
 option.MOTION_BLUR_STRENGTH=Motion Blur Strength
 # Lens
+option.LENS_GLOW_STRENGTH=Overall Glow Strength
+option.LENS_GLOW_STRENGTH.comment=Strengthens or weakens every effect that spreads light around bright things at once. 1 = unchanged, 0 = all off, 2 = double. Covers: bloom, bloom fog, point spread (blown-out specular points), sun / moon flare (ghosts, starburst, halo, glare, dirt, streak), ghosts and starbursts from bright pixels, veiling glare, spherical aberration glow, halation and the bright rim of bokeh balls. It multiplies each effect's own strength. Point spread keeps the total light and only scales the share that is spread (at most all of the point's light)
 option.LENS_FLARE=Lens Flare
 option.LENS_FLARE.comment=Master switch for the sun / moon flare (ghosts, starburst, halo, glare, dirt, streak)
 option.LENS_FLARE_STRENGTH=Flare Strength

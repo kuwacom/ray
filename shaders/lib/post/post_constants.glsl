@@ -194,6 +194,15 @@ const float DOF_BLADE_ROTATION = 0.2;
 const vec2 DOF_RIM_COC = vec2(1.5, 4.0);
 // 絞り羽根の丸みはレンズプリセット (LP_BLADE_ROUNDNESS)
 
+/*
+ * にじみ全体の強さ (設定 LENS_GLOW_STRENGTH)。明るい物の周りに光が広がる効果の「広げる量」に掛ける
+ * ブルームの混合率、点像の配る割合、フレア系 (ゴースト・光条・ハロー・グレア・汚れ・ストリーク)、球面収差の滲み、ハレーション、玉ボケの縁
+ * 配り直す効果 (点像) は総量を変えず、配る割合にだけ掛ける
+ */
+const float GLOW_GAIN = LENS_GLOW_STRENGTH;
+const float FLARE_GAIN = LENS_FLARE_STRENGTH * GLOW_GAIN;
+const float POINT_SPREAD_GAIN = LENS_POINT_SPREAD_STRENGTH * GLOW_GAIN;
+
 // ブルーム
 const int BLOOM_LEVELS = 7;          // 1/2 .. 1/128
 const int BLOOM_PADDING = 4;         // タイル間の隙間 (ピクセル)。ぼかしの滲み込みを防ぐ
