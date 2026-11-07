@@ -31,8 +31,9 @@ layout(std430, binding = 0) SSBO_FRAME_DATA_ACCESS buffer FrameDataBuffer {
     // light (begin / deferred_a で書く)
     uvec4 lightStats;            // x = 前フレームの光源数, y = 溢れ数, z = エンティティ光源の登録締め切りフラグ (light), w = 前フレームに距離で間引いた数
 
-    // surface の自由領域 ([0..2] は prepare が書く開けた水面の海の状態。lib/common/water_waves.glsl。[3] は prepare が書くきらめきのフレームの長さ。lib/common/water_glitter.glsl)
-    vec4 surfaceParams[4];
+    // surface の自由領域 ([0..2] は prepare が書く開けた水面の海の状態。lib/common/water_waves.glsl。[3] は prepare が書くきらめきのフレームの長さ。lib/common/water_glitter.glsl。
+    // [4..5] は prepare が書く海・湖・川を混ぜた水の吸収・散乱・波頭の尖り・映り込みの散らし。lib/common/water_waves.glsl)
+    vec4 surfaceParams[6];
 
     // post
     uint histogram[256];         // 露出ヒストグラム (composite25 内で毎フレームクリア)

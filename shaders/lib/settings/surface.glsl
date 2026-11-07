@@ -64,16 +64,33 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define WATER_GLITTER_DENSITY 1.0 // [0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0] きらめきの点の量の倍率。多いと細かい点が密に、少ないと明るい点がまばらに出る (光の総量は同じ)
 #define WATER_GLITTER_LENGTH 1.0 // [0.5 0.75 1.0 1.5 2.0] きらめきの横長の光の長さの倍率
 #define WATER_GLITTER_SINGLE 0.55 // [0.0 0.25 0.55 0.8 1.0] 横に割れずに丸い 1 つの点のまま光る、明るいきらめきの割合
-#define WATER_REFLECT_SCATTER 0.3 // [0.0 0.1 0.2 0.3 0.4 0.5 0.7 1.0] 細かい波による水面の映り込みの散らし。0 で鏡、大きいほど映り込みがにじんで空の色に溶ける
+#define WATER_REFLECT_SCATTER 0.3 // [0.0 0.1 0.2 0.3 0.4 0.5 0.7 1.0] 海の細かい波による水面の映り込みの散らし。0 で鏡、大きいほど映り込みがにじんで空の色に溶ける
 #define WATER_LAKE_WAVES 0.3 // [0.0 0.2 0.3 0.4 0.6 0.8 1.0 1.5 2.0] 湖 (海・川以外) の風の強さ (海に対する割合)
 #define WATER_RIVER_WAVES 0.4 // [0.0 0.2 0.4 0.6 0.8 1.0 1.5 2.0] 川の風の強さ (海に対する割合)
+// 海・湖・川ごとの水 (カメラのバイオームで混ぜる)。倍率は共通の WATER_WAVE_HEIGHT / WATER_CHOPPINESS / WATER_FOG_DENSITY に掛ける
+#define WATER_SEA_WAVE_HEIGHT 1.0 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0] 海の波の高さの倍率
+#define WATER_LAKE_WAVE_HEIGHT 1.0 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0] 湖の波の高さの倍率
+#define WATER_RIVER_WAVE_HEIGHT 1.0 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0] 川の波の高さの倍率
+#define WATER_SEA_CHOPPINESS 1.0 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0] 海の波頭の尖りの倍率
+#define WATER_LAKE_CHOPPINESS 1.0 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0] 湖の波頭の尖りの倍率
+#define WATER_RIVER_CHOPPINESS 1.0 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0] 川の波頭の尖りの倍率
+#define WATER_LAKE_REFLECT_SCATTER 0.3 // [0.0 0.1 0.2 0.3 0.4 0.5 0.7 1.0] 湖の映り込みの散らし。0 で鏡 (穏やかな湖は対岸がくっきり映る)
+#define WATER_RIVER_REFLECT_SCATTER 0.3 // [0.0 0.1 0.2 0.3 0.4 0.5 0.7 1.0] 川の映り込みの散らし。0 で鏡
+#define WATER_LAKE_TYPE 0 // [0 1 2] 湖の水の色 0=外洋 (青) 1=沿岸 (緑) 2=澄んだ水
+#define WATER_RIVER_TYPE 0 // [0 1 2] 川の水の色 0=外洋 (青) 1=沿岸 (緑) 2=澄んだ水
+#define WATER_SEA_ABSORPTION 1.0 // [0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0 4.0] 海の吸収の倍率。大きいほど深い所が早く暗く色づく
+#define WATER_LAKE_ABSORPTION 1.0 // [0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0 4.0] 湖の吸収の倍率
+#define WATER_RIVER_ABSORPTION 1.0 // [0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0 4.0] 川の吸収の倍率
+#define WATER_SEA_TURBIDITY 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0] 海の濁り (散乱の倍率)。大きいほど水が白っぽく濁って底が見えにくい
+#define WATER_LAKE_TURBIDITY 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0] 湖の濁り (散乱の倍率)
+#define WATER_RIVER_TURBIDITY 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0] 川の濁り (散乱の倍率)
 #define WATER_PARALLAX // 水面の視差
 #define WATER_REFRACTION 1 // [0 1 2] 0=なし 1=スクリーンスペース 2=レイトレース
 #define WATER_REFRACTION_MODE 2 // [0 1 2] 上から見た水の屈折の方式 0=波の分だけ (水底は実際の深さ) 1=端で弱める (屈折のまま画面の端で弱める) 2=ボクセルで辿る (屈折のまま画面外はボクセルで辿る。水底が浅く見える)
 //#define WATER_CAUSTICS // 水中のコースティクス
 //#define WATER_TEXTURE // バニラの水テクスチャを重ねる
 #define WATER_FOG_DENSITY 1.0 // [0.05 0.1 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0 6.0]
-#define WATER_TYPE 0 // [0 1 2] 0=外洋 (青) 1=沿岸 (緑) 2=澄んだ水
+#define WATER_TYPE 0 // [0 1 2] 海の水の色 0=外洋 (青) 1=沿岸 (緑) 2=澄んだ水
 #define REFLECTIONS 2 // [0 1 2 3] 0=空のみ 1=SSR 2=SSR+ラフ反射 3=SSR+ボクセル補完
 #define SSR_STEPS 24 // [8 12 16 24 32 48 64]
 #define SPECULAR_SUN_STRENGTH 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0 6.0 8.0] 昼の太陽の鏡面 (水面・ガラス・金属・水たまり) の明るさ。1 = 太陽の円盤の鏡像どおり

@@ -78,29 +78,67 @@ const float WATER_FALL_SPEED = 4.0;            // 側面 (滝) の流れ落ち�
 const float WATER_FLOW_CYCLE = 1.6;            // 流れの 2 相の切り替えの周期 (秒)
 
 /*
- * 吸収 a と散乱 b (1/ブロック)。水中フォグ (sky モジュール) もこの関数を使って見た目を揃える
- * WATER_TYPE 0: Jerlov IB 相当。純水の吸収 (Pope & Fry 1997) に少量のクロロフィルと粒子散乱を足した値
- *            1: 沿岸 (Jerlov 3C 寄り)。溶存有機物とプランクトンが青を吸い、粒子散乱が多いので緑に濁る
- *            2: 澄んだ水。ほぼ純水の吸収で散乱が少なく、遠くまで見通せる
+ * 海・湖・川の重み (x 海, y 湖, z 川。和は 1)。カメラのバイオームで決まり、shaders.properties の smooth で数秒かけて移る
+ * 種類ごとの設定 (WATER_SEA_* / WATER_LAKE_* / WATER_RIVER_*) はこの重みで混ぜる。uniform で分岐せず値を混ぜるだけにする
  */
-#if WATER_TYPE == 1
-    const vec3 WATER_ABSORPTION_COEFF = vec3(0.38, 0.085, 0.12);
-    const vec3 WATER_SCATTERING_COEFF = vec3(0.075, 0.09, 0.085);
-#elif WATER_TYPE == 2
-    const vec3 WATER_ABSORPTION_COEFF = vec3(0.33, 0.05, 0.014);
-    const vec3 WATER_SCATTERING_COEFF = vec3(0.010, 0.013, 0.018);
-#else
-    // 散乱は外洋の粒子散乱の下限寄り (0.03-0.05 では浅瀬が底まで透けて浅いプールに見える)
-    // 吸収は純水 (Pope & Fry 1997) + 少量のクロロフィル。消散は緑 0.21 / 青 0.15 で 15-25 ブロック先まで見える
-    // (緑 0.31 / 青 0.22 まで上げると水中の見通しが 10 ブロックほどしかなく、光源もすぐ水の色に埋もれる)。
-    // 深い所の暗さは内散乱の光源を深さで弱める式 (composite2 の waterInscatter) で出す
-    // 緑は青より強く吸わせて紺に寄せる (緑 0.09-0.10 では手前の水が底の砂の照り返しで明るいターコイズに浮く)
-    const vec3 WATER_ABSORPTION_COEFF = vec3(0.38, 0.12, 0.05);
-    const vec3 WATER_SCATTERING_COEFF = vec3(0.070, 0.085, 0.100);
-#endif
-vec3 waterAbsorption() { return WATER_ABSORPTION_COEFF * WATER_FOG_DENSITY; }
-vec3 waterScattering() { return WATER_SCATTERING_COEFF * WATER_FOG_DENSITY; }
+vec3 waterKindWeights() {
+    float ocean = saturate(distantOcean);
+    float river = saturate(waterRiver) * (1.0 - ocean);
+    return vec3(ocean, 1.0 - ocean - river, river);
+}
+
+float waterKindMix(float sea, float lake, float river) { return dot(waterKindWeights(), vec3(sea, lake, river)); }
+
+/*
+ * 吸収 a と散乱 b (1/ブロック)。水中フォグ (sky モジュール) もこの関数を使って見た目を揃える
+ * 水の色 (WATER_TYPE / WATER_LAKE_TYPE / WATER_RIVER_TYPE) ごとの係数
+ * 0: Jerlov IB 相当。純水の吸収 (Pope & Fry 1997) に少量のクロロフィルと粒子散乱を足した値
+ *    散乱は外洋の粒子散乱の下限寄り (0.03-0.05 では浅瀬が底まで透けて浅いプールに見える)
+ *    吸収は純水 (Pope & Fry 1997) + 少量のクロロフィル。消散は緑 0.21 / 青 0.15 で 15-25 ブロック先まで見える
+ *    (緑 0.31 / 青 0.22 まで上げると水中の見通しが 10 ブロックほどしかなく、光源もすぐ水の色に埋もれる)。
+ *    深い所の暗さは内散乱の光源を深さで弱める式 (composite2 の waterInscatter) で出す
+ *    緑は青より強く吸わせて紺に寄せる (緑 0.09-0.10 では手前の水が底の砂の照り返しで明るいターコイズに浮く)
+ * 1: 沿岸 (Jerlov 3C 寄り)。溶存有機物とプランクトンが青を吸い、粒子散乱が多いので緑に濁る
+ * 2: 澄んだ水。ほぼ純水の吸収で散乱が少なく、遠くまで見通せる
+ */
+#define WATER_TYPE_ABSORPTION(t) ((t) == 1 ? vec3(0.38, 0.085, 0.12) : (t) == 2 ? vec3(0.33, 0.05, 0.014) : vec3(0.38, 0.12, 0.05))
+#define WATER_TYPE_SCATTERING(t) ((t) == 1 ? vec3(0.075, 0.09, 0.085) : (t) == 2 ? vec3(0.010, 0.013, 0.018) : vec3(0.070, 0.085, 0.100))
+const vec3 WATER_SEA_ABSORPTION_COEFF = WATER_TYPE_ABSORPTION(WATER_TYPE) * WATER_SEA_ABSORPTION;
+const vec3 WATER_LAKE_ABSORPTION_COEFF = WATER_TYPE_ABSORPTION(WATER_LAKE_TYPE) * WATER_LAKE_ABSORPTION;
+const vec3 WATER_RIVER_ABSORPTION_COEFF = WATER_TYPE_ABSORPTION(WATER_RIVER_TYPE) * WATER_RIVER_ABSORPTION;
+const vec3 WATER_SEA_SCATTERING_COEFF = WATER_TYPE_SCATTERING(WATER_TYPE) * WATER_SEA_TURBIDITY;
+const vec3 WATER_LAKE_SCATTERING_COEFF = WATER_TYPE_SCATTERING(WATER_LAKE_TYPE) * WATER_LAKE_TURBIDITY;
+const vec3 WATER_RIVER_SCATTERING_COEFF = WATER_TYPE_SCATTERING(WATER_RIVER_TYPE) * WATER_RIVER_TURBIDITY;
+
+vec3 waterKindMix(vec3 sea, vec3 lake, vec3 river) {
+    vec3 w = waterKindWeights();
+    return sea * w.x + lake * w.y + river * w.z;
+}
+
+/*
+ * 混ぜた水の性質は prepare (sun_sky_light.csh) が毎フレーム 1 回求めて frameData.surfaceParams に置き、各パスは読むだけにする
+ * 並び: [4] = (吸収 rgb, 波頭の尖り), [5] = (散乱 rgb, 映り込みの散らし)。吸収と散乱は WATER_FOG_DENSITY 込み
+ * 読む所ごとに混ぜる式を入れると、大きいパス (composite2) がドライバの関数の展開の上限を超えて、展開しない呼び出しとローカルメモリの
+ * 配列で組まれ、フレームが 1.5 倍に重くなった。prepare より前の shadow パスは 1 フレーム前の値を読む (重みは数秒かけて動くので差は出ない)
+ */
+const int WATER_MEDIUM_SLOT = 4;
+
+vec3 waterAbsorption() { return frameData.surfaceParams[WATER_MEDIUM_SLOT].rgb; }
+vec3 waterScattering() { return frameData.surfaceParams[WATER_MEDIUM_SLOT + 1].rgb; }
 vec3 waterExtinction() { return waterAbsorption() + waterScattering(); }
+float waterChoppiness() { return frameData.surfaceParams[WATER_MEDIUM_SLOT].a; }
+float waterReflectScatter() { return frameData.surfaceParams[WATER_MEDIUM_SLOT + 1].a; }
+
+#ifdef SSBO_FRAME_DATA_WRITE
+void waterMediumStore() {
+    vec3 a = waterKindMix(WATER_SEA_ABSORPTION_COEFF, WATER_LAKE_ABSORPTION_COEFF, WATER_RIVER_ABSORPTION_COEFF) * WATER_FOG_DENSITY;
+    vec3 b = waterKindMix(WATER_SEA_SCATTERING_COEFF, WATER_LAKE_SCATTERING_COEFF, WATER_RIVER_SCATTERING_COEFF) * WATER_FOG_DENSITY;
+    float chop = WATER_CHOPPINESS * waterKindMix(WATER_SEA_CHOPPINESS, WATER_LAKE_CHOPPINESS, WATER_RIVER_CHOPPINESS);
+    float scatter = waterKindMix(WATER_REFLECT_SCATTER, WATER_LAKE_REFLECT_SCATTER, WATER_RIVER_REFLECT_SCATTER);
+    frameData.surfaceParams[WATER_MEDIUM_SLOT] = vec4(a, chop);
+    frameData.surfaceParams[WATER_MEDIUM_SLOT + 1] = vec4(b, scatter);
+}
+#endif
 
 float waterLayerTile(int i) { return WATER_LAYER0_TILE * WATER_WAVE_LENGTH / pow(WATER_LAYER_RATIO, float(i)); }
 
@@ -171,18 +209,25 @@ void waterAddSpectrum(inout WaterSea sea, float weight, float U, float fetch, fl
     sea.wind += U * weight;
 }
 
+/*
+ * 種類ごとの波の高さの倍率は分散の重みに 2 乗で掛ける (1 種類だけの時に振幅がちょうど倍率倍)。白波の量に使う風速の重みにも掛かるので、
+ * 高い波ほど白波も増える。2 乗は定数で畳む (関数で書くと composite2 がドライバの関数の展開の上限を超える。waterMediumStore の注)
+ */
+const float WATER_SEA_WAVE_VAR = WATER_SEA_WAVE_HEIGHT * WATER_SEA_WAVE_HEIGHT;
+const float WATER_LAKE_WAVE_VAR = WATER_LAKE_WAVE_HEIGHT * WATER_LAKE_WAVE_HEIGHT;
+const float WATER_RIVER_WAVE_VAR = WATER_RIVER_WAVE_HEIGHT * WATER_RIVER_WAVE_HEIGHT;
+
 // skyLm: スカイライト (0-1)。屋根の下や洞窟の水は風が当たらないので凪ぐ
 WaterSea waterSeaStateEval(float skyLm) {
     WaterSea sea;
     for (int i = 0; i < WATER_LAYERS; i++) sea.amp[i] = 0.0;
     for (int i = 0; i < WATER_CAPILLARY_LAYERS; i++) sea.capAmp[i] = 0.0;
     sea.wind = 0.0;
-    float ocean = saturate(distantOcean);
-    float river = saturate(waterRiver) * (1.0 - ocean);
+    vec3 kind = waterKindWeights();
     float wind = WATER_WIND_SPEED * mix(WATER_SHELTER_WIND, 1.0, smoothstep(WATER_SHELTER_SKYLM.x, WATER_SHELTER_SKYLM.y, skyLm));
-    waterAddSpectrum(sea, ocean, wind, WATER_FETCH_OCEAN, 1.0);
-    waterAddSpectrum(sea, 1.0 - ocean - river, wind * WATER_LAKE_WAVES, WATER_FETCH_LAKE, 0.0);
-    waterAddSpectrum(sea, river, wind * WATER_RIVER_WAVES, WATER_FETCH_RIVER, 0.0);
+    waterAddSpectrum(sea, kind.x * WATER_SEA_WAVE_VAR, wind, WATER_FETCH_OCEAN, 1.0);
+    waterAddSpectrum(sea, kind.y * WATER_LAKE_WAVE_VAR, wind * WATER_LAKE_WAVES, WATER_FETCH_LAKE, 0.0);
+    waterAddSpectrum(sea, kind.z * WATER_RIVER_WAVE_VAR, wind * WATER_RIVER_WAVES, WATER_FETCH_RIVER, 0.0);
     float h2 = 0.0;
     for (int i = 0; i < WATER_LAYERS; i++) {
         sea.amp[i] = sqrt(sea.amp[i]) * WATER_WAVE_HEIGHT;
@@ -351,7 +396,7 @@ vec4 waterWaveSumFlow(WaterSea sea, vec2 p, int first, int last, float footprint
  * 波頭を寄せた面 (x' = x - lambda D) の Jacobian。勾配はこれで割ると 1 次元では厳密 (dh/dx' = (dh/dx) / J)
  * 山 (発散が正) で J < 1 になって斜面が立ち、谷は寝る。J が小さい所は波が崩れかけ (白波)
  */
-float waterJacobian(vec4 w) { return max(1.0 - WATER_CHOPPINESS * w.w, WATER_JACOBIAN_MIN); }
+float waterJacobian(vec4 w) { return max(1.0 - waterChoppiness() * w.w, WATER_JACOBIAN_MIN); }
 vec3 waterChoppy(vec4 w) { return vec3(w.x, w.yz / waterJacobian(w)); }
 
 /*
@@ -490,9 +535,13 @@ vec3 waterRoughReflectDir(vec3 R, float slopeVar) {
  */
 const vec2 WATER_REFLECT_MIRROR_ALPHA = vec2(0.02, 0.03);
 
+/*
+ * 散らしの割合 (waterReflectScatter) は海・湖・川ごと (WATER_REFLECT_SCATTER が海)。湖と川の既定は 0 で鏡にする。散らすと、望遠で対岸を
+ * 見た時に、法線で描けない手前の細かい波が画面で縦に詰まって平らに見えるのに映り込みだけがにじみ、水面がのっぺりした面に見えた
+ */
 float waterReflectAlpha(float slopeVar) {
 #if REFLECTIONS >= 2
-    return sqrt(slopeVar) * WATER_REFLECT_SCATTER;
+    return sqrt(slopeVar) * waterReflectScatter();
 #else
     // 粗い反射の経路が無い (SSR だけ) 設定では鏡のまま
     return 0.0;
@@ -512,7 +561,7 @@ float waterReflectMirror(float slopeVar) {
 
 // 散らした向きで空を引く時に、散らしきらなかった傾きの分だけ仰角を持ち上げる分散
 float waterReflectLiftVar(float slopeVar, bool scattered) {
-    return scattered ? slopeVar * (1.0 - sqr(WATER_REFLECT_SCATTER)) : slopeVar;
+    return scattered ? slopeVar * (1.0 - sqr(waterReflectScatter())) : slopeVar;
 }
 
 #endif

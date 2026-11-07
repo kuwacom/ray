@@ -12,7 +12,7 @@
  *   [4] = (カメラの位置の雲の中の太陽の光, 雲の濃さ), [5] = (雲の中の空の光, 霧の消散係数) (prepare2 の cloud_weather.csh が書く。ここでは触らない)
  *   [6] = (雨の日の雲の向こうの空を置き換える灰色の放射輝度, 置き換える割合) (prepare2 の cloud_weather.csh が書く。反射の空が使う)
  * surfaceParams[0..2] は開けた水面の海の状態 (lib/common/water_waves.glsl の waterSeaStoreOpen)、[3] は水面のきらめきの寿命に使うフレームの長さ
- * (lib/common/water_glitter.glsl の waterGlintFrameStore)
+ * (lib/common/water_glitter.glsl の waterGlintFrameStore)、[4..5] は海・湖・川を混ぜた水の性質 (lib/common/water_waves.glsl の waterMediumStore)
  * sky モジュール (lib/sky)
  */
 // このプログラムで書く SSBO (lib/buffers。ほかのプログラムでは readonly)
@@ -140,6 +140,7 @@ void main() {
     bool timeJump = abs(dt) > WORLD_TIME_JUMP && abs(dt) < 24000 - WORLD_TIME_JUMP;
     historyFrames = timeJump ? 0.0 : min(historyFrames + 1.0, 65535.0);
     frameData.skyParams[1] = vec4(float(worldTime), historyFrames, 0.0, 0.0);
+    waterMediumStore();
     waterSeaStoreOpen();
 #ifdef WATER_GLITTER
     waterGlintFrameStore();
