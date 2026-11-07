@@ -219,6 +219,11 @@ void main() {
     }
 #endif
 
+#if defined GBUF_ENTITIES_TRANSLUCENT && defined WATER_SELF_REFRACTION
+    // 水の中の自分は composite1 (water_trace.fsh) が屈折した視線を自分の三角形に当てて描くので、ここでは描かない (二重の像になる)
+    if (entityId == ENTITY_CURRENT_PLAYER && isEyeInWater == 0 && waterSelfDepth(playerPos) > 0.0) discard;
+#endif
+
     vec3 color = forwardDiffuse(m, playerPos, geoNormal, geoNormal, V, dither);
     if (materialId == MAT_NETHER_PORTAL) color += m.albedo * getVisibleEmissionLuminance() * EMISSION_STRENGTH;
 #ifdef GBUF_FORWARD_OPAQUE
@@ -227,20 +232,20 @@ void main() {
         color += m.albedo * smoothstep(0.55, 0.9, maxOf(albedo.rgb)) * getVisibleEmissionLuminance() * EMISSION_STRENGTH;
     }
 #endif
-#ifdef GBUF_ENTITIES_TRANSLUCENT
+#if defined GBUF_ENTITIES_TRANSLUCENT && !defined WATER_SELF_REFRACTION
     /*
-     * 水に入った自分 (lib/surface/water_self.glsl): カメラが水の上なら、水面より下の画素に水の吸収と内散乱を掛ける (屈折は付かない)
+     * 水に入った自分 (lib/surface/water_self.glsl): 自分の三角形を持たない設定で、カメラが水の上なら、水面より下の画素に水の吸収と内散乱を掛ける (屈折は付かない)
      * 視線に沿った水の中の長さは、水面からの深さを視線の上向きの cos で割った長さ。内散乱は composite2 の深い水と同じ式で、
-     * 水面の照度は白い面の前方シェーディング (太陽の影・空・ブロックライト) から戻す
+     * 水面の照度は空と、影を掛けない太陽 (月) の上向きの面への照度 (前方シェーディングをもう 1 回呼ぶとプログラムが 1.5 倍に膨らむ)
      */
     if (entityId == ENTITY_CURRENT_PLAYER && isEyeInWater == 0) {
         float below = waterSelfDepth(playerPos);
         if (below > 0.0) {
             vec3 T = exp(-waterExtinction() * (below / max(V.y, WATER_SELF_MIN_COS)));
-            GBufferData gw = gbufferDefault();
-            gw.albedo = vec3(1.0);
-            vec3 up = vec3(0.0, 1.0, 0.0);
-            vec3 E = forwardDiffuse(decodeMaterial(gw), playerPos, up, up, V, dither) * PI;
+            SurfacePoint sp = surfacePoint(playerPos, vec3(0.0, 1.0, 0.0));
+            sp.lightmap = lmcoord;
+            SurfaceLights SL = gatherSurfaceLights(sp, SL_SUN_NONE, SL_BLOCK_NONE, SL_SKY | SL_CELESTIAL);
+            vec3 E = SL.sky + SL.celestial.irradiance * saturate(SL.celestial.direction.y);
             vec3 inscatter = E * waterScattering() / waterExtinction() * ((0.25 * RCP_PI) * WATER_MULTI_SCATTER * WATER_BACKSCATTER);
             color = color * T + inscatter * (1.0 - T);
         }
