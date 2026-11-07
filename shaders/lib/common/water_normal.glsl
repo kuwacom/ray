@@ -176,6 +176,12 @@ vec4 waterWaveSum(WaterLod lod, vec2 p) {
     for (int i = 0; i < WATER_LAYERS; i++) {
         if (lod.amp[i] > 0.0) sum += waterLayer(p, i, lod.amp[i], t, lod.footprint);
     }
+    float farPhase = t / waterFarPeriod();
+    for (int k = 0; k < WATER_FAR_LAYERS; k++) {
+        if (lod.farAmp[k] > 0.0) {
+            sum += waterLayerTiled(p, waterFarTile(k), WATER_FAR_ANGLE[k], WATER_FAR_OFFSET[k], WATER_FAR_MIRROR[k], lod.farAmp[k], farPhase, 0.0);
+        }
+    }
     return sum;
 }
 

@@ -85,13 +85,41 @@ const vec2 WATER_PARALLAX_FADE = vec2(0.5, 1.0);
  * 数十ブロック先から法線の傾きが 0 になり、映り込みが揺れない平らな鏡になる。落とした傾きを映り込みの散らしに回すと、すりガラスの
  * ようにぼける。足りない分をその距離で描ける最も細かい層の振幅に足し、画面で縦に数画素の波の帯で映り込みを揺らす
  * (足した分は粗さから引いて傾きの分散の合計を保つ)。足す層は帯の中心の波長が画面で 4 画素ほど以上なので、細かい砂目にならない
- * 長いうねりの残る海は、ふつうの距離ではこの割合を上回っていて変わらない
+ * 長いうねりの残る海は、層 0 が描ける距離ではこの割合を上回っていて変わらない
  */
 const float WATER_FAR_SLOPE_KEEP = 0.35;
+
+/*
+ * 遠い層: いちばん長い層 (層 0) も画素より細かくなる先 (目の高さ 2.5 ブロック・FOV 80 で 150 ブロック前後から) で、上の床を受け持つ
+ * 層 0 のタイルを 2.9 倍ずつ大きくした層を同じ波テクスチャで引く (5 本で、目の高さ 2.5 ブロック・FOV 80 の 10 km 先まで描ける層が残る)
+ * 海の状態のスペクトルには無い長さの波なので振幅は持たず、床の足りない分だけを載せる。無いと、その先の湖・川 (と別の射影で描く
+ * 遠景の水) は全部が揺れない平らな鏡になる
+ * 1 本だけに載せると、広い水面を見下ろした時に同じ模様が並ぶので、描ける最も細かい遠い層の帯の WATER_FAR_SPLIT を 1 つ長い層へ回して、
+ * 縮尺と向きの違う 2 本を重ねる。向き・位置・鏡映は層 0-4 とも互いともそろえない
+ */
+const int WATER_FAR_LAYERS = 5;
+const float WATER_FAR_SPLIT = 0.4;
+const float WATER_FAR_ANGLE[WATER_FAR_LAYERS] = float[](0.93, -0.71, 0.24, -0.38, 0.66);
+const vec2 WATER_FAR_OFFSET[WATER_FAR_LAYERS] = vec2[](vec2(0.29, 0.53), vec2(0.71, 0.17), vec2(0.47, 0.89), vec2(0.11, 0.37), vec2(0.83, 0.61));
+const float WATER_FAR_MIRROR[WATER_FAR_LAYERS] = float[](-1.0, 1.0, -1.0, 1.0, -1.0);
+
+float waterFarTile(int k) { return waterLayerTile(0) * pow(WATER_LAYER_RATIO, float(k + 1)); }
+
+/*
+ * 遠い層の時間のループの周期 (秒)。深水の分散関係のままだとタイルが大きいほど遅く (557 ブロックで 43 秒)、遠くの映り込みのゆがみが
+ * 止まって見えるので、どの遠い層も層 0 の周期で動かす (画面の上の波の速さは、手前の層から大きく離れない)
+ */
+float waterFarPeriod() { return waterLayerPeriod(waterLayerTile(0)); }
+
+float waterFarResolved(int k, float footprint) {
+    return footprint > 0.0 ? 1.0 - smoothstep(WATER_LAYER_FADE.x, WATER_LAYER_FADE.y, footprint * WATER_TEX_SIZE / waterFarTile(k)) : 1.0;
+}
 
 struct WaterLod {
     float footprint;            // 水面の 1 画素の大きさ (ブロック)
     float amp[WATER_LAYERS];    // 層ごとに法線で描く傾きの RMS
+    float farAmp[WATER_FAR_LAYERS]; // 遠い層ごとに法線で描く傾きの RMS
+    float heights;              // 波の高さ (波頭・泡・WATER_GLITTER のむら) を層から読むか (1 で読む。遠景を軽くする段で 0 にする)
     vec2 unresolved;            // 粗さへ回す傾きの分散 (GGX の alpha^2 に足す), 曲率の 2 乗の和 (WATER_GLITTER の点の数)
     float pixelSlopeVar;        // 法線で描いた層の、画素の中と露光の間の傾きの揺れの分散 (照り返しの alpha^2 に足す)
     float roughFar;             // フレネルと空の映り込みを画素より細かい波の粗さで均す割合
@@ -129,17 +157,40 @@ WaterLod waterLod(WaterSea sea, float dist, float NoV, float pixelAngle) {
     vec2 unresolved = vec2(0.0);
     float dt = min(frameTime, WATER_EXPOSURE_MAX_DT) * WATER_EXPOSURE_SHUTTER;
     float pixelVar = 0.0;
+    float added = 0.0;
     for (int i = 0; i < WATER_LAYERS; i++) {
         float tile = waterLayerTile(i);
         // 足りない傾きは、描ける層のうち最も細かい層へ (隣の層との重みの差なので、距離に対して連続に移る)
         float add = (sqr(r[i]) - sqr(r[i + 1])) * lack;
         lod.amp[i] = sqrt(sqr(r[i] * sea.amp[i]) + add);
-        // 法線側に r 倍を残すので、分散の合計が保たれるよう 1 - r^2 を回す (遠くで法線に戻した分は引く)
+        added += add;
+        // 法線側に r 倍を残すので、分散の合計が保たれるよう 1 - r^2 を回す (遠くで法線に戻した分は後で引く)
         float w = (1.0 - r[i] * r[i]) * sqr(sea.amp[i]);
         unresolved += w * vec2(1.0, sqr(TAU * WATER_BAND_CENTER / tile));
-        unresolved.x -= add;
         pixelVar += sqr(lod.amp[i] * WATER_PIXEL_SLOPE_SCALE) * waterLayerSlopeChange(tile, footprint, dt);
     }
+    // 層 0 も描けない先の床は遠い層へ。描ける最も細かい遠い層の帯から WATER_FAR_SPLIT を 1 つ長い層へ回す
+    float finer = sqr(r[0]);
+    float carry = 0.0;
+    for (int k = 0; k < WATER_FAR_LAYERS; k++) {
+        float rk = sqr(waterFarResolved(k, footprint));
+        float band = rk - finer;
+        float give = k + 1 < WATER_FAR_LAYERS ? WATER_FAR_SPLIT : 0.0;
+        float add = ((1.0 - give) * band + carry) * lack;
+        carry = give * band;
+        finer = rk;
+        lod.farAmp[k] = sqrt(add);
+        added += add;
+        float tile = waterFarTile(k);
+        pixelVar += add * sqr(WATER_PIXEL_SLOPE_SCALE)
+            * (sqr(footprint * WATER_BAND_CENTER / tile) + sqr(dt * WATER_TIME_HARMONIC_LO / waterFarPeriod()));
+    }
+    /*
+     * 法線へ戻した分は粗さから引く。WATER_GLITTER の点の数に使う曲率も、粗さに残った傾きの割合で減らす
+     * (層ごとの曲率は落とした層の波数で決まるので、同じ割合で縮むとみなす)
+     */
+    float rest = unresolved.x > 0.0 ? max(unresolved.x - added, 0.0) / unresolved.x : 1.0;
+    unresolved = vec2(unresolved.x - added, unresolved.y * rest);
     /*
      * 表面張力波は法線で描かないので、どの距離でも粗さになる。ただし画素がその波より小さい近くでは、1 画素が見るのは波の一部の
      * 面だけなので、傾きの分散を WATER_CAPILLARY_NEAR_ROUGH まで減らす (全部を回すと、近くの太陽の照り返しが表した波と無関係な
@@ -159,6 +210,7 @@ WaterLod waterLod(WaterSea sea, float dist, float NoV, float pixelAngle) {
     // 高さの差が画素に満たなければ探さない
     lod.parallax = smoothstep(WATER_PARALLAX_FADE.x, WATER_PARALLAX_FADE.y, lod.parallaxRange / max(footprint, 1e-6));
 
+    lod.heights = 1.0;
     lod.mirror = waterReflectMirror(unresolved.x);
     return lod;
 }

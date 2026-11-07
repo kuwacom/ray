@@ -310,19 +310,28 @@ vec4 waterWaveTexel(vec3 q, float texels) {
 }
 
 /*
+ * タイル tile・風下からの向き angle・位置のずれ offset・横の鏡映 mirror の 1 層を、時間の位相 phase (ループの周期で割った時刻) で引く
+ * texels: 1 画素あたりのテクセル数 (正なら近景を 3 次で補間する)
+ */
+vec4 waterLayerTiled(vec2 p, float tile, float angle, vec2 offset, float mirror, float amp, float phase, float texels) {
+    float a = WATER_WIND_ANGLE + angle;
+    vec2 dir = vec2(cos(a), sin(a));
+    vec2 side = vec2(-dir.y, dir.x) * mirror;
+    vec2 q = vec2(dot(p, dir), dot(p, side)) / tile + offset;
+    vec4 s = waterWaveTexel(vec3(q, phase), texels) * 2.0 - 1.0;
+    vec2 g = (dir * s.x + side * s.y) * WATER_TEX_SLOPE_RANGE;
+    return amp * vec4(s.z * WATER_TEX_HEIGHT_RANGE * tile, g, s.w * WATER_TEX_JACOBIAN_RANGE);
+}
+
+/*
  * 層 i を引く。戻り値 x = 高さ (ブロック), yz = 勾配 (ワールドの 2D), w = 水平変位の発散 (Jacobian の 1 次の項)
  * テクスチャの +x を風下に向け、タイルの長さで割った座標で引く。勾配はタイルの大きさによらず振幅 (傾きの RMS) 倍
  * footprint: 画素の大きさ (ブロック)。正なら近景を 3 次で補間する
  */
 vec4 waterLayer(vec2 p, int i, float amp, float t, float footprint) {
     float tile = waterLayerTile(i);
-    float a = WATER_WIND_ANGLE + WATER_LAYER_ANGLE[i];
-    vec2 dir = vec2(cos(a), sin(a));
-    vec2 side = vec2(-dir.y, dir.x) * WATER_LAYER_MIRROR[i];
-    vec2 q = vec2(dot(p, dir), dot(p, side)) / tile + WATER_LAYER_OFFSET[i];
-    vec4 s = waterWaveTexel(vec3(q, t / waterLayerPeriod(tile)), footprint * WATER_TEX_SIZE / tile) * 2.0 - 1.0;
-    vec2 g = (dir * s.x + side * s.y) * WATER_TEX_SLOPE_RANGE;
-    return amp * vec4(s.z * WATER_TEX_HEIGHT_RANGE * tile, g, s.w * WATER_TEX_JACOBIAN_RANGE);
+    return waterLayerTiled(p, tile, WATER_LAYER_ANGLE[i], WATER_LAYER_OFFSET[i], WATER_LAYER_MIRROR[i], amp, t / waterLayerPeriod(tile),
+        footprint * WATER_TEX_SIZE / tile);
 }
 
 vec4 waterLayer(vec2 p, int i, float amp, float t) {

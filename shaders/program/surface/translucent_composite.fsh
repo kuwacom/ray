@@ -263,14 +263,14 @@ void main() {
             bool top = N.y > 0.5;
             vec3 surfWorld = surfPlayer + cameraPosition;
             vec4 waves = vec4(0.0);
-            if (top) waves = waterWaveSum(sea, surfWorld.xz, 0, 3, footprint);
+            if (top && lod.heights > 0.0) waves = waterWaveSum(sea, surfWorld.xz, 0, 3, footprint);
             // 波頭は絶対の高さで測る (高さの RMS だけで割ると、ほぼ平らな湖も海と同じだけ光る)
             float crest = smoothstep(0.0, max(2.0 * sea.heightRms, WATER_CREST_HEIGHT), waves.x);
             // 粗さへ回した細かい波の分は、太陽 (月) を映す点の集まりとして描く (WATER_GLITTER)
             float glitter = 1.0;
 #ifdef WATER_GLITTER
             // 日陰・雲の影では光源が映らないので探さない
-            if (top && maxOf(sunSpecVis) > 0.0) {
+            if (top && lod.heights > 0.0 && maxOf(sunSpecVis) > 0.0) {
                 // 太陽 (月) の照り返しの粗さだけに、場所ごとのさざ波の強さのむらを掛ける (灯りの照り返しと反射の向きは一様のまま)
                 vec2 crestGrad;
                 float ripple = waterGlintPatch(vec3(sea.amp[0], sea.amp[1], sea.amp[2]), vec2(sea.amp[GLINT_SHORT_FIRST], sea.amp[GLINT_SHORT_FIRST + 1]),
