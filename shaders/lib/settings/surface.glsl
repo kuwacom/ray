@@ -74,8 +74,8 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define WATER_SEA_CHOPPINESS 1.0 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0] 海の波頭の尖りの倍率
 #define WATER_LAKE_CHOPPINESS 1.0 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0] 湖の波頭の尖りの倍率
 #define WATER_RIVER_CHOPPINESS 1.0 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0] 川の波頭の尖りの倍率
-#define WATER_LAKE_REFLECT_SCATTER 0.3 // [0.0 0.1 0.2 0.3 0.4 0.5 0.7 1.0] 湖の映り込みの散らし。0 で鏡 (穏やかな湖は対岸がくっきり映る)
-#define WATER_RIVER_REFLECT_SCATTER 0.3 // [0.0 0.1 0.2 0.3 0.4 0.5 0.7 1.0] 川の映り込みの散らし。0 で鏡
+#define WATER_LAKE_REFLECT_SCATTER 0.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.7 1.0] 湖の映り込みの散らし。0 で鏡 (穏やかな湖は対岸がくっきり映る)
+#define WATER_RIVER_REFLECT_SCATTER 0.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.7 1.0] 川の映り込みの散らし。0 で鏡
 #define WATER_LAKE_TYPE 0 // [0 1 2] 湖の水の色 0=外洋 (青) 1=沿岸 (緑) 2=澄んだ水
 #define WATER_RIVER_TYPE 0 // [0 1 2] 川の水の色 0=外洋 (青) 1=沿岸 (緑) 2=澄んだ水
 #define WATER_SEA_ABSORPTION 1.0 // [0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0 4.0] 海の吸収の倍率。大きいほど深い所が早く暗く色づく
