@@ -18,6 +18,7 @@
 #define LIGHT_ENTITY_TRI_GLSL
 
 //@include "/lib/settings.glsl"
+//@include "/lib/common/color.glsl"
 //@include "/lib/common/math.glsl"
 //@include "/lib/common/samplers.glsl"
 //@include "/lib/common/voxel_space.glsl"
@@ -58,21 +59,34 @@ float entityTriFloatFromOrdered(uint u) {
 /*
  * 三角形の透明部分のマスク。重心座標 (a, b) (a = e1 方向, b = e2 方向) を 8x8 に区切り、
  * 三角形に入る 36 セルの中心でテクスチャのアルファを読む
+ * color: 不透明なセルのテクスチャの色の平均 (sRGB)。同じ読みで集める
  */
-uvec2 entityTriAlphaMask(vec2 uv0, vec2 uv1, vec2 uv2, float vertexAlpha) {
+uvec2 entityTriAlphaMask(vec2 uv0, vec2 uv1, vec2 uv2, float vertexAlpha, out vec3 color) {
     uvec2 mask = uvec2(0u);
+    vec3 sum = vec3(0.0);
+    float n = 0.0;
     for (int j = 0; j < 8; j++) {
         for (int i = 0; i < 8 - j; i++) {
             vec2 b = (vec2(i, j) + 0.5) / 8.0;
             vec2 uv = uv0 + (uv1 - uv0) * b.x + (uv2 - uv0) * b.y;
-            if (textureLod(gtexture, uv, 0.0).a * vertexAlpha < ENTITY_TRI_ALPHA_CUTOFF) continue;
+            vec4 t = textureLod(gtexture, uv, 0.0);
+            if (t.a * vertexAlpha < ENTITY_TRI_ALPHA_CUTOFF) continue;
+            sum += t.rgb;
+            n += 1.0;
             int bit = i + j * 8;
             if (bit < 32) mask.x |= 1u << uint(bit);
             else mask.y |= 1u << uint(bit - 32);
         }
     }
+    color = sum / max(n, 1.0);
     return mask;
 }
+
+// 三角形の平均の色 (線形のアルベド)
+vec3 entityTriAlbedo(uint index) { return srgbToLinear(unpackUnorm4x8(entityTris.tris[index].color).rgb); }
+
+// 三角形の面の向き (向きの裏表は決めない)
+vec3 entityTriNormal(uint index) { return normalize(cross(entityTris.tris[index].e1, entityTris.tris[index].e2)); }
 
 // 書く関数は書くプログラム (shadow_entities・shadow_block・begin) だけが持つ (ほかでは entityTris が readonly)
 #ifdef SSBO_ENTITY_TRIS_WRITE
@@ -92,11 +106,11 @@ void entityTriGrowBounds(bool group, uint index, vec3 lo, vec3 hi) {
 }
 
 /*
- * shadow_entities.gsh から三角形 1 つを書く。p* は player 空間, uv* はテクスチャ座標
+ * shadow_entities.gsh から三角形 1 つを書く。p* は player 空間, uv* はテクスチャ座標, vertexColor は 3 頂点の色の平均
  * 戻り値 false = 保持しなかった (遠すぎる・容量超過)。呼び出し側は占有ボクセルへ退避する
  * 透明・縮退・体積外の三角形は遮蔽物にならないので true (何もしない) を返す
  */
-bool storeEntityTriangle(vec3 p0, vec3 p1, vec3 p2, vec2 uv0, vec2 uv1, vec2 uv2, float vertexAlpha, bool isPlayer) {
+bool storeEntityTriangle(vec3 p0, vec3 p1, vec3 p2, vec2 uv0, vec2 uv1, vec2 uv2, vec4 vertexColor, bool isPlayer) {
     vec3 v0 = playerToVoxel(p0);
     vec3 v1 = playerToVoxel(p1);
     vec3 v2 = playerToVoxel(p2);
@@ -124,7 +138,8 @@ bool storeEntityTriangle(vec3 p0, vec3 p1, vec3 p2, vec2 uv0, vec2 uv1, vec2 uv2
         }
     }
 
-    uvec2 mask = entityTriAlphaMask(uv0, uv1, uv2, vertexAlpha);
+    vec3 texColor;
+    uvec2 mask = entityTriAlphaMask(uv0, uv1, uv2, vertexColor.a, texColor);
     if (mask.x == 0u && mask.y == 0u) return true;
 
     uint slot = atomicAdd(entityTris.counts[region], 1u);
@@ -141,7 +156,7 @@ bool storeEntityTriangle(vec3 p0, vec3 p1, vec3 p2, vec2 uv0, vec2 uv1, vec2 uv2
         return false;
     }
     uint index = entityTriRegionStart(region) + slot;
-    entityTris.tris[index] = EntityTriangle(v0, mask.x, e1, mask.y, e2, 0u);
+    entityTris.tris[index] = EntityTriangle(v0, mask.x, e1, mask.y, e2, packUnorm4x8(vec4(saturate(texColor * vertexColor.rgb), 1.0)));
     entityTriGrowBounds(false, index / uint(ENTITY_TRI_CLUSTER), lo, hi);
     entityTriGrowBounds(true, index / uint(ENTITY_TRI_GROUP), lo, hi);
     return true;
@@ -177,27 +192,29 @@ bool entityTriRayBox(bool group, uint index, vec3 ro, vec3 rdInv, float t0, floa
     return tn <= tf;
 }
 
-// Möller-Trumbore (両面)。透明なセルに当たった場合は外れ
-bool entityTriHit(uint index, vec3 ro, vec3 dir, float t0, float t1) {
+// Möller-Trumbore (両面)。透明なセルに当たった場合は外れ。戻り値は当たった距離 (外れは負)
+float entityTriHitT(uint index, vec3 ro, vec3 dir, float t0, float t1) {
     EntityTriangle tri = entityTris.tris[index];
     vec3 p = cross(dir, tri.e2);
     float det = dot(tri.e1, p);
-    if (abs(det) < 1e-12) return false;
+    if (abs(det) < 1e-12) return -1.0;
     float inv = 1.0 / det;
     vec3 s = ro - tri.v0;
     float a = dot(s, p) * inv;
-    if (a < 0.0 || a > 1.0) return false;
+    if (a < 0.0 || a > 1.0) return -1.0;
     vec3 q = cross(s, tri.e1);
     float b = dot(dir, q) * inv;
-    if (b < 0.0 || a + b > 1.0) return false;
+    if (b < 0.0 || a + b > 1.0) return -1.0;
     float t = dot(tri.e2, q) * inv;
-    if (t < t0 || t > t1) return false;
+    if (t < t0 || t > t1) return -1.0;
     ivec2 c = min(ivec2(vec2(a, b) * 8.0), ivec2(7));
     if (c.x + c.y > 7) c.y = 7 - c.x;
     int bit = c.x + c.y * 8;
     uint word = bit < 32 ? tri.maskLo : tri.maskHi;
-    return (word & (1u << uint(bit & 31))) != 0u;
+    return (word & (1u << uint(bit & 31))) != 0u ? t : -1.0;
 }
+
+bool entityTriHit(uint index, vec3 ro, vec3 dir, float t0, float t1) { return entityTriHitT(index, ro, dir, t0, t1) >= 0.0; }
 
 /*
  * ボクセル空間のレイ ro + dir * t (dir は単位ベクトル) が区間 [t0, t1] でエンティティの三角形に当たるか
@@ -225,6 +242,39 @@ bool traceEntityTriangles(vec3 ro, vec3 dir, float t0, float t1, bool player, bo
         }
     }
     return false;
+}
+
+/*
+ * 領域 region (0 = 自分) の三角形のうち、ボクセル空間のレイ ro + dir * t が区間 [t0, t1] で一番近くで当たるもの
+ * 戻り値は三角形の番号 (外れは ENTITY_TRI_NONE)、tHit に距離。箱の判定は今の一番近い距離までで打ち切る
+ */
+const uint ENTITY_TRI_NONE = 0xFFFFFFFFu;
+
+uint traceEntityTrianglesClosest(vec3 ro, vec3 dir, float t0, float t1, int region, out float tHit) {
+    tHit = t1;
+    uint best = ENTITY_TRI_NONE;
+    if (t1 <= t0) return best;
+    uint n = min(entityTris.counts[region], entityTriRegionCap(region));
+    if (n == 0u) return best;
+    vec3 rdInv = sign(dir + 1e-20) / max(abs(dir), vec3(1e-7));
+    uint start = entityTriRegionStart(region);
+    uint end = start + n;
+    for (uint g = start / uint(ENTITY_TRI_GROUP); g * uint(ENTITY_TRI_GROUP) < end; g++) {
+        if (!entityTriRayBox(true, g, ro, rdInv, t0, tHit)) continue;
+        uint gEnd = min(end, (g + 1u) * uint(ENTITY_TRI_GROUP));
+        for (uint c = g * uint(ENTITY_TRI_GROUP / ENTITY_TRI_CLUSTER); c * uint(ENTITY_TRI_CLUSTER) < gEnd; c++) {
+            if (!entityTriRayBox(false, c, ro, rdInv, t0, tHit)) continue;
+            uint cEnd = min(gEnd, (c + 1u) * uint(ENTITY_TRI_CLUSTER));
+            for (uint i = c * uint(ENTITY_TRI_CLUSTER); i < cEnd; i++) {
+                float t = entityTriHitT(i, ro, dir, t0, tHit);
+                if (t >= 0.0) {
+                    tHit = t;
+                    best = i;
+                }
+            }
+        }
+    }
+    return best;
 }
 
 #endif

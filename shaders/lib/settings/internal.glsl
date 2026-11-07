@@ -2,6 +2,7 @@
 #define SETTINGS_INTERNAL_GLSL
 
 //@include "/lib/settings/light.glsl"
+//@include "/lib/settings/surface.glsl"
 
 // Iris の定数 (設定画面には出さない)
 const float ambientOcclusionLevel = 1.0;
@@ -60,6 +61,11 @@ const int noiseTextureResolution = 256;
 // 値付きにして Iris のブール設定として拾われないようにする
 #if LIGHT_OCCLUSION_MODE == 1 && (defined LIGHT_ENTITY_OCCLUSION || defined LIGHT_PLAYER_OCCLUSION)
     #define ENTITY_TRI_OCCLUSION 1
+#endif
+
+// 水に入った自分を、屈折した視線を自分の三角形に当てて描く (water_trace.fsh)。自分の三角形と水の屈折の両方が要る
+#if defined ENTITY_TRI_OCCLUSION && defined LIGHT_PLAYER_OCCLUSION && WATER_REFRACTION >= 1
+    #define WATER_SELF_REFRACTION 1
 #endif
 
 #endif

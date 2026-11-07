@@ -26,7 +26,7 @@ const int ENTITY_TRI_MAX_GROUPS = ENTITY_TRI_MAX / ENTITY_TRI_GROUP;
 struct EntityTriangle {
     vec3 v0; uint maskLo; // maskLo/Hi = 重心座標 8x8 格子のアルファ (bit = i + j*8, i は e1 方向)
     vec3 e1; uint maskHi;
-    vec3 e2; uint flags;  // 予備
+    vec3 e2; uint color;  // 不透明なセルのテクスチャ x 頂点色の平均 (sRGB の RGBA8、packUnorm4x8)。水の中の自分を屈折で描く色
 };
 
 layout(std430, binding = 4) SSBO_ENTITY_TRIS_ACCESS buffer EntityTriangleBuffer {

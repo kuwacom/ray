@@ -22,6 +22,9 @@
 //@include "/lib/surface/reflection.glsl"
 //@include "/lib/surface/composite_specular.glsl"
 //@include "/lib/surface/water_shading.glsl"
+//@include "/lib/surface/water_self.glsl"
+//@include "/lib/light/entity_tri.glsl"
+//@include "/lib/light/hand_light.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -105,6 +108,7 @@
 #include "/lib/surface/composite_specular.glsl"
 #include "/lib/common/exposure.glsl"
 #include "/lib/surface/water_shading.glsl"
+#include "/lib/surface/water_self.glsl"
 // END GENERATED includes
 
 #if REFLECTIONS > 0
@@ -293,6 +297,29 @@ void main() {
         behind = sColor.rgb;
         behindExcess = behindSparkle(sColor);
     }
+#ifdef WATER_SELF_REFRACTION
+    /*
+     * 水に入った自分 (lib/surface/water_self.glsl): 屈折した視線を、影のパスで毎フレーム持っている自分の三角形に当てる
+     * 自分の水の中の画素は gbuffers_entities_translucent が捨てるので、ここで水底の代わりに描く。色は三角形ごとの平均のアルベドを
+     * 当たった点で照らしたもの (水の中の太陽の影・コースティクス・空)。体を描かない一人称では当てない
+     */
+    if (!below && refracts && !firstPersonCamera) {
+        vec3 eye = getEyePlayerPos();
+        vec3 boxT0 = (eye + WATER_SELF_BOX_LO - surfPlayer) / refrDir;
+        vec3 boxT1 = (eye + WATER_SELF_BOX_HI - surfPlayer) / refrDir;
+        float reach = min(pathLen, WATER_SELF_TRACE_MAX);
+        if (max(maxOf(min(boxT0, boxT1)), 0.0) <= min(minOf(max(boxT0, boxT1)), reach)) {
+            float tHit;
+            uint tri = traceEntityTrianglesClosest(playerToVoxel(surfPlayer), refrDir, 0.0, reach, 0, tHit);
+            if (tri != ENTITY_TRI_NONE) {
+                vec3 n = entityTriNormal(tri);
+                behind = shadeSecondaryHit(surfPlayer + refrDir * tHit, dot(n, refrDir) > 0.0 ? -n : n, entityTriAlbedo(tri), lmT.y);
+                behindExcess = 0.0;
+                pathLen = tHit;
+            }
+        }
+    }
+#endif
     outRefraction = vec4(behind, pathLen);
 
     /*

@@ -16,6 +16,16 @@ const float WATER_SELF_SURFACE = 8.0 / 9.0;
 const int WATER_SELF_SEARCH = 4;
 // 視線の上向きの cos の下限 (かすめ角で水の中の長さが無限にならない)
 const float WATER_SELF_MIN_COS = 0.1;
+// 水のセルの底からこの分だけ下も水の中とみなす (膨らませた防具のブーツの底は足場のブロックへ 1/16 はみ出す)
+const float WATER_SELF_FLOOR_EPS = 0.125;
+// 屈折した視線を自分の三角形に当てる最大の距離 (ブロック)。水面から自分の足までの距離より長ければよい
+const float WATER_SELF_TRACE_MAX = 4.0;
+/*
+ * 自分の三角形を辿る前に視線を当てる箱 (目の位置からの player 空間)。泳ぐ姿勢・腕・防具まで入る大きさ
+ * 水面のほとんどの画素はこの箱で外れ、三角形の箱 (SSBO) を読まずに済む
+ */
+const vec3 WATER_SELF_BOX_LO = vec3(-1.5, -2.0, -1.5);
+const vec3 WATER_SELF_BOX_HI = vec3(1.5, 0.5, 1.5);
 
 bool waterSelfIsWater(ivec3 cell) {
     if (!isInVoxelVolume(cell)) return false;
@@ -26,7 +36,7 @@ bool waterSelfIsWater(ivec3 cell) {
 // 水面からの深さ (ブロック)。水の中でなければ負
 float waterSelfDepth(vec3 playerPos) {
     vec3 v = playerToVoxel(playerPos);
-    ivec3 cell = ivec3(floor(v));
+    ivec3 cell = ivec3(floor(v + vec3(0.0, WATER_SELF_FLOOR_EPS, 0.0)));
     if (!waterSelfIsWater(cell)) return -1.0;
     for (int k = 1; k <= WATER_SELF_SEARCH; k++) {
         if (!waterSelfIsWater(cell + ivec3(0, k, 0))) return float(cell.y + k - 1) + WATER_SELF_SURFACE - v.y;

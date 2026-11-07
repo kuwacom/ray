@@ -122,9 +122,9 @@ void main() {
      * 光る手持ちアイテム (たいまつ等) はその光源自身なので遮蔽物にしない
      */
     if (voxelize && getItemLightIndex(currentRenderedItemId) == LIGHT_NONE) {
-        float alpha = (vColor[0].a + vColor[1].a + vColor[2].a) / 3.0;
+        vec4 tint = (vColor[0] + vColor[1] + vColor[2]) / 3.0;
         bool stored = storeEntityTriangle(vPlayerPos[0], vPlayerPos[1], vPlayerPos[2],
-                                          vTexcoord[0], vTexcoord[1], vTexcoord[2], alpha, isPlayer);
+                                          vTexcoord[0], vTexcoord[1], vTexcoord[2], tint, isPlayer);
         if (!stored && !isPlayer) voxelizeEntityTriangle(vPlayerPos[0], vPlayerPos[1], vPlayerPos[2], false);
     }
 #else
