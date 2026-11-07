@@ -134,7 +134,7 @@
 | WATER_GLITTER_LENGTH | 1.0 | 0.5, 0.75, 1.0, 1.5, 2.0 |
 | WATER_GLITTER_SINGLE | 0.55 | 0.0, 0.25, 0.55, 0.8, 1.0 |
 | WATER_REFLECT_SCATTER | 0.3 | 0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0 |
-| WATER_LAKE_WAVES | 0.6 | 0.0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.5, 2.0 |
+| WATER_LAKE_WAVES | 0.3 | 0.0, 0.2, 0.3, 0.4, 0.6, 0.8, 1.0, 1.5, 2.0 |
 | WATER_RIVER_WAVES | 0.4 | 0.0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.5, 2.0 |
 | WATER_PARALLAX | ON | ON / OFF |
 | WATER_REFRACTION | 1 | 0, 1, 2 |
