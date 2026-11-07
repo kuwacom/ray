@@ -13,7 +13,10 @@
 // 上に水の無い水のブロックの水面の高さ (バニラの水源の上面。Ray の水面は形を動かさず法線だけで波を描くので、描く水面もこの高さ)
 const float WATER_SELF_SURFACE = 8.0 / 9.0;
 // 水面を探して上へ辿るセルの数。これより深い所は辿った分の深さとみなす (吸収はそこで飽和している)
-const int WATER_SELF_SEARCH = 4;
+// 自分の三角形を辿る長さ (WATER_SELF_TRACE_MAX) より深くまで水の中と判定できる数にする
+const int WATER_SELF_SEARCH = 6;
+// 目からこれより下を足の側とみなす。足のあるセルだけは水でないブロック (水の入ったハーフブロック・階段) でも上の水を探す
+const float WATER_SELF_FEET_BELOW_EYE = 1.0;
 // 視線の上向きの cos の下限 (かすめ角で水の中の長さが無限にならない)
 const float WATER_SELF_MIN_COS = 0.1;
 // 水のセルの底からこの分だけ下も水の中とみなす (膨らませた防具のブーツの底は足場のブロックへ 1/16 はみ出す)
@@ -27,21 +30,30 @@ const float WATER_SELF_TRACE_MAX = 4.0;
 const vec3 WATER_SELF_BOX_LO = vec3(-1.5, -2.0, -1.5);
 const vec3 WATER_SELF_BOX_HI = vec3(1.5, 0.5, 1.5);
 
-bool waterSelfIsWater(ivec3 cell) {
-    if (!isInVoxelVolume(cell)) return false;
-    int id = fetchVoxelBlockId(cell);
-    return id == BLOCK_WATER || id == BLOCK_UNDERWATER_PLANT;
-}
-
-// 水面からの深さ (ブロック)。水の中でなければ負
+/*
+ * 水面からの深さ (ブロック)。水の中でなければ負
+ * 上に水のある水のセルは面がすべて隠れて描かれず、ボクセルには空気として残る。水の下に空気のセルは長く残らないので、
+ * 空気は上に水がある限り水とみなして水面まで辿る
+ * 乗り物の中も水の中とみなさない (ボートの中は水を描かないので、捨てた脚が消える)
+ */
 float waterSelfDepth(vec3 playerPos) {
+    if (isRiding) return -1.0;
     vec3 v = playerToVoxel(playerPos);
     ivec3 cell = ivec3(floor(v + vec3(0.0, WATER_SELF_FLOOR_EPS, 0.0)));
-    if (!waterSelfIsWater(cell)) return -1.0;
-    for (int k = 1; k <= WATER_SELF_SEARCH; k++) {
-        if (!waterSelfIsWater(cell + ivec3(0, k, 0))) return float(cell.y + k - 1) + WATER_SELF_SURFACE - v.y;
+    bool feet = playerPos.y < -relativeEyePosition.y - WATER_SELF_FEET_BELOW_EYE;
+    int top = -1;
+    for (int k = 0; k <= WATER_SELF_SEARCH; k++) {
+        ivec3 c = cell + ivec3(0, k, 0);
+        if (!isInVoxelVolume(c)) break;
+        int id = fetchVoxelBlockId(c);
+        if (id == BLOCK_WATER || id == BLOCK_UNDERWATER_PLANT) {
+            top = k;
+        } else if (id != BLOCK_AIR && !(k == 0 && feet)) {
+            break;
+        }
     }
-    return float(WATER_SELF_SEARCH);
+    if (top < 0) return -1.0;
+    return float(cell.y + top) + WATER_SELF_SURFACE - v.y;
 }
 
 #endif

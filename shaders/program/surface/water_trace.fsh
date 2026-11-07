@@ -311,9 +311,11 @@ void main() {
         if (max(maxOf(min(boxT0, boxT1)), 0.0) <= min(minOf(max(boxT0, boxT1)), reach)) {
             float tHit;
             uint tri = traceEntityTrianglesClosest(playerToVoxel(surfPlayer), refrDir, 0.0, reach, 0, tHit);
-            if (tri != ENTITY_TRI_NONE) {
+            vec3 hitPlayer = surfPlayer + refrDir * tHit;
+            // 半透明の層が捨てた所だけ描く (同じ判定。捨てずに残した体と二重にならない)
+            if (tri != ENTITY_TRI_NONE && waterSelfDepth(hitPlayer) > 0.0) {
                 vec3 n = entityTriNormal(tri);
-                behind = shadeSecondaryHit(surfPlayer + refrDir * tHit, dot(n, refrDir) > 0.0 ? -n : n, entityTriAlbedo(tri), lmT.y);
+                behind = shadeSecondaryHit(hitPlayer, dot(n, refrDir) > 0.0 ? -n : n, entityTriAlbedo(tri), lmT.y);
                 behindExcess = 0.0;
                 pathLen = tHit;
             }

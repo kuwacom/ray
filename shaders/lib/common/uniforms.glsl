@@ -81,6 +81,7 @@ uniform float darknessLightFactor;
 uniform float nightVision;
 uniform float playerMood;
 uniform bool is_burning;
+uniform bool isRiding; // 乗り物に乗っている (Iris 1.10.4 以降。それより前は常に false)
 uniform bool hideGUI;
 
 // システム
