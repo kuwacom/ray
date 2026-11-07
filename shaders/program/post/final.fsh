@@ -342,7 +342,8 @@ void main() {
      * 溶岩の上は自分のブルーム (LAVA_BLOOM_GAIN 倍) が一様に乗って暗い殻が持ち上がり、模様が平らになる
      * 溶岩の画素だけ混合率を下げ、滲みは周りに出す
      */
-    float bloomMix = saturate(LOOK_BLOOM_STRENGTH * BLOOM_AMOUNT * GLOW_GAIN) * (1.0 - LAVA_SELF_BLOOM_CUT * lava);
+    float nightBloom = mix(NIGHT_BLOOM_GAIN, 1.0, smoothstep(NIGHT_BLOOM_SUN_Y.x, NIGHT_BLOOM_SUN_Y.y, getSunDir().y));
+    float bloomMix = saturate(LOOK_BLOOM_STRENGTH * BLOOM_AMOUNT * GLOW_GAIN * nightBloom) * (1.0 - LAVA_SELF_BLOOM_CUT * lava);
     hdr = mix(hdr, bloom, bloomMix);
     lavaGlowShare = saturate(bloomMix * bands.lava / max(luminance(hdr), 1e-6));
 
