@@ -187,8 +187,6 @@ float exposureCurve(float ev) {
     return EXPOSURE_ANCHOR_EV + (ev - EXPOSURE_ANCHOR_EV) * EXPOSURE_CURVE - boost;
 }
 
-const float EYE_BRIGHTNESS_MAX = 240.0; // eyeBrightness の最大値
-
 // 目の位置のブロックライト [0,1]。手持ちの光源は eyeBrightness に入らないので持っている光源の明るさも見る
 float eyeBlockLight() {
     float held = float(max(heldBlockLightValue, heldBlockLightValue2)) / LIGHT_LEVEL_MAX;
@@ -201,9 +199,7 @@ float eyeBlockLight() {
  */
 float applyEnvironmentExposure(float appliedEv, float ev) {
 #ifdef HAS_SKYLIGHT
-    // 窓のある部屋 (スカイライト 11 前後) は屋内、木の下・軒下 (14) は屋外として扱う
-    // 下端 0.6 では窓のある部屋 (0.73) が 3 割屋外になり、屋内の暗さがほとんど効かなかった
-    float outdoor = smoothstep(0.75, 0.93, float(eyeBrightnessSmooth.y) / EYE_BRIGHTNESS_MAX);
+    float outdoor = eyeOutdoor();
     float lift = min(EXPOSURE_NIGHT_SLOPE * max(EXPOSURE_NIGHT_EV_START - ev, 0.0), EXPOSURE_NIGHT_MAX_LIFT);
     float night = 1.0 - smoothstep(-0.2, -0.05, getSunDir().y);
     lift = max(lift, EXPOSURE_NIGHT_MIN_LIFT * night);

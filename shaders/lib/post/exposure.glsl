@@ -7,7 +7,18 @@
 #ifndef POST_EXPOSURE_GLSL
 #define POST_EXPOSURE_GLSL
 
+//@include "/lib/common/uniforms.glsl"
 //@include "/lib/post/post_constants.glsl"
+
+const float EYE_BRIGHTNESS_MAX = 240.0; // eyeBrightness の最大値
+// 窓のある部屋 (スカイライト 11 前後) は屋内、木の下・軒下 (14) は屋外として扱う範囲
+// 下端 0.6 では窓のある部屋 (0.73) が 3 割屋外になり、屋内の暗さがほとんど効かなかった
+const vec2 OUTDOOR_SKYLIGHT = vec2(0.75, 0.93);
+
+// 目の位置が屋外か [0,1]。露出の夜の持ち上げと夜のブルームが共有する
+float eyeOutdoor() {
+    return smoothstep(OUTDOOR_SKYLIGHT.x, OUTDOOR_SKYLIGHT.y, float(eyeBrightnessSmooth.y) / EYE_BRIGHTNESS_MAX);
+}
 
 const float EXPOSURE_INIT_MARKER = 271.828;
 const float EXPOSURE_ISO = 100.0;

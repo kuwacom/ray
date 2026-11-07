@@ -217,10 +217,12 @@ const float BLOOM_AMOUNT = 0.16;
 /*
  * 夜 (太陽が地平線の下) のブルームの混合率の倍率。夜は露出が上がって月とその照り返し・光源だけが飛び抜けて明るく、
  * 昼と同じ混合率では滲みが薄くて光って見えない。地面や空は一様なので、混合しても全体の明るさは変わらない
- * 夜の判定は露出の持ち上げ (applyEnvironmentExposure) と同じ太陽の高さの範囲にそろえる
+ * 夜の判定と屋外の判定は露出の持ち上げ (applyEnvironmentExposure) と同じにそろえる (地上の屋外だけ。洞窟・屋内・ネザー・エンドは昼と同じ)
+ * ブルームを強めた設定で画面全体がぼけないよう、増した後の混合率は元の値と NIGHT_BLOOM_MIX_MAX の大きいほうまでに止める
  */
 const float NIGHT_BLOOM_GAIN = 3.0;
 const vec2 NIGHT_BLOOM_SUN_Y = vec2(-0.2, -0.05);
+const float NIGHT_BLOOM_MIX_MAX = 0.35;
 // 雨・水中で広いブルームを足す量
 const float BLOOM_RAIN_BOOST = 0.6;
 const float BLOOM_WATER_BOOST = 1.0;
