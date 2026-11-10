@@ -631,7 +631,7 @@ sky モジュールが提供 (`//@include "/lib/sky/sky.glsl"`):
 |---|---|---|
 | `vec3 getSunIrradiance()` / `vec3 getMoonIrradiance()` | 全員 | 地表での直達照度 (FrameData) |
 | `LightSample getCelestialLight()` | surface (`gatherSurfaceLights`), sky (VL) | 影を落とす天体の光 (昼は太陽, 夜は月) |
-| `float celestialDiscScale()` / `celestialSpecularStrength()` | surface (`composite_specular.glsl`, `opaque_shading.fsh`) | 天体の鏡面の上限に掛ける円盤の明るさの倍率 (夜の月は空に描く円盤に合わせる。WATER_GLITTER の点は点に集めた分だけ実物の円盤まで上げ、円盤を超える点 (像が画素より大きい点) は SPECULAR_POINT_SPREAD_MAX 倍まで上限を上げてエネルギーを捨てない。1 より大きい強さで割り、強さを掛けても鏡のような面の鏡像は見えている円盤を超えない) と、設定 SPECULAR_SUN_STRENGTH / SPECULAR_MOON_STRENGTH |
+| `float celestialDiscScale()` / `celestialSpecularStrength()` | surface (`composite_specular.glsl`, `opaque_shading.fsh`) | 天体の鏡面の上限に掛ける円盤の明るさの倍率 (夜の月は空に描く円盤 (`MOON_DISK_NIGHT_GAIN` を掛けた後) に合わせる。WATER_GLITTER の点は点に集めた分だけ実物の円盤まで上げ、円盤を超える点 (像が画素より大きい点) は SPECULAR_POINT_SPREAD_MAX 倍まで上限を上げてエネルギーを捨てない。1 より大きい強さで割り、強さを掛けても鏡のような面の鏡像は見えている円盤を超えない) と、設定 SPECULAR_SUN_STRENGTH / SPECULAR_MOON_STRENGTH |
 | `vec3 getSkyIrradiance(vec3 n)` | surface (`gatherSurfaceLights`, 反射のフォールバック) | 空からの拡散照度 (SH) |
 | `vec3 getSkyRadiance(vec3 dir)` | surface (反射のフォールバック), post | 方向の空の放射 (太陽円盤なし) |
 | `vec3 renderSky(vec3 dir, vec3 vanillaSky)` | surface (deferred30 の空ピクセル) | 背景の空 (太陽月・星込み) |
@@ -708,6 +708,7 @@ post モジュールが提供 (`//@include "/lib/post/post.glsl"`):
 - 座標: screen (UV + 深度), view, player (カメラ原点のワールド軸, 法線もこの空間), world, voxel (`lib/common/transforms.glsl`, `voxel_space.glsl`)
 - 手の深度は `fixHandDepth()` で戻してから再構成する
 - 光の量は線形 HDR の相対値。基準は `lib/common/constants.glsl` の `SUN_ILLUMINANCE` (6.0) / `MOON_ILLUMINANCE` / `SKY_ILLUMINANCE` / `BLOCKLIGHT_ILLUMINANCE` (レベル 15 の光源から 1 ブロック) / `EMISSION_LUMINANCE` / `MIN_AMBIENT`。各モジュールが独自のスケールを作らない。最終的な明るさは自動露出が吸収する
+- 夜の月: 地面の拡散と照り返しのローブは照度 `MOON_ILLUMINANCE` (太陽の 1/500) のまま。空に描く円盤だけ見た目のために暗くしてあり、放射は照度どおりの値 (`MOON_DISK_SCALE` 2.5 倍の大きさ) の `MOON_NIGHT_BRIGHTNESS` 0.004 x `MOON_DISK_NIGHT_GAIN` 32 = 0.128 倍 (実寸の円盤の放射の 1/49)。鏡像の上限はこの円盤で、太陽と同じく強さ 1 で円盤の鏡像どおり。地球照とフレアの強さは `MOON_NIGHT_BRIGHTNESS` だけ (32 倍しない) を基準にする
 - アルベドは G バッファでは sRGB エンコード、シェーディングは線形
 
 ### コーディング規約

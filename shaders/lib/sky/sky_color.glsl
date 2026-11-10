@@ -167,14 +167,11 @@ LightSample getCelestialLight() {
 
 /*
  * 天体の鏡面に掛ける円盤の放射輝度の倍率 (specularDiscCap の discScale)。太陽は 1
- * 夜の月は空に描く円盤を MOON_DISK_SCALE 倍の大きさで MOON_NIGHT_BRIGHTNESS 倍に暗くしてあるので、鏡像もこの明るさを基準にする
- * (照度どおりの鏡像は空の月の 1500 倍 x フレネルになり、水面に月より明るい白い塊が出る)
- * 空の円盤だけは MOON_DISK_NIGHT_GAIN 倍に白飛びさせるが、鏡像の上限には掛けない (強さの設定が決める)
- * 鏡面のローブの広がりは物理の大きさのままで、上限だけ見えている円盤に合わせる
- * 強さの設定 (celestialSpecularStrength、呼び出し側が掛ける) は、太陽では粗い面の照り返しだけを明るくし、水たまりのような鏡に近い面の
- * 鏡像は見えている円盤より明るくしない。上限を 1 より大きい強さで割っておく
- * 夜の月は上限も強さに従って上がる。空の円盤は階調の肩で白に届かず、上限を円盤のままにすると強さを上げても月の道の芯が円盤の明るさで
- * 頭打ちになって暗いままなので、強さ 1 を超える分は鏡像が円盤より明るくなってよい (白飛びの板にならない範囲は強さの既定で抑える)
+ * 夜の月は空に描く円盤 (MOON_DISK_SCALE 倍の大きさで MOON_NIGHT_BRIGHTNESS x MOON_DISK_NIGHT_GAIN 倍) を基準にし、鏡像は空の月より明るくならない
+ * (照度どおりの鏡像は空の月の約 50 倍 x フレネルになり、水面に月より明るい白い塊が出る)
+ * 鏡面のローブの広がりと粗い面が受ける光は照度のまま (拡散と同じ光) で、上限だけ見えている円盤に合わせる
+ * 強さの設定 (celestialSpecularStrength、呼び出し側が掛ける) は、粗い面の照り返しだけを明るくし、水たまりのような鏡に近い面の
+ * 鏡像は見えている円盤より明るくしない。上限を 1 より大きい強さで割っておく (太陽も月も同じ。強さ 1 で円盤の鏡像どおり)
  */
 // 影を落とす天体の鏡面の強さの設定 (昼は太陽、夜は月。エンドの光も月の側)
 float celestialSpecularStrength() {
@@ -182,10 +179,12 @@ float celestialSpecularStrength() {
 }
 
 float celestialDiscScale() {
+    float disc = 1.0;
 #ifdef HAS_SKY
-    if (frameData.shadowLightIrradiance.a <= 0.5) return mix(MOON_NIGHT_BRIGHTNESS, 1.0, moonDayMix(getSunDir().y)) / sqr(MOON_DISK_SCALE);
+    if (frameData.shadowLightIrradiance.a <= 0.5)
+        disc = mix(MOON_NIGHT_BRIGHTNESS * MOON_DISK_NIGHT_GAIN, 1.0, moonDayMix(getSunDir().y)) / sqr(MOON_DISK_SCALE);
 #endif
-    return 1.0 / max(celestialSpecularStrength(), 1.0);
+    return disc / max(celestialSpecularStrength(), 1.0);
 }
 
 // 法線 n の面が空から受ける拡散照度 (遮蔽なし。AO・スカイライトは受け取り側が掛ける)
