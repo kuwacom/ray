@@ -7,6 +7,7 @@
 #define SKY_SKY_COLOR_GLSL
 
 //@include "/lib/settings.glsl"
+//@include "/lib/common/celestial_shape.glsl"
 //@include "/lib/common/color.glsl"
 //@include "/lib/common/constants.glsl"
 //@include "/lib/common/dimension.glsl"

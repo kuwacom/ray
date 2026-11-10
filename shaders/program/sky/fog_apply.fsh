@@ -46,6 +46,7 @@
 #include "/lib/sky/sh.glsl"
 #include "/lib/buffers/images.glsl"
 #include "/lib/sky/atmosphere.glsl"
+#include "/lib/common/celestial_shape.glsl"
 #include "/lib/sky/celestial.glsl"
 #include "/lib/common/look_presets.glsl"
 #include "/lib/common/frame_offset.glsl"

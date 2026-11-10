@@ -16,6 +16,7 @@
 #define IMG_CLOUD_WEATHER
 #define SSBO_FRAME_DATA_WRITE
 //@include "/lib/common/common.glsl"
+//@include "/lib/common/celestial_shape.glsl"
 //@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/sky/sky.glsl"
 //@include "/lib/sky/cloud_volume.glsl"
@@ -35,6 +36,8 @@
 #include "/lib/common/math.glsl"
 #include "/lib/common/shading_types.glsl"
 #include "/lib/common/common.glsl"
+#include "/lib/common/transforms.glsl"
+#include "/lib/common/celestial_shape.glsl"
 #include "/lib/buffers/frame_data.glsl"
 #include "/lib/sky/sh.glsl"
 #include "/lib/common/color.glsl"
@@ -42,7 +45,6 @@
 #include "/lib/buffers/images.glsl"
 #include "/lib/sky/atmosphere.glsl"
 #include "/lib/common/noise.glsl"
-#include "/lib/common/transforms.glsl"
 #include "/lib/sky/celestial.glsl"
 #include "/lib/common/look_presets.glsl"
 #include "/lib/common/frame_offset.glsl"
@@ -77,6 +79,8 @@ const float CLOUD_THUNDER_GAP_COVER = 0.88;
 const float CLOUD_SHADOW_PENUMBRA = 45.0;
 const float CLOUD_SHADOW_BLEND = 0.08;
 const float CLOUD_SHADOW_RESET_DISTANCE = 64.0;
+// 4 次元の低食い違い列 (R4, Roberts 2018)。半影 (xy) と光源の形 (zw) を別々に散らす (同じ列の 2 次元ずつだと 2 つのずれが同じ動きになる)
+const vec4 CLOUD_SHADOW_R4 = vec4(0.8566748839, 0.7338918566, 0.6287067210, 0.5385972572);
 
 // 非周期の 2D 勾配ノイズ (天気図用)
 vec2 weatherGradient(ivec2 cell, uint seed) {
@@ -391,10 +395,20 @@ void main() {
     // 半影: 円盤の中でずらした位置の透過率をフレームごとに積み重ね、ぼかした雲影にする (iterationT はガウシアン 2 パス)。
     // 1 テクセルずつの読み書きなので同じディスパッチ内で競合せず、別パスも要らない。
     // 面に固定した環状のタイルなので、カメラが動いても履歴は同じ点のまま。窓の端で新しく窓に入ったテクセルだけ履歴を捨てる
-    vec2 r2 = fract(float(frameCounter % 256) * vec2(0.7548777, 0.5698403) + interleavedGradientNoise(vec2(texel), 0));
+    vec2 r2 = fract(float(frameCounter % 256) * CLOUD_SHADOW_R4.xy + interleavedGradientNoise(vec2(texel), 0));
     vec2 jitter = sqrt(r2.x) * vec2(cos(TAU * r2.y), sin(TAU * r2.y)) * (CLOUD_SHADOW_PENUMBRA / CLOUD_KH);
+    /*
+     * 光源の大きさ: 見えている光源 (丸い円盤・バニラの四角) の中の向きにもずらして辿り、積み重ねで光源の面積のうち雲に隠れていない割合にする。
+     * 中心の 1 本だけでは、夕日の大きな四角の中心が雲に隠れると、縁が見えていても地面が真っ暗な影になった。
+     * 受ける面はカメラの高さとみなし、その向きの光が雲の下面を通る点まで面の上でずらす。
+     * 向きは全テクセルで同じにする (テクセルごとに散らすと、夕日の大きな四角では隣どうしが数百ブロック離れた雲を読み、キャッシュが効きにくい)
+     */
+    CelestialShape shape = shadowLightShape();
+    vec3 sampleDir = celestialShapeDir(shape, celestialShapePoint(shape, fract(float(frameCounter % 256) * CLOUD_SHADOW_R4.zw)));
+    float receiverHeight = max(CLOUD_BASE - cameraPosition.y, 0.0);
+    vec2 shift = receiverHeight * (sampleDir.xz / max(sampleDir.y, CLOUD_SHADOW_MIN_LIGHT_Y) - lightDir.xz / max(lightDir.y, CLOUD_SHADOW_MIN_LIGHT_Y));
     float dither = interleavedGradientNoise(vec2(texel), frameCounter);
-    float current = cloudShadowTransmittance(ctx, rel + jitter, lightDir, dither);
+    float current = cloudShadowTransmittance(ctx, rel + jitter + shift, sampleDir, dither);
     float history = imageLoad(cloudShadowImg, texel).r;
     // 履歴の無効: 再読み込み・時刻の飛び (prepare の履歴フレーム数) とテレポート
     bool reset = frameData.skyParams[1].y < 1.5 || distance(cameraPosition, previousCameraPosition) > CLOUD_SHADOW_RESET_DISTANCE || any(notEqual(plane, planePrev)) || isnan(history) || isinf(history);

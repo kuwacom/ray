@@ -54,10 +54,6 @@ const ivec2 TRANSMITTANCE_LUT_SIZE = ivec2(256, 64);
 const ivec2 MULTISCATTER_LUT_SIZE = ivec2(32, 32);
 const ivec2 SKYVIEW_LUT_SIZE = ivec2(192, 108);
 
-// 太陽・月の円盤の見かけの半径 (rad)。実際 (0.0047) の 2 倍にして画面上で読める大きさにする
-const float SUN_ANGULAR_RADIUS = 0.0093;
-const float MOON_ANGULAR_RADIUS = 0.0093;
-
 // 幾何 (惑星中心原点, r = 中心からの距離, mu = 天頂角の余弦)
 float atmoDistanceToTop(float r, float mu) {
     float disc = r * r * (mu * mu - 1.0) + ATMO_TOP_RADIUS * ATMO_TOP_RADIUS;

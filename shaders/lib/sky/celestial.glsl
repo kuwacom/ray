@@ -6,6 +6,7 @@
 #define SKY_CELESTIAL_GLSL
 
 //@include "/lib/settings.glsl"
+//@include "/lib/common/celestial_shape.glsl"
 //@include "/lib/common/color.glsl"
 //@include "/lib/common/constants.glsl"
 //@include "/lib/common/math.glsl"
@@ -18,8 +19,6 @@
 const float SUN_LIMB_DARKENING = 0.6;
 // 月面の地球照 (新月側がうっすら見える明るさ, 満月の照り返しに対する比)
 const float MOON_EARTHSHINE = 0.004;
-// 月の円盤の見かけの大きさ (atmosphere.glsl の MOON_ANGULAR_RADIUS に対する倍率)
-const float MOON_DISK_SCALE = 2.5;
 const float STAR_GRID = 110.0;          // 天球を刻む格子の細かさ (セル 1 つに星は最大 1 個)
 const float STAR_DENSITY = 0.055;       // 星があるセルの割合
 const float STAR_RADIANCE = 0.03;       // 最も明るい星の中心の放射
@@ -36,15 +35,6 @@ const float END_NEBULA_RADIANCE = 0.16; // 星雲の最も明るい所の放射 
 
 // 画面 1 ピクセルの見込み角 (rad)。星と円盤の縁のアンチエイリアス幅
 float skyPixelAngle() { return 2.0 / (viewHeight * gbufferProjection[1][1]); }
-
-/*
- * 天球の極 (太陽の日周運動の回転軸, player 空間)
- * Iris は太陽を Ry(-90) Rz(sunPathRotation) Rx(角度) で回すので、回転軸は (0, sin a, cos a)
- */
-vec3 celestialPole() {
-    float a = radians(sunPathRotation);
-    return vec3(0.0, sin(a), cos(a));
-}
 
 // 視線を天球座標へ (x = 太陽方向, z = 極)。夜空が太陽と一緒に回る
 vec3 toCelestial(vec3 dir) {

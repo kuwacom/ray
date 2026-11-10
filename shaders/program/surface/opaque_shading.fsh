@@ -71,6 +71,7 @@
 #include "/lib/sky/sh.glsl"
 #include "/lib/common/phase.glsl"
 #include "/lib/sky/atmosphere.glsl"
+#include "/lib/common/celestial_shape.glsl"
 #include "/lib/sky/celestial.glsl"
 #include "/lib/sky/cloud_styles.glsl"
 #include "/lib/sky/clouds.glsl"
