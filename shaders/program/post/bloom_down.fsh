@@ -42,6 +42,7 @@
 #include "/lib/post/bloom.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/post/lens_optics.glsl"
+#include "/lib/common/celestial_shape.glsl"
 #include "/lib/post/lens_ghosts.glsl"
 #include "/lib/post/lens_flare.glsl"
 #include "/lib/post/lens.glsl"

@@ -12,6 +12,7 @@
 // このプログラムで書く SSBO (lib/buffers。ほかのプログラムでは readonly)
 #define SSBO_FRAME_DATA_WRITE
 //@include "/lib/common/common.glsl"
+//@include "/lib/common/celestial_shape.glsl"
 //@include "/lib/common/gbuffer.glsl"
 //@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/ids/block_ids.glsl"
@@ -35,6 +36,8 @@
 #include "/lib/common/math.glsl"
 #include "/lib/common/shading_types.glsl"
 #include "/lib/common/common.glsl"
+#include "/lib/common/transforms.glsl"
+#include "/lib/common/celestial_shape.glsl"
 #include "/lib/common/color.glsl"
 #include "/lib/common/encoding.glsl"
 #include "/lib/common/gbuffer.glsl"
@@ -45,7 +48,6 @@
 #include "/lib/buffers/images.glsl"
 #include "/lib/light/voxel_read.glsl"
 #include "/lib/common/jitter.glsl"
-#include "/lib/common/transforms.glsl"
 #include "/lib/post/velocity.glsl"
 #include "/lib/common/look_presets.glsl"
 #include "/lib/post/tonemap.glsl"
@@ -81,15 +83,25 @@ const uint VIS_SCALE = 1024u;
 shared uint sharedVisible;
 shared uint sharedFarHidden;
 
-// 光源 (昼は太陽, 夜は月) の円盤内の index 番目の点。画面の端へ寄せた座標と、画面の外へのはみ出し (UV) を返す。光源が後ろなら false
+/*
+ * 光源 (昼は太陽, 夜は月) の形の中の index 番目の点。画面の端へ寄せた座標と、画面の外へのはみ出し (UV) を返す。光源が後ろなら false
+ * 丸い円盤は少し広めの円 (LENS_VIS_DISC_SCALE 倍)、バニラは明るい四角の格子 (周りの淡い光は光源に数えない)
+ */
 bool lightDiscTap(uint index, out vec2 clamped, out float outside) {
     clamped = vec2(0.0);
     outside = 0.0;
     if (shadowLightPosition.z >= 0.0) return false;
+#if SUN_MOON_STYLE == 0
+    CelestialShape shape = shadowLightShape();
+    vec2 xi = (vec2(index % LENS_VIS_SQUARE_GRID, index / LENS_VIS_SQUARE_GRID) + 0.5) / float(LENS_VIS_SQUARE_GRID);
+    vec3 tapView = mat3(gbufferModelView) * celestialShapeDir(shape, celestialShapePoint(shape, xi));
+    vec2 p = viewToScreen(tapView).xy;
+#else
     vec2 lightUv = viewToScreen(shadowLightPosition).xy;
-    float radius = LENS_VIS_DISC_SCALE * LENS_LIGHT_ANGULAR_RADIUS * gbufferProjection[1][1] * 0.5;
+    float radius = LENS_VIS_DISC_SCALE * shadowLightShape().size * gbufferProjection[1][1] * 0.5;
     radius = max(radius, 1.5 / viewHeight);
     vec2 p = lightUv + vogelDisk(int(index), 256, 0.0) * radius * vec2(1.0 / aspectRatio, 1.0);
+#endif
     clamped = clamp(p, vec2(0.5) / viewSize(), vec2(1.0) - vec2(0.5) / viewSize());
     outside = length(p - clamped);
     return true;
@@ -115,7 +127,7 @@ uint farHiddenTap(uint index) {
 #if defined LENS_FLARE && defined HAS_SKY
 /*
  * レンズフレアの光源 (昼は太陽, 夜は月) の見え具合 -> FrameData.postParams[2].x (平滑化済み), .y (今フレーム)
- * 256 スレッドがそれぞれ光源の円盤内の 1 点を調べ、見えている割合を集計する (木の葉越しの部分的な遮蔽も割合で効く)
+ * 256 スレッドがそれぞれ光源の形 (丸い円盤 / バニラの四角) の中の 1 点を調べ、見えている割合を集計する (木の葉越し・雲の縁の部分的な遮蔽も割合で効く)
  * - 地形・手: 深度が空 (1.0) でなければ遮蔽
  * - 雲: その点の明るさと空の平均の比 (雲に隠れると円盤が空と同じ明るさに落ちる)
  * - 画面の外: 一番近い画面端の画素で判定し、外へ離れるほど弱める (画面のすぐ外の太陽からもフレアは出る)
@@ -145,9 +157,11 @@ uint flareVisibilityTap(uint index) {
             // 歪曲・魚眼を TAA で組み立てた時は colortex0 が出力の座標なので、光源の出力の位置で読む
             vec2 colorUv = LENS_WARP_TAA ? lensForwardUv(clamped) : clamped;
             float l = luminance(sanitizeColor(textureLod(colortex0, colorUv, 0.0).rgb));
+#if SUN_MOON_STYLE == 1
             // 夜の円盤は白飛びさせるために明るく描いてある。フレアの見え具合は円盤を白飛びさせる前の明るさで比べる
             if (frameData.shadowLightIrradiance.a <= 0.5) l /= moonDiscBoost(getSunDir().y);
-            vis *= saturate(log2(max(l / skyLum, 1.0) / 4.0) / 10.0);
+#endif
+            vis *= saturate(log2(max(l / skyLum, 1.0) / LENS_VIS_SKY_RATIO.x) / LENS_VIS_SKY_RATIO.y);
         }
     }
     return uint(vis * float(VIS_SCALE) + 0.5);

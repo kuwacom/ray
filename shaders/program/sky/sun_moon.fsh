@@ -50,6 +50,12 @@ layout(location = 0) out vec4 outColor;
  */
 const float VANILLA_SUN_RADIANCE_SCALE = 10.0;
 const float VANILLA_MOON_RADIANCE_SCALE = 10.0;
+/*
+ * テクスチャの明るい四角の周りの淡い光 (sRGB で 1 割前後) は、ゲームの描き方で光らせた暈の絵。照度の 10 倍の放射にすると空と同じほどの明るさの
+ * 丸みのある暈になり、ブルームとフレアがその上に乗って光源の周りが大きな丸に見えた。暈はブルーム・フレア・大気の散乱が作るので、
+ * sRGB の明るさがこの範囲より明るい所 (太陽の四角・月の照らされた側) だけを光源にする
+ */
+const vec2 VANILLA_BODY_THRESHOLD = vec2(0.15, 0.3);
 
 void main() {
 #if defined WORLD_END
@@ -60,12 +66,15 @@ void main() {
         // 物理的な円盤は renderSky が描くので、バニラの太陽と月は捨てる (リソースパックのカスタム空は残す)
         if (renderStage == MC_RENDER_STAGE_SUN || renderStage == MC_RENDER_STAGE_MOON) discard;
     #endif
-    vec4 c = texture(gtexture, texcoord) * glcolor;
+    vec4 tex = texture(gtexture, texcoord);
+    vec4 c = tex * glcolor;
     vec3 radiance = srgbToLinear(c.rgb) * c.a;
+    // 雨で薄くなる分 (glcolor) は含めず、テクスチャの明るさだけで分ける
+    float body = smoothstep(VANILLA_BODY_THRESHOLD.x, VANILLA_BODY_THRESHOLD.y, luminance(tex.rgb) * tex.a);
     if (renderStage == MC_RENDER_STAGE_SUN) {
-        radiance *= getSunIrradiance() * VANILLA_SUN_RADIANCE_SCALE;
+        radiance *= getSunIrradiance() * (VANILLA_SUN_RADIANCE_SCALE * body);
     } else if (renderStage == MC_RENDER_STAGE_MOON) {
-        radiance *= getMoonIlluminanceFull() * atmoTransmittanceToLight(atmoViewerRadius(), getMoonDir().y) * VANILLA_MOON_RADIANCE_SCALE;
+        radiance *= getMoonIlluminanceFull() * atmoTransmittanceToLight(atmoViewerRadius(), getMoonDir().y) * (VANILLA_MOON_RADIANCE_SCALE * body);
     } else {
         radiance *= SKY_ILLUMINANCE * SKY_BRIGHTNESS;
     }

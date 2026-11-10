@@ -391,10 +391,22 @@ const float LENS_FISHEYE_TABLE_ANGLE = 1.562070; // 89.5 度
 const float LENS_CATS_EYE_SCALE = 1.0;
 // トリウムガラスの黄変 (LP_YELLOWING = 1 の時の透過色)
 const vec3 LENS_YELLOWING_TINT = vec3(1.0, 0.9, 0.68);
-// 太陽・月の視半径 (rad, lib/sky/atmosphere.glsl と同じ値)。ゴーストの縁のぼけと可視判定の範囲に使う
-const float LENS_LIGHT_ANGULAR_RADIUS = 0.0093;
-// 光源の可視判定 (composite25): 太陽円盤の何倍の範囲を見るか、平滑化の速さ (1/秒)、画面外の許容幅 (UV)
+// 光源の可視判定 (composite25): 丸い円盤の何倍の範囲を見るか、平滑化の速さ (1/秒)、画面外の許容幅 (UV)
 const float LENS_VIS_DISC_SCALE = 1.3;
+/*
+ * 光源の点が見えているかの明るさの判定: 空の平均の x 倍から見え始め、そこから 2^y 倍で見えきる
+ * 丸い円盤は放射が空の数万倍ある。バニラのテクスチャは照度の 10 倍ほどの放射 (晴れた昼で空の平均の 100 倍前後) なので、
+ * 円盤の閾値のままだと遮る物が無くても半分ほどしか見えないと数える
+ */
+#if SUN_MOON_STYLE == 0
+const vec2 LENS_VIS_SKY_RATIO = vec2(2.0, 4.0);
+#else
+const vec2 LENS_VIS_SKY_RATIO = vec2(4.0, 10.0);
+#endif
+// バニラの四角を調べる格子の 1 辺の点の数 (16 x 16 = composite25 の 256 スレッド)
+const uint LENS_VIS_SQUARE_GRID = 16u;
+// 光源の四角の上での光条の滲みの広がり (Airy 半径の倍数)。四角で畳み込んだ明るさへ割り戻す点像の大きさ
+const float LENS_STAR_SOURCE_SIGMA = 3.0;
 const float LENS_VIS_SPEED = 12.0;
 const float LENS_VIS_OFFSCREEN = 0.25;
 // 画面の外の光源に目の位置の影マップの判定を掛け始める幅 (UV)。端をまたぐ時にフレアが跳ばないよう、この幅で混ぜる
