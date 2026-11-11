@@ -408,6 +408,8 @@ const uint LENS_VIS_SQUARE_GRID = 16u;
 // 光源の四角の上での光条の滲みの広がり (Airy 半径の倍数)。四角で畳み込んだ明るさへ割り戻す点像の大きさ
 const float LENS_STAR_SOURCE_SIGMA = 3.0;
 const float LENS_VIS_SPEED = 12.0;
+// 見え具合が下がる向きの速さ (1/秒)。遅いと、遮る物が急に来た時に光源の位置のグレア・ハロー・ゴーストが遮る物の上にじわっと残る
+const float LENS_VIS_HIDE_SPEED = 60.0;
 const float LENS_VIS_OFFSCREEN = 0.25;
 // 画面の外の光源に目の位置の影マップの判定を掛け始める幅 (UV)。端をまたぐ時にフレアが跳ばないよう、この幅で混ぜる
 const float LENS_VIS_EYE_FADE = 0.05;

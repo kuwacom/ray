@@ -422,6 +422,8 @@ void main() {
     float visNow = float(sharedVisible) / float(VIS_SCALE * 256u) * (1.0 - 0.85 * rainStrength);
     float visPrev = frameData.postParams[2].x;
     if (!initialized || isnan(visPrev) || isinf(visPrev)) visPrev = visNow;
-    frameData.postParams[2].xy = vec2(mix(visPrev, visNow, 1.0 - exp(-LENS_VIS_SPEED * dt)), visNow);
+    // 隠れる向きは速く追う (平滑化はちらつきを抑えるためで、遮られた光源のフレアを残すためではない)
+    float visSpeed = visNow < visPrev ? LENS_VIS_HIDE_SPEED : LENS_VIS_SPEED;
+    frameData.postParams[2].xy = vec2(mix(visPrev, visNow, 1.0 - exp(-visSpeed * dt)), visNow);
 #endif
 }
