@@ -232,7 +232,7 @@ float applyEnvironmentExposure(float appliedEv, float ev, float darkEv) {
     float slope = EXPOSURE_NIGHT_SLOPE + EXPOSURE_NIGHT_MOON_SLOPE * moonLit;
     float maxLift = EXPOSURE_NIGHT_MAX_LIFT + EXPOSURE_NIGHT_MOON_MAX_LIFT * moonLit;
     float lift = min(slope * max(EXPOSURE_NIGHT_EV_START - liftEv, 0.0), maxLift);
-    lift = max(lift, EXPOSURE_NIGHT_MIN_LIFT * night);
+    lift = max(lift, EXPOSURE_NIGHT_MIN_LIFT * night) * EXPOSURE_NIGHT_LIFT_STRENGTH;
     float dim = EXPOSURE_INDOOR_DIM * smoothstep(EXPOSURE_INDOOR_EV.x, EXPOSURE_INDOOR_EV.y, ev)
               * (1.0 - smoothstep(EXPOSURE_INDOOR_EV.z, EXPOSURE_INDOOR_EV.w, ev))
               * smoothstep(EXPOSURE_INDOOR_BLOCKLIGHT.x, EXPOSURE_INDOOR_BLOCKLIGHT.y, eyeBlockLight());

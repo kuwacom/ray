@@ -88,6 +88,7 @@
 #define EXPOSURE_SPEED_DARK 1.0 // [0.05 0.1 0.25 0.5 1.0 2.0 3.0 5.0 7.5 10.0] 暗い場面へ順応する速さ
 #define EXPOSURE_MIN_EV -4.0 // [-10.0 -8.0 -6.0 -5.0 -4.0 -3.0 -2.0 -1.0 0.0]
 #define EXPOSURE_MAX_EV 6.0 // [1.0 2.0 4.0 6.0 8.0 10.0 12.0 14.0 16.0]
+#define EXPOSURE_NIGHT_LIFT_STRENGTH 1.0 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5] 屋外の夜に自動露出が画面を持ち上げる量への倍率 (0 = 持ち上げなし)
 #define TONEMAP 0 // [0 1 2 3 4 5] 0=AgX 1=AgX Punchy 2=ACES 3=Reinhard-Jodie 4=AgX Golden 5=PBR Neutral
 #define SATURATION 1.0 // [0.0 0.25 0.5 0.75 0.9 1.0 1.1 1.2 1.3 1.5 1.75 2.0]
 #define CONTRAST 1.0 // [0.5 0.6 0.7 0.8 0.9 1.0 1.05 1.1 1.2 1.3 1.5 1.75 2.0]
