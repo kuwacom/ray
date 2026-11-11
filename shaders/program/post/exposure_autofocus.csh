@@ -225,10 +225,10 @@ float applyEnvironmentExposure(float appliedEv, float ev, float darkEv) {
 #ifdef HAS_SKYLIGHT
     float outdoor = eyeOutdoor();
     float night = 1.0 - smoothstep(-0.2, -0.05, getSunDir().y);
-    // 実写の夜景のように暗い所 (水面・地面・空の暗い所) に合わせて持ち上げる (EXPOSURE_NIGHT_DARK_PERCENT)。昼は平均の計測のまま
-    float liftEv = mix(ev, min(darkEv, ev), night);
-    // 月が照らす夜だけ強く持ち上げる (新月・雨の夜の暗さは残す)
-    float moonLit = moonPhaseFactor() * (1.0 - rainStrength) * night;
+    // 月が照らす夜だけ強く持ち上げる (新月・雨の夜の暗さは残す)。水中は EXPOSURE_UNDERWATER_DIM の暗さを打ち消さないよう外す
+    float moonLit = moonPhaseFactor() * (1.0 - rainStrength) * night * (isEyeInWater == 0 ? 1.0 : 0.0);
+    // 実写の夜景のように暗い所 (水面・地面・空の暗い所) に合わせて持ち上げる (EXPOSURE_NIGHT_DARK_PERCENT)。昼・新月・雨は平均の計測のまま
+    float liftEv = mix(ev, min(darkEv, ev), moonLit);
     float slope = EXPOSURE_NIGHT_SLOPE + EXPOSURE_NIGHT_MOON_SLOPE * moonLit;
     float maxLift = EXPOSURE_NIGHT_MAX_LIFT + EXPOSURE_NIGHT_MOON_MAX_LIFT * moonLit;
     float lift = min(slope * max(EXPOSURE_NIGHT_EV_START - liftEv, 0.0), maxLift);

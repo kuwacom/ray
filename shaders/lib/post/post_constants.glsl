@@ -73,7 +73,7 @@ const float EXPOSURE_NIGHT_MIN_LIFT = 0.4;
  */
 const vec2 EXPOSURE_NIGHT_DARK_PERCENT = vec2(0.05, 0.5);
 /*
- * 月が照らす夜 (満ち欠け x 晴れ) だけ、持ち上げの傾きと上限を足す。新月と雨の夜は EXPOSURE_NIGHT_SLOPE・MAX_LIFT のまま暗く残す
+ * 月が照らす夜 (満ち欠け x 晴れ。水中は外す) だけ、暗い側の計測と持ち上げの傾き・上限を足す。新月・雨の夜・水中は平均の計測と EXPOSURE_NIGHT_SLOPE・MAX_LIFT のまま暗く残す
  * 満月の海の持ち上げは低い月で 2.2 EV、高い月で 2.7 EV (足さないと 1.0 / 1.3) になり、照り返しの道が白に届く。陸と灯りの点いた村は 0.25 EV ほど
  */
 const float EXPOSURE_NIGHT_MOON_SLOPE = 0.1;
