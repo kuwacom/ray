@@ -86,6 +86,16 @@ const float CLOUD_SHADOW_RESET_DISTANCE = 64.0;
 const float CLOUD_SHADOW_RECEIVER_EDGE = 0.98;
 // 4 次元の低食い違い列 (R4, Roberts 2018)。半影 (xy) と光源の形 (zw) を別々に散らす (同じ列の 2 次元ずつだと 2 つのずれが同じ動きになる)
 const vec4 CLOUD_SHADOW_R4 = vec4(0.8566748839, 0.7338918566, 0.6287067210, 0.5385972572);
+/*
+ * 1 フレームに辿る本数。バニラの形は柱の中か外かの 2 値なので、1 本ずつ積み重ねると半影の中が毎フレーム混合率 x 影の濃さの半分ほど揺れ、
+ * 光源の形のずれは全テクセル同じ向きなので、太陽の四角の幅の帯がまとめてちらつく。数本の平均にしてから積み重ねる。
+ * 写実の雲は密度が滑らかで 1 本の振れが小さく、1 本が重い (ノイズの 10 段) ので 1 本のまま
+ */
+#ifdef CLOUD_VANILLA_SHAPE
+const int CLOUD_SHADOW_SAMPLES = 8;
+#else
+const int CLOUD_SHADOW_SAMPLES = 1;
+#endif
 
 #ifdef CLOUD_SHADOWS
 /*
@@ -420,8 +430,7 @@ void main() {
     // 半影: 円盤の中でずらした位置の透過率をフレームごとに積み重ね、ぼかした雲影にする (iterationT はガウシアン 2 パス)。
     // 1 テクセルずつの読み書きなので同じディスパッチ内で競合せず、別パスも要らない。
     // 面に固定した環状のタイルなので、カメラが動いても履歴は同じ点のまま。窓の端で新しく窓に入ったテクセルだけ履歴を捨てる
-    vec2 r2 = fract(float(frameCounter % 256) * CLOUD_SHADOW_R4.xy + interleavedGradientNoise(vec2(texel), 0));
-    vec2 jitter = sqrt(r2.x) * vec2(cos(TAU * r2.y), sin(TAU * r2.y)) * (CLOUD_SHADOW_PENUMBRA / CLOUD_KH);
+    float ign = interleavedGradientNoise(vec2(texel), 0);
     /*
      * 光源の大きさ: 見えている光源 (丸い円盤・バニラの四角) の中の向きにもずらして辿り、積み重ねで光源の面積のうち雲に隠れていない割合にする。
      * 中心の 1 本だけでは、夕日の大きな四角の中心が雲に隠れると、縁が見えていても地面が真っ暗な影になった。
@@ -430,11 +439,19 @@ void main() {
      * 向きは全テクセルで同じにする (テクセルごとに散らすと、夕日の大きな四角では隣どうしが数百ブロック離れた雲を読み、キャッシュが効きにくい)
      */
     CelestialShape shape = shadowLightShape();
-    vec3 sampleDir = celestialShapeDir(shape, celestialShapePoint(shape, fract(float(frameCounter % 256) * CLOUD_SHADOW_R4.zw)));
     float receiverHeight = CLOUD_BASE - cloudShadowReceiverY(rel);
-    vec2 shift = receiverHeight * (sampleDir.xz / max(sampleDir.y, CLOUD_SHADOW_MIN_LIGHT_Y) - lightDir.xz / max(lightDir.y, CLOUD_SHADOW_MIN_LIGHT_Y));
+    vec2 centerSlope = lightDir.xz / max(lightDir.y, CLOUD_SHADOW_MIN_LIGHT_Y);
     float dither = interleavedGradientNoise(vec2(texel), frameCounter);
-    float current = cloudShadowTransmittance(ctx, rel + jitter + shift, sampleDir, dither);
+    float current = 0.0;
+    for (int i = 0; i < CLOUD_SHADOW_SAMPLES; i++) {
+        // R4 の続いた点は面の中に一様に散るので、1 フレームの数本が半影の円盤と光源の形を偏らずに覆う
+        vec4 xi = fract(float((frameCounter % 256) * CLOUD_SHADOW_SAMPLES + i) * CLOUD_SHADOW_R4 + vec4(ign, ign, 0.0, 0.0));
+        vec2 jitter = sqrt(xi.x) * vec2(cos(TAU * xi.y), sin(TAU * xi.y)) * (CLOUD_SHADOW_PENUMBRA / CLOUD_KH);
+        vec3 sampleDir = celestialShapeDir(shape, celestialShapePoint(shape, xi.zw));
+        vec2 shift = receiverHeight * (sampleDir.xz / max(sampleDir.y, CLOUD_SHADOW_MIN_LIGHT_Y) - centerSlope);
+        current += cloudShadowTransmittance(ctx, rel + jitter + shift, sampleDir, dither);
+    }
+    current /= float(CLOUD_SHADOW_SAMPLES);
     float history = imageLoad(cloudShadowImg, texel).r;
     // 履歴の無効: 再読み込み・時刻の飛び (prepare の履歴フレーム数) とテレポート
     bool reset = frameData.skyParams[1].y < 1.5 || distance(cameraPosition, previousCameraPosition) > CLOUD_SHADOW_RESET_DISTANCE || any(notEqual(plane, planePrev)) || isnan(history) || isinf(history);
