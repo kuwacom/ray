@@ -1094,3 +1094,7 @@ value.DEBUG_VIEW.11=速度ベクトル
 value.DEBUG_VIEW.12=デバッグイメージ
 option.RAY_VERSION=バージョン
 value.RAY_VERSION.1=v0.1.0-alpha
+option.RAY_AUTHOR=作者
+value.RAY_AUTHOR.1=kuwacom
+option.RAY_REPO=リポジトリ
+value.RAY_REPO.1=github.com/kuwacom/ray

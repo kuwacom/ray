@@ -9,6 +9,8 @@
 | 設定 | 既定 | 値の候補 |
 |---|---|---|
 | RAY_VERSION | 1 | 1 |
+| RAY_AUTHOR | 1 | 1 |
+| RAY_REPO | 1 | 1 |
 
 ## look (`lib/settings/look.glsl`)
 

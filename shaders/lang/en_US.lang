@@ -1094,3 +1094,7 @@ value.DEBUG_VIEW.11=Velocity
 value.DEBUG_VIEW.12=Debug Image
 option.RAY_VERSION=Version
 value.RAY_VERSION.1=v0.1.0-alpha
+option.RAY_AUTHOR=Author
+value.RAY_AUTHOR.1=kuwacom
+option.RAY_REPO=Repository
+value.RAY_REPO.1=github.com/kuwacom/ray
