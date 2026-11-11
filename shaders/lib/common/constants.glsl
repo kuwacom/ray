@@ -36,9 +36,9 @@ const float SPECULAR_DISC_PEAK = 1.25;
 // 昼の度合い (太陽の高さ sunY で 0 = 夜 .. 1 = 昼)。月の放射の昼夜の切り替え
 float moonDayMix(float sunY) { return smoothstep(-0.1, 0.1, sunY); }
 // 空に描く月の円盤の放射が、フレアの基準 (MOON_NIGHT_BRIGHTNESS) の何倍か。昼は 1
-float moonDiscBoost(float sunY) {
+float moonDiscBoost(float sunY, float nightGain) {
     float day = moonDayMix(sunY);
-    return mix(MOON_NIGHT_BRIGHTNESS * MOON_DISK_NIGHT_GAIN, 1.0, day) / mix(MOON_NIGHT_BRIGHTNESS, 1.0, day);
+    return mix(MOON_NIGHT_BRIGHTNESS * nightGain, 1.0, day) / mix(MOON_NIGHT_BRIGHTNESS, 1.0, day);
 }
 const float SKY_ILLUMINANCE = 1.0;        // 空の拡散照度の基準
 const float BLOCKLIGHT_ILLUMINANCE = 2.5; // 光源レベル 15 の光源から 1 ブロック離れた面の照度

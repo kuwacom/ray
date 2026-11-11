@@ -385,8 +385,10 @@ option.SKY_BRIGHTNESS=Sky Brightness
 option.SKY_AMBIENT_SATURATION=Sky Ambient Saturation
 option.SKY_AMBIENT_SATURATION.comment=How colorful the sky light that fills the shade is. Higher values make shade bluer against the warm sunlight. 0.3 = a subtle tint, 1 = the full sky color (shaded snow turns quite blue). Multiplies the Look preset value (1 with Natural)
 option.SUN_MOON_STYLE=Sun & Moon
+option.SUN_MOON_STYLE.comment=Vanilla = the game's sun and moon textures. Round = a round sun and a plain round moon that shows only the phase. Real Moon = a round sun and the moon drawn from NASA photographs of each phase (maria and craters). The moon's brightness, glint on water, flare and cloud shadows are the same as Round
 value.SUN_MOON_STYLE.0=Vanilla
 value.SUN_MOON_STYLE.1=Round
+value.SUN_MOON_STYLE.2=Real Moon
 option.STARS=Stars
 option.TWILIGHT_STRETCH=Twilight Length
 option.TWILIGHT_STRETCH.comment=Makes the colors of dawn and dusk last longer by compressing how far the sun sinks below the horizon, for the sky only. Civil twilight lasts about 20 seconds in Minecraft. 1 = real length. The sun disk, sunlight and shadows are unchanged

@@ -7,7 +7,7 @@
 #define MOON_BRIGHTNESS 1.0 // [0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0 4.0 6.0]
 #define SKY_BRIGHTNESS 1.0 // [0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0 4.0]
 #define SKY_AMBIENT_SATURATION 0.5 // [0.2 0.3 0.4 0.5 0.6 0.7 0.8 1.0] 空の環境光 (日陰を照らす空の光) の彩度。1 = 空の色のまま
-#define SUN_MOON_STYLE 1 // [0 1] 0=バニラテクスチャ 1=物理的な円盤
+#define SUN_MOON_STYLE 1 // [0 1 2] 0=バニラテクスチャ 1=物理的な円盤 2=物理的な太陽 + 実写の月
 #define STARS
 #define TWILIGHT_STRETCH 1.0 // [1.0 1.5 2.0 3.0] 薄明を長く見せる倍率 (空の色と空の光の太陽の高さを地平線より下だけ縮める。1 = 実際の長さ)
 #define CLOUDS 3 // [0 1 2 3] 0=なし 1=バニラ 2=2D 押し出し体積雲 3=3D 体積雲

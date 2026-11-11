@@ -374,7 +374,7 @@ vec3 renderSky(vec3 dir, vec3 vanillaSky) {
     sky = skyBelowHorizon(dir, sky);
 
     vec3 viewT = atmoTransmittanceToLight(r, dir.y) * (1.0 - 0.95 * skyOvercast());
-    #if SUN_MOON_STYLE == 1
+    #if SUN_MOON_STYLE >= 1
         sky += skySunDisk(dir, getSunDir(), getSunIlluminanceTOA(), viewT);
         sky += skyMoonDisk(dir, getMoonDir(), getMoonIlluminanceFull(), viewT);
     #endif

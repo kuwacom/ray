@@ -80,6 +80,12 @@
 | Pentax SMC FA 28mm f/2.8 Soft | US 5,822,132 (J. Hirakawa, 1998) Example 1 |
 | Canon 50mm f/0.95 | JP S39-10178 (キヤノン, 1964) 実施例 1 (原本は未確認) |
 
+## 素材
+
+| 素材 | 出典・ライセンス | 使用箇所 |
+|---|---|---|
+| 満ち欠けごとの月の画像 (8 段、写真は NASA の Lunar Reconnaissance Orbiter (LRO) の画像と高度計のデータから作られたもの) | NASA's Scientific Visualization Studio, "Moon Phase and Libration, 2023 South Up" (SVS 5049, https://svs.gsfc.nasa.gov/5049) の動画のフレーム。制作: USRA/Ernie Wright、USRA/David Ladd、NASA/GSFC/Noah Petro。パブリックドメイン (NASA の素材は著作権で保護されない)。月の自転軸の向きと大きさをそろえて 1 枚のアトラスにした | textures/moon_phases.png |
+
 ## 参考にしたシェーダー (コード不使用)
 すべて大変大好きなシェーダーです！  
 尊敬しています

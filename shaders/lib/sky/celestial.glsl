@@ -19,6 +19,15 @@
 const float SUN_LIMB_DARKENING = 0.6;
 // 月面の地球照 (新月側がうっすら見える明るさ, 満月の照り返しに対する比)
 const float MOON_EARTHSHINE = 0.004;
+#if SUN_MOON_STYLE == 2
+// 月の写真 (shaders/textures/moon_phases.png)。タイル 256 px が 4 列 x 2 行で moonPhase 0..3 / 4..7、円盤の半径は 124 px。
+// 日の当たる部分の反射率 (満月の円盤の平均が 1 / MOON_PHOTO_SCALE) で、欠けた側は 0
+uniform sampler2D moonPhotoTex;
+const float MOON_PHOTO_SCALE = 3.0;
+const float MOON_PHOTO_TILE_RADIUS = 124.0 / 256.0;
+// 縁の 1 画素は円盤の外との補間で暗くなるので、半径のこの割合より外は縁の値で止める
+const float MOON_PHOTO_LIMB = 0.985;
+#endif
 const float STAR_GRID = 110.0;          // 天球を刻む格子の細かさ (セル 1 つに星は最大 1 個)
 const float STAR_DENSITY = 0.055;       // 星があるセルの割合
 const float STAR_RADIANCE = 0.03;       // 最も明るい星の中心の放射
@@ -77,7 +86,7 @@ vec3 skySunDisk(vec3 dir, vec3 sunDir, vec3 illuminance, vec3 viewT) {
 float moonPhaseAngle() { return float(moonPhase) * (PI / 4.0); }
 
 /*
- * 月面。Lommel-Seeliger 反射 (月の表土で満月が縁まで平らに明るい) で位相を付け、海とクレーターを描く
+ * 月面。Lommel-Seeliger 反射 (月の表土で満月が縁まで平らに明るい) で位相を付ける。SUN_MOON_STYLE 2 は海とクレーターを含む写真の明暗を掛ける
  * 見かけの大きさは MOON_DISK_SCALE 倍 (実寸の 0.5 度では画面で数ピクセルの光る点になり模様が見えない)。
  * 照度は変えず放射を面積で割るので、大きくしても月明かりの明るさは同じで、円盤はそのぶん白飛びしにくい
  * illuminanceFull: 満月時の照度 (位相の減光前)
@@ -92,6 +101,13 @@ vec3 skyMoonDisk(vec3 dir, vec3 moonDir, vec3 illuminanceFull, vec3 viewT) {
     vec3 right = normalize(cross(moonDir, celestialPole()));
     vec3 up = cross(right, moonDir);
     vec2 p = vec2(dot(dir, right), dot(dir, up)) / radius;
+#if SUN_MOON_STYLE == 2
+    // 写真は満ち欠けの陰影を含む。向きは画面の右 = 写真の右、極 = 写真の上
+    vec2 q = p * min(1.0, MOON_PHOTO_LIMB * inversesqrt(max(dot(p, p), 1e-8)));
+    vec2 tile = vec2(float(moonPhase % 4), float(moonPhase / 4));
+    vec2 uv = (tile + 0.5 + vec2(q.x, -q.y) * MOON_PHOTO_TILE_RADIUS) / vec2(4.0, 2.0);
+    float lit = srgbToLinear(textureLod(moonPhotoTex, uv, 0.0).rgb).r * MOON_PHOTO_SCALE;
+#else
     float rr = min(dot(p, p), 1.0);
     vec3 n = vec3(p, sqrt(1.0 - rr));
 
@@ -99,14 +115,15 @@ vec3 skyMoonDisk(vec3 dir, vec3 moonDir, vec3 illuminanceFull, vec3 viewT) {
     // 満ちる側と欠ける側で照らされる縁が逆になる
     vec3 l = vec3(sin(alpha), 0.0, cos(alpha));
     float mu0 = max(dot(n, l), 0.0);
-    float lommel = 2.0 * mu0 / (mu0 + n.z + 1e-3);
-
     // 月面の模様 (海・クレーター) は描かず、一様な白い円盤にする。満ち欠けの陰影だけ残す
+    float lit = 2.0 * mu0 / (mu0 + n.z + 1e-3);
+#endif
+
     vec3 radiance = illuminanceFull / (PI * radius * radius);
     float sunY = getSunDir().y;
     radiance *= mix(MOON_NIGHT_BRIGHTNESS, 1.0, moonDayMix(sunY));
     // 夜は円盤だけ明るくして白飛びさせる。地球照は暗い側の淡い円盤なので倍率を掛けない
-    return radiance * (lommel * moonDiscBoost(sunY) + MOON_EARTHSHINE) * viewT * coverage;
+    return radiance * (lit * moonSkyDiscBoost(sunY) + MOON_EARTHSHINE) * viewT * coverage;
 }
 
 // 星 1 セル分。明るさはべき乗分布 (暗い星ほど多い)、色は黒体放射、瞬きは地平線ほど強い

@@ -385,8 +385,10 @@ option.SKY_BRIGHTNESS=空の明るさ
 option.SKY_AMBIENT_SATURATION=空の環境光の彩度
 option.SKY_AMBIENT_SATURATION.comment=日陰を照らす空の光の色の濃さ。上げると日陰が青み、日向の暖色との差が出る。0.3 = 控えめな色、1 = 空の色のまま (日陰の雪がかなり青くなる)。ルックのプリセットの値 (ナチュラルでは 1) に掛ける
 option.SUN_MOON_STYLE=太陽と月
+option.SUN_MOON_STYLE.comment=バニラ = ゲームの太陽と月のテクスチャ。丸 = 丸い太陽と、満ち欠けだけを付けた一様な丸い月。リアルの月 = 丸い太陽と、満ち欠けごとの NASA の写真 (海とクレーター) で描く月。月の明るさ・水面の照り返し・フレア・雲の影は丸と同じ
 value.SUN_MOON_STYLE.0=バニラ
 value.SUN_MOON_STYLE.1=丸
+value.SUN_MOON_STYLE.2=リアルの月
 option.STARS=星
 option.TWILIGHT_STRETCH=薄明の長さ
 option.TWILIGHT_STRETCH.comment=日の出前と日没後の空の色を長く見せる。空の色にだけ、太陽が地平線の下へ沈む深さを縮めて使う。Minecraft の市民薄明は 20 秒ほどしかない。1 = 実際の長さ。太陽の円盤・日光・影は変わらない

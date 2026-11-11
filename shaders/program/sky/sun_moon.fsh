@@ -62,7 +62,7 @@ void main() {
     // エンドの空は renderSky が手続き生成で描く
     discard;
 #else
-    #if SUN_MOON_STYLE == 1
+    #if SUN_MOON_STYLE >= 1
         // 物理的な円盤は renderSky が描くので、バニラの太陽と月は捨てる (リソースパックのカスタム空は残す)
         if (renderStage == MC_RENDER_STAGE_SUN || renderStage == MC_RENDER_STAGE_MOON) discard;
     #endif

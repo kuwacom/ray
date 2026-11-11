@@ -23,6 +23,17 @@ const float VANILLA_SUN_HALF_SIZE = 0.075;
 const float VANILLA_MOON_HALF_SIZE = 0.05;
 
 /*
+ * 空に描く夜の月の円盤の倍率 (MOON_NIGHT_BRIGHTNESS に掛ける)。写真の月 (SUN_MOON_STYLE 2) は、白飛びさせると
+ * 海とクレーターが消えるので、写真の明暗が残る 4 倍にする (6 倍で海が白く潰れ始め、8 倍以上で円盤全体が白飛びする)
+ */
+#if SUN_MOON_STYLE == 2
+const float MOON_SKY_DISC_NIGHT_GAIN = 4.0;
+#else
+const float MOON_SKY_DISC_NIGHT_GAIN = MOON_DISK_NIGHT_GAIN;
+#endif
+float moonSkyDiscBoost(float sunY) { return moonDiscBoost(sunY, MOON_SKY_DISC_NIGHT_GAIN); }
+
+/*
  * 天球の極 (太陽の日周運動の回転軸, player 空間)
  * Iris は太陽を Ry(-90) Rz(sunPathRotation) Rx(角度) で回すので、回転軸は (0, sin a, cos a)
  */

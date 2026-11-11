@@ -177,7 +177,7 @@
 | MOON_BRIGHTNESS | 1.0 | 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0, 6.0 |
 | SKY_BRIGHTNESS | 1.0 | 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0 |
 | SKY_AMBIENT_SATURATION | 0.5 | 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1.0 |
-| SUN_MOON_STYLE | 1 | 0, 1 |
+| SUN_MOON_STYLE | 1 | 0, 1, 2 |
 | STARS | ON | ON / OFF |
 | TWILIGHT_STRETCH | 1.0 | 1.0, 1.5, 2.0, 3.0 |
 | CLOUDS | 3 | 0, 1, 2, 3 |

@@ -60,7 +60,7 @@ tools/
 shaders/
   shaders.properties  block.properties  item.properties  entity.properties  dimension.properties
   lang/en_US.lang  lang/ja_JP.lang
-  textures/                                 blue_noise.png, lens_dirt.png, cloud_*.dat, lens_starburst.dat, water_waves.dat (+ .mcmeta)
+  textures/                                 blue_noise.png, lens_dirt.png, moon_phases.png (SUN_MOON_STYLE=2 の月の写真、満ち欠け 8 段のアトラス), cloud_*.dat, lens_starburst.dat, water_waves.dat (+ .mcmeta)
   textures/look/                            user_lut.png (ユーザーの LUT、恒等), split_tone.dat, film.dat, portra.dat, ektar.dat, vision3_500t.dat, velvia.dat, provia.dat, eterna.dat (同梱の LUT) (+ .mcmeta)
   lib/settings.glsl                         設定の入口 (lib/settings/ のファイルを宣言する)
   lib/settings/*                            全設定の定義 (look / light / surface / sky / post のモジュールごと)、導出値 (internal)、ブールの参照 (bool_refs、gen_settings.py が生成)
