@@ -43,7 +43,6 @@ const int SL_BLOCK_HIT_FLOOD = 4;         // 2 次ヒットの floodfill だけ
 
 // 足す項 (組み合わせ)
 const uint SL_SUN_CONTACT = 1u << 0;
-const uint SL_SUN_LEAF = 1u << 1;         // 葉を透過した分を sunLeafVis に分ける (無ければ sun に含める)
 const uint SL_POM = 1u << 2;
 const uint SL_SKY = 1u << 3;
 const uint SL_GI = 1u << 4;               // colortex8 を読み、GI が運ぶ空・地面の分を sky から引く
@@ -100,10 +99,8 @@ SurfacePoint surfacePoint(vec3 playerPos, vec3 normal) {
 
 struct SurfaceLights {
     LightSample celestial;  // 影を掛ける前の太陽 / 月
-    LightSample sun;        // 影・雲影・POM・接触影込み。SL_SUN_LEAF の時は葉を透過した分を除く (鏡面に使える)
+    LightSample sun;        // 影・雲影・POM・接触影込み
     vec3 sunVis;            // sun に掛けた可視率 (雲影込み)
-    vec3 sunVisAll;         // 葉を透過した分も含む可視率 (雲影込み)
-    vec3 sunLeafVis;        // 葉を透過した分の可視率 (雲影の前。拡散だけに使う。SL_SUN_SHADOW_MAP_FALLBACK のみ)
     SunShadow sunShadow;    // SSS の厚みと fade (SL_SUN_SHADOW_MAP_FALLBACK のみ)
     float sunFallback;      // 影マップの外の日向の推定 (SL_SUN_SHADOW_MAP_FALLBACK のみ)
     float cloudShadow;      // 雲影 (SL_SUN_SHADOW_MAP_FALLBACK のみ)
@@ -123,10 +120,7 @@ SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, ui
     L.celestial = (terms & SL_CELESTIAL) != 0u ? getCelestialLight() : noLight();
     L.sun = noLight();
     L.sunVis = vec3(0.0);
-    L.sunVisAll = vec3(0.0);
-    L.sunLeafVis = vec3(0.0);
     L.sunShadow.visibility = vec3(1.0);
-    L.sunShadow.leaf = vec3(0.0);
     L.sunShadow.thickness = 0.0;
     L.sunShadow.fade = 0.0;
     L.sunFallback = 0.0;
@@ -144,16 +138,7 @@ SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, ui
     float shadowStrength = celestialShadowStrength();
     if (sunMode == SL_SUN_SHADOW_MAP) {
         L.celestial = getCelestialLight();
-        if ((terms & SL_SUN_LEAF) != 0u) {
-            float cloud = getCloudShadow(p.playerPos);
-            vec3 specular;
-            vec3 withLeaf = getSunShadow(p.playerPos, p.geoNormal, p.dither, specular);
-            L.sunVisAll = mix(vec3(1.0), withLeaf, shadowStrength) * cloud;
-            L.sunVis = mix(vec3(1.0), specular, shadowStrength) * cloud;
-        } else {
-            L.sunVis = mix(vec3(1.0), getSunShadow(p.playerPos, p.geoNormal, p.dither), shadowStrength) * getCloudShadow(p.playerPos);
-            L.sunVisAll = L.sunVis;
-        }
+        L.sunVis = mix(vec3(1.0), getSunShadow(p.playerPos, p.geoNormal, p.dither), shadowStrength) * getCloudShadow(p.playerPos);
         L.sun = L.celestial;
         L.sun.irradiance *= L.sunVis;
     } else if (sunMode == SL_SUN_SHADOW_MAP_FALLBACK) {
@@ -163,34 +148,16 @@ SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, ui
         float fallback = smoothstep(SHADOW_FALLBACK_SKYLIGHT.x, SHADOW_FALLBACK_SKYLIGHT.y, p.lightmap.y);
         L.sunFallback = fallback;
         vec3 vis = mix(vec3(fallback), ss.visibility, ss.fade);
-        vec3 leaf = ss.leaf * ss.fade;
-        if ((terms & SL_POM) != 0u) {
-            vis *= p.pomShadow;
-            leaf = ss.leaf * (ss.fade * p.pomShadow);
-        }
+        if ((terms & SL_POM) != 0u) vis *= p.pomShadow;
         // 一人称の手は影マップ上で自分の体の影の中にあるので、スカイライトから日向を推定する
-        if (p.hand) {
-            vis = vec3(fallback);
-            leaf = vec3(0.0);
-        }
+        if (p.hand) vis = vec3(fallback);
 #ifdef SCREEN_SPACE_SHADOWS
         if ((terms & SL_SUN_CONTACT) != 0u && !p.hand && maxOf(vis) > 0.0) {
-            float contact = sunContactShadow(p.viewPos, playerToViewDir(p.geoNormal), playerToViewDir(L.celestial.direction), p.dither);
-            vis *= contact;
-            leaf *= contact;
+            vis *= sunContactShadow(p.viewPos, playerToViewDir(p.geoNormal), playerToViewDir(L.celestial.direction), p.dither);
         }
 #endif
-        // 葉を透過した分も S 倍にして、葉でない遮蔽の分が 1 - S + S x 元の値になるようにする
-        vis = mix(vec3(1.0), vis, shadowStrength);
-        leaf *= shadowStrength;
         L.cloudShadow = getCloudShadow(p.playerPos);
-        L.sunVisAll = vis * L.cloudShadow;
-        if ((terms & SL_SUN_LEAF) != 0u) {
-            L.sunVis = max(vis - leaf, 0.0) * L.cloudShadow;
-            L.sunLeafVis = leaf;
-        } else {
-            L.sunVis = L.sunVisAll;
-        }
+        L.sunVis = mix(vec3(1.0), vis, shadowStrength) * L.cloudShadow;
         L.sun = L.celestial;
         L.sun.irradiance *= L.sunVis;
     } else if (sunMode == SL_SUN_VOLUME) {

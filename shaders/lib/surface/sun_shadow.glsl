@@ -11,14 +11,11 @@
  *   サンプル位置は歪み前のクリップ座標 (= ワールド単位) で円盤に並べ、1 つずつ歪ませる。歪みで半影の幅が場所により変わらない
  * 色付き影: shadowtex0 (半透明込み) と shadowtex1 (不透明のみ) の差分に shadowcolor0 の透過色を掛ける
  *   水 (shadowcolor1.a = 1) は透過色の代わりに水深による吸収 + コースティクス
- * 葉の透過 (SHADOW_LEAF_TINT): 不透明に遮られた分のうち葉の分を、葉の色 x 重なった枚数 (ボクセルで数える) で透過させる
- *   透過した分は SunShadow.leaf に分けて返し、拡散だけに使う (鏡面の太陽を緑に染めない)
  */
 #ifndef SURFACE_SUN_SHADOW_GLSL
 #define SURFACE_SUN_SHADOW_GLSL
 
 //@include "/lib/settings.glsl"
-//@include "/lib/common/color.glsl"
 //@include "/lib/common/constants.glsl"
 //@include "/lib/common/dimension.glsl"
 //@include "/lib/common/math.glsl"
@@ -26,13 +23,7 @@
 //@include "/lib/common/shadow_space.glsl"
 //@include "/lib/common/transforms.glsl"
 //@include "/lib/common/uniforms.glsl"
-//@include "/lib/common/voxel_space.glsl"
-//@include "/lib/buffers/images.glsl"
-//@include "/lib/ids/block_ids.glsl"
-//@include "/lib/ids/id_decode.glsl"
 //@include "/lib/common/shadow_volume.glsl"
-//@include "/lib/light/voxel_read.glsl"
-//@include "/lib/common/water.glsl"
 
 const float SHADOW_NORMAL_OFFSET_MIN = 0.6;   // 法線オフセット (テクセル)。正面向きの面
 const float SHADOW_NORMAL_OFFSET_SLOPE = 1.4; // 法線オフセット (テクセル)。傾いた面での追加分
@@ -53,9 +44,7 @@ const float SHADOW_EDGE_FADE = 0.1;            // 影の範囲の外周 10% で�
 #endif
 
 struct SunShadow {
-    vec3 visibility; // 直接光の色付き透過率 (葉を透過した光を含む)
-    // visibility のうち葉を透過した分。葉の中で散乱して広がった光なので拡散だけに使い、鏡面の太陽 (水面・水たまり・金属の照り返し) には使わない
-    vec3 leaf;
+    vec3 visibility; // 直接光の色付き透過率
     float thickness; // 受け点から光源側の最寄りの不透明物までの距離 (ブロック, SSS 用。遮蔽なしなら 0)
     float fade;      // 1 = 影マップの範囲内。0 に近いほど呼び出し側のフォールバックを使う
 };
@@ -75,97 +64,12 @@ float shadowCompareBilinear(sampler2D tex, vec2 uv, float z) {
     return mix(mix(v.w, v.z, f.x), mix(v.x, v.y, f.x), f.y);
 }
 
-#ifdef SHADOW_LEAF_TINT
-/*
- * 葉の透過 (SHADOW_LEAF_TINT)
- * 影マップの葉はテクスチャの穴だけを光が抜け、葉そのものは不透明として書かれる。実際の葉は緑の光を 1-2 割通すので、
- * 不透明の影のうち葉で遮られた分に、葉の色の透過率を通った葉の枚数だけ掛けて足す (木漏れ日と森の床・幹が緑がかる)
- * 枚数は影マップの最も光源側の葉から受け点へボクセルを辿り、葉のセルを通る長さで数える。重なるほど暗く、緑が濃くなる
- * 途中で葉以外の光を通さないブロック (幹・地形) に当たれば、その先へは届かないので 0
- */
-const float LEAF_LAYER_PATH = 1.0;     // 葉 1 枚とみなす葉のセルの中を通る長さ (ブロック)。真上からの光が 1 ブロックを抜けると 1 枚
-const int LEAF_MAX_CELLS = 24;         // 光源側の葉から辿る最大のセル数
-const float LEAF_MAX_LAYERS = 5.0;     // これより重なれば届く光は無視できる (0.15^5 = 1e-4)
-const float LEAF_TOP_MARGIN = 0.5;     // 光源側の葉の面から辿り始める位置の余裕 (ブロック)
-const float LEAF_RECEIVER_MARGIN = 0.3; // 受け点の手前で辿るのをやめる距離 (受け点自身のブロックを数えない)
-const float LEAF_FAR_LAYERS = 2.0;     // ボクセルの範囲外で仮定する葉の枚数
-const float LEAF_VOXEL_EDGE = 8.0;     // ボクセルの範囲の端からこの幅で範囲外の仮定へ溶かす (ブロック)
-const float LEAF_TINT_POWER = 1.25;    // 1 枚の透過色の彩度 (葉の色を最大成分で割った値の冪。葉の色素は反射より透過で濃く色付く)
-// 葉の色が読めない時 (影マップの中心が葉の穴で下の地面が見えている) の色。オークの葉の平原の色 (tools/block_colors.json)
-const vec3 LEAF_FALLBACK_SRGB = vec3(66.0, 98.0, 23.0) / 255.0;
-
-// 葉 1 枚 (1 ブロック) の透過率。葉の色を最大成分で正規化して、輝度を SHADOW_LEAF_TRANSMISSION に合わせる
-vec3 leafLayerTransmittance(vec3 leafColor) {
-    vec3 c = pow(leafColor / max(maxOf(leafColor), 1e-4), vec3(LEAF_TINT_POWER));
-    return min(c * (SHADOW_LEAF_TRANSMISSION / max(luminance(c), 1e-4)), vec3(0.95));
-}
-
-/*
- * 光源側の葉の手前 topPlayer から受け点の方向 -L へ len だけ辿り、通った葉の枚数を返す。葉以外の固体に当たれば -1
- * edge: 辿り始めがボクセルの範囲の内側にある度合い (0 = 範囲外で分からない)
- */
-float leafLayersAlong(vec3 topPlayer, vec3 L, float len, out float edge) {
-    vec3 o = playerToVoxel(topPlayer);
-    edge = voxelEdgeFade(o, LEAF_VOXEL_EDGE);
-    if (edge <= 0.0) return 0.0;
-    vec3 dir = -L;
-    ivec3 cell = ivec3(floor(o));
-    ivec3 stepDir = ivec3(greaterThanEqual(dir, vec3(0.0))) * 2 - 1;
-    vec3 tDelta = 1.0 / max(abs(dir), vec3(1e-7));
-    vec3 fr = o - vec3(cell);
-    vec3 tMax = mix(fr, 1.0 - fr, vec3(greaterThan(stepDir, ivec3(0)))) * tDelta;
-    float t = 0.0;
-    float path = 0.0;
-    for (int i = 0; i < LEAF_MAX_CELLS && t < len; i++) {
-        if (!isInVoxelVolume(cell)) break;
-        float tNext = min(minOf(tMax), len);
-        int id = fetchVoxelBlockId(cell);
-        if (id == BLOCK_LEAVES) {
-            path += tNext - t;
-            if (path > LEAF_MAX_LAYERS * LEAF_LAYER_PATH) break;
-        } else if (isPlainSolidBlock(id) || (id >= 10 && id < 100)) {
-            return -1.0;
-        }
-        t = tNext;
-        if (tMax.x == minOf(tMax)) { cell.x += stepDir.x; tMax.x += tDelta.x; }
-        else if (tMax.y == minOf(tMax)) { cell.y += stepDir.y; tMax.y += tDelta.y; }
-        else { cell.z += stepDir.z; tMax.z += tDelta.z; }
-    }
-    return path / LEAF_LAYER_PATH;
-}
-
-/*
- * 不透明の影のうち葉を通って届く光の透過率 (rgb)
- * receiver: 法線オフセット後の受け点, uv / z: その影マップの座標と深度, occluderDist: 受け点から最も光源側の遮る物までの距離 (ブロック)
- * centerOpen: 影マップの中心のテクセルが遮られていない (葉の穴)
- */
-vec3 shadowLeafTransmittance(vec3 receiver, vec2 uv, float occluderDist, bool centerOpen) {
-    if (occluderDist <= 0.0) return vec3(0.0);
-    float kind = texture(shadowcolor1, uv).a;
-    bool leafTop = abs(kind - SHADOW_KIND_LEAVES) < 0.05;
-    // 中心が葉以外の物 (幹・地形・エンティティ) で遮られていれば葉の透過は無い
-    if (!leafTop && !centerOpen) return vec3(0.0);
-    vec3 leafColor = srgbToLinear(leafTop ? texture(shadowcolor0, uv).rgb : LEAF_FALLBACK_SRGB);
-    vec3 layerT = leafLayerTransmittance(leafColor);
-
-    vec3 L = getShadowLightDir();
-    float edge;
-    float start = occluderDist + LEAF_TOP_MARGIN;
-    float layers = leafLayersAlong(receiver + L * start, L, start - LEAF_RECEIVER_MARGIN, edge);
-    // 影マップは葉で遮られているのに葉が見つからない (エンティティ・ボクセルに入らない物) なら透過させない
-    vec3 near = layers > 0.0 ? pow(layerT, vec3(max(layers, 1.0))) : vec3(0.0);
-    vec3 far = leafTop ? pow(layerT, vec3(LEAF_FAR_LAYERS)) : vec3(0.0);
-    return mix(far, near, edge);
-}
-#endif
-
 /*
  * 面の太陽影 (詳細版)。sss: 表面下散乱の強さ (厚みの探索とフィルタ半径に使う)
  */
 SunShadow evalSunShadow(vec3 playerPos, vec3 geoNormal, float sss, float dither) {
     SunShadow r;
     r.visibility = vec3(1.0);
-    r.leaf = vec3(0.0);
     r.thickness = 0.0;
     r.fade = 0.0;
 #ifdef HAS_SUN_SHADOWS
@@ -284,20 +188,7 @@ SunShadow evalSunShadow(vec3 playerPos, vec3 geoNormal, float sss, float dither)
     vec3 tint = vec3(1.0);
     if (vo - va > 0.001) tint = shadowTranslucentTint(uv0, z0, playerPos);
     r.visibility = vec3(va) + max(vo - va, 0.0) * tint;
-    #ifdef SHADOW_LEAF_TINT
-        // 不透明に遮られた割合のうち葉の分は、葉の色で透過させる (遮る物の距離は中心のテクセル、葉の穴ならブロッカー探索の平均)
-        if (vo < 0.999 && NoL > 0.0) {
-            float dc = texture(shadowtex1, uv0).r;
-            bool centerOpen = dc >= z0;
-            float occluderDist = centerOpen ? r.thickness : (z0 - dc) / depthPerBlock;
-            r.leaf = (1.0 - vo) * shadowLeafTransmittance(biased, uv0, occluderDist, centerOpen);
-            r.visibility += r.leaf;
-        }
-    #endif
-    if (NoL <= 0.0) {
-        r.visibility = vec3(0.0);
-        r.leaf = vec3(0.0);
-    }
+    if (NoL <= 0.0) r.visibility = vec3(0.0);
 #endif
     return r;
 }
@@ -307,16 +198,6 @@ SunShadow evalSunShadow(vec3 playerPos, vec3 geoNormal, float sss, float dither)
  */
 vec3 getSunShadow(vec3 playerPos, vec3 geoNormal, float dither) {
     SunShadow s = evalSunShadow(playerPos, geoNormal, 0.0, dither);
-    return mix(vec3(1.0), s.visibility, s.fade);
-}
-
-/*
- * 面の太陽影と、鏡面の太陽に使う透過率 specular (葉を透過した拡散光を除く)
- * 葉の隙間を抜けた光は白いまま照り返すが、葉を透過した光は散乱して向きを失っているので太陽の鏡像を作らない
- */
-vec3 getSunShadow(vec3 playerPos, vec3 geoNormal, float dither, out vec3 specular) {
-    SunShadow s = evalSunShadow(playerPos, geoNormal, 0.0, dither);
-    specular = mix(vec3(1.0), s.visibility - s.leaf, s.fade);
     return mix(vec3(1.0), s.visibility, s.fade);
 }
 

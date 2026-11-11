@@ -57,19 +57,14 @@
 #include "/lib/common/water_normal.glsl"
 #include "/lib/common/water.glsl"
 #include "/lib/common/shadow_space.glsl"
-#include "/lib/common/voxel_space.glsl"
-#include "/lib/buffers/images.glsl"
-#include "/lib/ids/block_ids.glsl"
-#include "/lib/ids/entity_ids.glsl"
-#include "/lib/ids/light_ids.glsl"
-#include "/lib/ids/id_decode.glsl"
 #include "/lib/common/shadow_volume.glsl"
-#include "/lib/light/voxel_read.glsl"
 #include "/lib/surface/sun_shadow.glsl"
+#include "/lib/ids/block_ids.glsl"
 #include "/lib/surface/waving.glsl"
 #include "/lib/surface/surface.glsl"
 #include "/lib/sky/sh.glsl"
 #include "/lib/common/phase.glsl"
+#include "/lib/buffers/images.glsl"
 #include "/lib/sky/atmosphere.glsl"
 #include "/lib/common/celestial_shape.glsl"
 #include "/lib/sky/celestial.glsl"
@@ -84,10 +79,15 @@
 #include "/lib/buffers/light_bins.glsl"
 #include "/lib/light/light_bins.glsl"
 #include "/lib/buffers/block_data.glsl"
+#include "/lib/ids/light_ids.glsl"
 #include "/lib/light/light_def.glsl"
 #include "/lib/light/light_table_data.glsl"
 #include "/lib/light/light_table.glsl"
 #include "/lib/light/block_data.glsl"
+#include "/lib/common/voxel_space.glsl"
+#include "/lib/ids/entity_ids.glsl"
+#include "/lib/ids/id_decode.glsl"
+#include "/lib/light/voxel_read.glsl"
 #include "/lib/light/voxel.glsl"
 #include "/lib/light/floodfill.glsl"
 #include "/lib/buffers/entity_tris.glsl"
@@ -211,7 +211,7 @@ void main() {
     float puddleVar = puddleSlopeVar() * puddleWeight;
     vec3 specSum = vec3(0.0);
 
-    // 集める項: 太陽 (PCSS・POM・接触影・葉の透過。影マップの外はスカイライトで近似)・手持ち光源・ブロックライトの鏡面・
+    // 集める項: 太陽 (PCSS・POM・接触影。影マップの外はスカイライトで近似)・手持ち光源・ブロックライトの鏡面・
     //   空 (GI が運ぶ分を引く)・ブロックライト・手持ちの照り返し・GI
     // 省く項: なし (不透明面は全部掛かる)。環境光の鏡面 (反射) は composite2 が足す
     // 項ごとに分けて、太陽 -> 手持ち -> 鏡面 -> 空 -> ブロックライト -> 手持ちの照り返しの順に集める
@@ -221,16 +221,10 @@ void main() {
     sp.sss = m.sss;
 #endif
     // SSS が無ければ透過を足さないので、裏向きの面の厚みの探索と影のにじみも要らない
-    SurfaceLights L = gatherSurfaceLights(sp, SL_SUN_SHADOW_MAP_FALLBACK, SL_BLOCK_NONE, SL_SUN_CONTACT | SL_SUN_LEAF | SL_POM);
+    SurfaceLights L = gatherSurfaceLights(sp, SL_SUN_SHADOW_MAP_FALLBACK, SL_BLOCK_NONE, SL_SUN_CONTACT | SL_POM);
 
     // 太陽 / 月
     vec3 color = directLight(m, g.normal, V, L.sun, puddleVar, getCloudSunDiscVisibility(), celestialDiscScale(), celestialSpecularStrength(), specSum);
-    // 葉を透過した分 (拡散だけに使う。鏡面の太陽は葉の隙間を抜けた光だけで照り返す)
-    if (maxOf(L.sunLeafVis) > 0.0) {
-        LightSample leafLit = L.celestial;
-        leafLit.irradiance *= L.sunLeafVis * L.cloudShadow;
-        color += max(evalDirectLight(m, g.normal, V, leafLit) - evalDirectSpecular(m, g.normal, V, leafLit), 0.0);
-    }
 
 #ifdef SSS
     if (m.sss > 0.0) {

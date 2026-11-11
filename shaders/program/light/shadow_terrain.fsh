@@ -1,7 +1,7 @@
 /*
  * shadow (地形) のフラグメント: 影マップの色・法線を書く
  * shadowcolor0: 最も太陽側の面の色 (半透明は透過色 + 不透明度)
- * shadowcolor1: rg = 法線 (oct), b = スカイライト, a = 種別 (0=不透明 0.2=葉 0.5=半透明 1=水)
+ * shadowcolor1: rg = 法線 (oct), b = スカイライト, a = 種別 (0=不透明 0.5=半透明 1=水)
  * light モジュール (RSM で使う内容は surface モジュールと調整)
  */
 //@include "/lib/common/common.glsl"
@@ -62,10 +62,6 @@ void main() {
          * 半透明のブレンドでさらに薄まって色ガラスの日だまりが白かった。透過色の表の値を不透明で書く
          */
         albedo = vec4(linearToSrgb(tintTransmittance), 1.0);
-    } else if (blockId == BLOCK_LEAVES) {
-        // 葉はバイオームの色込みのまま不透明で書き、参照側 (SHADOW_LEAF_TINT) がこの色で透過させる
-        kind = SHADOW_KIND_LEAVES;
-        albedo.a = 1.0;
     } else {
         albedo.a = 1.0;
     }

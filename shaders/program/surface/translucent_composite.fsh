@@ -60,19 +60,14 @@
 #include "/lib/common/water_normal.glsl"
 #include "/lib/common/water.glsl"
 #include "/lib/common/shadow_space.glsl"
-#include "/lib/common/voxel_space.glsl"
-#include "/lib/buffers/images.glsl"
-#include "/lib/ids/block_ids.glsl"
-#include "/lib/ids/entity_ids.glsl"
-#include "/lib/ids/light_ids.glsl"
-#include "/lib/ids/id_decode.glsl"
 #include "/lib/common/shadow_volume.glsl"
-#include "/lib/light/voxel_read.glsl"
 #include "/lib/surface/sun_shadow.glsl"
+#include "/lib/ids/block_ids.glsl"
 #include "/lib/surface/waving.glsl"
 #include "/lib/surface/surface.glsl"
 #include "/lib/sky/sh.glsl"
 #include "/lib/common/phase.glsl"
+#include "/lib/buffers/images.glsl"
 #include "/lib/sky/atmosphere.glsl"
 #include "/lib/common/celestial_shape.glsl"
 #include "/lib/sky/celestial.glsl"
@@ -87,10 +82,15 @@
 #include "/lib/buffers/light_bins.glsl"
 #include "/lib/light/light_bins.glsl"
 #include "/lib/buffers/block_data.glsl"
+#include "/lib/ids/light_ids.glsl"
 #include "/lib/light/light_def.glsl"
 #include "/lib/light/light_table_data.glsl"
 #include "/lib/light/light_table.glsl"
 #include "/lib/light/block_data.glsl"
+#include "/lib/common/voxel_space.glsl"
+#include "/lib/ids/entity_ids.glsl"
+#include "/lib/ids/id_decode.glsl"
+#include "/lib/light/voxel_read.glsl"
 #include "/lib/light/voxel.glsl"
 #include "/lib/light/floodfill.glsl"
 #include "/lib/buffers/entity_tris.glsl"
@@ -185,16 +185,14 @@ void main() {
         /*
          * 側面の日向はスカイライトと雲影で近似する (影マップは滝の水柱自身の影に掛かり、PCSS のノイズが泡の白に出て砂嵐のようにざらついた)
          */
-        vec3 sunSpecVis = vec3(0.0);
         vec3 sunVis = vec3(0.0);
         if (side && !below) {
             sunVis = vec3(smoothstep(0.6, 0.95, lmT.y)) * getCloudShadow(surfPlayer);
-            sunSpecVis = sunVis * getCloudSunDiscVisibility();
         } else if (!below) {
             // 上向きの水面の影 (PCSS) は composite1 (water_trace.fsh) が求めた可視率
             sunVis = texelFetch(colortex21, texel, 0).rgb;
-            sunSpecVis = texelFetch(colortex19, texel, 0).rgb;
         }
+        vec3 sunSpecVis = sunVis * getCloudSunDiscVisibility();
 
         // 太陽以外の光: 手持ち光源 (内散乱・泡・鏡面) とブロックライトの鏡面 (光源ごとにトレース)。水中から見た面の裏は掛けない
         // 省く項: 太陽 (上で別に取る)・GI・AO・接触影 (水面の下に不透明面の深度しか無い)
@@ -213,7 +211,7 @@ void main() {
             vec4 refr = texelFetch(colortex18, texel, 0);
             behind = refr.rgb;
             pathLen = refr.a;
-            behindExcess = texelFetch(colortex19, texel, 0).a;
+            behindExcess = texelFetch(colortex21, texel, 0).a;
         }
 
         // 吸収と内散乱 (水の上から見た時だけ。水中側は sky のフォグ)
@@ -353,8 +351,7 @@ void main() {
         vec3 R = reflect(-V, N);
         vec3 refl = reflectionAt(texel, dist, R, lmT.y, roughness, vec3(0.0));
         if (roughness < MIRROR_ROUGHNESS) refl = mirrorReflection(refl, surfView, surfPlayer, N, R, dist, false, false, dither);
-        vec3 glassSunVis;
-        surfaceSunVisibility(surfPlayer, N, dither, glassSunVis);
+        vec3 glassSunVis = surfaceSunVisibility(surfPlayer, N, dither) * getCloudSunDiscVisibility();
         // 太陽以外の光の鏡面。省く項は水と同じ
         SurfacePoint gp = surfacePoint(surfPlayer, N);
         gp.lightmap = lmT;

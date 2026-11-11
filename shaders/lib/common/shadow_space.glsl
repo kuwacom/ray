@@ -12,8 +12,6 @@
 const float SHADOW_DISTORT_FACTOR = 0.85;
 // 深度方向を圧縮して遠方のジオメトリが far で切れないようにする
 const float SHADOW_DEPTH_SCALE = 0.2;
-// shadowcolor1.a の葉の種別 (shadow.fsh が書き、影の参照側が読む)。RSM は 0.25 より大きい種別を VPL にしないので、葉はその下に置く
-const float SHADOW_KIND_LEAVES = 0.2;
 
 float shadowDistortScale(vec2 clipXY) {
     return length(clipXY) * SHADOW_DISTORT_FACTOR + (1.0 - SHADOW_DISTORT_FACTOR);

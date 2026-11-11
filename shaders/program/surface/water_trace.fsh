@@ -1,6 +1,6 @@
 /*
- * composite1: 水面の光線を辿る部分。屈折先の色と水の中の経路長 (colortex18 / colortex19)、上向きの水面の太陽の可視率
- * (colortex19 / colortex21)、鏡面の映り込みのフル解像度の SSR (colortex20) を書き、半透明の合成 (composite2) が読む
+ * composite1: 水面の光線を辿る部分。屈折先の色と水の中の経路長 (colortex18)、上向きの水面の太陽の可視率と屈折先の白飛び分
+ * (colortex21)、鏡面の映り込みのフル解像度の SSR (colortex20) を書き、半透明の合成 (composite2) が読む
  * surface モジュール (lib/surface)
  *
  * 屈折 (WATER_REFRACTION 1 = 屈折方向に水深分進めて投影 + 深度検証, 2 = 屈折方向のレイマーチ)
@@ -59,19 +59,14 @@
 #include "/lib/common/water_normal.glsl"
 #include "/lib/common/water.glsl"
 #include "/lib/common/shadow_space.glsl"
-#include "/lib/common/voxel_space.glsl"
-#include "/lib/buffers/images.glsl"
-#include "/lib/ids/block_ids.glsl"
-#include "/lib/ids/entity_ids.glsl"
-#include "/lib/ids/light_ids.glsl"
-#include "/lib/ids/id_decode.glsl"
 #include "/lib/common/shadow_volume.glsl"
-#include "/lib/light/voxel_read.glsl"
 #include "/lib/surface/sun_shadow.glsl"
+#include "/lib/ids/block_ids.glsl"
 #include "/lib/surface/waving.glsl"
 #include "/lib/surface/surface.glsl"
 #include "/lib/sky/sh.glsl"
 #include "/lib/common/phase.glsl"
+#include "/lib/buffers/images.glsl"
 #include "/lib/sky/atmosphere.glsl"
 #include "/lib/common/celestial_shape.glsl"
 #include "/lib/sky/celestial.glsl"
@@ -86,10 +81,15 @@
 #include "/lib/buffers/light_bins.glsl"
 #include "/lib/light/light_bins.glsl"
 #include "/lib/buffers/block_data.glsl"
+#include "/lib/ids/light_ids.glsl"
 #include "/lib/light/light_def.glsl"
 #include "/lib/light/light_table_data.glsl"
 #include "/lib/light/light_table.glsl"
 #include "/lib/light/block_data.glsl"
+#include "/lib/common/voxel_space.glsl"
+#include "/lib/ids/entity_ids.glsl"
+#include "/lib/ids/id_decode.glsl"
+#include "/lib/light/voxel_read.glsl"
 #include "/lib/light/voxel.glsl"
 #include "/lib/light/floodfill.glsl"
 #include "/lib/buffers/entity_tris.glsl"
@@ -113,15 +113,14 @@
 // END GENERATED includes
 
 #if REFLECTIONS > 0
-/* RENDERTARGETS: 18,19,21,20 */
+/* RENDERTARGETS: 18,21,20 */
 #else
-/* RENDERTARGETS: 18,19,21 */
+/* RENDERTARGETS: 18,21 */
 #endif
 layout(location = 0) out vec4 outRefraction;
-layout(location = 1) out vec4 outSunExcess;
-layout(location = 2) out vec4 outSunVis;
+layout(location = 1) out vec4 outSunVis;
 #if REFLECTIONS > 0
-layout(location = 3) out vec4 outMirror;
+layout(location = 2) out vec4 outMirror;
 #endif
 
 void main() {
@@ -346,14 +345,12 @@ void main() {
 
     /*
      * 上から見た上向きの水面の太陽の可視率 (影の PCSS + 雲影)。PCSS も影マップの読みを待つ処理なので、合成ではなくここで求める
-     * rgb = 内散乱・泡・波頭の透過光に使う可視率, 太陽の照り返しに使う分 (葉を透過した分を除く) は colortex19 の rgb
+     * rgb = 内散乱・泡・波頭の透過光と太陽の照り返しに使う可視率, a = 屈折先の白飛び分の輝度
      * 側面と水中から見た面は合成が近似で決める
      */
-    vec3 sunSpecVis = vec3(0.0);
     vec3 sunVis = vec3(0.0);
-    if (!below && !side) sunVis = surfaceSunVisibility(surfPlayer, vec3(0.0, 1.0, 0.0), dither, sunSpecVis);
-    outSunExcess = vec4(sunSpecVis, behindExcess);
-    outSunVis = vec4(sunVis, 0.0);
+    if (!below && !side) sunVis = surfaceSunVisibility(surfPlayer, vec3(0.0, 1.0, 0.0), dither);
+    outSunVis = vec4(sunVis, behindExcess);
 
 #if REFLECTIONS > 0
     /*

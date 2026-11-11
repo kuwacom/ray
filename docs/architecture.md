@@ -109,7 +109,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 21 | gbuffers_water / hand_water / particles_translucent / weather / clouds | surface (weather・clouds は sky) | 半透明の前方シェーディング (clouds は CLOUDS=1 のバニラの雲。deferred の後に描かれるので前方で色を決め、colortex4 だけに書く) | アトラス, 影, flood | colortex4 (乗算済み), colortex5 | 画面 | 常時 |
 | 22 | composite.csh | surface | 反射 (SSR / ラフ / ボクセル補完) | colortex0/2/3/5, voxel | reflectionImg | local 8², 0.5 | REFLECTIONS>0 |
 | 23 | composite1_a.csh | sky | VL / 高さフォグのレイマーチ (影マップ空間 + floodfill + 雲影) | 影マップ, flood, cloudShadow | colorimg12 (左上 1/VL_RES), fogHistoryImg | local 8², 1/VL_RES | VL |
-| 24 | composite1.vsh/fsh | surface | 水面の光線を辿る部分: 屈折先の色と水の中の経路長 (画面の歩き + ボクセルの屈折、側面の水の厚み)、上向きの水面の太陽の可視率 (PCSS + 雲影)、鏡面の映り込みのフル解像度の SSR (映り込みを散らさない凪の水面だけ)。水の画素だけ書く。合成と分けるのは、光線を辿る処理と影が合成のシェーダーに入ると、合成の重い経路でレジスタの数が決まってワープが減り、水の画素の全部の処理が遅くなるため | colortex0/5, depthtex0/1, voxel, 影マップ | colortex18, colortex19, colortex21, colortex20 (REFLECTIONS>0) | 画面 | 常時 |
+| 24 | composite1.vsh/fsh | surface | 水面の光線を辿る部分: 屈折先の色と水の中の経路長 (画面の歩き + ボクセルの屈折、側面の水の厚み)、上向きの水面の太陽の可視率 (PCSS + 雲影)、鏡面の映り込みのフル解像度の SSR (映り込みを散らさない凪の水面だけ)。水の画素だけ書く。合成と分けるのは、光線を辿る処理と影が合成のシェーダーに入ると、合成の重い経路でレジスタの数が決まってワープが減り、水の画素の全部の処理が遅くなるため | colortex0/5, depthtex0/1, voxel, 影マップ | colortex18, colortex21, colortex20 (REFLECTIONS>0) | 画面 | 常時 |
 | 25 | composite2.vsh/fsh | surface | 半透明合成 (水中吸収・反射・太陽の鏡面・泡、ガラスの透過) | colortex0/4/5/18-21, reflectionImg | colortex0 | 画面 | 常時 |
 | 26 | composite12.vsh/fsh | sky | 画面空間の光芒 1/3: 空のマスク (深度 x 雲の透過率 x 光源からの角度) をタップごとに求め、光源へ向かう最短のスパンでぼかす | depthtex2, colortex11 | colortex16 | 画面 (1/GODRAYS_RES) | GODRAYS, world0 |
 | 27 | composite13.vsh/fsh | sky | 同 2/3: 中のスパン | colortex16 | colortex16 | 同上 | 同上 |
@@ -157,12 +157,11 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 16 | R16F | sky: 画面空間の光芒 (低解像度 `size.buffer.colortex16` = 1/GODRAYS_RES)。composite12 -> 13 -> 14 で同じバッファをピンポンして読み書きし、composite19 が足す | sky | sky | 毎フレーム |
 | 17 | RGBA16F | post: 鏡面の白飛び分の履歴 (rgb = 露出前の線形, a 予備)。SPECULAR_SPARKLE の時だけ composite20 が読み書きし、final がミップで読んで点像の芯と裾を作る (LENS_POINT_SPREAD_STRENGTH) | post | post | 永続 |
 | 18 | RGBA16F | surface: 水の屈折先の色 (rgb、吸収の前) + 水の中の経路長 (a)。水の画素だけ書き、ほかは前の値のまま | surface (composite1) | surface (composite2) | なし |
-| 19 | RGBA16F | surface: rgb = 上向きの水面の太陽の照り返しに使う可視率 (葉を透過した分を除く), a = 水の屈折先の白飛び分の輝度 (屈折先の deferred30 の a から)。水の画素だけ | surface (composite1) | surface (composite2) | なし |
 | 20 | RGBA16F | surface: 水の鏡面の映り込みのフル解像度の SSR (rgb = 当たりの色 x 画面端の重み, a = 重み、外れは 0)。水の画素のうち映り込みを散らさない凪の水面だけ、REFLECTIONS > 0 | surface (composite1) | surface (composite2) | なし |
-| 21 | RGBA16F | surface: 上向きの水面の太陽の可視率 (影の PCSS + 雲影、rgb。内散乱・泡・波頭の透過光に使う)。水の画素だけ | surface (composite1) | surface (composite2) | なし |
+| 21 | RGBA16F | surface: 上向きの水面の太陽の可視率 (影の PCSS + 雲影、rgb。内散乱・泡・波頭の透過光と太陽の照り返しに使う), a = 水の屈折先の白飛び分の輝度 (屈折先の deferred30 の a から)。水の画素だけ | surface (composite1) | surface (composite2) | なし |
 
 - gbuffers では colortex0-3 を読めない (Iris の仕様)
-- `shadowcolor0` RGBA8: 最も太陽側の面の色 (半透明は透過色 + a 不透明度、不透明は a=1)。`shadowcolor1` RGBA16: rg 法線 (oct), b スカイライト, a 種別 (0 不透明 / 0.2 葉 / 0.5 半透明 / 1 水)。RSM (surface) と色付き影・葉の透過 (surface) と色付き光芒 (sky) が読む
+- `shadowcolor0` RGBA8: 最も太陽側の面の色 (半透明は透過色 + a 不透明度、不透明は a=1)。`shadowcolor1` RGBA16: rg 法線 (oct), b スカイライト, a 種別 (0 不透明 / 0.5 半透明 / 1 水)。RSM (surface) と色付き影 (surface) と色付き光芒 (sky) が読む
 
 ### カスタムイメージ (16 枚すべて使用。正本は `lib/buffers/images.glsl` + shaders.properties。GLSL の宣言は下の「opt-in」を参照)
 
@@ -403,7 +402,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 
 | 項目 | 方式 | モジュール |
 |---|---|---|
-| 太陽 / 月の影 | 歪み付き単一影マップ (`lib/common/shadow_space.glsl`) + PCSS (ブロッカー探索と PCF 分離) + スクリーンスペース接触影 + 色付き影 (shadowcolor0)。葉の透過 (SHADOW_LEAF_TINT): 不透明の影のうち葉で遮られた分を、影マップの葉の色 x 重なった枚数 (光源側の葉から受け点へボクセルを辿って数える) で透過させる。SHADOW_FILTER=0 でハード | surface |
+| 太陽 / 月の影 | 歪み付き単一影マップ (`lib/common/shadow_space.glsl`) + PCSS (ブロッカー探索と PCF 分離) + スクリーンスペース接触影 + 色付き影 (shadowcolor0)。SHADOW_FILTER=0 でハード | surface |
 | 雲影 | prepare2 で 512² の雲影マップを作り `getCloudShadow()` で地形・VL に渡す。マップは雲の下面の面の座標に固定した環状のタイル (面上のテクセル番号を 512 で割った余りがテクセルの位置) で、カメラが動いても同じ点は同じテクセルに残るので履歴をそのまま積み重ねられ、窓の端で新しく窓に入る列だけが入れ替わる (カメラに合わせて窓ごと動かすと、歩くたびに影の縁が 1 テクセルずつ引きずられてちらつく)。読み取りは 4 点の手動補間 (`cloudShadowFetch`)。光源の大きさは、毎フレーム光源の形 (丸い円盤 / バニラの四角、`lib/common/celestial_shape.glsl`) の中の 1 つの向き (R4 列、全テクセル共通) で雲を辿り、その向きの光が雲影を受ける面から雲の下面を通る点まで面の上でずらして積み重ねる。受ける面の高さはテクセルごとに影マップの深度から取る (影マップは光の向きの正射影なので、面上の点から光の向きに下ろした線の上で最初に光を受ける面が 1 回の読みで分かる。影マップの外と何も無い所は海面の高さで、カメラがそれより低ければカメラの高さ)。カメラの高さで代えると、雲の下面より上から見下ろした地面ではずらしが 0 になり、太陽が見えていても影になる。履歴の混合で、光源の面積のうち雲に隠れていない割合になる (夕日の大きな四角の一部が見えていれば、その割合だけ日が当たる)。読む側の重さは変わらない | sky |
 | 雲の中の霧 | カメラが雲 (低層・バニラの形の板・中層) の中にいる間、雲のマーチの消散は外から見た雲のための薄い値で中にいても地面や遠景が透けるので、層を出るまでの一様な霧として fog_apply で掛ける (`CLOUD_INTERIOR_VISIBILITY`、既定 48 ブロック、0 で無効)。霧の消散係数は 3 / 視程 (その距離で 5% まで霞む) で、距離に比例して濃くなる。prepare2 の 1 スレッドが濃さ・雲のマーチと同じ光 (`cloudInscatter`)・マーチがすでに持つ消散を引いた霧の消散係数を求めて `skyParams[4]` `[5]` に書く。濃さは、体積の層ではカメラの周り 19 点 (中心・上下・水平の 2 つの輪。外側の輪の半径 12 ブロック) の平均から、雲の縁から十数ブロックかけて濃くなり、出るときも同じ距離で薄くなる。バニラの形の柱は半径 8 ブロックの円盤 48 点 (`cloudInteriorSlabCover`) の平均の濃さ (縁の外 4 ブロックで 0.14、縁で 0.44、縁を 3 ブロック越えて 0.66、8 ブロック越えて 1) を、0.12〜0.8 の間で 2 乗して立ち上げる (頭・底の面から 3 ブロックまで滑らかに立ち上がる)。縁では薄く、奥ほど濃い。fog_apply は `exp(-濃さ x min(距離, 霧の長さ) x 消散係数)` (`cloudInteriorFog`)。霧の長さは体積の層では層の出口までの距離で、バニラの形の板では板の上面・下面を抜けるまでの距離 (prepare2 が `skyParams[7]` に書くカメラから上面・下面までの高さ。真横に近い視線は視程の 2 倍で打ち切る)。バニラの形の柱では、雲のマーチが描く壁の消散を同じ円盤の濃さが 0.14〜0.55 の間 (縁の外 4 ブロックから縁を 1.5 ブロック越えるまで) に指数で弱め (倍率は prepare2 が `skyParams[7].z` に書く)、面から 3 ブロック内側では 0 にして、霧が視程どおりの消散を全部持つ。壁は縁の手前から透けて中の霧へつながり、縁で画面が白く閉じない。半透明 (ガラス) の向こうの背景には、ガラスから奥の面までの分を translucent_composite が先に掛け、ガラスまでの分は fog_apply が全体に掛ける。空の光は彩度を落として白灰にし、光源の光は `cloudInteriorPhase` で向きによる差を付ける。外から見た雲、雲の外のカメラは濃さ 0 で変わらない。手の深度には掛けない。レンズフレアの光源の見え具合にも濃さを掛ける | sky |
 | AO | GTAO (AO_MODE=2), 軽量は SSAO | surface |
@@ -499,7 +498,6 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | SHADOW_FILTER | 2 | **1** | **1** | 2 | 2 | 2 | 2 | 2 | 2 | 2 |
 | SHADOW_SAMPLES | 16 | **4** | **8** | **8** | **12** | 16 | **24** | **24** | **32** | **32** |
 | SHADOW_COLORED | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
-| SHADOW_LEAF_TINT | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
 | ENTITY_SHADOWS | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
 | BLOCK_ENTITY_SHADOWS | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
 | SCREEN_SPACE_SHADOWS | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
@@ -646,7 +644,7 @@ surface モジュールが提供 (`//@include "/lib/surface/surface.glsl"`):
 | 関数 | 呼ぶ側 | 内容 |
 |---|---|---|
 | `Material decodeMaterial(GBufferData g)` | surface, light (鏡面の重み付け) | labPBR -> シェーディング値 |
-| `vec3 evalDirectLight(Material m, vec3 N, vec3 V, LightSample L)` | surface | 直接光 1 つの出射放射 |
+| `vec3 evalDirectLight(Material m, vec3 N, vec3 V, LightSample L, float discScale, out vec3 spec)` | surface | 直接光 1 つの拡散の出射放射 (spec に鏡面) |
 | `vec3 evalDiffuseIrradiance(Material m, vec3 irradiance)` | surface | 方向のない照度の出射放射 |
 | `SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, uint terms)` (`lib/surface/surface_lights.glsl`) | deferred30, 半透明, composite2, 二次ヒット (`lib/surface/lighting.glsl`) | 表面の光 (太陽の影・空・ブロックライト・手持ち光源・GI) を、取り方 (`SL_SUN_*` / `SL_BLOCK_*`) と足す項 (`SL_*`) を指定して集める。返すのは照度と `LightSample` だけで、BRDF・AO・溶岩・水たまり・SSS の厚みの減衰は呼ぶ側が掛ける |
 | `vec3 getSunShadow(vec3 playerPos, vec3 geoNormal, float dither)` | surface (`gatherSurfaceLights`), light (GI 的な用途) | 太陽影 (色付き透過率) |
@@ -660,7 +658,7 @@ surface モジュールが提供 (`//@include "/lib/surface/surface.glsl"`):
 
 | 項 | deferred30 (不透明) | 半透明の前方シェーディング | composite2 (水・ガラス) | 二次ヒット (GI・反射・屈折先) |
 |---|---|---|---|---|
-| 太陽の影 | PCSS + 葉の透過。影マップの外と一人称の手はスカイライトで近似 (`SL_SUN_SHADOW_MAP_FALLBACK`) | PCSS。外は 1 (`SL_SUN_SHADOW_MAP`) | PCSS。外は 1 (影の距離より遠い地下の水・ガラスは日向になる)。水の側面は雲影とスカイライトで近似、水中は 0 | ボクセル体積の 1 タップ (`SL_SUN_VOLUME`) |
+| 太陽の影 | PCSS。影マップの外と一人称の手はスカイライトで近似 (`SL_SUN_SHADOW_MAP_FALLBACK`) | PCSS。外は 1 (`SL_SUN_SHADOW_MAP`) | PCSS。外は 1 (影の距離より遠い地下の水・ガラスは日向になる)。水の側面は雲影とスカイライトで近似、水中は 0 | ボクセル体積の 1 タップ (`SL_SUN_VOLUME`) |
 | 接触影・POM の自己影 | ○ | - | - | - |
 | 空 (SH x スカイライト) | ○ (GI が運ぶ分を引く) | ○ | 内散乱・泡 | ○ |
 | GI・AO | ○ | - | - | 前フレームの GI を多重反射に使う |

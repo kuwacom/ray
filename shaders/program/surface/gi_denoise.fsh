@@ -8,12 +8,14 @@
  * 2. 時間 (GI_DENOISE>=1): 前フレームへ再投影した履歴を、近傍の平均 +- k 標準偏差に収めてから指数移動平均
  *    (分散クリップ。ディスオクルージョンで古い値が残るのも同じクリップで抑える)
  */
+//@include "/lib/buffers/images.glsl"
 //@include "/lib/common/common.glsl"
 //@include "/lib/common/joint_bilateral.glsl"
 //@include "/lib/common/temporal.glsl"
 //@include "/lib/surface/surface.glsl"
 //@include "/lib/post/post.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
+#include "/lib/buffers/images.glsl"
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
 #include "/lib/settings/surface.glsl"
@@ -49,15 +51,9 @@
 #include "/lib/common/water_normal.glsl"
 #include "/lib/common/water.glsl"
 #include "/lib/common/shadow_space.glsl"
-#include "/lib/common/voxel_space.glsl"
-#include "/lib/buffers/images.glsl"
-#include "/lib/ids/block_ids.glsl"
-#include "/lib/ids/entity_ids.glsl"
-#include "/lib/ids/light_ids.glsl"
-#include "/lib/ids/id_decode.glsl"
 #include "/lib/common/shadow_volume.glsl"
-#include "/lib/light/voxel_read.glsl"
 #include "/lib/surface/sun_shadow.glsl"
+#include "/lib/ids/block_ids.glsl"
 #include "/lib/surface/waving.glsl"
 #include "/lib/surface/surface.glsl"
 #include "/lib/common/jitter.glsl"

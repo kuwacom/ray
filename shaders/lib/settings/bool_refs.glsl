@@ -46,8 +46,6 @@
 #endif
 #ifdef SHADOW_COLORED
 #endif
-#ifdef SHADOW_LEAF_TINT
-#endif
 #ifdef ENTITY_SHADOWS
 #endif
 #ifdef BLOCK_ENTITY_SHADOWS

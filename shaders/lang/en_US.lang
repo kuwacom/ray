@@ -199,10 +199,6 @@ option.MOON_SHADOW_STRENGTH=Moon Shadow Darkness
 option.MOON_SHADOW_STRENGTH.comment=How dark the shadows cast by the moon and the End light are. 0 = no shadows, 1 = full shadows.
 option.SHADOW_COLORED=Colored Shadows
 option.SHADOW_COLORED.comment=Stained glass and water cast colored sun shadows.
-option.SHADOW_LEAF_TINT=Leaf Transmission
-option.SHADOW_LEAF_TINT.comment=Some sunlight passes through leaves, tinted by the leaf color. Sun flecks, the forest floor and trunks turn slightly green.
-option.SHADOW_LEAF_TRANSMISSION=Leaf Transmission Strength
-option.SHADOW_LEAF_TRANSMISSION.comment=Fraction of light one leaf block lets through. Stacked leaves get darker and greener.
 option.ENTITY_SHADOWS=Entity Shadows
 option.BLOCK_ENTITY_SHADOWS=Block Entity Shadows
 option.SCREEN_SPACE_SHADOWS=Contact Shadows

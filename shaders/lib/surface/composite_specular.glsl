@@ -77,13 +77,10 @@ vec3 opaqueEnvSpecular(ivec2 texel, float depth) {
 
 // 面での太陽の可視率 (影 + 雲影)。PCSS は重いので 1 ピクセル 1 回にして鏡面・内散乱・泡で使い回す
 // 集める項は太陽の影だけ (空・ブロックライト・手持ち光源は泡・内散乱・鏡面が別に集める。GI・AO・接触影は水・ガラスに掛けない)
-// specular: 太陽の照り返しに使う分 (葉を透過した拡散光を除く。葉越しの太陽が緑の光源として映らないように)
-vec3 surfaceSunVisibility(vec3 playerPos, vec3 geoNormal, float dither, out vec3 specular) {
+vec3 surfaceSunVisibility(vec3 playerPos, vec3 geoNormal, float dither) {
     SurfacePoint p = surfacePoint(playerPos, geoNormal);
     p.dither = dither;
-    SurfaceLights L = gatherSurfaceLights(p, SL_SUN_SHADOW_MAP, SL_BLOCK_NONE, SL_SUN_LEAF);
-    specular = L.sunVis * getCloudSunDiscVisibility();
-    return L.sunVisAll;
+    return gatherSurfaceLights(p, SL_SUN_SHADOW_MAP, SL_BLOCK_NONE, 0u).sunVis;
 }
 
 // 影を掛ける前の太陽 (方向・角半径・照度)。水の側面の近似と水中は可視率を呼ぶ側が決める

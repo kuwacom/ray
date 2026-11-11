@@ -180,13 +180,6 @@ vec3 evalDirectLight(Material m, vec3 N, vec3 V, LightSample L, float discScale,
     return diffuse * L.irradiance * NoL;
 }
 
-// 拡散 + 鏡面
-vec3 evalDirectLight(Material m, vec3 N, vec3 V, LightSample L) {
-    vec3 spec;
-    vec3 diffuse = evalDirectLight(m, N, V, L, 1.0, spec);
-    return diffuse + spec;
-}
-
 // 拡散だけ (前方シェーディングの半透明: 鏡面は composite2 でまとめて掛けるため)
 vec3 evalDirectDiffuse(Material m, vec3 N, vec3 V, LightSample L) {
     float NoL = dot(N, L.direction);
