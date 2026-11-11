@@ -145,7 +145,9 @@ vec3 lookSunTint() {
 // 新月の夜の明るさは向きのない空の底 (SKY_NIGHT_FLOOR・大気光・星) と MIN_AMBIENT が受け持つ。
 // ここに下限を残すと、新月でも月の方向から平行光が来て、影・光芒・フレアが出る
 float moonPhaseFactor() {
-    float a = moonPhaseAngle();
+    // 位相角は満ちる側で PI を超えるので、明るさは 2PI - a に折り返して欠ける側と対称にする
+    float raw = moonPhaseAngle();
+    float a = min(raw, 2.0 * PI - raw);
     float lambert = ((PI - a) * cos(a) + sin(a)) * RCP_PI;
     return pow(saturate(lambert), MOON_PHASE_EXPONENT);
 }
