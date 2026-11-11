@@ -2,7 +2,7 @@
  * 露出の単位変換 (post モジュール)
  * 設定の EV は EV100 (反射光式 EV100 = log2(L * 100 / 12.5)) として扱う。L はシーン単位の輝度
  * FrameData.postParams[0]: x = 順応済みの計測 EV100, y = 今フレームの計測 EV100, z = 初期化済みマーカー, w = 適用 EV100
- * FrameData.postParams[1]: x = オートフォーカスの目標距離 (デバッグ用)
+ * FrameData.postParams[1]: x = オートフォーカスの目標距離 (デバッグ用), y = 順応済みの暗い側の計測 EV100 (夜の持ち上げ用)
  */
 #ifndef POST_EXPOSURE_GLSL
 #define POST_EXPOSURE_GLSL

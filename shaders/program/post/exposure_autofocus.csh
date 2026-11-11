@@ -4,7 +4,7 @@
  * - ヒストグラム 256 ビン (log2 輝度) を共有メモリで集計し、上下のパーセンタイルを除いた log 平均を EV100 にする
  * - 順応は EV のまま指数補間。明るい場面へは EXPOSURE_SPEED_BRIGHT、暗い場面へは EXPOSURE_SPEED_DARK
  * - 適用 EV は完全補正にせず (EXPOSURE_CURVE)、EXPOSURE_MIN_EV .. MAX_EV で止める (夜と洞窟は暗いまま残る)
- *   屋外の夜だけは止めた後に暗さに応じて明るく写す (EXPOSURE_NIGHT_*)
+ *   屋外の夜だけは止めた後に、画面の暗い側の計測に応じて明るく写す (EXPOSURE_NIGHT_*。月が照らす夜は強め)
  * - フォーカス: 手を含まない深度 (depthtex2) の画面中央 9 点の中央値を log 空間で平滑化。水面・ガラス・氷は設定で焦点に入れる
  * DoF (composite22) はこのパスより前に走るので、1 フレーム前のフォーカスを使う
  * post モジュール (lib/post)
@@ -20,6 +20,7 @@
 //@include "/lib/common/voxel_space.glsl"
 //@include "/lib/light/voxel_read.glsl"
 //@include "/lib/post/post_internal.glsl"
+//@include "/lib/sky/sky_color.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -66,6 +67,14 @@
 #include "/lib/post/lens_flare.glsl"
 #include "/lib/post/lens.glsl"
 #include "/lib/post/post_internal.glsl"
+#include "/lib/common/phase.glsl"
+#include "/lib/sky/atmosphere.glsl"
+#include "/lib/sky/celestial.glsl"
+#include "/lib/common/frame_offset.glsl"
+#include "/lib/sky/cloud_styles.glsl"
+#include "/lib/sky/clouds.glsl"
+#include "/lib/sky/sh.glsl"
+#include "/lib/sky/sky_color.glsl"
 // END GENERATED includes
 
 layout(local_size_x = 16, local_size_y = 16) in;
@@ -210,12 +219,19 @@ float eyeBlockLight() {
 /*
  * 曲線と下限で止めた EV を目の位置の明るさ (屋外 / 屋内・洞窟) で補正する
  * 屋外の夜は明るく写す (下限 EXPOSURE_MIN_EV は洞窟の暗さのために残す)、灯りの点いた屋内・洞窟は少し暗く写す
+ * darkEv は画面の暗い側だけの計測 EV (EXPOSURE_NIGHT_DARK_PERCENT)。夜の持ち上げだけに使う
  */
-float applyEnvironmentExposure(float appliedEv, float ev) {
+float applyEnvironmentExposure(float appliedEv, float ev, float darkEv) {
 #ifdef HAS_SKYLIGHT
     float outdoor = eyeOutdoor();
-    float lift = min(EXPOSURE_NIGHT_SLOPE * max(EXPOSURE_NIGHT_EV_START - ev, 0.0), EXPOSURE_NIGHT_MAX_LIFT);
     float night = 1.0 - smoothstep(-0.2, -0.05, getSunDir().y);
+    // 実写の夜景のように暗い所 (水面・地面・空の暗い所) に合わせて持ち上げる (EXPOSURE_NIGHT_DARK_PERCENT)。昼は平均の計測のまま
+    float liftEv = mix(ev, min(darkEv, ev), night);
+    // 月が照らす夜だけ強く持ち上げる (新月・雨の夜の暗さは残す)
+    float moonLit = moonPhaseFactor() * (1.0 - rainStrength) * night;
+    float slope = EXPOSURE_NIGHT_SLOPE + EXPOSURE_NIGHT_MOON_SLOPE * moonLit;
+    float maxLift = EXPOSURE_NIGHT_MAX_LIFT + EXPOSURE_NIGHT_MOON_MAX_LIFT * moonLit;
+    float lift = min(slope * max(EXPOSURE_NIGHT_EV_START - liftEv, 0.0), maxLift);
     lift = max(lift, EXPOSURE_NIGHT_MIN_LIFT * night);
     float dim = EXPOSURE_INDOOR_DIM * smoothstep(EXPOSURE_INDOOR_EV.x, EXPOSURE_INDOOR_EV.y, ev)
               * (1.0 - smoothstep(EXPOSURE_INDOOR_EV.z, EXPOSURE_INDOOR_EV.w, ev))
@@ -400,8 +416,22 @@ void main() {
 
     float speed = measuredEv > prevEv ? EXPOSURE_SPEED_BRIGHT : EXPOSURE_SPEED_DARK;
     float adaptedEv = mix(prevEv, measuredEv, 1.0 - exp(-speed * dt));
-    float appliedEv = applyEnvironmentExposure(clamp(exposureCurve(adaptedEv), EXPOSURE_MIN_EV, EXPOSURE_MAX_EV), adaptedEv);
-    float targetEv = applyEnvironmentExposure(clamp(exposureCurve(measuredEv), EXPOSURE_MIN_EV, EXPOSURE_MAX_EV), measuredEv);
+
+    // 暗い所の計測 EV (夜の持ち上げ用)。平均の側と同じ速さで順応させ、持ち上げが跳ばないようにする
+    float measuredDarkEv = measuredEv;
+    float adaptedDarkEv = adaptedEv;
+    #if EXPOSURE_MODE == 2 && defined HAS_SKYLIGHT
+        bool darkOk;
+        float darkLogAverage = histogramLogAverage(EXPOSURE_NIGHT_DARK_PERCENT.x, EXPOSURE_NIGHT_DARK_PERCENT.y, darkOk);
+        float prevDarkEv = frameData.postParams[1].y;
+        if (darkOk) measuredDarkEv = luminanceToEv100(exp2(darkLogAverage));
+        if (!initialized || isnan(prevDarkEv) || isinf(prevDarkEv)) prevDarkEv = measuredDarkEv;
+        float darkSpeed = measuredDarkEv > prevDarkEv ? EXPOSURE_SPEED_BRIGHT : EXPOSURE_SPEED_DARK;
+        adaptedDarkEv = mix(prevDarkEv, measuredDarkEv, 1.0 - exp(-darkSpeed * dt));
+        frameData.postParams[1].y = adaptedDarkEv;
+    #endif
+    float appliedEv = applyEnvironmentExposure(clamp(exposureCurve(adaptedEv), EXPOSURE_MIN_EV, EXPOSURE_MAX_EV), adaptedEv, adaptedDarkEv);
+    float targetEv = applyEnvironmentExposure(clamp(exposureCurve(measuredEv), EXPOSURE_MIN_EV, EXPOSURE_MAX_EV), measuredEv, measuredDarkEv);
 #endif
 
     float bias = exp2(LOOK_EXPOSURE_BIAS);
