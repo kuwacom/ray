@@ -82,6 +82,8 @@ const float CLOUD_THUNDER_GAP_COVER = 0.88;
 const float CLOUD_SHADOW_PENUMBRA = 45.0;
 const float CLOUD_SHADOW_BLEND = 0.08;
 const float CLOUD_SHADOW_RESET_DISTANCE = 64.0;
+// 影マップの外で地形の高さを読む位置 (影マップのクリップ座標の絶対値。1 が縁)
+const float CLOUD_SHADOW_RECEIVER_EDGE = 0.98;
 // 4 次元の低食い違い列 (R4, Roberts 2018)。半影 (xy) と光源の形 (zw) を別々に散らす (同じ列の 2 次元ずつだと 2 つのずれが同じ動きになる)
 const vec4 CLOUD_SHADOW_R4 = vec4(0.8566748839, 0.7338918566, 0.6287067210, 0.5385972572);
 
@@ -89,15 +91,17 @@ const vec4 CLOUD_SHADOW_R4 = vec4(0.8566748839, 0.7338918566, 0.6287067210, 0.53
 /*
  * 雲影マップの面上の点 (カメラ基準の xz が rel、高さ CLOUD_BASE) の雲影を受ける面の高さ (ワールド y)
  * 影マップは光の向きの正射影なので、面上の点から光の向きに下ろした線は影マップの 1 点に写り、その深度が線の上で最初に光を受ける面になる。
- * 影マップの外と何も無い所は海面の高さ (カメラがそれより低ければカメラの高さ) とみなす。雲より上を飛んでいても、遠くの地面は海面のあたりにある
+ * 影マップの外は縁の少し内側を読み、いちばん近い地形の高さにする (縁で高さが連続になり、雲影のぼけ方が縁で線に切り替わらない。読みは 1 回のまま)。
+ * 何も無い所 (深度 1) は海面の高さ (カメラがそれより低ければカメラの高さ) とみなす。雲より上を飛んでいても、遠くの地面は海面のあたりにある
  */
 float cloudShadowReceiverY(vec2 rel) {
     vec3 view = playerToShadowView(vec3(rel.x, CLOUD_BASE - cameraPosition.y, rel.y));
     vec3 clip = (shadowProjection * vec4(view, 1.0)).xyz;
-    float fallback = min(cameraPosition.y, SKY_SEA_LEVEL);
-    if (any(greaterThan(abs(clip.xy), vec2(1.0)))) return fallback;
-    float depth = textureLod(shadowtex0, distortShadowClip(clip).xy * 0.5 + 0.5, 0.0).r;
-    if (depth >= 1.0) return fallback;
+    // 縁のテクセルは書き込みが欠けることがあるので、縁そのものではなく少し内側で読む
+    vec2 readClip = clamp(clip.xy, vec2(-CLOUD_SHADOW_RECEIVER_EDGE), vec2(CLOUD_SHADOW_RECEIVER_EDGE));
+    view.xy = (shadowProjectionInverse * vec4(readClip, clip.z, 1.0)).xy;
+    float depth = textureLod(shadowtex0, distortShadowClip(vec3(readClip, clip.z)).xy * 0.5 + 0.5, 0.0).r;
+    if (depth >= 1.0) return min(cameraPosition.y, SKY_SEA_LEVEL);
     float hitZ = ((depth * 2.0 - 1.0) / SHADOW_DEPTH_SCALE - shadowProjection[3][2]) / shadowProjection[2][2];
     return (shadowModelViewInverse * vec4(view.xy, hitZ, 1.0)).y + cameraPosition.y;
 }
