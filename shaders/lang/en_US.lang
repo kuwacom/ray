@@ -228,6 +228,8 @@ option.GI_DENOISE=GI Denoiser
 value.GI_DENOISE.0=Off
 value.GI_DENOISE.1=Temporal
 value.GI_DENOISE.2=Temporal + Spatial
+option.GI_VOXEL_FADE=Voxel GI Fade Distance
+option.GI_VOXEL_FADE.comment=Width in blocks over which voxel ray traced GI fades into the plain sky light at the edge of the voxel range. Wider hides the edge better when flying down from the sky or looking at distant terrain. Voxel ray tracing only.
 
 # Materials
 option.PBR_FORMAT=PBR Format

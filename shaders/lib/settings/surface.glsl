@@ -27,6 +27,7 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define GI_GROUND_REPLACE 1.0 // [0.0 0.25 0.5 0.75 1.0] 空の環境光の灰色の地面の照り返しを GI (実際の地面の色) に置き換える割合 0=置き換えない (二重に数える)
 #define GI_RES 2 // [1 2] GI 解像度の分母
 #define GI_DENOISE 2 // [0 1 2] 0=なし 1=時間 2=時間+空間
+#define GI_VOXEL_FADE 32 // [8 16 24 32 48 64] ボクセル RT (GI_MODE=3) の範囲の端で GI を外の空の環境光へ溶かす幅 (ブロック)。体積の各軸の長さの 3/8 まで
 
 // マテリアル / 水 / 反射 (surface モジュール)
 #define PBR_FORMAT 0 // [0 1] 0=なし 1=labPBR

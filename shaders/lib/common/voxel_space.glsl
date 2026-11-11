@@ -36,9 +36,10 @@ bool isInVoxelVolume(vec3 voxelPos) {
 ivec3 getVoxelFrameOffset() { return getCameraBlock() - getPreviousCameraBlock(); }
 
 // 体積の端に近づくほど 0 に落ちる重み (外側はバニラのライトマップへフォールバックさせる)
+// margin は端からの幅 (ブロック)。短い辺で中心まで落ちないよう、各軸の長さの 3/8 (中心の 1/4 は 1 のまま) までに抑える
 float voxelEdgeFade(vec3 voxelPos, float margin) {
     vec3 d = min(voxelPos, vec3(VOXEL_SIZE) - voxelPos);
-    return saturate(minOf(d) / margin);
+    return saturate(minOf(d / min(vec3(margin), vec3(VOXEL_SIZE) * 0.375)));
 }
 
 #endif

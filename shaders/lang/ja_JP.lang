@@ -228,6 +228,8 @@ option.GI_DENOISE=GI のノイズ除去
 value.GI_DENOISE.0=なし
 value.GI_DENOISE.1=時間
 value.GI_DENOISE.2=時間 + 空間
+option.GI_VOXEL_FADE=ボクセル GI のフェード幅
+option.GI_VOXEL_FADE.comment=ボクセル RT の GI を、ボクセル範囲の端で外側の通常の空の光へ溶かす幅 (ブロック)。大きいほど、空から降りる時や遠景で範囲の境目が目立たない。ボクセル RT のみ
 
 # マテリアル
 option.PBR_FORMAT=PBR 形式

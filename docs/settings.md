@@ -101,6 +101,7 @@
 | GI_GROUND_REPLACE | 1.0 | 0.0, 0.25, 0.5, 0.75, 1.0 |
 | GI_RES | 2 | 1, 2 |
 | GI_DENOISE | 2 | 0, 1, 2 |
+| GI_VOXEL_FADE | 32 | 8, 16, 24, 32, 48, 64 |
 | PBR_FORMAT | 0 | 0, 1 |
 | NORMAL_MAPPING | ON | ON / OFF |
 | GENERATED_NORMALS | ON | ON / OFF |

@@ -48,6 +48,7 @@
 #include "/lib/surface/brdf.glsl"
 #include "/lib/common/frame_offset.glsl"
 #include "/lib/common/look_presets.glsl"
+#include "/lib/common/voxel_space.glsl"
 #include "/lib/surface/gi.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/common/transforms.glsl"
@@ -84,7 +85,6 @@
 #include "/lib/light/light_table_data.glsl"
 #include "/lib/light/light_table.glsl"
 #include "/lib/light/block_data.glsl"
-#include "/lib/common/voxel_space.glsl"
 #include "/lib/ids/entity_ids.glsl"
 #include "/lib/ids/id_decode.glsl"
 #include "/lib/light/voxel_read.glsl"
@@ -260,12 +260,12 @@ void main() {
     if (hand) blockLight = max(blockLight, blockLightmapFallback(g.lightmap.x));
     else blockLight += gatherSurfaceLights(sp, SL_SUN_NONE, SL_BLOCK_NONE, SL_HAND_FILL).handFill * ao;
     vec3 indirectLight = indirect.rgb * g.ao;
-    if (A.giSky) {
+    if (A.giSky > 0.0) {
         // GI は幾何法線で張った半球なので、テクスチャ法線の凹凸は空の SH の向きによる差で戻す
         // (照度として足すのではなく、2 つの法線の SH の比を取るだけなので gatherSurfaceLights を通さない)
         float detail = luminance(getSkyIrradiance(g.normal)) / max(luminance(getSkyIrradiance(g.geoNormal)), 1e-6);
         // ボクセルに入らない小物 (草・柵・エンティティ) の遮蔽は GTAO で足す。ブロックの遮蔽はレイが見ているので半分だけ
-        indirectLight *= clamp(detail, GI_NORMAL_DETAIL_MIN, GI_NORMAL_DETAIL_MAX) * mix(1.0, indirect.a, GI_SKY_GTAO_WEIGHT);
+        indirectLight *= mix(1.0, clamp(detail, GI_NORMAL_DETAIL_MIN, GI_NORMAL_DETAIL_MAX) * mix(1.0, indirect.a, GI_SKY_GTAO_WEIGHT), A.giSky);
     }
     bool lava = readMaterialId(texel) == MAT_LAVA;
     if (lava) {

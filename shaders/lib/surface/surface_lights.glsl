@@ -16,7 +16,6 @@
 //@include "/lib/common/shadow_volume.glsl"
 //@include "/lib/common/transforms.glsl"
 //@include "/lib/common/uniforms.glsl"
-//@include "/lib/common/voxel_space.glsl"
 //@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/light/blocklight.glsl"
 //@include "/lib/light/floodfill.glsl"
@@ -110,7 +109,7 @@ struct SurfaceLights {
     vec3 block;             // ブロックライトの拡散照度 (AO の前)
     vec3 handFill;          // 手持ち光源の照り返し (AO の前)
     vec4 indirect;          // colortex8 (rgb = GI, a = GTAO)
-    bool giSky;             // GI が空の光を運んでいる
+    float giSky;            // GI が空の光を運んでいる度合い (ボクセル RT の範囲の端で 0 へ落ちる)
     int blockSpecCount;
     LightSample blockSpec[BLOCKLIGHT_SPECULAR_LIGHTS];
 };
@@ -129,7 +128,7 @@ SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, ui
     L.block = vec3(0.0);
     L.handFill = vec3(0.0);
     L.indirect = vec4(0.0, 0.0, 0.0, 1.0);
-    L.giSky = false;
+    L.giSky = 0.0;
     L.blockSpecCount = 0;
 
     if ((terms & SL_GI) != 0u) L.indirect = getIndirectLight(p.texel);
@@ -196,15 +195,16 @@ SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, ui
 #if GI_MODE == 2 || GI_MODE == 3
     #ifdef GI_TRACES_SKY
             // GI のレイが空の光を向きと遮蔽込みで運ぶので、空の環境光は置き換えない分 (GI_SKY_OCCLUSION, GI_GROUND_REPLACE) だけ残す
-            // (lib/surface/gi.glsl)。ボクセル体積の外は GI が 0 なので空の環境光をそのまま使う
+            // (lib/surface/gi.glsl)。ボクセル体積の外は GI が 0 なので空の環境光をそのまま使い、端 (GI_VOXEL_FADE) では GI と同じ重みで移る
         #if GI_MODE == 3
-            L.giSky = !p.hand && isInVoxelVolume(playerToVoxel(p.playerPos + p.geoNormal * GI_VOLUME_TEST_OFFSET));
+            L.giSky = p.hand ? 0.0 : giVoxelWeight(p.playerPos + p.geoNormal * GI_VOLUME_TEST_OFFSET);
         #else
-            L.giSky = !p.hand;
+            L.giSky = p.hand ? 0.0 : 1.0;
         #endif
-            if (L.giSky) {
+            if (L.giSky > 0.0) {
                 vec3 groundE = getSkyGroundIrradiance(p.normal);
-                skyE = max(skyE - groundE, 0.0) * (1.0 - LOOK_GI_SKY_OCCLUSION) + groundE * (1.0 - GI_GROUND_REPLACE);
+                vec3 replaced = max(skyE - groundE, 0.0) * (1.0 - LOOK_GI_SKY_OCCLUSION) + groundE * (1.0 - GI_GROUND_REPLACE);
+                skyE = mix(skyE, replaced, L.giSky);
             }
     #else
             if (!p.hand) skyE = max(skyE - getSkyGroundIrradiance(p.normal) * GI_GROUND_REPLACE, 0.0);

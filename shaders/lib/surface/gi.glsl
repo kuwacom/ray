@@ -11,6 +11,7 @@
 //@include "/lib/common/look_presets.glsl"
 //@include "/lib/common/math.glsl"
 //@include "/lib/common/samplers.glsl"
+//@include "/lib/common/voxel_space.glsl"
 
 /*
  * deferred11 のデノイズ済み結果 (colortex8)
@@ -72,6 +73,15 @@ vec3 giBounceGrade(vec3 c) {
  */
 const float GI_SKY_GATE_LIGHTMAP = 0.35;
 float giVoxelSkyGate(float skyLm) { return smoothstep(0.0, GI_SKY_GATE_LIGHTMAP, skyLm); }
+
+/*
+ * ボクセル RT の範囲 (カメラ追従の体積) の中での重み。体積の端から GI_VOXEL_FADE ブロックで 1 -> 0 に落とし、
+ * 外の空の環境光 (スカイライトと SH) へ溶かす。レイが追えない外で GI が 0 になる境目が、空から降りる時に体積の下面が地面を横切る線として見えた
+ * 幅は各軸の長さの 3/8 まで (voxelEdgeFade)
+ */
+#if GI_MODE == 3
+float giVoxelWeight(vec3 playerPos) { return voxelEdgeFade(playerToVoxel(playerPos), float(GI_VOXEL_FADE)); }
+#endif
 
 // RSM は可視性を見ないので、スカイライトがこの範囲で 0 -> 1 になるように絞る (deferred10)。deferred30 が SH から引く地面の分も同じ絞り
 const float RSM_SKYLIGHT_MIN = 0.1;

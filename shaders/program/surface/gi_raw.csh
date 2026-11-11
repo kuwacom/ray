@@ -48,6 +48,7 @@
 #include "/lib/surface/brdf.glsl"
 #include "/lib/common/frame_offset.glsl"
 #include "/lib/common/look_presets.glsl"
+#include "/lib/common/voxel_space.glsl"
 #include "/lib/surface/gi.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/common/transforms.glsl"
@@ -85,7 +86,6 @@
 #include "/lib/light/light_table_data.glsl"
 #include "/lib/light/light_table.glsl"
 #include "/lib/light/block_data.glsl"
-#include "/lib/common/voxel_space.glsl"
 #include "/lib/ids/entity_ids.glsl"
 #include "/lib/ids/id_decode.glsl"
 #include "/lib/light/voxel_read.glsl"
@@ -298,8 +298,9 @@ vec3 ssgiIndirect(vec3 viewPos, vec3 normal, float skyLm, vec4 noise) {
 vec3 voxelIndirect(vec3 playerPos, vec3 normal, vec3 geoNormal, float skyLm, vec4 noise) {
     mat3 basis = tbnFromNormal(normal);
     vec3 origin = voxelRayOrigin(playerPos, geoNormal);
-    // ボクセル体積の外はレイを追えないので 0 (deferred30 が空の SH の環境光を使う)
-    if (!isInVoxelVolume(playerToVoxel(origin))) return vec3(0.0);
+    // ボクセル体積の外はレイを追えないので 0 (deferred30 が空の SH の環境光を使う)。端は GI_VOXEL_FADE の幅で 0 へ落とす
+    float edge = giVoxelWeight(origin);
+    if (edge <= 0.0) return vec3(0.0);
     vec3 sum = vec3(0.0);
 #ifdef GI_TRACES_SKY
     float gate = giVoxelSkyGate(skyLm);
@@ -313,7 +314,7 @@ vec3 voxelIndirect(vec3 playerPos, vec3 normal, vec3 geoNormal, float skyLm, vec
         vec4 hit = traceVoxelRadiance(origin, dir, VOXEL_GI_DISTANCE, skyLm, false);
         sum += hit.a > 0.5 ? giBounceGrade(hit.rgb) : giMissRadiance(dir, ground, gate);
     }
-    return sum * PI / float(GI_SAMPLES);
+    return sum * (PI * edge / float(GI_SAMPLES));
 }
 #endif
 
