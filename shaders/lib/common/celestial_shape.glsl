@@ -23,15 +23,23 @@ const float VANILLA_SUN_HALF_SIZE = 0.075;
 const float VANILLA_MOON_HALF_SIZE = 0.05;
 
 /*
- * 空に描く夜の月の円盤の倍率 (MOON_NIGHT_BRIGHTNESS に掛ける)。写真の月 (SUN_MOON_STYLE 2) は、白飛びさせると
- * 海とクレーターが消えるので、写真の明暗が残る 4 倍にする (6 倍で海が白く潰れ始め、8 倍以上で円盤全体が白飛びする)
+ * 空に描く夜の月の円盤の倍率 (MOON_NIGHT_BRIGHTNESS に掛ける)。写真の月 (SUN_MOON_STYLE 2) は円盤の見かけの大きさで変える。
+ * - 通常の画角 (半径 15 画素前後): 模様はほとんど解像されない。半月の写真の反射率は満月の半分以下で、AgX の肩も緩い
+ *   (露出後の輝度 3.5 で表示 246) ので、4 倍だと灰色に見える。8 倍で芯を白く飛ばして明るい光にする
+ * - 拡大した接写 (半径 36 画素以上): 暗い空は露出が大きく、4 倍でも凸月の明るい側が AgX の白を超えて模様が消える。3 倍で海とクレーターを残す
  */
 #if SUN_MOON_STYLE == 2
-const float MOON_SKY_DISC_NIGHT_GAIN = 4.0;
+const float MOON_DISC_NIGHT_GAIN_WIDE = 8.0;
+const float MOON_DISC_NIGHT_GAIN_ZOOM = 3.0;
+const vec2 MOON_DISC_ZOOM_PIXELS = vec2(18.0, 36.0);
+float moonSkyDiscGain() {
+    float pixels = MOON_ANGULAR_RADIUS * MOON_DISK_SCALE * 0.5 * viewHeight * gbufferProjection[1][1];
+    return mix(MOON_DISC_NIGHT_GAIN_WIDE, MOON_DISC_NIGHT_GAIN_ZOOM, smoothstep(MOON_DISC_ZOOM_PIXELS.x, MOON_DISC_ZOOM_PIXELS.y, pixels));
+}
 #else
-const float MOON_SKY_DISC_NIGHT_GAIN = MOON_DISK_NIGHT_GAIN;
+float moonSkyDiscGain() { return MOON_DISK_NIGHT_GAIN; }
 #endif
-float moonSkyDiscBoost(float sunY) { return moonDiscBoost(sunY, MOON_SKY_DISC_NIGHT_GAIN); }
+float moonSkyDiscBoost(float sunY) { return moonDiscBoost(sunY, moonSkyDiscGain()); }
 
 /*
  * 天球の極 (太陽の日周運動の回転軸, player 空間)
