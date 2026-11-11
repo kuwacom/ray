@@ -27,6 +27,11 @@ const float MOON_NIGHT_BRIGHTNESS = 0.004;
  * 掛けた後の円盤 (照度どおりの放射の 0.128 倍、実寸の円盤に直すと 1/49) が鏡像の上限の基準になる。フレアの強さ・地面の月光には掛けない
  */
 const float MOON_DISK_NIGHT_GAIN = 32.0;
+/*
+ * 鏡面の上限に掛ける、太陽の円盤の中心の放射輝度 / 平均 (周縁減光 SUN_LIMB_DARKENING が 0.6 のとき 1 / (1 - 0.6 / 3))
+ * 周縁減光の無い月の円盤は中心も平均と同じなので、月の側は掛けた分を割って戻す (celestialDiscScale)
+ */
+const float SPECULAR_DISC_PEAK = 1.25;
 
 // 昼の度合い (太陽の高さ sunY で 0 = 夜 .. 1 = 昼)。月の放射の昼夜の切り替え
 float moonDayMix(float sunY) { return smoothstep(-0.1, 0.1, sunY); }

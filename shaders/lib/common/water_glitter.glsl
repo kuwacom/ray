@@ -144,6 +144,15 @@ const float GLINT_MIN_FRAMES = 3.0;
  * じわっと明滅させると、波が動いて消えた所に点だけが残像のように残った。半周期ずらした 2 組の和は常に 1 (エネルギーは同じ)
  */
 const float GLINT_FADE = 0.3;
+/*
+ * 点の量の倍率 (WATER_GLITTER_DENSITY)。月が光源の夜は WATER_GLITTER_NIGHT_DENSITY を掛ける
+ * 月の道は太陽の道より桁違いに暗く、細かい点を密に置くと一つ一つが白に届かない。点を減らすと、同じ総量が
+ * まばらで明るい点に集まる (点の明るさは点の数に反比例し、光の総量は変わらない)
+ */
+float waterGlitterDensity() {
+    return WATER_GLITTER_DENSITY * (frameData.shadowLightIrradiance.a > 0.5 ? 1.0 : WATER_GLITTER_NIGHT_DENSITY);
+}
+
 // 画素の中の点の数がこの範囲で滑らかな平均へ移す
 const vec2 GLINT_SMOOTH_LAMBDA = vec2(4.0, 16.0);
 const float GLINT_SMOOTH_NEAR = 1.0;         // 近くで数える点の割合 (1 で置く前の全部の点)
@@ -433,7 +442,7 @@ float waterGlitter(vec2 pos, vec3 N, vec3 V, vec3 L, float alpha2, vec2 unresolv
     float x = clamp((1.0 / (NoH * NoH) - 1.0) / alpha2, 0.0, GLINT_X_MAX);
     float gauss = exp(-x);
     // 点の密度はワールドの面積あたりで決まる (画素の大きさによらない)。近づくと画面の中の数が減り、1 つは明るく大きくなる
-    float rho = gauss / (PI * alpha2) * GLINT_CURVATURE * WATER_GLITTER_DENSITY * unresolved.y;
+    float rho = gauss / (PI * alpha2) * GLINT_CURVATURE * waterGlitterDensity() * unresolved.y;
 
     float NoV = max(NoVGeo, 0.02);
     float footprint = pixelWorld / NoV;

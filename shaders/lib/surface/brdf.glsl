@@ -148,9 +148,8 @@ float eonRoughness(Material m) { return saturate(m.roughness * EON_ROUGHNESS_SCA
  * 鏡面の放射輝度の上限: 光源の円盤の放射輝度 (照度 / 円盤の立体角) x フレネル。鏡像は光源より明るくならない
  * GGX の正規化は光源の大きさでローブを広げた近似で、粗さの小さい面かつかすめ角では円盤の鏡像より明るく出るので、その上限にもなる
  * discScale: 見えている円盤の放射輝度が照度から求めた値の何倍か (夜の月は空に描く円盤を暗くしてあるので、その分)
- * SPECULAR_DISC_PEAK: 周縁減光 (celestial.glsl の SUN_LIMB_DARKENING) の円盤の中心は、平均の 1 / (1 - 0.6 / 3) 倍
+ * SPECULAR_DISC_PEAK (constants.glsl): 周縁減光 (celestial.glsl の SUN_LIMB_DARKENING) の円盤の中心は、平均の 1 / (1 - 0.6 / 3) 倍
  */
-const float SPECULAR_DISC_PEAK = 1.25;
 
 // 鏡面 BRDF x NoL (光源の見かけの大きさでラフネスを広げる)。照度を掛ける前の値で、円盤の鏡像で頭打ちにする
 // gain: ローブに掛ける倍率 (画素の中の面の数のゆらぎ。頭打ちの前に掛ける), gaussian: 分布を GGX ではなく Beckmann にする
