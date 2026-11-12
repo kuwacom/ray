@@ -294,6 +294,7 @@ getLightDef(index) -> lightEmission(d, level), lightRange(d, level), lightFallof
 - 実際の光源レベルは `at_midBlock.w` (Iris 1.7+, 状態込みの発光レベル: ロウソク本数・シーピクルス数・リスポーンアンカーの充填等) を優先し、0 ならテーブルの既定レベル
 - 炎系の色は `BLOCKLIGHT_WARMTH` で中性 (sRGB 1.0, 0.86, 0.72) からバニラ寄りの暖色まで動かす。既定 0.6 (黒体で約 3100K。AgX が明るい面の彩度を落とすので見た目は 3500-4000K。0.5 以下ではたいまつの洞窟が中性すぎて炎の色に見えない)
 - 新しい光源の追加 = `tools/id_tables.py` の `LIGHTS` に 1 行足して `uv run tools/gen_block_properties.py` (index の定数、ID、光源の表が生成される)
+- 画面に見える発光の明るさを種類ごとに設定で変える分類は、`Light.kind` (たいまつ・炎・ランタン・ビーコン。フラグ `LIGHT_FLAG_KIND_*`) と、ブロック全体が光る光源 (`LIGHT_FLAG_OCCLUDES`) = 光源ブロック。deferred30 (`opaque_shading.fsh`) が発光の画素の位置のボクセルから光源の表を引いて `EMISSION_*_BRIGHTNESS` を掛ける。ビームはマテリアル、手持ちは持っているアイテムの光源で分ける。溶岩は `LAVA_BRIGHTNESS`。`EMISSION_GLARE` が ON のときは発光の倍率を点の光源 4・面の光源 1.5 にして、白を超えた分を鏡面の白飛び分と同じ経路で TAA の外へ渡す
 
 ### item.properties (`heldItemId` / `heldItemId2` / `currentRenderedItemId`)
 

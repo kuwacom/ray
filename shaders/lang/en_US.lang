@@ -274,6 +274,16 @@ option.EMISSION_GLARE=Light Source Glare
 option.EMISSION_GLARE.comment=Makes the glowing parts of torches, lanterns, fire and other light sources 4x brighter so their cores blow out to white, and keeps the part above white as fine sparkle that reaches bloom and lens effects. Looks like a light photographed directly, but is very eye-catching
 option.EMISSION_STRENGTH=Emission Strength
 option.EMISSION_STRENGTH.comment=Brightness of the glowing parts of torches, lanterns and other light sources. Higher values blow out the core
+option.EMISSION_TORCH_BRIGHTNESS=Torch Brightness
+option.EMISSION_TORCH_BRIGHTNESS.comment=How bright the glowing part of torches (soul, redstone and copper included) looks on screen. Does not change the light they cast
+option.EMISSION_FIRE_BRIGHTNESS=Fire Brightness
+option.EMISSION_FIRE_BRIGHTNESS.comment=How bright fire, soul fire, campfires and candles look on screen. Does not change the light they cast
+option.EMISSION_LANTERN_BRIGHTNESS=Lantern Brightness
+option.EMISSION_LANTERN_BRIGHTNESS.comment=How bright the glowing part of lanterns (soul and copper included) looks on screen. Lower values show more of the texture pattern. Does not change the light they cast
+option.EMISSION_BLOCK_BRIGHTNESS=Light Block Brightness
+option.EMISSION_BLOCK_BRIGHTNESS.comment=How bright blocks that glow as a whole (glowstone, sea lantern, redstone lamp, jack o'lantern, froglights, shroomlight) look on screen. Lower values show more of the texture pattern. Does not change the light they cast
+option.EMISSION_BEACON_BRIGHTNESS=Beacon Brightness
+option.EMISSION_BEACON_BRIGHTNESS.comment=How bright the beacon block and its beam look on screen. The beam is always visible from far away, so a low value keeps it from standing out. Does not change the light the beacon casts
 option.LAVA_BRIGHTNESS=Lava Brightness
 option.LAVA_BRIGHTNESS.comment=How bright lava itself looks on screen. Higher values shift it from orange toward yellow. Does not change the light it casts. 0 = no extra brightening (darker orange)
 option.LAVA_BLOOM=Lava Bloom

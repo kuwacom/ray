@@ -478,6 +478,11 @@ def render_light_ids() -> str:
         "const uint LIGHT_FLAG_ENTITY_FLASH = 64u;   // entityColor.a (点滅) が強い時だけ光る (TNT・クリーパー)",
         "const uint LIGHT_FLAG_EMISSION_MASK = 128u; // 面の光り方のデータがある (lightMasks。setup_tables.csh が立てる)",
         "const uint LIGHT_FLAG_FACING = 256u;        // 向きのある光源 (前面だけが光る。向きはブロック ID の向きの番号 lib/ids/id_decode.glsl blockLightFacing)",
+        "// 発光の見た目の明るさを設定で分ける種類 (EMISSION_*_BRIGHTNESS)。光源ブロックは LIGHT_FLAG_OCCLUDES で分ける",
+        "const uint LIGHT_FLAG_KIND_TORCH = 512u;    // たいまつ (魂・レッドストーン・銅を含む)",
+        "const uint LIGHT_FLAG_KIND_FIRE = 1024u;    // 炎 (火・魂の火・キャンプファイヤー・ロウソク)",
+        "const uint LIGHT_FLAG_KIND_LANTERN = 2048u; // ランタン (魂・銅を含む)",
+        "const uint LIGHT_FLAG_KIND_BEACON = 4096u;  // ビーコン (ブロック。ビームはマテリアルで分ける)",
         "",
         "// 向きのある光源か (LIGHT_FLAG_FACING の光源。光源の表を引かずに gbuffers で判定する)",
         "bool isFacingLight(int light) {",
@@ -613,7 +618,7 @@ def render_light_table_data() -> str:
         if light.count > 1:
             lines += [f"    {n}" for n in light.note]
             lines += [f"    if (i >= {light.name} && i < {light.name} + {light.count}) {{",
-                      f"        return makeLight({light.make});", "    }"]
+                      f"        return makeLight({light.make_expr()});", "    }"]
     lines.append("    switch (i) {")
     for light in LIGHTS:
         if light.index in headers:
@@ -627,8 +632,7 @@ def render_light_table_data() -> str:
         label = f"case {light.label or light.name}:"
         width = 29 if light.index <= LIGHT_BLOCK_LAST else 34
         label = label.ljust(width) if len(label) <= width else label + " "
-        make = light.make + " | LIGHT_FLAG_FACING" if light.facing else light.make
-        lines.append(f"        {label}return makeLight({make});")
+        lines.append(f"        {label}return makeLight({light.make_expr()});")
     lines += [
         "    }",
         "    LightDef none;",

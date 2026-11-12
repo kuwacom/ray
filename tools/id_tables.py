@@ -47,6 +47,10 @@ def state_values(block: str, prop: str, values: list[str]) -> list[str]:
     return [f"{block}:{prop}={v}" for v in values]
 
 
+# 発光の見た目の明るさの種類 -> light_def.glsl の LT_* (値は gen_block_properties.py の LIGHT_FLAG_KIND_*)
+KIND_FLAGS = {"torch": "LT_TORCH", "fire": "LT_FIRE", "lantern": "LT_LANTERN", "beacon": "LT_BEACON"}
+
+
 @dataclass(frozen=True)
 class Light:
     index: int
@@ -64,6 +68,14 @@ class Light:
     count: int = 1                   # 2 以上は index から count 個を同じ式で処理する (i を使える)
     mask: str = ""                   # 面の光り方を測るブロックと状態 ("redstone_lamp:lit=true")。空なら LT_OCC の光源だけ blocks[0]
     facing: bool = False             # 前面だけが光る向きのあるブロック (かまど・ジャック・オ・ランタン)。向きごとに ID を分ける。mask は facing=north を指定する
+    kind: str = ""                   # 発光の見た目の明るさを設定で分ける種類 (KIND_FLAGS のキー)。光源ブロック (LT_OCC) は種類を付けずフラグで分ける
+
+    def make_expr(self) -> str:
+        make = self.make + " | LIGHT_FLAG_FACING" if self.facing else self.make
+        if not self.kind:
+            return make
+        flag = KIND_FLAGS[self.kind]
+        return make[:-2] + flag if make.endswith("0u") else f"{make} | {flag}"
 
     def mask_block(self) -> str:
         if self.mask:
@@ -91,19 +103,19 @@ _DECOR = "DECOR_LIGHT_BRIGHTNESS, DECOR_LIGHT_LEVEL, 0.5, LT_CENTER, 0.0, LT_OCC
 
 LIGHTS: list[Light] = [
     Light(1, "LIGHT_TORCH", "torch", f"fire, 1.0, 14.0, 0.08, {_V}, 0.6, 0u",
-          blocks=_lit("torch", "wall_torch"), items=_lit("torch")),
+          blocks=_lit("torch", "wall_torch"), items=_lit("torch"), kind="torch"),
     Light(2, "LIGHT_SOUL_TORCH", "soul torch", f"SOUL_SRGB, 0.8, 10.0, 0.08, {_V}, 0.4, 0u",
-          blocks=_lit("soul_torch", "soul_wall_torch"), items=_lit("soul_torch")),
+          blocks=_lit("soul_torch", "soul_wall_torch"), items=_lit("soul_torch"), kind="torch"),
     Light(3, "LIGHT_REDSTONE_TORCH", "redstone torch", f"vec3(1.0, 0.25, 0.15), 0.6, 7.0, 0.06, {_V}, 0.0, 0u",
-          blocks=_lit("redstone_torch:lit=true", "redstone_wall_torch:lit=true"), items=_lit("redstone_torch")),
+          blocks=_lit("redstone_torch:lit=true", "redstone_wall_torch:lit=true"), items=_lit("redstone_torch"), kind="torch"),
     Light(4, "LIGHT_COPPER_TORCH", "copper torch", f"COPPER_FLAME_SRGB, 0.9, 14.0, 0.08, {_V}, 0.5, 0u",
-          blocks=_lit("copper_torch", "copper_wall_torch"), items=_lit("copper_torch")),
+          blocks=_lit("copper_torch", "copper_wall_torch"), items=_lit("copper_torch"), kind="torch"),
     Light(5, "LIGHT_LANTERN", "lantern", f"fire, 1.0, 15.0, 0.15, {_LAMP}, 0.3, 0u",
-          blocks=_lit("lantern"), items=_lit("lantern"), mask="lantern"),
+          blocks=_lit("lantern"), items=_lit("lantern"), mask="lantern", kind="lantern"),
     Light(6, "LIGHT_SOUL_LANTERN", "soul lantern", f"SOUL_SRGB, 0.8, 10.0, 0.15, {_LAMP}, 0.2, 0u",
-          blocks=_lit("soul_lantern"), items=_lit("soul_lantern"), mask="soul_lantern"),
+          blocks=_lit("soul_lantern"), items=_lit("soul_lantern"), mask="soul_lantern", kind="lantern"),
     Light(7, "LIGHT_COPPER_LANTERN", "copper lantern", f"COPPER_FLAME_SRGB, 0.9, 15.0, 0.15, {_LAMP}, 0.3, 0u",
-          blocks=_copper("copper_lantern"), items=_copper("copper_lantern"), mask="copper_lantern"),
+          blocks=_copper("copper_lantern"), items=_copper("copper_lantern"), mask="copper_lantern", kind="lantern"),
     Light(8, "LIGHT_GLOWSTONE", "glowstone", "vec3(1.0, 0.80, 0.52), 1.0, 15.0, 0.5, LT_CENTER, 0.0, LT_OCC",
           blocks=_lit("glowstone"), items=_lit("glowstone")),
     Light(9, "LIGHT_SEA_LANTERN", "sea lantern", "vec3(0.85, 0.95, 1.0), 0.75, 15.0, 0.5, LT_CENTER, 0.0, LT_OCC",
@@ -116,18 +128,18 @@ LIGHTS: list[Light] = [
           blocks=_lit("jack_o_lantern"), items=_lit("jack_o_lantern"), mask="jack_o_lantern:facing=north", facing=True),
     Light(12, "LIGHT_LAVA", "lava", "LAVA_SRGB, 1.2, 15.0, 0.5, vec3(0.5, 0.45, 0.5), 0.2, LIGHT_FLAG_FLUID",
           blocks=_lit("lava", "lava_cauldron")),
-    Light(13, "LIGHT_FIRE", "fire", f"{_FIRE_MILD}, 1.1, 15.0, 0.4, {_LOW}, 0.8, 0u", blocks=_lit("fire")),
-    Light(14, "LIGHT_SOUL_FIRE", "soul fire", f"SOUL_SRGB, 0.9, 10.0, 0.4, {_LOW}, 0.6, 0u", blocks=_lit("soul_fire")),
+    Light(13, "LIGHT_FIRE", "fire", f"{_FIRE_MILD}, 1.1, 15.0, 0.4, {_LOW}, 0.8, 0u", blocks=_lit("fire"), kind="fire"),
+    Light(14, "LIGHT_SOUL_FIRE", "soul fire", f"SOUL_SRGB, 0.9, 10.0, 0.4, {_LOW}, 0.6, 0u", blocks=_lit("soul_fire"), kind="fire"),
     Light(15, "LIGHT_CAMPFIRE", "campfire", f"fire, 1.1, 15.0, 0.35, {_LOW}, 0.7, 0u",
-          blocks=_lit("campfire:lit=true"), items=_lit("campfire")),
+          blocks=_lit("campfire:lit=true"), items=_lit("campfire"), kind="fire"),
     Light(16, "LIGHT_SOUL_CAMPFIRE", "soul campfire", f"SOUL_SRGB, 0.9, 10.0, 0.35, {_LOW}, 0.5, 0u",
-          blocks=_lit("soul_campfire:lit=true"), items=_lit("soul_campfire")),
+          blocks=_lit("soul_campfire:lit=true"), items=_lit("soul_campfire"), kind="fire"),
     Light(17, "LIGHT_MAGMA_BLOCK", "magma block", "vec3(1.0, 0.40, 0.15), 0.8, 3.0, 0.5, LT_CENTER, 0.1, LT_OCC",
           blocks=_lit("magma_block"), items=_lit("magma_block")),
     Light(18, "LIGHT_END_ROD", "end rod", "vec3(0.95, 0.90, 1.0), 0.9, 14.0, 0.1, LT_CENTER, 0.0, 0u",
           blocks=_lit("end_rod"), items=_lit("end_rod")),
     Light(19, "LIGHT_BEACON", "beacon", "vec3(0.85, 0.95, 1.0), 1.2, 15.0, 0.4, LT_CENTER, 0.0, 0u",
-          blocks=_lit("beacon"), items=_lit("beacon")),
+          blocks=_lit("beacon"), items=_lit("beacon"), kind="beacon"),
     Light(20, "LIGHT_CONDUIT", "conduit", "vec3(0.60, 0.90, 1.0), 1.0, 15.0, 0.2, LT_CENTER, 0.0, 0u",
           blocks=_lit("conduit"), items=_lit("conduit")),
     Light(21, "LIGHT_SEA_PICKLE", "sea pickle", "vec3(0.60, 1.0, 0.75), 0.8, 15.0, 0.15, vec3(0.5, 0.3, 0.5), 0.0, 0u",
@@ -150,12 +162,12 @@ LIGHTS: list[Light] = [
     Light(29, "LIGHT_PEARLESCENT_FROGLIGHT", "pearlescent froglight", "vec3(1.0, 0.75, 0.95), 1.0, 15.0, 0.5, LT_CENTER, 0.0, LT_OCC",
           blocks=_lit("pearlescent_froglight"), items=_lit("pearlescent_froglight")),
     Light(30, "LIGHT_CANDLE", "candle", f"fire, 1.0, 12.0, 0.05, {_LOW}, 0.5, 0u",
-          blocks=_lit("candle:lit=true", "candle_cake:lit=true")),
+          blocks=_lit("candle:lit=true", "candle_cake:lit=true"), kind="fire"),
     # 色付きロウソク 16 色 (ID は 1031 から続く)
     Light(31, "LIGHT_CANDLE_COLORED", "colored candles",
           f"mix(fire, dyeSrgb(i - LIGHT_CANDLE_COLORED), 0.5), 1.0, 12.0, 0.05, {_LOW}, 0.5, 0u",
           variants=tuple((f"{c} candle", (f"{c}_candle:lit=true", f"{c}_candle_cake:lit=true")) for c in COLORS),
-          comment="31-46 (white..black, block_ids の色順)", count=16,
+          comment="31-46 (white..black, block_ids の色順)", count=16, kind="fire",
           note=("// 色付きロウソクは炎の色と染料の色の中間 (染料色そのままだと暗い色が光らなくなる)",)),
     Light(47, "LIGHT_COPPER_BULB", "copper bulb", "vec3(1.0, 0.80, 0.60), 1.0, 15.0, 0.5, LT_CENTER, 0.0, LT_OCC",
           blocks=tuple(with_state([f"{p}copper_bulb" for p in COPPER_PREFIX] + [f"waxed_{p}copper_bulb" for p in COPPER_PREFIX], "lit=true"))),

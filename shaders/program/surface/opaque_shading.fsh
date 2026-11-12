@@ -134,12 +134,51 @@ const float LAVA_EXPOSED_MAX = 1.2;
 
 #ifdef EMISSION_GLARE
 /*
- * 光源ブロックの発光部分の輝度の倍率 (露出に応じて下げる getVisibleEmissionLuminance の前の値に掛ける)
+ * EMISSION_GLARE: 光源ブロックの発光部分の輝度の倍率 (露出に応じて下げる getVisibleEmissionLuminance の前の値に掛ける)
  * 1 では昼の炎の芯が露出後 1 前後で AgX の白に届かず、光って見えない。4 で昼は芯が白く飛び、露出の上がる夜・洞窟では芯が大きく飛ぶ。
  * 8 以上は夜のグロウストーンが模様の消えた白い板になる。露出の測光は上位 8% を除くので、小さな光源は露出を下げない
+ * ブロック全体が光る光源 (グロウストーンなど) は発光の斑が画面の広い面積を占め、同じ倍率では全体が白い塊になって模様が消えるので抑える
  */
-const float EMISSION_VISIBLE_GAIN = 4.0;
+const float EMISSION_POINT_GAIN = 4.0;
+const float EMISSION_AREA_GAIN = 1.5;
+#else
+const float EMISSION_POINT_GAIN = 1.0;
+const float EMISSION_AREA_GAIN = 1.0;
 #endif
+
+// 光源の種類ごとの見た目の明るさ (設定 EMISSION_*_BRIGHTNESS) x 倍率。種類は光源の表のフラグ。表に種類のない光源は倍率だけ
+float emissionKindGain(uint flags) {
+    if ((flags & LIGHT_FLAG_KIND_TORCH) != 0u) return EMISSION_TORCH_BRIGHTNESS * EMISSION_POINT_GAIN;
+    if ((flags & LIGHT_FLAG_KIND_FIRE) != 0u) return EMISSION_FIRE_BRIGHTNESS * EMISSION_POINT_GAIN;
+    if ((flags & LIGHT_FLAG_KIND_LANTERN) != 0u) return EMISSION_LANTERN_BRIGHTNESS * EMISSION_POINT_GAIN;
+    if ((flags & LIGHT_FLAG_KIND_BEACON) != 0u) return EMISSION_BEACON_BRIGHTNESS * EMISSION_POINT_GAIN;
+    if ((flags & LIGHT_FLAG_OCCLUDES) != 0u) return EMISSION_BLOCK_BRIGHTNESS * EMISSION_AREA_GAIN;
+    return EMISSION_POINT_GAIN;
+}
+
+// 面の位置から法線の逆向き (と順向き) へ入れて光源のセルを読む距離。深度の誤差で隣のセルを読まず、セルの縁にある炎も拾う
+const float EMISSION_KIND_INSET = 0.25;
+
+float emissionGain(vec3 playerPos, vec3 geoNormal, int materialId, bool hand) {
+    uint flags = 0u;
+    if (materialId == MAT_BEACON_BEAM) {
+        flags = LIGHT_FLAG_KIND_BEACON;
+    } else if (hand) {
+        // 持っている光源 (両手のときは利き手)
+        flags = getHandLightDef(heldBlockLightValue > 0 ? heldItemId : heldItemId2).info.x;
+    } else {
+        for (int i = 0; i < 2; i++) {
+            ivec3 cell = ivec3(floor(playerToVoxel(playerPos + geoNormal * (i == 0 ? -EMISSION_KIND_INSET : EMISSION_KIND_INSET))));
+            if (!isInVoxelVolume(cell)) break;
+            int light = getBlockLightIndex(fetchVoxelBlockId(cell));
+            if (light != LIGHT_NONE) {
+                flags = getLightDef(light).info.x;
+                break;
+            }
+        }
+    }
+    return emissionKindGain(flags);
+}
 
 vec3 lavaRadiance(vec3 albedo) {
     float lum = max(luminance(albedo), 1e-4);
@@ -288,20 +327,16 @@ void main() {
     vec3 ambient = skyAmbient + blockLight + indirectLight + minAmbientIrradiance() * ao;
     color += evalDiffuseIrradiance(m, ambient);
 
+    vec3 glow = vec3(0.0);
     if (lava) color += lavaRadiance(g.albedo) * EMISSION_STRENGTH;
-#ifdef EMISSION_GLARE
-    vec3 glow = g.albedo * g.emission * (getVisibleEmissionLuminance() * EMISSION_VISIBLE_GAIN * EMISSION_STRENGTH);
-    if (!lava) color += glow;
-#else
-    else color += g.albedo * g.emission * getVisibleEmissionLuminance() * EMISSION_STRENGTH;
-#endif
-    color += specSum;
+    else if (g.emission > 0.0) glow = g.albedo * g.emission * (getVisibleEmissionLuminance() * emissionGain(playerPos, g.geoNormal, g.materialId, hand) * EMISSION_STRENGTH);
+    color += glow + specSum;
     float texelPx = SPARKLE_TEXEL_SIZE / max(waterFootprint(length(playerPos), abs(dot(g.geoNormal, V))), 1e-5);
     float texelGate = puddleWeight > 0.0 ? 1.0 : smoothstep(SPARKLE_TEXEL_PX.x, SPARKLE_TEXEL_PX.y, texelPx);
     float sparkle = hand ? 0.0 : luminance(sparkleExcess(specSum, getExposure())) * texelGate;
 #ifdef EMISSION_GLARE
     // 発光の白飛び分も鏡面と同じく線形の短い履歴で TAA の外へ渡す。小さな炎は TAA の箱で潰れて滲みに届かない
-    if (!lava && !hand) sparkle += luminance(sparkleExcess(glow, getExposure()));
+    if (!hand) sparkle += luminance(sparkleExcess(glow, getExposure()));
 #endif
     // 鏡面の白飛び分を a = 1 + 割合で composite2 -> composite19 -> composite20 (TAA の後に足す) へ渡す
     outColor = vec4(color, 1.0 + saturate(sparkle / max(luminance(color), 1e-6)));
