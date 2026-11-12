@@ -137,8 +137,16 @@ vec4 encodeTranslucentDataTint(vec3 normal, vec2 lightmap, int materialId, int t
     return d;
 }
 
-// 前方シェーディングの拡散 (太陽 + 手持ち光源 + 空 + ブロックライト)
-vec3 forwardDiffuse(Material m, vec3 playerPos, vec3 normal, vec3 geoNormal, vec3 V, float dither) {
+// 金属にした装備の前方シェーディングで残す拡散の割合 (反射だけだと、光の少ない所で真っ黒になる)
+const float METAL_FORWARD_DIFFUSE = 0.3;
+// 装備は面が平らで法線の凹凸も無いので、磨いたままだと夕方の低い太陽の反射が面ごとに白く飛ぶ
+const float METAL_FORWARD_SMOOTHNESS_MAX = 0.45;
+
+/*
+ * 前方シェーディングの拡散 (太陽 + 手持ち光源 + 空 + ブロックライト)
+ * shiny: 金属・宝石にした装備。G バッファ経路が無いので、鏡面は太陽・手持ち光源の直接光と空の反射 (SH) だけをここで足す
+ */
+vec3 forwardDiffuse(Material m, vec3 playerPos, vec3 normal, vec3 geoNormal, vec3 V, float dither, bool shiny) {
     // 集める項: 太陽の影 (影マップの外は 1)・手持ち光源・空・ブロックライト
     // 省く項: 接触影と POM (深度に半透明が無い・POM なし)、鏡面 (composite2 が掛ける)、GI と AO (この経路にバッファが無い。手持ち光源の照り返しが GI の代わり)
     // 太陽 -> 手持ち -> 空とブロックライト -> 手持ちの照り返し に分けて集め、拡散を掛ける順番を保つ
@@ -154,12 +162,22 @@ vec3 forwardDiffuse(Material m, vec3 playerPos, vec3 normal, vec3 geoNormal, vec
     p.dither = dither;
     SurfaceLights L = gatherSurfaceLights(p, SL_SUN_SHADOW_MAP, SL_BLOCK_NONE, 0u);
     vec3 color = evalDirectDiffuse(m, normal, V, L.sun);
+    if (shiny) color += evalDirectSpecular(m, normal, V, L.sun);
     L = gatherSurfaceLights(p, SL_SUN_NONE, SL_BLOCK_NONE, SL_HAND);
     color += evalDirectDiffuse(m, normal, V, L.handMain);
     color += evalDirectDiffuse(m, normal, V, L.handOff);
+    if (shiny) color += evalDirectSpecular(m, normal, V, L.handMain) + evalDirectSpecular(m, normal, V, L.handOff);
     L = gatherSurfaceLights(p, SL_SUN_NONE, blockMode, SL_SKY);
 
     vec3 ambient = L.sky + L.block + minAmbientIrradiance();
+    if (shiny) {
+        // 環境光の鏡面: 反射方向の空 (SH を粗さで広げずそのまま使う) + ブロックライトと最低限の環境光
+        vec3 env = (L.block + minAmbientIrradiance()) * RCP_PI;
+#ifdef HAS_SKY
+        env += getSkyIrradiance(reflect(-V, normal)) * (RCP_PI * SH_LOOK_UNDO) * skylightCurve(lmcoord.y);
+#endif
+        color += env * envSpecularWeight(m, max(dot(normal, V), 1e-3));
+    }
     /*
      * 手持ち光源は floodfill に入らず、この経路には GI も無いので、三人称の自分の背中 (光源の反対側) やガラスの陰が真っ黒になる
      * 周りの壁・床で跳ね返った光を、影なし・向きなしの照度の一定割合の環境光として足す
@@ -170,10 +188,15 @@ vec3 forwardDiffuse(Material m, vec3 playerPos, vec3 normal, vec3 geoNormal, vec
     return color + evalDiffuseIrradiance(m, ambient);
 }
 
+vec3 forwardDiffuse(Material m, vec3 playerPos, vec3 normal, vec3 geoNormal, vec3 V, float dither) {
+    return forwardDiffuse(m, playerPos, normal, geoNormal, V, dither, false);
+}
+
 void main() {
     vec4 albedo = texture(gtexture, texcoord) * glcolor;
     if (albedo.a < 0.01) discard;
 
+    vec3 texRgb = albedo.rgb;
 #if defined GBUF_ENTITIES_TRANSLUCENT
     // バニラの丸影は太陽影・光源シャドウと二重になるので描かない
     if (entityId == ENTITY_SHADOW || albedo.a < alphaTestRef) discard;
@@ -197,7 +220,21 @@ void main() {
 
     GBufferData g = gbufferDefault();
     g.albedo = srgbToLinear(albedo.rgb);
+    bool shiny = false;
+#if defined GBUF_ENTITIES_TRANSLUCENT && defined AUTO_METAL_PARTS
+    // 装備 (防具・馬鎧) はこの経路で描かれる。金属の判定は G バッファ経路 (gbuffers_solid.fsh) と同じ
+    SurfaceParams metalParams = applyMetalGate(surfaceParamsDefault(), max(metalGateOfId(currentRenderedItemId), entityMetalGate(entityId)), texRgb);
+    shiny = metalParams.smoothness > 0.0;
+    if (shiny) {
+        g.smoothness = min(metalParams.smoothness, METAL_FORWARD_SMOOTHNESS_MAX);
+        g.f0 = metalParams.f0;
+    }
+#endif
     Material m = decodeMaterial(g);
+    if (shiny && m.metalId == METAL_ALBEDO) {
+        m.f0 = metalReflectance(g.albedo);
+        m.albedo = g.albedo * METAL_FORWARD_DIFFUSE;
+    }
 
 #ifndef GBUF_PARTICLES_TRANSLUCENT
     if (materialId == MAT_WATER) {
@@ -230,7 +267,7 @@ void main() {
     }
 #endif
 
-    vec3 color = forwardDiffuse(m, playerPos, geoNormal, geoNormal, V, dither);
+    vec3 color = forwardDiffuse(m, playerPos, geoNormal, geoNormal, V, dither, shiny);
     if (materialId == MAT_NETHER_PORTAL) color += m.albedo * getVisibleEmissionLuminance() * EMISSION_STRENGTH;
 #ifdef GBUF_FORWARD_OPAQUE
     // G バッファ経路 (solid.fsh の estimateEmission) と同じく、発光エンティティは明るい画素だけ光らせる
