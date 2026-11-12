@@ -93,6 +93,8 @@ const float GENERATED_NORMAL_MAX_SLOPE = 1.5;    // 勾配の頭打ち (強い�
 const float GENERATED_NORMAL_BASE_DENSITY = 16.0; // 勾配の基準のテクセル密度 (テクセル/ブロック)
 const float GENERATED_NORMAL_MAX_STEP_LOG2 = 5.0; // 差を取る幅の上限 (2^5 = 32 テクセル = 512 px パック)
 const float GENERATED_NORMAL_MAX_LOD = 0.25; // 差を取る幅が画素とほぼ同じ大きさ (lod 0) を超えると勾配がジッターでちらつくので消す
+const vec2 GENERATED_FLAT_DIFF = vec2(0.01, 0.04); // 隣の輝度差がこの範囲で、一色の面に足す起伏を消していく
+const float GENERATED_FLAT_BUMP = 0.1;      // 一色の面に足す起伏の強さ (テクセルごとの高さ -0.5〜0.5 に対する輝度差)
 const float FRONT_FACING_MIN_NOV = 0.05;     // テクスチャ法線と視線の内積の下限
 const float VANILLA_AO_SOFTEN = 0.6;     // GTAO 併用時はバニラ AO を弱めて二重に暗くならないように
 /*
@@ -255,6 +257,10 @@ ivec2 generatedTap(ivec2 t, ivec2 tmin, ivec2 tsize) {
 #endif
 }
 
+float generatedTexelHeight(ivec2 t) {
+    return hash3(uvec3(uvec2(t), 0u)).x - 0.5;
+}
+
 // テクスチャの輝度を高さとみなした勾配から接空間の法線を作る (PBR テクスチャが無いリソースパック用)
 vec3 generatedNormal(vec2 uv, vec3 playerPos) {
     ivec2 size = textureSize(gtexture, 0);
@@ -293,16 +299,31 @@ vec3 generatedNormal(vec2 uv, vec3 playerPos) {
     ivec2 tsize = max(ivec2(floor((tileMid + tileHalf) * vec2(size) - 0.5)) - tmin + 1, ivec2(1));
     c = clamp(c, tmin, tmin + tsize - 1);
     ivec2 stp = ivec2(1 << int(stepLog2));
-    vec4 l = texelFetch(gtexture, generatedTap(c - ivec2(stp.x, 0), tmin, tsize), 0);
-    vec4 r = texelFetch(gtexture, generatedTap(c + ivec2(stp.x, 0), tmin, tsize), 0);
-    vec4 u = texelFetch(gtexture, generatedTap(c - ivec2(0, stp.y), tmin, tsize), 0);
-    vec4 d = texelFetch(gtexture, generatedTap(c + ivec2(0, stp.y), tmin, tsize), 0);
+    ivec2 cl = generatedTap(c - ivec2(stp.x, 0), tmin, tsize);
+    ivec2 cr = generatedTap(c + ivec2(stp.x, 0), tmin, tsize);
+    ivec2 cu = generatedTap(c - ivec2(0, stp.y), tmin, tsize);
+    ivec2 cd = generatedTap(c + ivec2(0, stp.y), tmin, tsize);
+    vec4 l = texelFetch(gtexture, cl, 0);
+    vec4 r = texelFetch(gtexture, cr, 0);
+    vec4 u = texelFetch(gtexture, cu, 0);
+    vec4 d = texelFetch(gtexture, cd, 0);
     // 抜き部分 (葉の穴) を低い所として扱うと縁が立体的に見える
     float hl = luminance(l.rgb) * l.a;
     float hr = luminance(r.rgb) * r.a;
     float hu = luminance(u.rgb) * u.a;
     float hd = luminance(d.rgb) * d.a;
-    vec2 grad = vec2(hr - hl, hd - hu) * (GENERATED_NORMAL_GAIN * GENERATED_NORMAL_STRENGTH * gain * fade);
+    vec2 diff = vec2(hr - hl, hd - hu);
+#ifdef GBUF_ENTITIES
+    /*
+     * 一色の面 (ラヴェジャーの鼻・角など) は輝度差が 0 で凹凸が出ない。輝度差が小さい所にだけ、テクセルの位置から決まる弱い起伏を足す
+     * テクセルに固定した値なので画素や時間で変わらずちらつかず、距離で差を取る幅が画素に近づくと上の fade で一緒に消える
+     * ブロックには掛けない。模様のあるブロックは元の輝度差で足り、コンクリートのような無地のブロックは粒が出て、たいまつの光の下で漆喰のように荒れる
+     */
+    float flatness = 1.0 - smoothstep(GENERATED_FLAT_DIFF.x, GENERATED_FLAT_DIFF.y, max(abs(diff.x), abs(diff.y)));
+    vec2 bump = vec2(generatedTexelHeight(cr) - generatedTexelHeight(cl), generatedTexelHeight(cd) - generatedTexelHeight(cu));
+    diff += bump * (GENERATED_FLAT_BUMP * flatness);
+#endif
+    vec2 grad = diff * (GENERATED_NORMAL_GAIN * GENERATED_NORMAL_STRENGTH * gain * fade);
     grad /= sqrt(1.0 + dot(grad, grad) / (GENERATED_NORMAL_MAX_SLOPE * GENERATED_NORMAL_MAX_SLOPE));
     return normalize(vec3(-grad, 1.0));
 }
