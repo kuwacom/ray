@@ -56,6 +56,8 @@
 #endif
 #ifdef GENERATED_NORMALS
 #endif
+#ifdef GENERATED_NORMAL_ENTITIES
+#endif
 #ifdef POM
 #endif
 #ifdef POM_SHADOW

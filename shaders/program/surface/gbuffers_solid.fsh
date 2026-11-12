@@ -81,7 +81,7 @@ layout(location = 3) out vec4 outVelocity;
 #if defined POM && defined USE_LABPBR && defined GBUF_TERRAIN
     #define USE_POM
 #endif
-#if defined GENERATED_NORMALS && PBR_FORMAT == 0 && defined GBUF_TERRAIN
+#if defined GENERATED_NORMALS && PBR_FORMAT == 0 && (defined GBUF_TERRAIN || (defined GBUF_ENTITIES && defined GENERATED_NORMAL_ENTITIES))
     #define USE_GENERATED_NORMALS
 #endif
 
@@ -246,9 +246,13 @@ float parallaxShadow(vec2 hitUv, float hitDepth, vec3 lightTs, vec2 dx, vec2 dy,
 #endif
 
 #ifdef USE_GENERATED_NORMALS
-// 近傍のテクセル。ブロックは繰り返し模様なので範囲で折り返す
+// 近傍のテクセル。ブロックは繰り返し模様なので範囲で折り返し、エンティティの面は繰り返さないので端で止める
 ivec2 generatedTap(ivec2 t, ivec2 tmin, ivec2 tsize) {
+#ifdef GBUF_ENTITIES
+    return clamp(t, tmin, tmin + tsize - 1);
+#else
     return tmin + ((t - tmin) % tsize + tsize) % tsize;
+#endif
 }
 
 // テクスチャの輝度を高さとみなした勾配から接空間の法線を作る (PBR テクスチャが無いリソースパック用)
@@ -264,7 +268,7 @@ vec3 generatedNormal(vec2 uv, vec3 playerPos) {
     float texelDy = dot(dy, dy);
     /*
      * 輝度差は 1 テクセルあたりの値なので、同じ絵でも解像度が高いほど勾配が弱くなる。面の 1 ブロックあたりのテクセル数を
-     * 画面微分の比で測り (向きや遠近に依らない)、基準 (16) に対する比 ratio の分だけ
+     * 画面微分の比で測り (向きや遠近に依らない。エンティティの 64x64 も 128x128 もこれで揃う)、基準 (16) に対する比 ratio の分だけ
      * 勾配を強め、差を取る幅も 2 の冪に丸めた ratio テクセルに広げる。幅を広げずに掛けるだけだと、細かい絵のノイズまで増幅される
      */
     vec3 pdx = dFdx(playerPos);
@@ -282,7 +286,7 @@ vec3 generatedNormal(vec2 uv, vec3 playerPos) {
     float fade = 1.0 - smoothstep(-1.0, GENERATED_NORMAL_MAX_LOD, lod);
     if (fade <= 0.0) return vec3(0.0, 0.0, 1.0);
     ivec2 c = ivec2(floor(uv * vec2(size)));
-    // 近傍はスプライトの外 (アトラスの隣の絵) を読まないよう、スプライトの範囲 (テクセル) に収める
+    // 近傍はスプライト (エンティティは面) の外の絵を読まないよう、その範囲 (テクセル) に収める
     // 端で範囲に収める (片側差分) と縁の 1 テクセルだけ勾配が変わり、ブロックの継ぎ目に法線の段差の線が出る。
     // ブロックのテクスチャは繰り返し模様なので、折り返すと隣のブロックの縁と同じ値になって継ぎ目が消える
     ivec2 tmin = ivec2(floor((tileMid - tileHalf) * vec2(size) + 0.5));

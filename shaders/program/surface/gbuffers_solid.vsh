@@ -87,6 +87,8 @@
 #ifdef GBUF_TERRAIN
     in vec2 mc_Entity;
     in vec4 at_midBlock;
+#endif
+#if defined GBUF_TERRAIN || defined GBUF_ENTITIES
     in vec2 mc_midTexCoord;
 #endif
 in vec4 at_tangent;
@@ -98,6 +100,7 @@ out vec3 viewPos;
 out vec3 normalPlayer;
 out vec4 tangentPlayer;
 // アトラス上のスプライトの中心と半径 (POM の折り返し・自動法線の近傍参照をスプライト内に留める)
+// エンティティは面 (四角形) の UV の中心と半幅。テクスチャの隣の面の絵を読まないために使う
 out vec2 tileMid;
 out vec2 tileHalf;
 flat out int blockId;
@@ -123,6 +126,10 @@ void main() {
     if (any(greaterThan(midUv, vec2(2.0)))) midUv = uintBitsToFloat(uvec2(midUv * MID_UV_FIXED_SCALE)) / MID_UV_FIXED_SCALE;
     tileMid = midUv;
     tileHalf = abs(texcoord - midUv);
+#elif defined GBUF_ENTITIES
+    blockId = 0;
+    tileMid = mc_midTexCoord;
+    tileHalf = abs(texcoord - mc_midTexCoord);
 #else
     blockId = 0;
     tileMid = vec2(0.5);
