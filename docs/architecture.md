@@ -258,6 +258,7 @@ struct LightInstance {
 | 1001-1255 | 光源 (光源インデックス = id - 1000) | 1001 たいまつ … 1062 トライアルスポナー |
 | 1257-1895 | 向きのある光源の東・南・西 (id = 1000 + 256 x 向き + 光源インデックス。向き 1 東 2 南 3 西。北は向きなしと同じ ID) | かまど・燻製器・溶鉱炉 (点灯) 1305 / 1561 / 1817、ジャック・オ・ランタン 1267 / 1523 / 1779 |
 | 2000-4095 | 色の付いた固体 (遮蔽・マテリアルは未登録の固体と同じ)。上の帯に無いブロックを平均の色ごとにまとめたもの | 羊毛・コンクリート・石・板材 (使用中は 2000-2351) |
+| 元の ID + 4096 x 判定の番号 (1-5) | 一部だけ金属のブロック。下位 12bit が元の ID (ボクセル・光源・形はそのまま)、上が金属の画素を選ぶ判定 (`METAL_GATE_*`)。Iris の頂点の ID は符号付き 16bit なので 32767 以下 | 1 全体 (銅の鉄格子・鎖・ドア・避雷針・鉄のドア・鎖・鉄格子・感圧板), 2 灰色 (レール・ホッパー・大釜), 3 青みの暗い画素 (ランタンの枠), 4 灰色+金 (動力レール), 5 金 (鐘) |
 
 - ボクセルには下位 12bit しか入らないので 4095 を超える ID は作らない
 - ブロックの平均の色は `tools/gen_block_colors.py` がクライアント jar のテクスチャから `tools/block_colors.json` に書き (面積と不透明度で重み付けした線形の平均。草・葉・水は平原の色で代表)、`gen_block_properties.py` が 2000 番台の ID と `lib/ids/block_albedo.glsl` (ID ごとの色の定数表) を作る。setup.csh が SSBO1 `blockData.albedo[4096]` に展開し、実行時は `getBlockAlbedo(voxelId)` で引く (floodfill の照り返し、ボクセル RT の画面外の当たり)。上面の色が全体の平均と違うブロック (草ブロック・原木など) は json の `top` に上面だけの平均を持ち、`blockData.albedoUp[4096]` に展開してレイの当たりで `getBlockAlbedo(voxelId, faceNormal)` が上向きの面に使う (草ブロックの全面の平均は側面の土で茶色)。2000 番台以外の ID はその ID に載せたブロックの平均、未登録 (1) は線形 0.3 の灰色
@@ -299,6 +300,7 @@ getLightDef(index) -> lightEmission(d, level), lightRange(d, level), lightFallof
 - 光るアイテムだけを登録: ブロックアイテム (たいまつ等) は block と同じ 1000 + index、アイテム専用は 1128-1137
 - 手持ち: `heldItemId` -> `getItemLightIndex()` -> 光源テーブル。強さは `heldBlockLightValue` (0-15)。テーブルに無い発光アイテム (MOD) は中性の炎色
 - ドロップ: アイテムエンティティ (entity 5003) を描く時の `currentRenderedItemId` で同じ表を引く
+- 一部だけ金属のアイテム (道具・防具・インゴット・バケツ・ランタンなど): ID = 4096 x 金属の判定の番号 (4096 全体, 8192 灰色, 20480 金, 24576 銅, 28672 ネザライト, 32768 宝石)。ランタンのように光るアイテムは光源の ID + 4096 x 判定の番号で、`getItemLightIndex()` が判定の分を外して光源を引く。手に持つ・落ちた・額縁・アーマースタンドやモブが身に着けた防具は `currentRenderedItemId` が同じ表を引く
 
 ### entity.properties (`entityId`)
 
@@ -310,6 +312,7 @@ getLightDef(index) -> lightEmission(d, level), lightRange(d, level), lightFallof
 | 5004 | item_frame, glow_item_frame | 中身を光源化しない |
 | 5005-5007 | entity_shadow / name_tag / end_crystal_beam (Iris 固定) | 遮蔽・影から外す |
 | 5100-5115 | blaze, magma_cube, glow_squid, allay, end_crystal, experience_orb, spectral_arrow, fireball+small_fireball, dragon_fireball, tnt, creeper, firework_rocket, lightning_bolt, entity_flame (Iris 固定), shulker_bullet, tnt_minecart | 光源エンティティ |
+| 5201-5208 | 金属の判定の番号 (1-8) + 5200 | 一部だけ金属のエンティティ (トロッコ・銅のゴーレム) |
 
 光源エンティティの分類フラグ (LightDef.info.x) で個別スイッチを判定する:
 `LIGHT_FLAG_CAT_ITEM` (ITEM_LIGHTS) / `CAT_PROJECTILE` (PROJECTILE_LIGHTS) / `CAT_BURNING` (BURNING_ENTITY_LIGHTS) / `CAT_GLOWING` (GLOWING_ENTITY_LIGHTS)。
@@ -319,6 +322,8 @@ TNT・クリーパーは `LIGHT_FLAG_ENTITY_FLASH` で `entityColor.a` (点滅) 
 
 0 空 / 1 地形 / 2 植物 / 3 葉 / 4 発光ブロック / 5 金属 / 6 光沢 / 7 雪 / 8 溶岩 / 9 水中植物 / 10 水 / 11 ガラス / 12 色付きガラス / 13 氷 / 14 スライム・ハチミツ / 15 ネザーポータル / 16 その他半透明 / 20 エンティティ / 21 プレイヤー / 22 ドロップアイテム / 23 発光エンティティ / 24 ブロックエンティティ / 25 ビーコンの光線 / 26 雷 / 30 手 / 31 光る物を持った手 / 40 パーティクル / 41 天候 / 42 バニラの雲 (予約。前方シェーディングなので G バッファには書かない) / 43 線など。
 gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.glsl) により変換し、deferred 以降はマテリアル ID だけを見る。
+
+一部だけ金属のもの (`AUTO_METAL_PARTS`): ID (ブロック・アイテム・エンティティ) に載せた判定の番号で、gbuffers が画素ごとにテクスチャの色から金属かを決める (`metalGatePixel`, lib/surface/material.glsl)。金属の画素は 5 金属ブロックと同じ質感 (アルベドを F0 に使い、明るい所ほど滑らか)、宝石は光沢のある誘電体 (F0 0.17)。labPBR の `_s` があるテクスチャはその値が優先で、判定は `_s` が無い (推定の) ときだけ。暗い金属は F0 の輝度を持ち上げる (`metalReflectance`)。
 
 ---
 

@@ -246,6 +246,66 @@ ENTITIES: list[tuple[int, str, str, tuple[str, ...], str]] = [
     (5007, "ENTITY_BEAM", "Iris の minecraft:end_crystal_beam", ("minecraft:end_crystal_beam",), ""),
 ]
 
+# 一部だけ金属のブロック・アイテム・エンティティの自動メタリック。金属の画素を選ぶ判定 (gate) を ID に載せる
+# ブロックとアイテムは元の ID + gate 番号 x METAL_GATE_STRIDE (下位 12bit が元の ID。ボクセルや光源には元の ID だけを渡す)
+# エンティティは ENTITY_METAL_BASE + gate 番号。判定の中身は shaders/lib/surface/material.glsl の metalGatePixel
+METAL_GATE_STRIDE = 4096
+ENTITY_METAL_BASE = 5200
+METAL_GATES = ["all", "gray", "cool", "graygold", "gold", "copper", "netherite", "gem"]  # 番号は 1 から (0 は金属なし)
+
+
+def _copper_all(*bases: str) -> list[str]:
+    return [n for b in bases for n in _copper(b)]
+
+
+def _armor(material: str, *extra: str) -> list[str]:
+    return [f"{material}_{p}" for p in ("helmet", "chestplate", "leggings", "boots", *extra)]
+
+
+def _tools(material: str) -> list[str]:
+    return [f"{material}_{t}" for t in ("sword", "axe", "pickaxe", "shovel", "hoe", "spear")]
+
+
+def metal_blocks() -> dict[str, list[str]]:
+    cut = [f"{p}cut_copper_{s}" for p in COPPER_PREFIX for s in ("slab", "stairs")]
+    return {
+        # テクスチャの全体が金属 (緑青の画素だけは除く)
+        "all": [*_copper_all("copper_bars", "copper_chain", "copper_door", "copper_trapdoor", "lightning_rod", "copper_bulb",
+                             "copper_chest", "copper_golem_statue", "copper_lantern"),
+                *cut, *[f"waxed_{n}" for n in cut],
+                "chain", "iron_chain", "iron_door", "iron_trapdoor", "iron_bars", "heavy_weighted_pressure_plate",
+                "light_weighted_pressure_plate"],
+        # 灰色の画素だけが金属 (木の枕木・水・中身の色は除く)
+        "gray": ["rail", "activator_rail", "detector_rail", "tripwire_hook", "hopper", "cauldron", "water_cauldron",
+                 "lava_cauldron", "powder_snow_cauldron"],
+        # 青みの暗い画素だけが金属 (ランタンの枠。炎は除く)
+        "cool": ["lantern", "soul_lantern"],
+        "graygold": ["powered_rail"],
+        "gold": ["bell"],
+    }
+
+
+# アイテム (手持ち・ドロップ・額縁・装備)。装備は防具のテクスチャ全体が金属なので all、道具は持ち手 (木) を除く判定
+METAL_ITEMS: dict[str, list[str]] = {
+    "all": [*_armor("iron", "horse_armor"), *_armor("chainmail"), *_armor("golden", "horse_armor"), *_armor("copper", "horse_armor"),
+            *_armor("netherite", "horse_armor"), "iron_nautilus_armor", "golden_nautilus_armor", "copper_nautilus_armor",
+            "netherite_nautilus_armor"],
+    "gray": [*_tools("iron"), "mace", "iron_ingot", "iron_nugget", "bucket", "water_bucket", "milk_bucket", "powder_snow_bucket",
+             "axolotl_bucket", "tadpole_bucket", "cod_bucket", "salmon_bucket", "pufferfish_bucket", "tropical_fish_bucket",
+             "shears", "flint_and_steel", "compass", "recovery_compass", "minecart", "chest_minecart", "furnace_minecart",
+             "hopper_minecart", "command_block_minecart", "tnt_minecart"],
+    "gold": [*_tools("golden"), "gold_ingot", "gold_nugget", "clock"],
+    "copper": [*_tools("copper"), "copper_ingot", "copper_nugget"],
+    "netherite": [*_tools("netherite"), "netherite_ingot"],
+    "gem": [*_tools("diamond"), *_armor("diamond", "horse_armor"), "diamond_nautilus_armor", "diamond"],
+}
+
+METAL_ENTITIES: dict[str, list[str]] = {
+    "all": ["minecraft:copper_golem"],
+    "gray": ["minecraft:minecart", "minecraft:chest_minecart", "minecraft:furnace_minecart", "minecraft:hopper_minecart",
+             "minecraft:command_block_minecart", "minecraft:spawner_minecart"],
+}
+
 # block_ids.glsl の定数: ("raw", 行) / ("const", 行末コメントの桁, 定数名, 値, コメント, 表に載る)
 # 表に載る定数は block.properties に同じ ID の行が無いと生成が止まる (ID のずれの検出)
 BLOCK_CONSTS: list[tuple] = [
@@ -304,4 +364,7 @@ BLOCK_CONSTS: list[tuple] = [
     ("const", 40, "BLOCK_LIGHT_LAST", LIGHT_FACING_LAST, "光源の ID の上限 (向きのある光源の西)", False),
     ("raw", ""),
     ("const", 40, "BLOCK_COLOR_FIRST", COLOR_BAND_FIRST, "2000 以降は色の付いた固体 (マテリアル・遮蔽は BLOCK_SOLID と同じ)", False),
+    ("raw", ""),
+    ("const", 40, "METAL_GATE_STRIDE", METAL_GATE_STRIDE, "一部だけ金属の ID = 元の ID + 判定の番号 x この値 (ブロック・アイテム)", False),
+    *[("const", 40, f"METAL_GATE_{g.upper()}", i + 1, "", False) for i, g in enumerate(METAL_GATES)],
 ]

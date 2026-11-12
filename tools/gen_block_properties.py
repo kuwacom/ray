@@ -26,6 +26,7 @@ from id_tables import (  # noqa: E402
     BLOCK_CONSTS, COLOR_BAND_FIRST, COLOR_BAND_LAST, COLORS, COPPER_PREFIX, ENTITIES, ENTITY_LIGHT_ID_BASE, LIGHT_BLOCK_LAST,
     FACINGS, LIGHT_ENTITY_FIRST, LIGHT_ENTITY_LAST, LIGHT_FACING_LAST, LIGHT_FACING_STRIDE, LIGHT_ID_BASE, LIGHT_ITEM_FIRST,
     LIGHT_ITEM_LAST, LIGHTS, Light, STAIRS_FIRST, with_state,
+    ENTITY_METAL_BASE, METAL_ENTITIES, METAL_GATE_STRIDE, METAL_GATES, METAL_ITEMS, metal_blocks,
 )
 from lib.color import linear_to_srgb, srgb_to_linear  # noqa: E402
 from lib.generated import check as generated_check  # noqa: E402
@@ -99,13 +100,13 @@ def stair_entries() -> list[tuple[int, str, list[str]]]:
 # (ID, コメント, ブロック一覧) の順に並べる
 # コメントは .properties にそのまま出るので ASCII で書く (Iris は ISO-8859-1 で読み、UTF-8 の日本語は前処理を壊す)
 BLOCKS: list[tuple[int, str, list[str]]] = [
-    # 暗い金属 (ネザライト・金床) はアルベドを F0 にすると黒い鏡になるので 11 (光沢のある誘電体) に入れる
-    (10, "metal (material hint)", ["iron_block", *COPPER, *[f"waxed_{c}" for c in COPPER], *[f"{p}cut_copper" for p in COPPER_PREFIX],
+    # 暗い金属 (ネザライト・金床) はアルベドをそのまま F0 にすると黒い鏡になるので、gbuffers が暗さを持ち上げる (lib/surface/material.glsl metalReflectance)
+    (10, "metal (material hint)", ["iron_block", "netherite_block", "anvil", "chipped_anvil", "damaged_anvil", "heavy_core",
+                                     *COPPER, *[f"waxed_{c}" for c in COPPER], *[f"{p}cut_copper" for p in COPPER_PREFIX],
                                      *[f"waxed_{p}cut_copper" for p in COPPER_PREFIX], *[f"{p}chiseled_copper" for p in COPPER_PREFIX],
                                      *[f"waxed_{p}chiseled_copper" for p in COPPER_PREFIX],
                                      *[f"{p}copper_grate" for p in COPPER_PREFIX], *[f"waxed_{p}copper_grate" for p in COPPER_PREFIX]]),
-    (11, "polished stone / minerals / dark metals", ["netherite_block", "anvil", "chipped_anvil", "damaged_anvil", "heavy_core",
-                            "quartz_block", "smooth_quartz", "quartz_bricks",
+    (11, "polished stone / minerals", ["quartz_block", "smooth_quartz", "quartz_bricks",
                             "polished_granite", "polished_diorite", "polished_andesite", "polished_deepslate", "polished_blackstone",
                             "polished_tuff", "polished_basalt", "packed_ice", "blue_ice", "obsidian", *colored("glazed_terracotta")]),
     (12, "snow", ["snow_block", "powder_snow"]),
@@ -190,17 +191,41 @@ HEADER = """#
 """
 
 
-def render(kind: str, entries: list[tuple[int, str, list[str]]]) -> str:
+def render(kind: str, entries: list[tuple[int, str, list[str]]], metal: dict[str, list[str]] | None = None,
+           metal_items: dict[str, list[str]] | None = None) -> str:
+    """metal: 一部だけ金属の名前 (判定ごと)。元の ID の行から外し、ID + 判定の番号 x METAL_GATE_STRIDE の行へ出す
+    metal_items: 元の ID を持たないアイテム。ID = 判定の番号 x METAL_GATE_STRIDE の行へ出す"""
+    gate_of = {n: i + 1 for i, g in enumerate(METAL_GATES) for n in (metal or {}).get(g, [])}
     lines = [HEADER.format(kind=kind)]
     seen: dict[str, int] = {}
+    registered: set[str] = set()
     for bid, comment, names in entries:
         for n in names:
             if n in seen:
                 raise SystemExit(f"{kind}: {n} が ID {seen[n]} と {bid} に重複")
             seen[n] = bid
-        lines.append(f"# {comment}")
-        lines.append(f"{kind}.{bid} = " + " ".join(names))
-        lines.append("")
+            registered.add(n.split(":")[0])
+        plain = [n for n in names if n.split(":")[0] not in gate_of]
+        if plain:
+            lines.append(f"# {comment}")
+            lines.append(f"{kind}.{bid} = " + " ".join(plain))
+            lines.append("")
+        for gate in sorted({gate_of[n.split(":")[0]] for n in names if n.split(":")[0] in gate_of}):
+            lines.append(f"# {comment} (metal gate {METAL_GATES[gate - 1]})")
+            lines.append(f"{kind}.{bid + gate * METAL_GATE_STRIDE} = "
+                         + " ".join(n for n in names if gate_of.get(n.split(":")[0]) == gate))
+            lines.append("")
+    # どの行にも無いブロック (ブロックエンティティだけのもの) は未登録の固体 (ID 1) の判定付きとして出す
+    if kind == "block":
+        for gate, g in enumerate(METAL_GATES, start=1):
+            rest = [n for n in (metal or {}).get(g, []) if n not in registered]
+            if rest:
+                lines += [f"# metal gate {g} (block entities and others not in any other row)",
+                          f"{kind}.{1 + gate * METAL_GATE_STRIDE} = " + " ".join(rest), ""]
+    for gate, g in enumerate(METAL_GATES, start=1):
+        names = (metal_items or {}).get(g, [])
+        if names:
+            lines += [f"# metal gate {g}", f"{kind}.{gate * METAL_GATE_STRIDE} = " + " ".join(names), ""]
     text = "\n".join(lines)
     if not text.isascii():
         raise SystemExit(f"{kind}.properties に ASCII 以外の文字がある (コメントは ASCII で書く)")
@@ -395,6 +420,15 @@ def check_tables() -> None:
     entity_ids = [e[0] for e in ENTITIES]
     if len(set(entity_ids)) != len(entity_ids) or max(entity_ids) >= ENTITY_LIGHT_ID_BASE:
         raise SystemExit("エンティティ ID が重複しているか、光源の帯 (5100-) に入っている")
+    if ENTITY_METAL_BASE <= ENTITY_LIGHT_ID_BASE + LIGHT_ENTITY_LAST - LIGHT_ENTITY_FIRST:
+        raise SystemExit("金属のエンティティ ID が光源の帯と重なる")
+    for table in (metal_blocks(), METAL_ITEMS, METAL_ENTITIES):
+        unknown = set(table) - set(METAL_GATES)
+        if unknown:
+            raise SystemExit(f"金属の判定の名前が METAL_GATES に無い: {sorted(unknown)}")
+    # Iris はブロック ID を符号付き 16bit で頂点に持つので、ブロックの ID は 32767 以下
+    if any((METAL_GATES.index(g) + 1) * METAL_GATE_STRIDE + 4095 > 32767 for g in metal_blocks()):
+        raise SystemExit("金属の判定付きのブロック ID が 32767 を超える")
 
 
 def trailing(line: str, width: int, comment: str) -> str:
@@ -493,6 +527,7 @@ def render_entity_ids() -> str:
     rows.append((f"const int ENTITY_LIGHT_BASE = {ENTITY_LIGHT_ID_BASE};",
                  f"{ENTITY_LIGHT_ID_BASE}-{last} は光源エンティティ (光源インデックス {LIGHT_ENTITY_FIRST} + (id - {ENTITY_LIGHT_ID_BASE}))"))
     rows.append((f"const int ENTITY_LIGHT_LAST = {last};", ""))
+    rows.append((f"const int ENTITY_METAL_BASE = {ENTITY_METAL_BASE};", f"{ENTITY_METAL_BASE} + 金属の判定の番号 (METAL_GATE_*) は一部だけ金属のエンティティ"))
     lines = [
         "/*",
         " * エンティティ ID (entity.properties と対応) とアイテム ID (item.properties と対応)",
@@ -542,6 +577,10 @@ def render_entity_properties() -> str:
     for light in LIGHTS:
         if light.entities:
             row(ENTITY_LIGHT_ID_BASE + light.index - LIGHT_ENTITY_FIRST, light.entities, light.entity_note)
+    lines += ["", f"# Partly metal entities ({ENTITY_METAL_BASE} + metal gate number)"]
+    for gate, g in enumerate(METAL_GATES, start=1):
+        if METAL_ENTITIES.get(g):
+            row(ENTITY_METAL_BASE + gate, tuple(METAL_ENTITIES[g]), f"metal gate {g}")
     lines.append("")
     text = "\n".join(lines)
     if not text.isascii():
@@ -664,8 +703,8 @@ def generated(shaders: Path = SHADERS) -> dict[Path, str]:
     colored, palette, palette_top = color_blocks(colors, tops)
     ids = shaders / "lib" / "ids"
     return {
-        shaders / "block.properties": render("block", all_blocks() + colored),
-        shaders / "item.properties": render("item", light_item_entries()),
+        shaders / "block.properties": render("block", all_blocks() + colored, metal_blocks()),
+        shaders / "item.properties": render("item", light_item_entries(), metal_blocks(), METAL_ITEMS),
         shaders / "entity.properties": render_entity_properties(),
         ids / "block_albedo.glsl": render_albedo_glsl(colors, tops, palette, palette_top),
         ids / "block_ids.glsl": render_block_ids(),

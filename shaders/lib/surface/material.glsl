@@ -7,10 +7,12 @@
 #define SURFACE_MATERIAL_GLSL
 
 //@include "/lib/common/color.glsl"
+//@include "/lib/common/constants.glsl"
 //@include "/lib/common/encoding.glsl"
 //@include "/lib/common/gbuffer.glsl"
 //@include "/lib/common/math.glsl"
 //@include "/lib/common/samplers.glsl"
+//@include "/lib/ids/block_ids.glsl"
 //@include "/lib/ids/material_ids.glsl"
 
 struct Material {
@@ -162,6 +164,83 @@ SurfaceParams decodeLabPbr(vec4 spec, vec4 normalTex) {
 const float METAL_SMOOTHNESS_MIN = 0.35;
 const float METAL_SMOOTHNESS_MAX = 0.72;
 
+// 金属の質感 (鉄・銅のブロックなど)。f0 = 1.0 は labPBR の「アルベドを F0 に使う金属」
+SurfaceParams metalSurfaceParams(vec3 albedoSrgb) {
+    SurfaceParams p = surfaceParamsDefault();
+    // 緑青 (酸化した銅の緑の画素) は金属ではなく粗い鉱物。酸化途中の銅は金属の地と緑青がまだらになる
+    if (albedoSrgb.g > albedoSrgb.r + 0.03) {
+        p.smoothness = 0.25;
+        p.f0 = 0.04;
+        p.porosity = 0.3;
+    } else {
+        // 金属ブロックはテクスチャの明るい所ほど磨かれているように見せる。暗い筋 (傷・継ぎ目) は粗くする
+        // 鏡に近いと周りの景色がそのまま映ってガラスの箱のように見えるので、最も明るい所でも少しぼかす
+        float lum = luminance(albedoSrgb);
+        p.smoothness = METAL_SMOOTHNESS_MIN + (METAL_SMOOTHNESS_MAX - METAL_SMOOTHNESS_MIN) * lum * lum;
+        p.f0 = 1.0;
+    }
+    return p;
+}
+
+// 宝石 (ダイヤモンドの道具・防具)。F0 0.17 は屈折率 2.42
+const float GEM_SMOOTHNESS = 0.85;
+const float GEM_F0 = 0.17;
+
+SurfaceParams gemSurfaceParams() {
+    SurfaceParams p = surfaceParamsDefault();
+    p.smoothness = GEM_SMOOTHNESS;
+    p.f0 = GEM_F0;
+    return p;
+}
+
+/*
+ * 一部だけ金属のブロック・アイテムで、金属の画素をテクスチャの色から選ぶ (METAL_GATE_*)
+ * 木の枕木・持ち手・炎・中身の液体を金属にしないための判定で、種類ごとに金属の色が違う
+ * 暗い画素の彩度は誤差で大きく振れるので、灰色は最大成分に対する彩度で見る
+ */
+const float METAL_GRAY_SATURATION = 0.2;
+const float METAL_GOLD_SATURATION = 0.45;   // 金の持ち手 (木) との境。持ち手は同じ色相で暗いので明るさでも分ける
+const float METAL_GOLD_LUMINANCE = 0.45;
+const float METAL_COOL_LUMINANCE = 0.4;     // ランタンの枠 (青みの暗い灰色)。炎は明るいか暖色
+const float METAL_COPPER_GREEN_RATIO = 0.68; // 銅の色相 (赤に対する緑の比) の上限。木の持ち手は 0.75 以上
+const float METAL_COPPER_SATURATION = 0.35;
+
+bool metalGatePixel(int gate, vec3 c) {
+    float mx = maxOf(c);
+    float sat = (mx - minOf(c)) / max(mx, EPS);
+    float lum = luminance(c);
+    bool gray = sat < METAL_GRAY_SATURATION;
+    bool gold = c.r >= 0.9 * c.g && c.g > c.b && sat > METAL_GOLD_SATURATION && lum > METAL_GOLD_LUMINANCE && c.g > 0.6 * c.r;
+    if (gate == METAL_GATE_GRAY) return gray;
+    if (gate == METAL_GATE_COOL) return c.b >= c.r - 0.01 && lum < METAL_COOL_LUMINANCE;
+    // 動力レールの金の線路は金色で明るく彩度が高い。枕木の木はもっと暗いか彩度が低い
+    if (gate == METAL_GATE_GRAYGOLD) return gray || (gold && sat > 0.6 && lum > 0.5);
+    if (gate == METAL_GATE_GOLD) return gold;
+    if (gate == METAL_GATE_COPPER) return c.g < METAL_COPPER_GREEN_RATIO * c.r && c.b <= c.g && sat > METAL_COPPER_SATURATION;
+    if (gate == METAL_GATE_NETHERITE) return gray || c.b > c.g;
+    if (gate == METAL_GATE_GEM) return c.g > c.r + 0.02 && c.b > c.r + 0.02;
+    return true;
+}
+
+// 判定に合う画素を金属 (宝石は光沢のある誘電体) に置き換える。AO と高さはそのまま。PBR テクスチャが無い (推定の) 時だけ使う
+SurfaceParams applyMetalGate(SurfaceParams base, int gate, vec3 albedoSrgb) {
+    if (gate == 0 || !metalGatePixel(gate, albedoSrgb)) return base;
+    SurfaceParams p = gate == METAL_GATE_GEM ? gemSurfaceParams() : metalSurfaceParams(albedoSrgb);
+    p.ao = base.ao;
+    p.height = base.height;
+    return p;
+}
+
+/*
+ * 金属のアルベド (線形) を F0 に使うときの持ち上げ。暗い金属 (鉄の鎖・金床・ネザライト) をそのまま F0 にすると黒い鏡になる
+ * 灰色を足すので色味の差はそのまま残り (掛けると暗い紫のネザライトがピンクになる)、明るい金属ほど足す量が小さい
+ */
+const float METAL_DARK_LIFT = 0.1;
+
+vec3 metalReflectance(vec3 albedoLinear) {
+    return min(albedoLinear + METAL_DARK_LIFT * sqr(1.0 - luminance(albedoLinear)), vec3(1.0));
+}
+
 /*
  * PBR テクスチャが無い時 (PBR_FORMAT=0) の推定 (マテリアル ID + 色の統計)
  * ブロックごとの巨大な表は持たず、ID の大分類と輝度から決める (保守性のため)
@@ -171,17 +250,7 @@ SurfaceParams estimateSurfaceParams(int materialId, vec3 albedoSrgb) {
     float lum = luminance(albedoSrgb);
     float chroma = maxOf(albedoSrgb) - minOf(albedoSrgb);
     if (materialId == MAT_METAL) {
-        // 緑青 (酸化した銅の緑の画素) は金属ではなく粗い鉱物。酸化途中の銅は金属の地と緑青がまだらになる
-        if (albedoSrgb.g > albedoSrgb.r + 0.03) {
-            p.smoothness = 0.25;
-            p.f0 = 0.04;
-            p.porosity = 0.3;
-        } else {
-            // 金属ブロックはテクスチャの明るい所ほど磨かれているように見せる。暗い筋 (傷・継ぎ目) は粗くする
-            // 鏡に近いと周りの景色がそのまま映ってガラスの箱のように見えるので、最も明るい所でも少しぼかす
-            p.smoothness = METAL_SMOOTHNESS_MIN + (METAL_SMOOTHNESS_MAX - METAL_SMOOTHNESS_MIN) * lum * lum;
-            p.f0 = 1.0;
-        }
+        p = metalSurfaceParams(albedoSrgb);
     } else if (materialId == MAT_GLOSSY) {
         p.smoothness = 0.72 + 0.15 * lum;
         p.f0 = 0.045;

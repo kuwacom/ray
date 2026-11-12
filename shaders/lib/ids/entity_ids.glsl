@@ -15,6 +15,7 @@ const int ENTITY_NAME_TAG = 5006;       // Iris の minecraft:name_tag (ボク�
 const int ENTITY_BEAM = 5007;           // Iris の minecraft:end_crystal_beam
 const int ENTITY_LIGHT_BASE = 5100;     // 5100-5163 は光源エンティティ (光源インデックス 192 + (id - 5100))
 const int ENTITY_LIGHT_LAST = 5163;
+const int ENTITY_METAL_BASE = 5200;     // 5200 + 金属の判定の番号 (METAL_GATE_*) は一部だけ金属のエンティティ
 
 // アイテム: 光るアイテムは 1000 + 光源インデックス。それ以外の特別扱い
 const int ITEM_LIGHT_BASE = 1000;

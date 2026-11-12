@@ -363,7 +363,7 @@ void main() {
 
     int materialId = MAT_TERRAIN;
 #if defined GBUF_TERRAIN
-    materialId = blockIdToMaterial(blockId);
+    materialId = blockIdToMaterial(blockBase);
 #elif defined GBUF_ENTITIES
     materialId = entityIdToMaterial(entityId, currentRenderedItemId);
     albedo.rgb = mix(albedo.rgb, entityColor.rgb, entityColor.a);
@@ -383,9 +383,27 @@ void main() {
 #ifdef USE_LABPBR
     vec4 normalTex = SAMPLE_ATLAS(normals);
     vec4 specTex = SAMPLE_ATLAS(specular);
+    // 金属の判定はテクスチャの元の色で行う (エンティティのダメージの赤や点滅で変わらないように)
+    vec3 texRgb = albedo.rgb;
+    int blockBase = stripMetalGate(blockId);
+    int metalGate = 0;
+#ifdef AUTO_METAL_PARTS
+    #if defined GBUF_TERRAIN
+        metalGate = metalGateOfId(blockId);
+    #elif defined GBUF_ENTITIES
+        // 手に持った・落ちた・額縁の・身に着けたアイテムは currentRenderedItemId、金属のエンティティ (トロッコ) は entityId
+        metalGate = max(metalGateOfId(currentRenderedItemId), entityMetalGate(entityId));
+    #elif defined GBUF_HAND
+        metalGate = metalGateOfId(currentRenderedItemId);
+    #elif defined GBUF_BLOCK
+        metalGate = metalGateOfId(blockEntityId);
+    #endif
+#endif
+
     SurfaceParams sp = decodeLabPbr(specTex, normalTex);
     // _s が無いテクスチャ (Iris の既定は全 0) は ID からの推定で埋める。AO と高さは _n のまま
-    if (dot(specTex, specTex) <= 0.0) {
+    bool estimated = dot(specTex, specTex) <= 0.0;
+    if (estimated) {
         SurfaceParams est = estimateSurfaceParams(materialId, albedo.rgb);
         est.ao = sp.ao;
         est.height = sp.height;
@@ -396,7 +414,8 @@ void main() {
 #endif
 
     // 法線
-    bool isPlant = materialId == MAT_PLANT || materialId == MAT_UNDERWATER_PLANT;
+    // 金属にした画素は、レール・鎖などの植物扱い (法線を上向きにする) から外す
+    bool isPlant = (materialId == MAT_PLANT || materialId == MAT_UNDERWATER_PLANT) && !autoMetal;
     vec3 normalTs = vec3(0.0, 0.0, 1.0);
 #if defined USE_LABPBR && defined NORMAL_MAPPING
     vec2 nxy = normalTex.xy * 2.0 - 1.0;
@@ -415,7 +434,11 @@ void main() {
     // 雨の濡れと水たまり (Lagarde 2013: 空隙が水で満ちると暗くなり、表面に水膜ができて滑らかになる)
     float puddle = 0.0;
     float wetAmount = 0.0;
+    const bool estimated = true;
 #if defined RAIN_PUDDLES && defined HAS_SKY && defined GBUF_TERRAIN
+    // 一部だけ金属のものは、PBR テクスチャの値があればそちらを使い、無い (推定の) 時だけ金属の画素を置き換える
+    if (estimated) sp = applyMetalGate(sp, metalGate, texRgb);
+    bool autoMetal = estimated && labPbrMetalId(sp.f0) == METAL_ALBEDO;
     if (rainWetness > 0.001 && biome_precipitation == 1 && !isPlant) {
         float exposure = smoothstep(0.88, 0.97, lmcoord.y);
         wetAmount = rainWetness * exposure;
@@ -484,9 +507,10 @@ void main() {
     g.wetness = max(wetAmount, puddle);
     g.emission = max(estimateEmission(albedo.rgb, materialId), sp.emission);
 #if defined GBUF_TERRAIN
-    if (isFacingLight(getBlockLightIndex(blockId))) g.emission *= facingLightEmissionMask(albedo.rgb, geoN, blockLightFacing(blockId));
+    if (isFacingLight(getBlockLightIndex(blockBase))) g.emission *= facingLightEmissionMask(albedo.rgb, geoN, blockLightFacing(blockBase));
 #endif
 #if defined GBUF_ENTITIES
+    if (autoMetal) g.albedo = metalReflectance(g.albedo);
     // クリーパー・TNT は点滅の白さ (entityColor) の分だけ、発光エンティティと同じ式で明るい画素を光らせる。点滅していない時は光らない
     if (isFlashEntity(entityId)) {
         g.emission = max(g.emission, entityFlashStrength(entityColor) * smoothstep(0.55, 0.9, maxOf(albedo.rgb)));
@@ -494,7 +518,7 @@ void main() {
 #endif
 #if defined GBUF_TERRAIN && DECORATIVE_BLOCK_LIGHTS > 0
     // 鉱物ブロック (DECORATIVE_BLOCK_LIGHTS)。光源ブロックより弱く、模様の明るい所ほど光らせる
-    if (isDecorativeBlock(blockId)) g.emission = max(g.emission, DECOR_EMISSION * smoothstep(0.15, 0.85, maxOf(albedo.rgb)));
+    if (isDecorativeBlock(blockBase)) g.emission = max(g.emission, DECOR_EMISSION * smoothstep(0.15, 0.85, maxOf(albedo.rgb)));
 #endif
     encodeGBuffer(g, outAlbedo, outNormal, outMaterial);
     outMaterial.a = encodeSurfaceExtra(pomShadow, puddle);

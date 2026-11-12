@@ -72,4 +72,14 @@ const int BLOCK_LIGHT_LAST = 1895;      // 光源の ID の上限 (向きのあ�
 
 const int BLOCK_COLOR_FIRST = 2000;     // 2000 以降は色の付いた固体 (マテリアル・遮蔽は BLOCK_SOLID と同じ)
 
+const int METAL_GATE_STRIDE = 4096;     // 一部だけ金属の ID = 元の ID + 判定の番号 x この値 (ブロック・アイテム)
+const int METAL_GATE_ALL = 1;
+const int METAL_GATE_GRAY = 2;
+const int METAL_GATE_COOL = 3;
+const int METAL_GATE_GRAYGOLD = 4;
+const int METAL_GATE_GOLD = 5;
+const int METAL_GATE_COPPER = 6;
+const int METAL_GATE_NETHERITE = 7;
+const int METAL_GATE_GEM = 8;
+
 #endif

@@ -39,7 +39,17 @@ int blockLightFacing(int blockId) {
     return max(blockId - BLOCK_LIGHT_BASE, 0) >> 8;
 }
 
+// 一部だけ金属のブロック・アイテムの ID は、元の ID + 金属の判定の番号 x METAL_GATE_STRIDE (番号 0 = 金属なし)
+int metalGateOfId(int id) { return max(id, 0) / METAL_GATE_STRIDE; }
+int stripMetalGate(int id) { return id >= METAL_GATE_STRIDE ? id % METAL_GATE_STRIDE : id; }
+
+int entityMetalGate(int entId) {
+    int gate = entId - ENTITY_METAL_BASE;
+    return (gate >= METAL_GATE_ALL && gate <= METAL_GATE_GEM) ? gate : 0;
+}
+
 int getItemLightIndex(int itemId) {
+    itemId = stripMetalGate(itemId);
     return (itemId > ITEM_LIGHT_BASE && itemId <= ITEM_LIGHT_LAST) ? itemId - ITEM_LIGHT_BASE : LIGHT_NONE;
 }
 

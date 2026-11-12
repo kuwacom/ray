@@ -58,6 +58,8 @@
 #endif
 #ifdef GENERATED_NORMAL_ENTITIES
 #endif
+#ifdef AUTO_METAL_PARTS
+#endif
 #ifdef POM
 #endif
 #ifdef POM_SHADOW

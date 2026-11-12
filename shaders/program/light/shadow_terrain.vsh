@@ -91,7 +91,7 @@ void main() {
     skyLight = saturate((lm.y - 1.0 / LIGHTMAP_TEXELS) * LIGHTMAP_TEXELS / LIGHTMAP_RANGE);
     normalPlayer = mat3(shadowModelViewInverse) * normalize(gl_NormalMatrix * gl_Normal);
     int rawBlockId = int(round(mc_Entity.x));
-    blockId = terrainBlockId(rawBlockId);
+    blockId = terrainBlockId(stripMetalGate(rawBlockId));
     // 色付き影はブロックライト (floodfill / 光源シャドウ) と同じ透過色の表を使う
     tintTransmittance = isTintBlock(blockId) ? floodCellTransmittance(blockId) : vec3(1.0);
 

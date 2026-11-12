@@ -35,6 +35,7 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define GENERATED_NORMALS // テクスチャからの法線自動生成 (PBR なしのとき)
 #define GENERATED_NORMAL_STRENGTH 1.5 // [0.5 0.75 1.0 1.25 1.5 1.75 2.0 2.5 3.0] 自動法線の凹凸の強さ。テクスチャの解像度によらず、16 テクセル/ブロックの絵の強さを 1 とする
 #define GENERATED_NORMAL_ENTITIES // エンティティ (モブ・防具・落ちたアイテム) にも自動法線を付ける
+#define AUTO_METAL_PARTS // 一部だけ金属のブロック (レール・鉄格子・鎖・ランタンの枠・ホッパー) と、金属の道具・防具を、金属の画素だけ金属にする (PBR なしのとき)
 //#define POM // 視差オクルージョンマッピング
 #define POM_DEPTH 0.25 // [0.05 0.1 0.15 0.2 0.25 0.3 0.4 0.5 0.75 1.0]
 #define POM_SAMPLES 32 // [16 32 48 64]
