@@ -87,6 +87,13 @@ const float FLUID_LIGHT_EMISSION_MUL = 8.0;
 const float FLUID_LIGHT_RANGE_MUL = 0.7;
 const float FLUID_LIGHT_SIZE = 1.5;
 
+/*
+ * 溶岩の光 (設定 LAVA_LIGHT = 1 のときの倍率)。表示上の溶岩本体は頭打ちで、近くの壁は直接光だけで白く飛んで本体より明るくなる
+ * 直接光は 0.4 倍に抑えて近い壁を本体より暗くし、洞窟の遠い壁と床は floodfill の種を 10 倍にして持ち上げる
+ */
+const float LAVA_DIRECT_GAIN = 0.4;
+const float LAVA_FLOOD_GAIN = 10.0;
+
 // エンティティ光源の塊: 代表セルの判定半径 (局所最大) と重心を集める半径
 const int ENTITY_REP_RADIUS = 1;
 const int ENTITY_GATHER_RADIUS = 2;
@@ -234,7 +241,6 @@ void main() {
          * 直接光の当たらない影の側が光源と位相のずれた明滅になっていた
          */
         emission = lightEmission(d, level);
-        if ((d.info.x & LIGHT_FLAG_FLUID) != 0u) emission *= LAVA_LIGHT;
         vec3 flickered = emission * lightFlicker(d.params.y, uvec3(worldCell + 0x4000));
         float range = lightRange(d, level);
         if ((d.info.x & LIGHT_FLAG_FLUID) != 0u) {
@@ -242,8 +248,9 @@ void main() {
             bool anchor = ((worldCell.x | worldCell.z) & (FLUID_LIGHT_SPACING - 1)) == 0;
             if (surface && anchor && level > 0.5) {
                 registerLight(vec3(cell) + d.shape.xyz, range * FLUID_LIGHT_RANGE_MUL,
-                    flickered * FLUID_LIGHT_EMISSION_MUL, luminance(emission) * FLUID_LIGHT_EMISSION_MUL, FLUID_LIGHT_SIZE, true);
+                    flickered * (FLUID_LIGHT_EMISSION_MUL * LAVA_DIRECT_GAIN * LAVA_LIGHT), luminance(emission) * (FLUID_LIGHT_EMISSION_MUL * LAVA_DIRECT_GAIN * LAVA_LIGHT), FLUID_LIGHT_SIZE, true);
             }
+            emission *= LAVA_FLOOD_GAIN * LAVA_LIGHT;
         } else if (level > 0.5) {
             registerLight(vec3(cell) + d.shape.xyz, range, flickered, luminance(emission), d.shape.w, true);
         }
