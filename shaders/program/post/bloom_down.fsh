@@ -50,6 +50,7 @@
 // END GENERATED includes
 
 const bool colortex0MipmapEnabled = true;
+const bool colortex17MipmapEnabled = true;
 
 in vec2 texcoord;
 
@@ -61,9 +62,15 @@ layout(location = 0) out vec4 outBloom;
  * colortex0.a < 0 は溶岩の発光の割合 (composite19 -> TAA)。ミップは範囲の平均の割合になる
  */
 vec4 fetchSource(vec2 uv, float lod) {
-    vec4 s = textureLod(colortex0, clamp(uv, vec2(0.0), vec2(1.0)), lod);
+    vec2 p = clamp(uv, vec2(0.0), vec2(1.0));
+    vec4 s = textureLod(colortex0, p, lod);
     vec3 c = sanitizeColor(s.rgb);
     float lava = clamp(-s.a, 0.0, 1.0);
+#ifdef SPECULAR_SPARKLE
+    // 光源ブロックの発光の輝度 (colortex17.a, TAA が書く) の、この範囲の明るさに占める割合だけ滲みの元を強める
+    float glow = saturate(textureLod(colortex17, p, lod).a / max(luminance(c), 1e-6));
+    c *= 1.0 + (EMISSION_BLOOM_GAIN - 1.0) * glow;
+#endif
     return vec4(c * (1.0 + (LAVA_BLOOM_GAIN - 1.0) * lava), luminance(c) * LAVA_BLOOM_GAIN * lava);
 }
 

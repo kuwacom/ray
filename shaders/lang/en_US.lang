@@ -268,6 +268,7 @@ option.RAIN_DRY_HALFLIFE=Drying Time
 option.RAIN_DRY_HALFLIFE.comment=Seconds after rain stops until the ground is half dry. Puddles, rain clouds and fog clear at the same pace
 suffix.RAIN_DRY_HALFLIFE= s
 option.EMISSION_STRENGTH=Emission Strength
+option.EMISSION_STRENGTH.comment=Brightness of glowing parts of torches, lanterns and other light sources. Higher values blow out the core and widen the bloom around it
 option.LAVA_BRIGHTNESS=Lava Brightness
 option.LAVA_BRIGHTNESS.comment=How bright lava itself looks on screen. Higher values shift it from orange toward yellow. Does not change the light it casts. 0 = no extra brightening (darker orange)
 option.LAVA_BLOOM=Lava Bloom

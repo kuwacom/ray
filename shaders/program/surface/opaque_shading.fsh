@@ -132,6 +132,14 @@ const float LAVA_BODY_ALBEDO = 0.175;
 const float LAVA_PATTERN_CONTRAST = 1.7;
 const float LAVA_EXPOSED_MAX = 1.2;
 
+/*
+ * 光源ブロックの発光部分の輝度の倍率 (露出に応じて下げる getVisibleEmissionLuminance の前の値に掛ける)
+ * 1 では昼の炎の芯が露出後 1 前後で AgX の白に届かず、光って見えない。4 で昼は芯が白く飛び、露出の上がる夜・洞窟では芯が大きく飛ぶ。
+ * 8 以上は夜のグロウストーンが模様の消えた白い板になる。露出の測光は上位 8% を除くので、小さな光源は露出を下げない。
+ * 滲みの強さは EMISSION_BLOOM_GAIN (post_constants.glsl)
+ */
+const float EMISSION_VISIBLE_GAIN = 4.0;
+
 vec3 lavaRadiance(vec3 albedo) {
     float lum = max(luminance(albedo), 1e-4);
     float pattern = pow(lum / LAVA_BODY_ALBEDO, LAVA_PATTERN_CONTRAST);
@@ -279,12 +287,14 @@ void main() {
     vec3 ambient = skyAmbient + blockLight + indirectLight + minAmbientIrradiance() * ao;
     color += evalDiffuseIrradiance(m, ambient);
 
+    vec3 glow = vec3(0.0);
     if (lava) color += lavaRadiance(g.albedo) * EMISSION_STRENGTH;
-    else color += g.albedo * g.emission * getVisibleEmissionLuminance() * EMISSION_STRENGTH;
-    color += specSum;
+    else glow = g.albedo * g.emission * (getVisibleEmissionLuminance() * EMISSION_VISIBLE_GAIN * EMISSION_STRENGTH);
+    color += glow + specSum;
     float texelPx = SPARKLE_TEXEL_SIZE / max(waterFootprint(length(playerPos), abs(dot(g.geoNormal, V))), 1e-5);
     float texelGate = puddleWeight > 0.0 ? 1.0 : smoothstep(SPARKLE_TEXEL_PX.x, SPARKLE_TEXEL_PX.y, texelPx);
-    float sparkle = hand ? 0.0 : luminance(sparkleExcess(specSum, getExposure())) * texelGate;
+    // 発光の白飛び分も鏡面と同じく線形の短い履歴で TAA の外へ渡す。小さな炎は TAA の箱で潰れてブルームに届かない
+    float sparkle = hand ? 0.0 : luminance(sparkleExcess(specSum, getExposure())) * texelGate + luminance(sparkleExcess(glow, getExposure()));
     // 鏡面の白飛び分を a = 1 + 割合で composite2 -> composite19 -> composite20 (TAA の後に足す) へ渡す
     outColor = vec4(color, 1.0 + saturate(sparkle / max(luminance(color), 1e-6)));
 }

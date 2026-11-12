@@ -268,6 +268,7 @@ option.RAIN_DRY_HALFLIFE=乾くまでの時間
 option.RAIN_DRY_HALFLIFE.comment=雨が止んでから地面が半分まで乾く秒数。水たまり・雨雲・フォグも同じ速さで引く
 suffix.RAIN_DRY_HALFLIFE= 秒
 option.EMISSION_STRENGTH=発光の強さ
+option.EMISSION_STRENGTH.comment=たいまつ・ランタンなど光源の光っている部分の明るさ。上げるほど芯が白く飛び、周りのにじみが広がる
 option.LAVA_BRIGHTNESS=溶岩の明るさ
 option.LAVA_BRIGHTNESS.comment=画面に見える溶岩そのものの明るさ。上げるほど橙から黄色へ寄る。周りを照らす光は変わらない。0 で持ち上げなし (暗めの橙)
 option.LAVA_BLOOM=溶岩のブルーム

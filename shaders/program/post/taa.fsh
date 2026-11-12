@@ -8,6 +8,8 @@
  */
 //@include "/lib/common/common.glsl"
 //@include "/lib/common/exposure.glsl"
+//@include "/lib/common/gbuffer.glsl"
+//@include "/lib/ids/material_ids.glsl"
 //@include "/lib/common/temporal.glsl"
 //@include "/lib/post/post_internal.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
@@ -28,11 +30,14 @@
 #include "/lib/common/common.glsl"
 #include "/lib/buffers/frame_data.glsl"
 #include "/lib/common/exposure.glsl"
+#include "/lib/common/color.glsl"
+#include "/lib/common/encoding.glsl"
+#include "/lib/common/gbuffer.glsl"
+#include "/lib/ids/material_ids.glsl"
 #include "/lib/common/temporal.glsl"
 #include "/lib/common/jitter.glsl"
 #include "/lib/common/transforms.glsl"
 #include "/lib/post/velocity.glsl"
-#include "/lib/common/color.glsl"
 #include "/lib/common/look_presets.glsl"
 #include "/lib/post/tonemap.glsl"
 #include "/lib/post/post.glsl"
@@ -143,11 +148,19 @@ void writeTaaOutput(vec3 result, vec3 sparkleNow, vec3 sparkleMax, vec2 prevUv, 
     sparkleHist = min(sparkleHist, max(sparkleMax, sparkleNow));
     float sa = valid ? mix(SPARKLE_HISTORY_BLEND, SPARKLE_HISTORY_BLEND_MOVING, saturate(motionPx / TAA_BLEND_MOTION_PX)) : 1.0;
     vec3 sparkle = mix(sparkleHist, sparkleNow, sa);
-    outSparkle = vec4(sparkle, 0.0);
 #else
     vec3 sparkle = sparkleNow;
 #endif
     vec3 color = result + sparkle;
+#ifdef SPECULAR_SPARKLE
+    /*
+     * a = 光源ブロックの発光で光っている画素の輝度 (溶岩は別の仕組み)。ブルームの縮小 (composite23) がミップの平均から
+     * 「その範囲の明るさのうち発光の割合」を求め、発光の滲みだけを強める (小さな炎は面積の割合では薄まって効かない)
+     */
+    ivec2 texel = ivec2(gl_FragCoord.xy);
+    float glow = readMaterialId(texel) == MAT_LAVA ? 0.0 : readEmission(texel);
+    outSparkle = vec4(sparkle, glow * luminance(color));
+#endif
     float share = saturate(luminance(sparkle) / max(luminance(color), 1e-6));
     outColor = vec4(color, rawA < 0.0 ? rawA : share);
     outHistory = vec4(result, historyDist);
