@@ -191,6 +191,20 @@ float celestialDiscScale() {
     return disc / max(celestialSpecularStrength(), 1.0);
 }
 
+/*
+ * 月夜の地上の金属でない面 (草・葉・土・石) の月の照り返しの倍率 (見た目の調整)。物理どおりの 1 では、月の方を見た草の先の照り返しが
+ * 拡散と同じ程度にしかならず、月明かりの草原が灰色にくすむ。8 で草の先が白く光り、地形の暗さとの差で照らされて見える
+ * 水面 (半透明の経路) と金属 (鉄ブロックの白飛び) には掛けない。水たまりの鏡像は上限をこの倍率で割るので空の円盤を超えない
+ */
+const float MOON_DIELECTRIC_SPECULAR_GAIN = 8.0;
+
+float moonDielectricSpecularGain(float metalness) {
+#ifdef HAS_SKYLIGHT
+    if (frameData.shadowLightIrradiance.a <= 0.5 && metalness < 0.5) return MOON_DIELECTRIC_SPECULAR_GAIN;
+#endif
+    return 1.0;
+}
+
 // 法線 n の面が空から受ける拡散照度 (遮蔽なし。AO・スカイライトは受け取り側が掛ける)
 vec3 getSkyIrradiance(vec3 n) { return shEvalIrradiance(n); }
 

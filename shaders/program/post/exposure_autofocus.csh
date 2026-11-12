@@ -230,8 +230,7 @@ float applyEnvironmentExposure(float appliedEv, float ev, float darkEv) {
     // 実写の夜景のように暗い所 (水面・地面・空の暗い所) に合わせて持ち上げる (EXPOSURE_NIGHT_DARK_PERCENT)。昼・新月・雨は平均の計測のまま
     float liftEv = mix(ev, min(darkEv, ev), moonLit);
     float slope = EXPOSURE_NIGHT_SLOPE + EXPOSURE_NIGHT_MOON_SLOPE * moonLit;
-    float maxLift = EXPOSURE_NIGHT_MAX_LIFT + EXPOSURE_NIGHT_MOON_MAX_LIFT * moonLit;
-    float lift = min(slope * max(EXPOSURE_NIGHT_EV_START - liftEv, 0.0), maxLift);
+    float lift = min(slope * max(EXPOSURE_NIGHT_EV_START - liftEv, 0.0), EXPOSURE_NIGHT_MAX_LIFT);
     lift = max(lift, EXPOSURE_NIGHT_MIN_LIFT * night) * EXPOSURE_NIGHT_LIFT_STRENGTH;
     float dim = EXPOSURE_INDOOR_DIM * smoothstep(EXPOSURE_INDOOR_EV.x, EXPOSURE_INDOOR_EV.y, ev)
               * (1.0 - smoothstep(EXPOSURE_INDOOR_EV.z, EXPOSURE_INDOOR_EV.w, ev))

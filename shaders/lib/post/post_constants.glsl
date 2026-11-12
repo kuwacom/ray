@@ -73,11 +73,11 @@ const float EXPOSURE_NIGHT_MIN_LIFT = 0.4;
  */
 const vec2 EXPOSURE_NIGHT_DARK_PERCENT = vec2(0.05, 0.5);
 /*
- * 月が照らす夜 (満ち欠け x 晴れ。水中は外す) だけ、暗い側の計測と持ち上げの傾き・上限を足す。新月・雨の夜・水中は平均の計測と EXPOSURE_NIGHT_SLOPE・MAX_LIFT のまま暗く残す
- * 満月の海の持ち上げは低い月で 2.2 EV、高い月で 2.7 EV (足さないと 1.0 / 1.3) になり、照り返しの道が白に届く。陸と灯りの点いた村は 0.25 EV ほど
+ * 月が照らす夜 (満ち欠け x 晴れ。水中は外す) だけ、暗い側の計測と持ち上げの傾きを足す。新月・雨の夜・水中は平均の計測と EXPOSURE_NIGHT_SLOPE のまま暗く残す
+ * 上限は月夜も EXPOSURE_NIGHT_MAX_LIFT のまま (見た目の判断)。月夜だけ上限を 2.8 EV まで上げると、月の照る暗い草原も 1.3〜1.5 EV
+ * 持ち上がり、地形の暗さと空が灰色に浮いて霧っぽくなり、月の照り返しで光る草が浮いて見えなくなった。海の月の道は暗めになる
  */
 const float EXPOSURE_NIGHT_MOON_SLOPE = 0.1;
-const float EXPOSURE_NIGHT_MOON_MAX_LIFT = 1.5;
 /*
  * 水中を暗く写す EV。水中は画面全体が内散乱のフォグになり、自動露出がそれを中間調まで持ち上げるので、
  * 吸収を強めても表示の明るさがほとんど変わらず、明るく白っぽい青になる

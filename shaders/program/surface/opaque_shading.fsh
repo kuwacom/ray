@@ -272,7 +272,8 @@ void main() {
     SurfaceLights L = gatherSurfaceLights(sp, SL_SUN_SHADOW_MAP_FALLBACK, SL_BLOCK_NONE, SL_SUN_CONTACT | SL_POM);
 
     // 太陽 / 月
-    vec3 color = directLight(m, g.normal, V, L.sun, puddleVar, getCloudSunDiscVisibility(), celestialDiscScale(), celestialSpecularStrength(), specSum);
+    float moonGain = moonDielectricSpecularGain(m.metalness);
+    vec3 color = directLight(m, g.normal, V, L.sun, puddleVar, getCloudSunDiscVisibility(), celestialDiscScale() / moonGain, celestialSpecularStrength() * moonGain, specSum);
 
 #ifdef SSS
     if (m.sss > 0.0) {
