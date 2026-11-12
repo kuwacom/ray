@@ -137,18 +137,19 @@ vec4 encodeTranslucentDataTint(vec3 normal, vec2 lightmap, int materialId, int t
     return d;
 }
 
-// 金属にした装備の前方シェーディングで残す拡散の割合 (反射だけだと、光の少ない所で真っ黒になる)
-// 直接光の拡散は小さく (金属ブロックは太陽の拡散を持たず、艶で見せる)、環境光の分で暗い所の黒つぶれを防ぐ
-const float METAL_FORWARD_DIFFUSE = 0.2;
-const float METAL_FORWARD_DIRECT_DIFFUSE = 0.15;
+/*
+ * 金属にした装備の前方シェーディングで残す拡散の割合。環境の映り込み (SSR・ボクセル・空) は composite2 が足すので小さくてよい
+ * 金属ブロックは拡散を持たないが、この経路には GI の照り返しが無く、映り込みの外れ (空のフォールバック) だけでは暗い所が黒く沈む
+ */
+const float METAL_FORWARD_DIFFUSE = 0.1;
+const float METAL_FORWARD_DIRECT_DIFFUSE = 0.05;
 // 宝石 (ダイヤ) は金属ではなく拡散が主体なので、アルベドを少し落として淡く飛ばない色にする
 const float GEM_FORWARD_DIFFUSE = 0.7;
-// 装備は面が平らで法線の凹凸も無いので、磨いたままだと夕方の低い太陽の反射が面ごとに白く飛ぶ
-const float METAL_FORWARD_SMOOTHNESS_MAX = 0.6;
 
 /*
  * 前方シェーディングの拡散 (太陽 + 手持ち光源 + 空 + ブロックライト)
- * shiny: 金属・宝石にした装備。G バッファ経路が無いので、鏡面は太陽・手持ち光源の直接光と空の反射 (SH) だけをここで足す
+ * shiny: 金属・宝石にした装備。G バッファ経路が無いので、太陽・手持ち光源の直接光の鏡面とブロックライトの照り返しをここで足す
+ * (空と周りの映り込みは composite.csh の反射を composite2 が足す)
  */
 vec3 forwardDiffuse(Material m, vec3 playerPos, vec3 normal, vec3 geoNormal, vec3 V, float dither, bool shiny, float directScale) {
     // 集める項: 太陽の影 (影マップの外は 1)・手持ち光源・空・ブロックライト
@@ -177,11 +178,8 @@ vec3 forwardDiffuse(Material m, vec3 playerPos, vec3 normal, vec3 geoNormal, vec
 
     vec3 ambient = L.sky + L.block + minAmbientIrradiance();
     if (shiny) {
-        // 環境光の鏡面: 反射方向の空 (SH を粗さで広げずそのまま使う) + ブロックライトと最低限の環境光
+        // 環境光の鏡面のうちブロックライトと最低限の環境光 (映り込みの外れた洞窟でも灯りの照り返しを残す)
         vec3 env = (L.block + minAmbientIrradiance()) * RCP_PI;
-#ifdef HAS_SKY
-        env += getSkyIrradiance(reflect(-V, normal)) * (RCP_PI * SH_LOOK_UNDO) * skylightCurve(lmcoord.y);
-#endif
         color += env * envSpecularWeight(m, max(dot(normal, V), 1e-3));
     }
     /*
@@ -229,10 +227,13 @@ void main() {
     bool shiny = false;
 #if defined GBUF_ENTITIES_TRANSLUCENT && defined AUTO_METAL_PARTS
     // 装備 (防具・馬鎧) はこの経路で描かれる。金属の判定は G バッファ経路 (gbuffers_solid.fsh) と同じ
-    SurfaceParams metalParams = applyMetalGate(surfaceParamsDefault(), max(metalGateOfId(currentRenderedItemId), entityMetalGate(entityId)), texRgb);
+    int metalGate = max(metalGateOfId(currentRenderedItemId), entityMetalGate(entityId));
+    SurfaceParams metalParams = applyMetalGate(surfaceParamsDefault(), metalGate, texRgb);
     shiny = metalParams.smoothness > 0.0;
     if (shiny) {
-        g.smoothness = min(metalParams.smoothness, METAL_FORWARD_SMOOTHNESS_MAX);
+        // 全体が金属の防具は金属ブロックと同じ滑らかさの範囲 (小さな部品向けの狭い範囲では模様の明暗が艶に出ない)
+        if (metalGate == METAL_GATE_ALL && labPbrMetalId(metalParams.f0) == METAL_ALBEDO) metalParams = metalSurfaceParams(texRgb);
+        g.smoothness = metalParams.smoothness;
         g.f0 = metalParams.f0;
     }
 #endif
@@ -319,5 +320,14 @@ void main() {
     // (そもそも Iris 26.1 には at_velocity が無い。lib/post/velocity.glsl)
     // a = 0 にして深度からの再投影 (静止物扱い) に任せる。背後のエンティティの速度も上書きする
     outVelocity = vec4(0.0);
+    /*
+     * 金属・宝石の装備は deferred の後に描かれ、G バッファの反射を受けない。半透明の表面 (水・ガラス) と同じく colortex5 に印を残し、
+     * composite.csh が反射を辿り、composite2 が 反射 x 重み を足す。予備 8bit は滑らかさ
+     * 重み (方向アルベド x 補償。金属は F0 の色) は colortex15 の rgb に置く。a = 0 の画素の rgb は速度として読まれない (読む側は a を見る)
+     */
+    if (shiny && albedo.a > 0.99) {
+        outData = encodeTranslucentDataTint(geoNormal, lmcoord, MAT_METAL_ARMOR, int(round(g.smoothness * UNORM8_MAX)));
+        outVelocity.rgb = envSpecularWeight(m, max(abs(dot(geoNormal, V)), 1e-3));
+    }
 #endif
 }

@@ -145,8 +145,20 @@ void main() {
         vec3 result = color * (1.0 - translucent.a) + translucent.rgb;
         // deferred30 が a = 1 + 割合で渡した直接光の鏡面の白飛び分と、ここで足す映り込みの白飛び分を、重なった半透明の分だけ直して渡す
         // (しきい値は別々に掛けるので、両方が白の手前の時は少なめに出る)
-        float sparkle = saturate(sceneIn.a - 1.0) * luminance(scene) + luminance(sparkleExcess(env, getExposure()));
-        outColor = vec4(result, 1.0 + saturate(sparkle * (1.0 - translucent.a) / max(luminance(result), 1e-6)));
+        float sparkle = (saturate(sceneIn.a - 1.0) * luminance(scene) + luminance(sparkleExcess(env, getExposure()))) * (1.0 - translucent.a);
+        if (matT == MAT_METAL_ARMOR && d0 < d1 && !isHandDepth(d0)) {
+            // 金属・宝石の装備: 前方で照らした色に、不透明の金属と同じ 反射 x 重み を足す (重みは colortex15 の rgb、gbuffers_translucent.fsh)
+            vec3 armorPlayer = screenToPlayer(vec3(texcoord, d0));
+            float armorDist = length(armorPlayer);
+            vec3 armorV = -armorPlayer / max(armorDist, 1e-4);
+            vec3 armorN = dot(nT, armorV) < 0.0 ? -nT : nT;
+            float roughness = 1.0 - unpack2x8(data.a).y;
+            vec3 armorEnv = reflectionAt(texel, armorDist, reflect(-armorV, armorN), lmT.y, roughness, vec3(0.0))
+                * texelFetch(colortex15, texel, 0).rgb;
+            result += armorEnv;
+            sparkle += luminance(sparkleExcess(armorEnv, getExposure()));
+        }
+        outColor = vec4(result, 1.0 + saturate(sparkle / max(luminance(result), 1e-6)));
         return;
     }
 

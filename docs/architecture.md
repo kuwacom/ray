@@ -143,7 +143,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 2 | RGBA16 | G: rg テクスチャ法線 (oct), b 幾何法線 (oct 8+8), a ライトマップ (8+8) | surface | 全 | 毎フレーム |
 | 3 | RGBA16 | G: r smoothness+f0, g sss+emission, b ao+wetness, a 予備 | surface | 全 | 毎フレーム |
 | 4 | RGBA16F | 半透明の色 (乗算済みアルファ, 既定ブレンドで自然にそうなる) | surface, sky(雨) | surface (composite2) | 毎フレーム |
-| 5 | RGBA16 | 半透明のデータ: rg 法線, b ライトマップ, a マテリアル ID | surface | surface, sky | 毎フレーム |
+| 5 | RGBA16 | 半透明のデータ: rg 法線, b ライトマップ, a マテリアル ID + 予備 8bit (ガラスの透過色の index、金属の防具は滑らかさ) | surface | surface, sky | 毎フレーム |
 | 6 | RGBA16F | light: ブロックライト直接光 (拡散照度, デノイズ済み) | light (deferred2) | surface (light の関数経由) | 毎フレーム |
 | 7 | RGBA16F | light: ブロックライト履歴 | light | light | 永続 |
 | 8 | RGBA16F | surface: rgb 間接光照度, a AO | surface (deferred11) | surface, post(debug) | 毎フレーム |
@@ -153,7 +153,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 12 | RGBA16F | sky: VL / フォグ (低解像度) rgb 内散乱, a 透過率 | sky | sky | 永続 |
 | 13 | RGBA16F | post: TAA 履歴 | post | post | 永続 |
 | 14 | RGBA16F | post: ブルームタイル | post | post | 毎フレーム |
-| 15 | RGBA16F | 速度: rg = 前フレーム UV - 今の UV, a = 1 なら有効 (エンティティ・手) | surface (gbuffers, post の関数) | post | 毎フレーム |
+| 15 | RGBA16F | 速度: rg = 前フレーム UV - 今の UV, a = 1 なら有効 (エンティティ・手)。a = 0 の金属の防具の画素だけ rgb = 環境光の鏡面の重み (gbuffers_entities_translucent -> composite2) | surface (gbuffers, post の関数) | post | 毎フレーム |
 | 16 | R16F | sky: 画面空間の光芒 (低解像度 `size.buffer.colortex16` = 1/GODRAYS_RES)。composite12 -> 13 -> 14 で同じバッファをピンポンして読み書きし、composite19 が足す | sky | sky | 毎フレーム |
 | 17 | RGBA16F | post: 鏡面の白飛び分の履歴 (rgb = 露出前の線形, a 予備)。SPECULAR_SPARKLE の時だけ composite20 が読み書きし、final がミップで読んで点像の芯と裾を作る (LENS_POINT_SPREAD_STRENGTH) | post | post | 永続 |
 | 18 | RGBA16F | surface: 水の屈折先の色 (rgb、吸収の前) + 水の中の経路長 (a)。水の画素だけ書き、ほかは前の値のまま | surface (composite1) | surface (composite2) | なし |
@@ -321,10 +321,10 @@ TNT・クリーパーは `LIGHT_FLAG_ENTITY_FLASH` で `entityColor.a` (点滅) 
 
 ### マテリアル ID (G バッファ 8bit, `lib/ids/material_ids.glsl`)
 
-0 空 / 1 地形 / 2 植物 / 3 葉 / 4 発光ブロック / 5 金属 / 6 光沢 / 7 雪 / 8 溶岩 / 9 水中植物 / 10 水 / 11 ガラス / 12 色付きガラス / 13 氷 / 14 スライム・ハチミツ / 15 ネザーポータル / 16 その他半透明 / 20 エンティティ / 21 プレイヤー / 22 ドロップアイテム / 23 発光エンティティ / 24 ブロックエンティティ / 25 ビーコンの光線 / 26 雷 / 30 手 / 31 光る物を持った手 / 40 パーティクル / 41 天候 / 42 バニラの雲 (予約。前方シェーディングなので G バッファには書かない) / 43 線など。
+0 空 / 1 地形 / 2 植物 / 3 葉 / 4 発光ブロック / 5 金属 / 6 光沢 / 7 雪 / 8 溶岩 / 9 水中植物 / 10 水 / 11 ガラス / 12 色付きガラス / 13 氷 / 14 スライム・ハチミツ / 15 ネザーポータル / 16 その他半透明 / 20 エンティティ / 21 プレイヤー / 22 ドロップアイテム / 23 発光エンティティ / 24 ブロックエンティティ / 25 ビーコンの光線 / 26 雷 / 27 金属・宝石の防具 (colortex5 だけ) / 30 手 / 31 光る物を持った手 / 40 パーティクル / 41 天候 / 42 バニラの雲 (予約。前方シェーディングなので G バッファには書かない) / 43 線など。
 gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.glsl) により変換し、deferred 以降はマテリアル ID だけを見る。
 
-一部だけ金属のもの (`AUTO_METAL_PARTS`): ID (ブロック・アイテム・エンティティ) に載せた判定の番号で、gbuffers が画素ごとにテクスチャの色から金属かを決める (`metalGatePixel`, lib/surface/material.glsl)。金属の画素は 5 金属ブロックと同じ質感 (アルベドを F0 に使い、明るい所ほど滑らか)、宝石は光沢のある誘電体 (F0 0.17)。labPBR の `_s` があるテクスチャはその値が優先で、判定は `_s` が無い (推定の) ときだけ。暗い金属は F0 の輝度を持ち上げる (`metalReflectance`)。防具・馬鎧は半透明の前方シェーディング経路 (gbuffers_entities_translucent) で描かれ、G バッファの金属が使えないので、同じ判定で太陽・手持ち光源の鏡面と空の反射 (SH) を足し、拡散を一部残す。
+一部だけ金属のもの (`AUTO_METAL_PARTS`): ID (ブロック・アイテム・エンティティ) に載せた判定の番号で、gbuffers が画素ごとにテクスチャの色から金属かを決める (`metalGatePixel`, lib/surface/material.glsl)。金属の画素は 5 金属ブロックと同じ質感 (アルベドを F0 に使い、明るい所ほど滑らか)、宝石は光沢のある誘電体 (F0 0.17)。labPBR の `_s` があるテクスチャはその値が優先で、判定は `_s` が無い (推定の) ときだけ。暗い金属は F0 の輝度を持ち上げる (`metalReflectance`)。防具・馬鎧は半透明の前方シェーディング経路 (gbuffers_entities_translucent) で描かれ、G バッファの金属が使えないので、同じ判定で太陽・手持ち光源の鏡面を前方で足し、拡散を少し残す。環境の映り込みは水・ガラスと同じ半透明の表面として受ける: colortex5 にマテリアル 27 と滑らかさ、colortex15 の rgb に重み (方向アルベド x 補償) を書き、composite.csh が反射 (SSR・ボクセル・空) を辿り、composite2 が 反射 x 重み を前方の色に足す。全体が金属の防具の滑らかさは金属ブロックと同じ範囲。
 
 ---
 

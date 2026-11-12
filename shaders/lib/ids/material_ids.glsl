@@ -31,6 +31,7 @@ const int MAT_EMISSIVE_ENTITY = 23;
 const int MAT_BLOCK_ENTITY = 24;
 const int MAT_BEACON_BEAM = 25;
 const int MAT_LIGHTNING = 26;
+const int MAT_METAL_ARMOR = 27;      // 金属・宝石にした防具・馬鎧 (半透明の経路。colortex5 にだけ書く)
 
 const int MAT_HAND = 30;
 const int MAT_HAND_EMISSIVE = 31;

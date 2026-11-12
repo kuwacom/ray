@@ -75,9 +75,10 @@ ReflectSurface getReflectSurface(ivec2 texel) {
     vec3 nT;
     vec2 lmT;
     int matT;
-    decodeTranslucentData(texelFetch(colortex5, texel, 0), nT, lmT, matT);
+    vec4 dataT = texelFetch(colortex5, texel, 0);
+    decodeTranslucentData(dataT, nT, lmT, matT);
 
-    if (d0 < d1 && !isHandDepth(d0) && isReflectiveTranslucent(matT)) {
+    if (d0 < d1 && !isHandDepth(d0) && (isReflectiveTranslucent(matT) || matT == MAT_METAL_ARMOR)) {
         s.valid = true;
         s.translucent = true;
         s.materialId = matT;
@@ -85,7 +86,8 @@ ReflectSurface getReflectSurface(ivec2 texel) {
         s.viewPos = screenToView(vec3(uv, d0));
         s.normal = nT;
         s.geoNormal = nT;
-        s.perceptualRoughness = translucentRoughness(matT);
+        // 防具は予備 8bit の滑らかさ (gbuffers_translucent.fsh)
+        s.perceptualRoughness = matT == MAT_METAL_ARMOR ? 1.0 - unpack2x8(dataT.a).y : translucentRoughness(matT);
         s.skyLm = lmT.y;
     } else if (d1 < 1.0 && !isHandDepth(d1)) {
         GBufferData g = readGBuffer(texel);
