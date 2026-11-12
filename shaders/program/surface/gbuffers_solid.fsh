@@ -437,6 +437,7 @@ void main() {
     // 一部だけ金属のものは、PBR テクスチャの値があればそちらを使い、無い (推定の) 時だけ金属の画素を置き換える
     if (estimated) sp = applyMetalGate(sp, metalGate, texRgb);
     bool autoMetal = estimated && labPbrMetalId(sp.f0) == METAL_ALBEDO;
+    bool railMirror = autoMetal && metalGate == METAL_GATE_RAIL;
 
     // 法線
     // 金属にした画素は、レール・鎖などの植物扱い (法線を上向きにする) から外す
@@ -446,7 +447,8 @@ void main() {
     vec2 nxy = normalTex.xy * 2.0 - 1.0;
     normalTs = vec3(nxy, sqrt(saturate(1.0 - dot(nxy, nxy))));
 #elif defined USE_GENERATED_NORMALS
-    if (!isPlant) normalTs = generatedNormal(uv, playerPos);
+    // 磨いた線路は平らなまま (テクセルごとに向きが違う法線は、滑らかな面の映り込みを砂目にする)
+    if (!isPlant && !railMirror) normalTs = generatedNormal(uv, playerPos);
 #endif
     vec3 normal = normalize(tbn * normalTs);
     vec3 geoNormal = geoN;
@@ -509,6 +511,7 @@ void main() {
 
     GBufferData g = gbufferDefault();
     g.albedo = srgbToLinear(albedo.rgb);
+    if (railMirror) g.albedo = min(g.albedo * RAIL_F0_GAIN, vec3(1.0));
     if (autoMetal) g.albedo = metalReflectance(g.albedo);
     g.materialId = materialId;
     g.geoNormal = geoNormal;

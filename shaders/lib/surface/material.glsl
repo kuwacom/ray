@@ -222,8 +222,8 @@ bool metalGatePixel(int gate, vec3 c) {
     bool gold = c.r >= 0.9 * c.g && c.g > c.b && sat > METAL_GOLD_SATURATION && lum > METAL_GOLD_LUMINANCE && c.g > 0.6 * c.r;
     if (gate == METAL_GATE_GRAY) return gray;
     if (gate == METAL_GATE_COOL) return c.b >= c.r - 0.01 && lum < METAL_COOL_LUMINANCE;
-    // 動力レールの金の線路は金色で明るく彩度が高い。枕木の木はもっと暗いか彩度が低い
-    if (gate == METAL_GATE_GRAYGOLD) return gray || (gold && sat > 0.6 && lum > 0.5);
+    // 線路は灰色の鉄。動力レールの金の線路は金色で明るく彩度が高い。枕木の木はもっと暗いか彩度が低い
+    if (gate == METAL_GATE_RAIL) return gray || (gold && sat > 0.6 && lum > 0.5);
     if (gate == METAL_GATE_GOLD) return gold;
     if (gate == METAL_GATE_COPPER) return c.g < METAL_COPPER_GREEN_RATIO * c.r && c.b <= c.g && sat > METAL_COPPER_SATURATION;
     if (gate == METAL_GATE_NETHERITE) return gray || c.b > c.g;
@@ -231,10 +231,20 @@ bool metalGatePixel(int gate, vec3 c) {
     return true;
 }
 
+/*
+ * 線路の金属は走行で磨かれた面。反射率は高いが、細かな削れと線路の湾曲で映り込みと太陽・月の照り返しはぼやける (完全な鏡にはしない)
+ * 輝度で変えると画素ごとの粗さのまだらがきらめきになるので一定
+ */
+const float RAIL_SMOOTHNESS = 0.8;
+// 線路のテクスチャの鉄は暗い灰色 (線形 0.33 前後) で、そのまま F0 にすると暗い鏡になる。磨いた金属の高い反射率まで上げる。明暗の模様は残る
+const float RAIL_F0_GAIN = 2.4;
+
 // 判定に合う画素を金属 (宝石は光沢のある誘電体) に置き換える。AO と高さはそのまま。PBR テクスチャが無い (推定の) 時だけ使う
 SurfaceParams applyMetalGate(SurfaceParams base, int gate, vec3 albedoSrgb) {
     if (gate == 0 || !metalGatePixel(gate, albedoSrgb)) return base;
-    SurfaceParams p = gate == METAL_GATE_GEM ? gemSurfaceParams() : metalSurfaceParams(albedoSrgb, METAL_PART_SMOOTHNESS_MIN, METAL_PART_SMOOTHNESS_MAX);
+    SurfaceParams p = gate == METAL_GATE_GEM ? gemSurfaceParams()
+        : gate == METAL_GATE_RAIL ? metalSurfaceParams(albedoSrgb, RAIL_SMOOTHNESS, RAIL_SMOOTHNESS)
+        : metalSurfaceParams(albedoSrgb, METAL_PART_SMOOTHNESS_MIN, METAL_PART_SMOOTHNESS_MAX);
     p.ao = base.ao;
     p.height = base.height;
     return p;

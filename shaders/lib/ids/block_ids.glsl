@@ -76,7 +76,7 @@ const int METAL_GATE_STRIDE = 4096;     // 一部だけ金属の ID = 元の ID 
 const int METAL_GATE_ALL = 1;
 const int METAL_GATE_GRAY = 2;
 const int METAL_GATE_COOL = 3;
-const int METAL_GATE_GRAYGOLD = 4;
+const int METAL_GATE_RAIL = 4;
 const int METAL_GATE_GOLD = 5;
 const int METAL_GATE_COPPER = 6;
 const int METAL_GATE_NETHERITE = 7;

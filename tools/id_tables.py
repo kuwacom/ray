@@ -263,7 +263,7 @@ ENTITIES: list[tuple[int, str, str, tuple[str, ...], str]] = [
 # エンティティは ENTITY_METAL_BASE + gate 番号。判定の中身は shaders/lib/surface/material.glsl の metalGatePixel
 METAL_GATE_STRIDE = 4096
 ENTITY_METAL_BASE = 5200
-METAL_GATES = ["all", "gray", "cool", "graygold", "gold", "copper", "netherite", "gem"]  # 番号は 1 から (0 は金属なし)
+METAL_GATES = ["all", "gray", "cool", "rail", "gold", "copper", "netherite", "gem"]  # 番号は 1 から (0 は金属なし)
 
 
 def _copper_all(*bases: str) -> list[str]:
@@ -288,11 +288,12 @@ def metal_blocks() -> dict[str, list[str]]:
                 "chain", "iron_chain", "iron_door", "iron_trapdoor", "iron_bars", "heavy_weighted_pressure_plate",
                 "light_weighted_pressure_plate"],
         # 灰色の画素だけが金属 (木の枕木・水・中身の色は除く)
-        "gray": ["rail", "activator_rail", "detector_rail", "tripwire_hook", "hopper", "cauldron", "water_cauldron",
+        "gray": ["tripwire_hook", "hopper", "cauldron", "water_cauldron",
                  "lava_cauldron", "powder_snow_cauldron"],
         # 青みの暗い画素だけが金属 (ランタンの枠。炎は除く)
         "cool": ["lantern", "soul_lantern"],
-        "graygold": ["powered_rail"],
+        # 線路 (灰色の鉄と動力レールの明るい金)。走行で磨かれた面としてほぼ鏡にする
+        "rail": ["rail", "activator_rail", "detector_rail", "powered_rail"],
         "gold": ["bell"],
     }
 
