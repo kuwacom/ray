@@ -12,6 +12,7 @@ profile.EXTREME_BALANCED=Extreme (Balanced)
 profile.comment=Lightest first. Low: floodfill light only. Medium: traced light shadows (partial blocks and entities included) and hand light rays. High (Fastest) / High (Fast): the High look with lower internal resolutions and fewer samples, filled in by temporal accumulation and denoising. High (default): contact shadows, RSM GI, more light traces, DoF. Ultra: SSGI, more samples. Extreme (Lite): voxel GI and voxel reflections with the Ultra ranges and resolutions. Extreme (Balanced): Extreme at half resolution for light tracing, GI, clouds and volumetric light. Extreme: voxel GI and full resolution everything. Clouds look the same from Medium up; only their cost changes.
 
 screen.LIGHTING=Block Lighting
+screen.LIGHT_APPEARANCE_OPTIONS=Light Source Look
 screen.LIGHT_SHADOW_OPTIONS=Light Source Shadows
 screen.HAND_LIGHT_OPTIONS=Handheld Light
 screen.ENTITY_LIGHT_OPTIONS=Entity Lights
@@ -269,8 +270,10 @@ suffix.RAIN_WET_HALFLIFE= s
 option.RAIN_DRY_HALFLIFE=Drying Time
 option.RAIN_DRY_HALFLIFE.comment=Seconds after rain stops until the ground is half dry. Puddles, rain clouds and fog clear at the same pace
 suffix.RAIN_DRY_HALFLIFE= s
+option.EMISSION_GLARE=Light Source Glare
+option.EMISSION_GLARE.comment=Makes the glowing parts of torches, lanterns, fire and other light sources 4x brighter so their cores blow out to white, and keeps the part above white as fine sparkle that reaches bloom and lens effects. Looks like a light photographed directly, but is very eye-catching
 option.EMISSION_STRENGTH=Emission Strength
-option.EMISSION_STRENGTH.comment=Brightness of glowing parts of torches, lanterns and other light sources. Higher values blow out the core and widen the bloom around it
+option.EMISSION_STRENGTH.comment=Brightness of the glowing parts of torches, lanterns and other light sources. Higher values blow out the core
 option.LAVA_BRIGHTNESS=Lava Brightness
 option.LAVA_BRIGHTNESS.comment=How bright lava itself looks on screen. Higher values shift it from orange toward yellow. Does not change the light it casts. 0 = no extra brightening (darker orange)
 option.LAVA_BLOOM=Lava Bloom

@@ -80,7 +80,6 @@ GBufferData readGBuffer(ivec2 texel) {
 // 法線だけ欲しい時用 (GI・デノイズ等で多用するので個別に用意)
 vec3 readGBufferNormal(ivec2 texel) { return octDecode(texelFetch(colortex2, texel, 0).rg); }
 int readMaterialId(ivec2 texel) { return decodeId8(texelFetch(colortex1, texel, 0).a); }
-float readEmission(ivec2 texel) { return unpack2x8(texelFetch(colortex3, texel, 0).g).y; }
 
 /*
  * 半透明のデータ (colortex5 RGBA16)

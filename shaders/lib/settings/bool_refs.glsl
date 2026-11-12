@@ -72,6 +72,8 @@
 #endif
 #ifdef RAIN_PUDDLES
 #endif
+#ifdef EMISSION_GLARE
+#endif
 #ifdef WATER_WAVES
 #endif
 #ifdef WATER_GLITTER
