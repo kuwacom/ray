@@ -119,6 +119,8 @@ const float PUDDLE_F0 = 0.2;
 const float WET_GLOSS = 0.7;             // 水たまりから離れた濡れた面の艶の強さ (x (1 - 多孔度))
 const float WET_SMOOTHNESS = 0.8;
 const float WET_DARKEN = 0.45;           // 濡れた多孔質の面のアルベド低下 (Lagarde 2013 の測定に近い値)
+// 濡れた線路の金属。水の膜で照り返しを締めるが、水たまりの平らな鏡 (PUDDLE_SMOOTHNESS) にはしない
+const float RAIL_WET_SMOOTHNESS = 0.9;
 
 const float LAVA_EMISSION_MIN = 0.12;
 // 明るい筋も 1.0 では AgX の肩に入って彩度が抜け、溶岩の滝が白っぽいサーモン色になった。AgX は明るい橙の青を持ち上げるので、橙を残すには暗めに置く (0.5 でもまだ薄い橙)
@@ -462,7 +464,12 @@ void main() {
     float puddle = 0.0;
     float wetAmount = 0.0;
 #if defined RAIN_PUDDLES && defined HAS_SKY && defined GBUF_TERRAIN
-    if (rainWetness > 0.001 && biome_precipitation == 1 && !isPlant) {
+    /*
+     * 線路は地面より上に浮いた薄い板なので水たまりは溜めず、金属と枕木を濡らすだけにする
+     * 枕木は植物扱い (isPlant) だが、十字の草ではないので濡れは掛ける
+     */
+    bool isRail = metalGateOfId(blockId) == METAL_GATE_RAIL;
+    if (rainWetness > 0.001 && biome_precipitation == 1 && (!isPlant || isRail)) {
         float exposure = smoothstep(0.88, 0.97, lmcoord.y);
         wetAmount = rainWetness * exposure;
         if (wetAmount > 0.0) {
@@ -471,7 +478,7 @@ void main() {
             // 水たまりは真上が空の所 (スカイライト 15) の上向きの面だけ。葉・溶岩の上には溜めない
             float growth = smoothstep(PUDDLE_GROWTH.x, PUDDLE_GROWTH.y, rainWetness);
             float puddleArea = smoothstep(0.7, 0.95, geoN.y) * smoothstep(PUDDLE_SKYLIGHT.x, PUDDLE_SKYLIGHT.y, lmcoord.y) * growth;
-            if (materialId == MAT_LEAVES || materialId == MAT_LAVA) puddleArea = 0.0;
+            if (materialId == MAT_LEAVES || materialId == MAT_LAVA || isRail) puddleArea = 0.0;
             float fringe = 0.0;
             if (puddleArea > 0.0) {
                 // 降り始めは模様の一番低い所 (ノイズの山) から溜まり、雨が続くほど PUDDLE_AMOUNT まで広がる。乾く時はその逆。POM の窪みには先に溜まる
@@ -488,7 +495,7 @@ void main() {
             // 雨が降り続くと空隙が満ちて表面に水膜が張るので、多孔質の面も艶が出る (水を吸う分だけ弱め)
             // 地面全体を水たまり並みに光らせると水たまりとの差が無くなって見えなくなった。艶は水たまりの周りの帯で強める
             float gloss = max(wetStrength * WET_GLOSS * (1.0 - sp.porosity), fringe * PUDDLE_FRINGE_GLOSS);
-            sp.smoothness = mix(sp.smoothness, max(sp.smoothness, WET_SMOOTHNESS), gloss);
+            sp.smoothness = mix(sp.smoothness, max(sp.smoothness, railMirror ? RAIL_WET_SMOOTHNESS : WET_SMOOTHNESS), gloss);
             sp.smoothness = mix(sp.smoothness, PUDDLE_SMOOTHNESS, puddle);
             if (labPbrMetalId(sp.f0) == METAL_NONE) sp.f0 = mix(sp.f0, PUDDLE_F0, puddle);
             if (puddle > 0.0) {
