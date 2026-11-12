@@ -88,8 +88,11 @@ layout(location = 3) out vec4 outVelocity;
 const float POM_DISTANCE = 32.0;         // POM を掛ける距離 (ブロック)。この手前 30% で滑らかに消す
 const int POM_SHADOW_STEPS = 12;
 const float POM_SHADOW_SOFTNESS = 6.0;   // 自己影の縁の柔らかさ (高さ差に対する倍率)
-const float GENERATED_NORMAL_STRENGTH = 1.2;
-const float GENERATED_NORMAL_MAX_LOD = 0.25; // テクセルが画素とほぼ同じ大きさ (lod 0) を超えると勾配がジッターでちらつくので消す
+const float GENERATED_NORMAL_GAIN = 1.2;         // 16 テクセル/ブロックで、隣の輝度差 1 あたりの勾配
+const float GENERATED_NORMAL_MAX_SLOPE = 1.5;    // 勾配の頭打ち (強い縁だけが立ちすぎないように、これに向けて滑らかに圧縮する)
+const float GENERATED_NORMAL_BASE_DENSITY = 16.0; // 勾配の基準のテクセル密度 (テクセル/ブロック)
+const float GENERATED_NORMAL_MAX_STEP_LOG2 = 5.0; // 差を取る幅の上限 (2^5 = 32 テクセル = 512 px パック)
+const float GENERATED_NORMAL_MAX_LOD = 0.25; // 差を取る幅が画素とほぼ同じ大きさ (lod 0) を超えると勾配がジッターでちらつくので消す
 const float FRONT_FACING_MIN_NOV = 0.05;     // テクスチャ法線と視線の内積の下限
 const float VANILLA_AO_SOFTEN = 0.6;     // GTAO 併用時はバニラ AO を弱めて二重に暗くならないように
 /*
@@ -243,13 +246,13 @@ float parallaxShadow(vec2 hitUv, float hitDepth, vec3 lightTs, vec2 dx, vec2 dy,
 #endif
 
 #ifdef USE_GENERATED_NORMALS
+// 近傍のテクセル。ブロックは繰り返し模様なので範囲で折り返す
+ivec2 generatedTap(ivec2 t, ivec2 tmin, ivec2 tsize) {
+    return tmin + ((t - tmin) % tsize + tsize) % tsize;
+}
+
 // テクスチャの輝度を高さとみなした勾配から接空間の法線を作る (PBR テクスチャが無いリソースパック用)
-vec3 generatedNormal(vec2 uv) {
-    /*
-     * テクセルが画素より小さくなる距離では、TAA のジッターで毎フレーム別のテクセルの勾配を拾い、静止していてもちらつく
-     * (テクスチャ法線は直接光・鏡面に効くので明るい所ほど目立つ)。テクセルが 2 画素 (lod -1) より小さくなり始めたら弱め、
-     * 1 テクセル = 画素の手前 (GENERATED_NORMAL_MAX_LOD) で消す。勾配はテクセルの中心で取り、画素内の位置で値が変わらないようにする
-     */
+vec3 generatedNormal(vec2 uv, vec3 playerPos) {
     ivec2 size = textureSize(gtexture, 0);
     /*
      * textureQueryLod は異方性フィルタが効くと短い方の軸の LOD を返すので、かすめ角の床では縦方向にテクセルが
@@ -257,26 +260,46 @@ vec3 generatedNormal(vec2 uv) {
      */
     vec2 dx = dFdx(uv * vec2(size));
     vec2 dy = dFdy(uv * vec2(size));
-    float lod = 0.5 * log2(max(max(dot(dx, dx), dot(dy, dy)), 1e-8));
+    float texelDx = dot(dx, dx);
+    float texelDy = dot(dy, dy);
+    /*
+     * 輝度差は 1 テクセルあたりの値なので、同じ絵でも解像度が高いほど勾配が弱くなる。面の 1 ブロックあたりのテクセル数を
+     * 画面微分の比で測り (向きや遠近に依らない)、基準 (16) に対する比 ratio の分だけ
+     * 勾配を強め、差を取る幅も 2 の冪に丸めた ratio テクセルに広げる。幅を広げずに掛けるだけだと、細かい絵のノイズまで増幅される
+     */
+    vec3 pdx = dFdx(playerPos);
+    vec3 pdy = dFdy(playerPos);
+    float ratio = sqrt((texelDx + texelDy) / max(dot(pdx, pdx) + dot(pdy, pdy), 1e-10)) / GENERATED_NORMAL_BASE_DENSITY;
+    ratio = clamp(ratio, 0.25, exp2(GENERATED_NORMAL_MAX_STEP_LOG2));
+    float stepLog2 = round(max(log2(ratio), 0.0));
+    float gain = ratio / exp2(stepLog2);
+    /*
+     * 差を取る幅が画素より小さくなる距離では、TAA のジッターで毎フレーム別のテクセルの勾配を拾い、静止していてもちらつく
+     * (テクスチャ法線は直接光・鏡面に効くので明るい所ほど目立つ)。幅が 2 画素 (lod -1) より小さくなり始めたら弱め、
+     * 幅 = 画素の手前 (GENERATED_NORMAL_MAX_LOD) で消す。勾配はテクセルの中心で取り、画素内の位置で値が変わらないようにする
+     */
+    float lod = 0.5 * log2(max(max(texelDx, texelDy), 1e-8)) - stepLog2;
     float fade = 1.0 - smoothstep(-1.0, GENERATED_NORMAL_MAX_LOD, lod);
     if (fade <= 0.0) return vec3(0.0, 0.0, 1.0);
     ivec2 c = ivec2(floor(uv * vec2(size)));
-    // 近傍はスプライトの外 (アトラスの隣の絵) を読まないよう、スプライトの範囲 (テクセル) で折り返す
+    // 近傍はスプライトの外 (アトラスの隣の絵) を読まないよう、スプライトの範囲 (テクセル) に収める
     // 端で範囲に収める (片側差分) と縁の 1 テクセルだけ勾配が変わり、ブロックの継ぎ目に法線の段差の線が出る。
     // ブロックのテクスチャは繰り返し模様なので、折り返すと隣のブロックの縁と同じ値になって継ぎ目が消える
     ivec2 tmin = ivec2(floor((tileMid - tileHalf) * vec2(size) + 0.5));
     ivec2 tsize = max(ivec2(floor((tileMid + tileHalf) * vec2(size) - 0.5)) - tmin + 1, ivec2(1));
     c = clamp(c, tmin, tmin + tsize - 1);
-    vec4 l = texelFetch(gtexture, tmin + (c - tmin - ivec2(1, 0) + tsize) % tsize, 0);
-    vec4 r = texelFetch(gtexture, tmin + (c - tmin + ivec2(1, 0)) % tsize, 0);
-    vec4 u = texelFetch(gtexture, tmin + (c - tmin - ivec2(0, 1) + tsize) % tsize, 0);
-    vec4 d = texelFetch(gtexture, tmin + (c - tmin + ivec2(0, 1)) % tsize, 0);
+    ivec2 stp = ivec2(1 << int(stepLog2));
+    vec4 l = texelFetch(gtexture, generatedTap(c - ivec2(stp.x, 0), tmin, tsize), 0);
+    vec4 r = texelFetch(gtexture, generatedTap(c + ivec2(stp.x, 0), tmin, tsize), 0);
+    vec4 u = texelFetch(gtexture, generatedTap(c - ivec2(0, stp.y), tmin, tsize), 0);
+    vec4 d = texelFetch(gtexture, generatedTap(c + ivec2(0, stp.y), tmin, tsize), 0);
     // 抜き部分 (葉の穴) を低い所として扱うと縁が立体的に見える
     float hl = luminance(l.rgb) * l.a;
     float hr = luminance(r.rgb) * r.a;
     float hu = luminance(u.rgb) * u.a;
     float hd = luminance(d.rgb) * d.a;
-    vec2 grad = vec2(hr - hl, hd - hu) * GENERATED_NORMAL_STRENGTH * fade;
+    vec2 grad = vec2(hr - hl, hd - hu) * (GENERATED_NORMAL_GAIN * GENERATED_NORMAL_STRENGTH * gain * fade);
+    grad /= sqrt(1.0 + dot(grad, grad) / (GENERATED_NORMAL_MAX_SLOPE * GENERATED_NORMAL_MAX_SLOPE));
     return normalize(vec3(-grad, 1.0));
 }
 #endif
@@ -375,7 +398,7 @@ void main() {
     vec2 nxy = normalTex.xy * 2.0 - 1.0;
     normalTs = vec3(nxy, sqrt(saturate(1.0 - dot(nxy, nxy))));
 #elif defined USE_GENERATED_NORMALS
-    if (!isPlant) normalTs = generatedNormal(uv);
+    if (!isPlant) normalTs = generatedNormal(uv, playerPos);
 #endif
     vec3 normal = normalize(tbn * normalTs);
     vec3 geoNormal = geoN;
