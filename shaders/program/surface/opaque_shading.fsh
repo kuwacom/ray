@@ -129,7 +129,7 @@ const float LAVA_RECEIVED_LIGHT = 0.15;
  */
 const float LAVA_LUMINANCE = 0.8;
 const float LAVA_BODY_ALBEDO = 0.175;
-const float LAVA_PATTERN_CONTRAST = 1.7;
+const float LAVA_PATTERN_CONTRAST = 2.6;
 const float LAVA_EXPOSED_MAX = 1.2;
 
 /*

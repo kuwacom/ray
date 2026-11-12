@@ -234,6 +234,7 @@ void main() {
          * 直接光の当たらない影の側が光源と位相のずれた明滅になっていた
          */
         emission = lightEmission(d, level);
+        if ((d.info.x & LIGHT_FLAG_FLUID) != 0u) emission *= LAVA_LIGHT;
         vec3 flickered = emission * lightFlicker(d.params.y, uvec3(worldCell + 0x4000));
         float range = lightRange(d, level);
         if ((d.info.x & LIGHT_FLAG_FLUID) != 0u) {

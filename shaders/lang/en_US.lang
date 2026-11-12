@@ -273,6 +273,8 @@ option.LAVA_BRIGHTNESS=Lava Brightness
 option.LAVA_BRIGHTNESS.comment=How bright lava itself looks on screen. Higher values shift it from orange toward yellow. Does not change the light it casts. 0 = no extra brightening (darker orange)
 option.LAVA_BLOOM=Lava Bloom
 option.LAVA_BLOOM.comment=Strength of the glow around lava. 0 = same bloom as other objects
+option.LAVA_LIGHT=Lava Light
+option.LAVA_LIGHT.comment=Strength of the light lava casts on the surrounding terrain. Does not change how bright lava itself looks. 0 = lava lights nothing
 
 # Water & reflections
 option.WATER_WAVES=Water Waves
