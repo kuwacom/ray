@@ -138,15 +138,19 @@ vec4 encodeTranslucentDataTint(vec3 normal, vec2 lightmap, int materialId, int t
 }
 
 // 金属にした装備の前方シェーディングで残す拡散の割合 (反射だけだと、光の少ない所で真っ黒になる)
-const float METAL_FORWARD_DIFFUSE = 0.3;
+// 直接光の拡散は小さく (金属ブロックは太陽の拡散を持たず、艶で見せる)、環境光の分で暗い所の黒つぶれを防ぐ
+const float METAL_FORWARD_DIFFUSE = 0.2;
+const float METAL_FORWARD_DIRECT_DIFFUSE = 0.15;
+// 宝石 (ダイヤ) は金属ではなく拡散が主体なので、アルベドを少し落として淡く飛ばない色にする
+const float GEM_FORWARD_DIFFUSE = 0.7;
 // 装備は面が平らで法線の凹凸も無いので、磨いたままだと夕方の低い太陽の反射が面ごとに白く飛ぶ
-const float METAL_FORWARD_SMOOTHNESS_MAX = 0.45;
+const float METAL_FORWARD_SMOOTHNESS_MAX = 0.6;
 
 /*
  * 前方シェーディングの拡散 (太陽 + 手持ち光源 + 空 + ブロックライト)
  * shiny: 金属・宝石にした装備。G バッファ経路が無いので、鏡面は太陽・手持ち光源の直接光と空の反射 (SH) だけをここで足す
  */
-vec3 forwardDiffuse(Material m, vec3 playerPos, vec3 normal, vec3 geoNormal, vec3 V, float dither, bool shiny) {
+vec3 forwardDiffuse(Material m, vec3 playerPos, vec3 normal, vec3 geoNormal, vec3 V, float dither, bool shiny, float directScale) {
     // 集める項: 太陽の影 (影マップの外は 1)・手持ち光源・空・ブロックライト
     // 省く項: 接触影と POM (深度に半透明が無い・POM なし)、鏡面 (composite2 が掛ける)、GI と AO (この経路にバッファが無い。手持ち光源の照り返しが GI の代わり)
     // 太陽 -> 手持ち -> 空とブロックライト -> 手持ちの照り返し に分けて集め、拡散を掛ける順番を保つ
@@ -160,12 +164,14 @@ vec3 forwardDiffuse(Material m, vec3 playerPos, vec3 normal, vec3 geoNormal, vec
     p.geoNormal = geoNormal;
     p.lightmap = lmcoord;
     p.dither = dither;
+    Material direct = m;
+    direct.albedo *= directScale;
     SurfaceLights L = gatherSurfaceLights(p, SL_SUN_SHADOW_MAP, SL_BLOCK_NONE, 0u);
-    vec3 color = evalDirectDiffuse(m, normal, V, L.sun);
+    vec3 color = evalDirectDiffuse(direct, normal, V, L.sun);
     if (shiny) color += evalDirectSpecular(m, normal, V, L.sun);
     L = gatherSurfaceLights(p, SL_SUN_NONE, SL_BLOCK_NONE, SL_HAND);
-    color += evalDirectDiffuse(m, normal, V, L.handMain);
-    color += evalDirectDiffuse(m, normal, V, L.handOff);
+    color += evalDirectDiffuse(direct, normal, V, L.handMain);
+    color += evalDirectDiffuse(direct, normal, V, L.handOff);
     if (shiny) color += evalDirectSpecular(m, normal, V, L.handMain) + evalDirectSpecular(m, normal, V, L.handOff);
     L = gatherSurfaceLights(p, SL_SUN_NONE, blockMode, SL_SKY);
 
@@ -189,7 +195,7 @@ vec3 forwardDiffuse(Material m, vec3 playerPos, vec3 normal, vec3 geoNormal, vec
 }
 
 vec3 forwardDiffuse(Material m, vec3 playerPos, vec3 normal, vec3 geoNormal, vec3 V, float dither) {
-    return forwardDiffuse(m, playerPos, normal, geoNormal, V, dither, false);
+    return forwardDiffuse(m, playerPos, normal, geoNormal, V, dither, false, 1.0);
 }
 
 void main() {
@@ -231,9 +237,13 @@ void main() {
     }
 #endif
     Material m = decodeMaterial(g);
+    float directScale = 1.0;
     if (shiny && m.metalId == METAL_ALBEDO) {
         m.f0 = metalReflectance(g.albedo);
         m.albedo = g.albedo * METAL_FORWARD_DIFFUSE;
+        directScale = METAL_FORWARD_DIRECT_DIFFUSE / METAL_FORWARD_DIFFUSE;
+    } else if (shiny) {
+        m.albedo *= GEM_FORWARD_DIFFUSE;
     }
 
 #ifndef GBUF_PARTICLES_TRANSLUCENT
@@ -267,7 +277,7 @@ void main() {
     }
 #endif
 
-    vec3 color = forwardDiffuse(m, playerPos, geoNormal, geoNormal, V, dither, shiny);
+    vec3 color = forwardDiffuse(m, playerPos, geoNormal, geoNormal, V, dither, shiny, directScale);
     if (materialId == MAT_NETHER_PORTAL) color += m.albedo * getVisibleEmissionLuminance() * EMISSION_STRENGTH;
 #ifdef GBUF_FORWARD_OPAQUE
     // G バッファ経路 (solid.fsh の estimateEmission) と同じく、発光エンティティは明るい画素だけ光らせる

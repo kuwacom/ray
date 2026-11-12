@@ -164,8 +164,13 @@ SurfaceParams decodeLabPbr(vec4 spec, vec4 normalTex) {
 const float METAL_SMOOTHNESS_MIN = 0.35;
 const float METAL_SMOOTHNESS_MAX = 0.72;
 
+// 画素の判定で金属にした部分 (感圧板・トラップドア・道具など) の滑らかさの範囲
+// 小さな面は輝度のばらつきがそのまま粗さのまだらときらめきになるので、ブロックより狭くする
+const float METAL_PART_SMOOTHNESS_MIN = 0.45;
+const float METAL_PART_SMOOTHNESS_MAX = 0.6;
+
 // 金属の質感 (鉄・銅のブロックなど)。f0 = 1.0 は labPBR の「アルベドを F0 に使う金属」
-SurfaceParams metalSurfaceParams(vec3 albedoSrgb) {
+SurfaceParams metalSurfaceParams(vec3 albedoSrgb, float smoothnessMin, float smoothnessMax) {
     SurfaceParams p = surfaceParamsDefault();
     // 緑青 (酸化した銅の緑の画素) は金属ではなく粗い鉱物。酸化途中の銅は金属の地と緑青がまだらになる
     if (albedoSrgb.g > albedoSrgb.r + 0.03) {
@@ -176,10 +181,14 @@ SurfaceParams metalSurfaceParams(vec3 albedoSrgb) {
         // 金属ブロックはテクスチャの明るい所ほど磨かれているように見せる。暗い筋 (傷・継ぎ目) は粗くする
         // 鏡に近いと周りの景色がそのまま映ってガラスの箱のように見えるので、最も明るい所でも少しぼかす
         float lum = luminance(albedoSrgb);
-        p.smoothness = METAL_SMOOTHNESS_MIN + (METAL_SMOOTHNESS_MAX - METAL_SMOOTHNESS_MIN) * lum * lum;
+        p.smoothness = smoothnessMin + (smoothnessMax - smoothnessMin) * lum * lum;
         p.f0 = 1.0;
     }
     return p;
+}
+
+SurfaceParams metalSurfaceParams(vec3 albedoSrgb) {
+    return metalSurfaceParams(albedoSrgb, METAL_SMOOTHNESS_MIN, METAL_SMOOTHNESS_MAX);
 }
 
 // 宝石 (ダイヤモンドの道具・防具)。F0 0.17 は屈折率 2.42
@@ -225,7 +234,7 @@ bool metalGatePixel(int gate, vec3 c) {
 // 判定に合う画素を金属 (宝石は光沢のある誘電体) に置き換える。AO と高さはそのまま。PBR テクスチャが無い (推定の) 時だけ使う
 SurfaceParams applyMetalGate(SurfaceParams base, int gate, vec3 albedoSrgb) {
     if (gate == 0 || !metalGatePixel(gate, albedoSrgb)) return base;
-    SurfaceParams p = gate == METAL_GATE_GEM ? gemSurfaceParams() : metalSurfaceParams(albedoSrgb);
+    SurfaceParams p = gate == METAL_GATE_GEM ? gemSurfaceParams() : metalSurfaceParams(albedoSrgb, METAL_PART_SMOOTHNESS_MIN, METAL_PART_SMOOTHNESS_MAX);
     p.ao = base.ao;
     p.height = base.height;
     return p;
@@ -235,10 +244,15 @@ SurfaceParams applyMetalGate(SurfaceParams base, int gate, vec3 albedoSrgb) {
  * 金属のアルベド (線形) を F0 に使うときの持ち上げ。暗い金属 (鉄の鎖・金床・ネザライト) をそのまま F0 にすると黒い鏡になる
  * 灰色を足すので色味の差はそのまま残り (掛けると暗い紫のネザライトがピンクになる)、明るい金属ほど足す量が小さい
  */
-const float METAL_DARK_LIFT = 0.1;
+const float METAL_DARK_LIFT = 0.2;
+// 金のように青の反射率がほぼ 0 の金属は、青い空を映すと緑がかったオリーブ色になる。赤緑が強く青が弱い色だけ輝度の灰色へ寄せる
+const float METAL_YELLOW_DESATURATE = 0.25;
 
 vec3 metalReflectance(vec3 albedoLinear) {
-    return min(albedoLinear + METAL_DARK_LIFT * sqr(1.0 - luminance(albedoLinear)), vec3(1.0));
+    float l = luminance(albedoLinear);
+    float yellow = smoothstep(0.45, 0.6, albedoLinear.g / max(albedoLinear.r, 1e-4)) * (1.0 - smoothstep(0.2, 0.4, albedoLinear.b / max(albedoLinear.g, 1e-4)));
+    vec3 f0 = mix(albedoLinear, vec3(l), METAL_YELLOW_DESATURATE * yellow);
+    return min(f0 + METAL_DARK_LIFT * sqr(1.0 - l), vec3(1.0));
 }
 
 /*
