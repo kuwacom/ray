@@ -328,7 +328,7 @@ void main() {
 
     int materialId = MAT_TERRAIN;
 #if defined GBUF_TERRAIN
-    materialId = blockIdToMaterial(blockBase);
+    materialId = vesselPixelMaterial(blockIdToMaterial(blockBase), metalGateOfId(blockId), texRgb);
 #elif defined GBUF_ENTITIES
     materialId = entityIdToMaterial(entityId, currentRenderedItemId);
     albedo.rgb = mix(albedo.rgb, entityColor.rgb, entityColor.a);

@@ -257,6 +257,17 @@ SurfaceParams applyMetalGate(SurfaceParams base, int gate, vec3 albedoSrgb) {
 }
 
 /*
+ * 器と中身が 1 つのブロックの光源 (溶岩の大釜) の、画素ごとのマテリアル ID
+ * ID の金属の判定 (gate) は器の画素を選ぶ判定でもあるので、金属の設定 (AUTO_METAL_PARTS) や PBR テクスチャの有無によらずこれで分ける
+ * 溶岩は画素ごとの発光 (g.emission) ではなくマテリアル ID で面全体を溶岩として描く (発光・受ける光・トーンマップ・ブルーム) ので、
+ * 器の画素に付けると外側の金属まで丸ごと光る。器の画素は中身の無いブロックと同じ MAT_TERRAIN にする
+ * MAT_EMISSIVE_BLOCK は明るい画素だけが光る画素ごとの発光で、器の金属と同じ画素に重ねられるので変えない (銅の電球は全体が器で、光る芯も判定に入る)
+ */
+int vesselPixelMaterial(int materialId, int gate, vec3 albedoSrgb) {
+    return (materialId == MAT_LAVA && gate != 0 && metalGatePixel(gate, albedoSrgb)) ? MAT_TERRAIN : materialId;
+}
+
+/*
  * 金属のアルベド (線形) を F0 に使うときの持ち上げ。暗い金属 (鉄の鎖・金床・ネザライト) をそのまま F0 にすると黒い鏡になる
  * 灰色を足すので色味の差はそのまま残り (掛けると暗い紫のネザライトがピンクになる)、明るい金属ほど足す量が小さい
  * 暗い金属 (鎖・金床・鉄の道具。線形 0.03-0.1) だけ F0 を 0.5 前後まで上げ、明るい鉄・金と銅の色味はほぼ変えない (暗さの 6 乗で効かせる。銅ブロックの輝度 0.25 で 0.12)
