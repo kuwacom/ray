@@ -466,7 +466,7 @@ void main() {
 #endif
 #if defined GBUF_TERRAIN && DECORATIVE_BLOCK_LIGHTS > 0
     // 鉱物ブロック (DECORATIVE_BLOCK_LIGHTS)。光源ブロックより弱く、模様の明るい所ほど光らせる
-    if (isDecorativeBlock(blockBase)) g.emission = max(g.emission, DECOR_EMISSION * smoothstep(0.15, 0.85, maxOf(albedo.rgb)));
+    if (isDecorGlowBlock(blockBase)) g.emission = max(g.emission, DECOR_EMISSION * smoothstep(0.15, 0.85, maxOf(albedo.rgb)));
 #endif
     encodeGBuffer(g, outAlbedo, outNormal, outMaterial);
     outMaterial.a = encodeSurfaceExtra(pomShadow, puddle);

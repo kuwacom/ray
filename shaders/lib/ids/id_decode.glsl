@@ -25,9 +25,32 @@ bool isPlainSolidBlock(int blockId) { return blockId == BLOCK_SOLID || blockId >
 
 bool isDecorativeBlock(int blockId) { return blockId >= BLOCK_DECOR_LAPIS && blockId <= BLOCK_DECOR_AMETHYST; }
 
+// 種類ごとの設定 (DECOR_*) で発光する鉱物ブロック。発光・光源の両方がこれに従う
+bool isDecorGlowBlock(int blockId) {
+#ifdef DECOR_LAPIS
+    if (blockId == BLOCK_DECOR_LAPIS) return true;
+#endif
+#ifdef DECOR_EMERALD
+    if (blockId == BLOCK_DECOR_EMERALD) return true;
+#endif
+#ifdef DECOR_DIAMOND
+    if (blockId == BLOCK_DECOR_DIAMOND) return true;
+#endif
+#ifdef DECOR_GOLD
+    if (blockId == BLOCK_DECOR_GOLD) return true;
+#endif
+#ifdef DECOR_REDSTONE
+    if (blockId == BLOCK_DECOR_REDSTONE) return true;
+#endif
+#ifdef DECOR_AMETHYST
+    if (blockId == BLOCK_DECOR_AMETHYST) return true;
+#endif
+    return false;
+}
+
 int getBlockLightIndex(int blockId) {
 #if DECORATIVE_BLOCK_LIGHTS == 2
-    if (isDecorativeBlock(blockId)) return LIGHT_DECOR_FIRST + (blockId - BLOCK_DECOR_LAPIS);
+    if (isDecorGlowBlock(blockId)) return LIGHT_DECOR_FIRST + (blockId - BLOCK_DECOR_LAPIS);
 #endif
     // 向きのある光源 (東・南・西) は 256 ずつ上の帯。下位 8 bit が光源インデックス
     int r = blockId - BLOCK_LIGHT_BASE;

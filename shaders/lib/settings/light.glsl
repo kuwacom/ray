@@ -10,6 +10,12 @@
 #define BLOCKLIGHT_WARMTH 0.6 // [0.0 0.25 0.4 0.5 0.6 0.7 0.75 1.0] 0=中性 1=バニラ寄りの暖色
 #define LIGHT_FLICKER // 炎系光源の揺らぎ
 #define DECORATIVE_BLOCK_LIGHTS 0 // [0 1 2] 光らない鉱物ブロック (ラピス・エメラルド・ダイヤ・金・レッドストーン・アメジスト) 0=そのまま 1=発光のみ 2=光源
+#define DECOR_LAPIS // ラピスラズリブロックを発光させる (DECORATIVE_BLOCK_LIGHTS が 1 以上の時)
+#define DECOR_EMERALD // エメラルドブロックを発光させる
+//#define DECOR_DIAMOND // ダイヤモンドブロックを発光させる
+//#define DECOR_GOLD // 金ブロックを発光させる
+#define DECOR_REDSTONE // レッドストーンブロックを発光させる
+#define DECOR_AMETHYST // アメジストブロック・芽生えたアメジストを発光させる
 #define LIGHT_SHADOWS // 設置光源の光源シャドウ (直接光のレイトレース)
 #define LIGHT_SHADOW_STRENGTH 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0] 設置光源 (ドロップ・燃焼・発光エンティティの光も) の影の濃さ 0=影なし 1=真っ暗な影
 #define LIGHT_TRACE_COUNT 4 // [1 2 3 4 6 8 12 16] 1 ピクセルあたりトレースする光源数

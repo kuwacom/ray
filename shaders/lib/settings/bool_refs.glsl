@@ -14,6 +14,18 @@
 #endif
 #ifdef LIGHT_FLICKER
 #endif
+#ifdef DECOR_LAPIS
+#endif
+#ifdef DECOR_EMERALD
+#endif
+#ifdef DECOR_DIAMOND
+#endif
+#ifdef DECOR_GOLD
+#endif
+#ifdef DECOR_REDSTONE
+#endif
+#ifdef DECOR_AMETHYST
+#endif
 #ifdef LIGHT_SHADOWS
 #endif
 #ifdef LIGHT_SHAPE_TRACE
