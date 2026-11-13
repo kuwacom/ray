@@ -60,13 +60,15 @@ Helios 44-2 や Sonnar のようなオールドレンズから、Hologon や Fle
 
 ## 導入
 
-リポジトリの中にある `shaders/` フォルダがシェーダーパックの本体です。配布用の zip はまだ用意していないので、次の手順で入れてください
+[Releases の nightly](https://github.com/kuwacom/ray/releases/tag/nightly) から `Ray-<バージョン>-<コミット>-nightly.zip` をダウンロードして入れます。nightly は `main` の最新を反映したアルファ版で、`shaders/` などが変わるたびに置き換わります
 
-1. リポジトリを clone するか、ZIP でダウンロードして展開します
-2. `shaders/` を直接含むフォルダを `<Minecraft のインスタンス>\shaderpacks\` に置きます
+1. zip をダウンロードします (展開は不要です)
+2. zip を `<Minecraft のインスタンス>\shaderpacks\` に置きます
 3. ゲーム内の ビデオ設定 -> シェーダーパック で Ray を選びます
 
-zip にして置く場合は、`shaders/` が zip の直下に来るように作ります
+不具合を報告するときは、入れた zip のファイル名を書いてください
+
+リポジトリを clone して使う場合は、`shaders/` を直接含むフォルダを `shaderpacks\` に置きます。編集をそのまま反映したいときは、下の「開発」の「ジャンクションでつなぐ」を使います
 
 ## 機能
 

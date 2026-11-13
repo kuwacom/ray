@@ -60,13 +60,15 @@ Ghost color and shape, distortion, vignetting, bokeh shape, and chromatic aberra
 
 ## Installation
 
-The `shaders/` folder in the repository is the shader pack itself. There is no release zip yet, so install it with the following steps
+Download `Ray-<version>-<commit>-nightly.zip` from the [nightly release](https://github.com/kuwacom/ray/releases/tag/nightly). The nightly is an alpha build of the latest `main`, and it is replaced whenever `shaders/` or similar files change
 
-1. Clone the repository, or download it as a ZIP and extract it
-2. Put the folder that directly contains `shaders/` into `<Minecraft instance>\shaderpacks\`
+1. Download the zip (you do not need to extract it)
+2. Put the zip into `<Minecraft instance>\shaderpacks\`
 3. In the game, select Ray under Video Settings -> Shader Packs
 
-If you install it as a zip, make sure `shaders/` is at the top level of the zip
+When you report a bug, include the file name of the zip you installed
+
+If you use a clone of the repository, put the folder that directly contains `shaders/` into `shaderpacks\`. To have your edits take effect right away, use "Linking with a Junction" under "Development" below
 
 ## Feature Details
 
