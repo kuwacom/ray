@@ -71,11 +71,23 @@ in vec2 tileMid;
 in vec2 tileHalf;
 flat in int blockId;
 
+#ifdef GBUF_HAND
+/*
+ * MC 1.21.11 の Iris は半透明のエンティティ (額縁の地図などの文字の経路) を手より先に描き、colortex4/5 に残る
+ * 手は深度では勝つが半透明の層を消さないので、composite2 が手の上に重ねる。手の画素では両方を空に戻す
+ */
+/* RENDERTARGETS: 1,2,3,15,4,5 */
+#else
 /* RENDERTARGETS: 1,2,3,15 */
+#endif
 layout(location = 0) out vec4 outAlbedo;
 layout(location = 1) out vec4 outNormal;
 layout(location = 2) out vec4 outMaterial;
 layout(location = 3) out vec4 outVelocity;
+#ifdef GBUF_HAND
+layout(location = 4) out vec4 outTranslucentClear;
+layout(location = 5) out vec4 outTranslucentDataClear;
+#endif
 
 #if PBR_FORMAT == 1 && !defined GBUF_BASIC && !defined GBUF_LINE
     #define USE_LABPBR
@@ -475,6 +487,8 @@ void main() {
     outVelocity = encodeVelocity(viewPos);
 #elif defined GBUF_HAND
     outVelocity = encodeHandVelocity();
+    outTranslucentClear = vec4(0.0);
+    outTranslucentDataClear = vec4(0.0);
 #else
     outVelocity = vec4(0.0);
 #endif
