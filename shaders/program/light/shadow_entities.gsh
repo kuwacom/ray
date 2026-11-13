@@ -11,7 +11,11 @@
 #define IMG_VOXEL_EMIT
 //@include "/lib/common/common.glsl"
 //@include "/lib/common/shadow_space.glsl"
-//@include "/lib/light/light.glsl"
+//@include "/lib/ids/id_decode.glsl"
+//@include "/lib/light/voxel.glsl"
+//@include "/lib/light/entity_tri.glsl"
+//@include "/lib/light/entity_light.glsl"
+//@include "/lib/light/hand_pose.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -29,37 +33,26 @@
 #include "/lib/common/shading_types.glsl"
 #include "/lib/common/common.glsl"
 #include "/lib/common/shadow_space.glsl"
-#include "/lib/buffers/light_bins.glsl"
-#include "/lib/light/light_bins.glsl"
-#include "/lib/common/color.glsl"
-#include "/lib/buffers/block_data.glsl"
 #include "/lib/ids/block_ids.glsl"
-#include "/lib/ids/light_ids.glsl"
-#include "/lib/light/light_def.glsl"
-#include "/lib/light/light_table_data.glsl"
-#include "/lib/light/light_table.glsl"
-#include "/lib/common/noise.glsl"
-#include "/lib/light/block_data.glsl"
-#include "/lib/common/voxel_space.glsl"
-#include "/lib/buffers/images.glsl"
 #include "/lib/ids/entity_ids.glsl"
+#include "/lib/ids/light_ids.glsl"
 #include "/lib/ids/material_ids.glsl"
 #include "/lib/ids/id_decode.glsl"
+#include "/lib/common/voxel_space.glsl"
+#include "/lib/buffers/images.glsl"
+#include "/lib/common/color.glsl"
+#include "/lib/common/noise.glsl"
+#include "/lib/buffers/block_data.glsl"
+#include "/lib/light/block_data.glsl"
 #include "/lib/light/voxel_read.glsl"
 #include "/lib/light/voxel.glsl"
-#include "/lib/light/floodfill.glsl"
 #include "/lib/buffers/entity_tris.glsl"
+#include "/lib/light/floodfill.glsl"
 #include "/lib/light/entity_tri.glsl"
-#include "/lib/common/transforms.glsl"
-#include "/lib/light/trace.glsl"
-#include "/lib/common/frame_offset.glsl"
-#include "/lib/buffers/global_lights.glsl"
-#include "/lib/light/light_select.glsl"
 #include "/lib/buffers/frame_data.glsl"
+#include "/lib/buffers/light_bins.glsl"
 #include "/lib/light/entity_light.glsl"
-#include "/lib/light/hand_light.glsl"
-#include "/lib/light/blocklight.glsl"
-#include "/lib/light/light.glsl"
+#include "/lib/light/hand_pose.glsl"
 // END GENERATED includes
 
 layout(triangles) in;
@@ -103,7 +96,7 @@ void main() {
         if (!isPlayer && entityId != ENTITY_ITEM && entityId != ENTITY_ITEM_FRAME) voxelize = true;
     #endif
     voxelize = voxelize && !ignored;
-    // 手持ちのランタンはエンティティ ID が付かずに描かれるので、光る物を持つ手の近くなら外す (lib/light/hand_light.glsl)
+    // 手持ちのランタンはエンティティ ID が付かずに描かれるので、光る物を持つ手の近くなら外す (lib/light/hand_pose.glsl)
     if (!isPlayer && entityId <= 0 && voxelize && isNearLitHand((vPlayerPos[0] + vPlayerPos[1] + vPlayerPos[2]) / 3.0)) voxelize = false;
     #ifdef ENTITY_SHADOWS
         bool castShadow = !ignored;

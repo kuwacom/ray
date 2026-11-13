@@ -58,6 +58,7 @@
 #include "/lib/common/frame_offset.glsl"
 #include "/lib/light/light_select.glsl"
 #include "/lib/light/entity_light.glsl"
+#include "/lib/light/hand_pose.glsl"
 #include "/lib/light/hand_light.glsl"
 #include "/lib/light/blocklight.glsl"
 #include "/lib/light/light.glsl"

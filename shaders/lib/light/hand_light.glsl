@@ -24,6 +24,7 @@
 //@include "/lib/ids/id_decode.glsl"
 //@include "/lib/ids/light_ids.glsl"
 //@include "/lib/light/block_data.glsl"
+//@include "/lib/light/hand_pose.glsl"
 //@include "/lib/light/light_select.glsl"
 //@include "/lib/light/trace.glsl"
 //@include "/lib/light/voxel.glsl"
@@ -31,10 +32,6 @@
 // 一人称のカメラから見た手の位置 (view 空間, ブロック)
 // 目から離すほど段差の縁の影 (黒い楔) と、両手持ちで片方の影にだけ乗る色の帯が太く見えるので画面の手より内側に置く
 const vec3 HAND_OFFSET_VIEW = vec3(0.2, -0.18, -0.3);
-// 三人称の手の位置: 目からの下がり幅, 体の中心からの横幅, 前へのずれ (ブロック)
-const float HAND_THIRD_PERSON_DROP = 0.75;
-const float HAND_THIRD_PERSON_SIDE = 0.38;
-const float HAND_THIRD_PERSON_FORWARD = 0.15;
 // 画面空間の影のレイ長とステップ数
 const float HAND_SS_LENGTH = 4.0;
 const int HAND_SS_STEPS = 12;
@@ -52,34 +49,6 @@ const float HAND_TRI_SELF_SKIP = 0.3;
 // 直接光の影が真っ暗になる HAND_LIGHT_SHADOW_STRENGTH。これ未満では影が薄くなり、これ以上では陰の照り返しだけが減る
 const float HAND_SHADOW_FULL_STRENGTH = 0.6;
 const float HAND_DIRECT_SHADOW_STRENGTH = min(HAND_LIGHT_SHADOW_STRENGTH / HAND_SHADOW_FULL_STRENGTH, 1.0);
-
-// プレイヤーの目の位置 (player 空間)。relativeEyePosition = cameraPosition - eyePosition
-vec3 getEyePlayerPos() { return -relativeEyePosition; }
-
-// 体のモデル (shadow パス・三人称) で光源を持つ手の位置 (player 空間)
-vec3 getBodyHandPosition(bool mainHand) {
-    float side = (mainHand == isRightHanded) ? 1.0 : -1.0;
-    // 体の向き (水平) から右手方向を作る。MC の座標系 (x 東, z 南) で右 = (-f.z, 0, f.x)
-    vec3 body = vec3(playerBodyVector.x, 0.0, playerBodyVector.z);
-    if (dot(body, body) < 1e-4) body = vec3(playerLookVector.x, 0.0, playerLookVector.z);
-    body = dot(body, body) > 1e-4 ? normalize(body) : vec3(0.0, 0.0, 1.0);
-    vec3 right = vec3(-body.z, 0.0, body.x);
-    return getEyePlayerPos() + vec3(0.0, -HAND_THIRD_PERSON_DROP, 0.0)
-        + right * (side * HAND_THIRD_PERSON_SIDE) + body * HAND_THIRD_PERSON_FORWARD;
-}
-
-/*
- * 光る物を持つ手 (体のモデル) の近くか。p は player 空間
- * 手持ちのランタンは影パスでエンティティ ID (entityId <= 0) も光るアイテムの ID も付かずに描かれる (たいまつ・グロウストーンでは起きない)。
- * ほかのエンティティの三角形として手持ち光の遮蔽物になり、一人称でランタン自身の影が床や壁に出ていた。
- * shadow_entities.gsh がこの範囲の ID の無い三角形を外す。ランタンのモデルはこの手の位置から 0.6 より離れた所まであるので 1.2 (実機で確認)
- */
-const float HAND_HELD_ITEM_RADIUS = 1.2;
-
-bool isNearLitHand(vec3 p) {
-    if (heldBlockLightValue > 0 && distance(p, getBodyHandPosition(true)) < HAND_HELD_ITEM_RADIUS) return true;
-    return heldBlockLightValue2 > 0 && distance(p, getBodyHandPosition(false)) < HAND_HELD_ITEM_RADIUS;
-}
 
 // 手の光源位置 (player 空間)。mainHand=false でオフハンド
 vec3 getHandLightPosition(bool mainHand) {
