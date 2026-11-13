@@ -3,6 +3,13 @@ name: Nightly
 on:
   push:
     branches: [main]
+    paths:
+      - shaders/**
+      - tools/**
+      - pyproject.toml
+      - uv.lock
+      - .python-version
+      - .github/workflows/**
 
 # 連続した push は順番に処理
 concurrency:
