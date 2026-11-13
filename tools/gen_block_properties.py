@@ -17,6 +17,7 @@ ID と光源の表から、シェーダー側の ID の定数・properties・光
 
 from __future__ import annotations
 
+import itertools
 import json
 import sys
 from pathlib import Path
@@ -24,7 +25,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from id_tables import (  # noqa: E402
     BLOCK_CONSTS, COLOR_BAND_FIRST, COLOR_BAND_LAST, COLORS, COPPER_PREFIX, ENTITIES, ENTITY_LIGHT_ID_BASE, LIGHT_BLOCK_LAST,
-    FACINGS, LIGHT_ENTITY_FIRST, LIGHT_ENTITY_LAST, LIGHT_FACING_LAST, LIGHT_FACING_STRIDE, LIGHT_ID_BASE, LIGHT_ITEM_FIRST,
+    BARS_FIRST, FACINGS, FENCE_FIRST, WALL_FIRST, LIGHT_ENTITY_FIRST, LIGHT_ENTITY_LAST, LIGHT_FACING_LAST, LIGHT_FACING_STRIDE, LIGHT_ID_BASE, LIGHT_ITEM_FIRST,
     LIGHT_ITEM_LAST, LIGHTS, Light, STAIRS_FIRST, with_state,
     ENTITY_METAL_BASE, ITEMLESS_METAL_BLOCKS, METAL_ENTITIES, METAL_GATE_STRIDE, METAL_GATES, METAL_ITEMS, METAL_LIGHT_ITEMS,
     metal_blocks,
@@ -95,6 +96,17 @@ def stair_entries() -> list[tuple[int, str, list[str]]]:
                      for b in SLAB_STAIR_BASES for f in STAIR_FACINGS for s in STAIR_SHAPES if stair_slot(f, s) == slot]
             out.append((STAIRS_FIRST + h * 8 + slot, f"stairs ({half}, shape {slot})", names))
     return out
+
+
+def connected_entries(first: int, label: str, blocks: list[str], arm_values: list[str]) -> list[tuple[int, str, list[str]]]:
+    """接続の向きごとに ID を分ける (フェンス・塀・鉄格子)。ID = first + 北 1 東 2 南 4 西 8 の和。
+    腕の値は フェンス・鉄格子が true/false、塀が none/low/tall (none と false 以外を接続とする)。
+    Iris の状態フィルタは 1 プロパティ 1 値の完全一致なので、組み合わせを全部書く"""
+    names_of: list[list[str]] = [[] for _ in range(16)]
+    for combo in itertools.product(arm_values, repeat=4):
+        mask = sum((v not in ("false", "none")) << i for i, v in enumerate(combo))
+        names_of[mask] += [f"{b}:" + ":".join(f"{s}={v}" for s, v in zip(STAIR_FACINGS, combo)) for b in blocks]
+    return [(first + m, f"{label} (connection mask {m})", names) for m, names in enumerate(names_of)]
 
 
 # 光源でないブロックの表。光源 (ID 1001-1255) は id_tables.py の LIGHTS
@@ -171,9 +183,6 @@ BLOCKS: list[tuple[int, str, list[str]]] = [
 
     (300, "bottom slabs", with_state([f"{b}_slab" for b in SLAB_STAIR_BASES + SLAB_ONLY], "type=bottom")),
     (301, "top slabs", with_state([f"{b}_slab" for b in SLAB_STAIR_BASES + SLAB_ONLY], "type=top")),
-    (304, "fences", [*wood_prefixed("fence", [w for w in WOODS]), "nether_brick_fence"]),
-    (305, "walls", [f"{b}_wall" for b in WALL_BASES]),
-    (306, "bars (panes other than glass)", ["iron_bars", *[f"{p}copper_bars" for p in COPPER_PREFIX], *[f"waxed_{p}copper_bars" for p in COPPER_PREFIX]]),
     (307, "low blocks", ["stonecutter", "daylight_detector", "lectern", "composter", "farmland", "dirt_path", "sculk_shrieker"]),
     # 積もった雪は層の数で高さが違う (1 層 = 1/8)。遮蔽の形を高さに合わせるため層ごとに分ける (308 = 1 層, 310-316 = 2-8 層)
     (308, "snow layers (1)", ["snow:layers=1"]),
@@ -181,6 +190,11 @@ BLOCKS: list[tuple[int, str, list[str]]] = [
                                  *with_state([f"{w}_trapdoor" for w in DOOR_TRAPDOOR], "open=false")]),
     *[(308 + k, f"snow layers ({k})", [f"snow:layers={k}"]) for k in range(2, 9)],
     *stair_entries(),
+    *connected_entries(FENCE_FIRST, "fences", [*wood_prefixed("fence"), "nether_brick_fence"], ["false", "true"]),
+    *connected_entries(WALL_FIRST, "walls", [f"{b}_wall" for b in WALL_BASES], ["none", "low", "tall"]),
+    *connected_entries(BARS_FIRST, "bars (panes other than glass)",
+                       ["iron_bars", *[f"{p}copper_bars" for p in COPPER_PREFIX], *[f"waxed_{p}copper_bars" for p in COPPER_PREFIX]],
+                       ["false", "true"]),
 ]
 
 

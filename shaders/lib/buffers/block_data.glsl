@@ -29,7 +29,7 @@ struct LightDef {
 
 layout(std430, binding = 1) SSBO_BLOCK_DATA_ACCESS buffer BlockDataBuffer {
     LightDef lightDefs[LIGHT_TABLE_SIZE];
-    uvec4 shapes[SHAPE_TABLE_SIZE]; // AABB 2 個: x/y = box0 min/max, z/w = box1 min/max (packUnorm4x8, min>max で無効)
+    uvec4 shapes[SHAPE_TABLE_SIZE]; // AABB 4 個: x/y/z/w = box0-3 (1/16 刻みの min xyz, max xyz を 5bit ずつ。min>max で無効)
     vec4 tints[TINT_TABLE_SIZE];    // rgb = 透過色 (線形), a = 不透明度
     uint initialized;
     /*

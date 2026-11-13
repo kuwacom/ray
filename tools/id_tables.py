@@ -32,6 +32,9 @@ COLOR_BAND_FIRST = 2000       # 色の付いた固体の ID 帯 (ボクセルに
 COLOR_BAND_LAST = 4095
 STAIRS_FIRST = 320            # 階段の ID 帯 320-335 (向き x 上下 x 外角の 16 通り)
 STAIRS_LAST = 335
+FENCE_FIRST = 336             # フェンス・塀・鉄格子の ID 帯。各 16 通り (接続の向き。ID = 先頭 + 北 1 東 2 南 4 西 8 の和)
+WALL_FIRST = 352
+BARS_FIRST = 368
 LIGHT_FACING_STRIDE = 256     # 向きのある光源ブロックの ID = 1000 + 256 x 向き (1 東 2 南 3 西) + 光源インデックス。北は向きなしと同じ ID
 LIGHT_FACING_LAST = LIGHT_ID_BASE + 3 * LIGHT_FACING_STRIDE + LIGHT_BLOCK_LAST
 FACINGS = ["north", "east", "south", "west"]  # 時計回り (上から見て)。ID の向きの番号と同じ順
@@ -372,9 +375,6 @@ BLOCK_CONSTS: list[tuple] = [
     ("raw", ""),
     ("const", 0, "BLOCK_SLAB_BOTTOM", 300, "", True),
     ("const", 0, "BLOCK_SLAB_TOP", 301, "", True),
-    ("const", 0, "BLOCK_FENCE", 304, "", True),
-    ("const", 0, "BLOCK_WALL", 305, "", True),
-    ("const", 0, "BLOCK_PANE_BARS", 306, "", True),
     ("const", 40, "BLOCK_LOW", 307, "ベッド・石切台等の背の低いブロック", True),
     ("const", 40, "BLOCK_SNOW_LAYER", 308, "積もった雪 1 層 (高さ 1/8)", True),
     ("const", 40, "BLOCK_DOOR_CLOSED", 309, "閉じたドア・トラップドア (薄いが光は遮る)", True),
@@ -382,6 +382,9 @@ BLOCK_CONSTS: list[tuple] = [
     ("const", 40, "BLOCK_SNOW_LAYER_8", 316, "", True),
     ("const", 40, "BLOCK_STAIRS_FIRST", STAIRS_FIRST, "320-335 = 階段 (向き x 上下 x 外角の 16 通り。形は lib/light/light_table.glsl)", True),
     ("const", 40, "BLOCK_STAIRS_LAST", STAIRS_LAST, "", True),
+    ("const", 40, "BLOCK_FENCE_FIRST", FENCE_FIRST, "336-351 = フェンス (接続の向き 16 通り: 北 1 東 2 南 4 西 8 の和。形は lib/light/light_table.glsl)", True),
+    ("const", 40, "BLOCK_WALL_FIRST", WALL_FIRST, "352-367 = 塀 (同じ接続の 16 通り)", True),
+    ("const", 40, "BLOCK_PANE_BARS_FIRST", BARS_FIRST, "368-383 = 鉄格子 (同じ接続の 16 通り)", True),
     ("raw", ""),
     ("const", 40, "BLOCK_LIGHT_BASE", LIGHT_ID_BASE, "1001-1255 が光源 (光源インデックス = id - 1000)", False),
     ("const", 40, "BLOCK_LIGHT_FACING_STRIDE", LIGHT_FACING_STRIDE, "向きのある光源は 1000 + 256 x 向き (1 東 2 南 3 西) + 光源インデックス", False),

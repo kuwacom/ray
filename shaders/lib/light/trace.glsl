@@ -70,16 +70,26 @@ bool isShapeOccluderWithoutTrace(int voxelId) {
     return (voxelId >= BLOCK_STAIRS_FIRST && voxelId <= BLOCK_STAIRS_LAST) || voxelId == BLOCK_DOOR_CLOSED;
 }
 
-// 部分形状の AABB (最大 2 個) とレイ区間 [tEnter, tLeave] の交差。ro はセルローカルの原点
-bool shapeIntersect(int voxelId, vec3 ro, vec3 rdInv, float tEnter, float tLeave, out float tHit, out vec3 hitNormal) {
+// 接続の向きごとに ID が分かれた細い形 (フェンス・塀・鉄格子)。着色点のセルでも形を判定する
+bool isThinConnectedShape(int voxelId) {
+    return voxelId >= BLOCK_FENCE_FIRST && voxelId < BLOCK_PANE_BARS_FIRST + 16;
+}
+
+/*
+ * 部分形状の AABB (最大 4 個) とレイ区間 [tEnter, tLeave] の交差。ro はセルローカルの原点。箱の詰め方は lib/light/light_table.glsl の packBox
+ * skipContaining: ro を含む箱は無視する (着色点のセルの判定用。面から押し出した点が、腕でふさがれた柱の面や横木の間の箱の中に入る)
+ */
+bool shapeIntersect(int voxelId, vec3 ro, vec3 rdInv, float tEnter, float tLeave, bool skipContaining, out float tHit, out vec3 hitNormal) {
     uvec4 s = getShape(getShapeIndex(voxelId));
     tHit = 1e9;
     hitNormal = vec3(0.0);
     bool hit = false;
-    for (int b = 0; b < 2; b++) {
-        vec3 bmin = unpackUnorm4x8(b == 0 ? s.x : s.z).xyz;
-        vec3 bmax = unpackUnorm4x8(b == 0 ? s.y : s.w).xyz;
+    for (int b = 0; b < 4; b++) {
+        uint p = s[b];
+        vec3 bmin = vec3(uvec3(p & 31u, (p >> 5) & 31u, (p >> 10) & 31u)) * (1.0 / 16.0);
+        vec3 bmax = vec3(uvec3((p >> 15) & 31u, (p >> 20) & 31u, (p >> 25) & 31u)) * (1.0 / 16.0);
         if (any(greaterThan(bmin, bmax))) continue;
+        if (skipContaining && all(greaterThan(ro, bmin)) && all(lessThan(ro, bmax))) continue;
         vec3 t0 = (bmin - ro) * rdInv;
         vec3 t1 = (bmax - ro) * rdInv;
         vec3 tmin = min(t0, t1);
@@ -121,7 +131,7 @@ vec3 voxelCellTransmittance(int id, ivec3 cell, vec3 origin, vec3 rdInv, float t
         if ((flags & TRACE_SHAPES) != 0u) {
             float tHit;
             vec3 n;
-            return shapeIntersect(id, origin - vec3(cell), rdInv, tEnter, tLeave, tHit, n) ? vec3(0.0) : vec3(1.0);
+            return shapeIntersect(id, origin - vec3(cell), rdInv, tEnter, tLeave, false, tHit, n) ? vec3(0.0) : vec3(1.0);
         }
         return isShapeOccluderWithoutTrace(id) ? vec3(0.0) : vec3(1.0);
     }
@@ -206,10 +216,18 @@ vec3 traceVisibility(vec3 fromVoxel, vec3 toVoxel, uint flags, float dither, flo
     /*
      * 着色点が水の中なら、始点のセルの水も通る長さで減衰させる。始点のセルは判定しないので、光が始点のセルを出るまでの
      * 水の分だけ減衰が抜ける。その長さはブロックの中の位置で変わり、水の中の床の明るさがブロックの境目で段になっていた
+     * 着色点のセルが細い形 (フェンス・塀・鉄格子) なら、そのセルの中の形でも遮る。判定しないと、柱や横木の足元の床 (同じセル)
+     * には自分の影が落ちず、影がセルの境目から始まる
      */
-    if ((flags & TRACE_TINT) != 0u && isInVoxelVolume(cell)) {
+    if ((flags & (TRACE_TINT | TRACE_SHAPES)) != 0u && isInVoxelVolume(cell)) {
         int startId = fetchVoxelBlockId(cell);
-        if (startId == BLOCK_WATER) transmit = voxelCellTransmittance(startId, cell, fromVoxel, rdInv, 0.0, min(minOf(tMax), len), flags);
+        float tStartLeave = min(minOf(tMax), len);
+        if ((flags & TRACE_TINT) != 0u && startId == BLOCK_WATER) transmit = voxelCellTransmittance(startId, cell, fromVoxel, rdInv, 0.0, tStartLeave, flags);
+        if ((flags & TRACE_SHAPES) != 0u && isThinConnectedShape(startId)) {
+            float tHit;
+            vec3 n;
+            if (shapeIntersect(startId, fromVoxel - vec3(cell), rdInv, 0.0, tStartLeave, true, tHit, n)) return vec3(0.0);
+        }
     }
     for (int i = 0; i < TRACE_MAX_STEPS && cell != endCell; i++) {
         float tEnter = minOf(tMax);
@@ -288,7 +306,7 @@ bool traceVoxelRay(vec3 originVoxel, vec3 dir, float maxDist, out vec3 hitVoxel,
         if (id >= 300 && id < 400) {
             vec3 sn;
             float tLeave = minOf(tMax);
-            if (shapeIntersect(id, originVoxel - vec3(cell), rdInv, tEnter, tLeave, tHit, sn)) {
+            if (shapeIntersect(id, originVoxel - vec3(cell), rdInv, tEnter, tLeave, false, tHit, sn)) {
                 solid = true;
                 n = sn;
             }
