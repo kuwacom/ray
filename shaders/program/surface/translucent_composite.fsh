@@ -270,6 +270,15 @@ void main() {
 #endif
         color = behind * (1.0 - F) + refl * F;
         sparkleLum = behindExcess * (1.0 - F);
+        if (below) {
+            /*
+             * 水中から見た水面は gbuffers_water が colortex4 の水面の奥の分を F だけ消して a に F を足してある
+             * (水面の奥の半透明が全反射に透けないように)。屈折先は (1 - a) で、反射は a の外で足す
+             */
+            color = behind * (1.0 - translucent.a) + refl * F;
+            sparkleLum = behindExcess * (1.0 - translucent.a);
+            translucent.a = 0.0;
+        }
         if (!below) {
             // 太陽・灯りの照り返しの粗さ: 表した波の斜面は法線が受け持つので、光学的に滑らかな水に、画素より細かい波と画素の中・露光の間の法線の揺れを足す
             // 側面 (滝) は落ちる水の乱れに任せ、幅のある淡いつやを残す

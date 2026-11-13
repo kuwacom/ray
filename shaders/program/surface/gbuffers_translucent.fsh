@@ -300,6 +300,17 @@ void main() {
     #else
         outColor = vec4(0.0);
     #endif
+        /*
+         * 水中から見た水面: 水面の奥 (水の上) の半透明 (ガラス・エンティティなど) は水より先に描かれて colortex4 に残り、
+         * composite2 が全反射の上に重ねて透けていた。水面で反射する F の分を消し、a に F を足す
+         * (composite2 は水中の水面で 屈折先 x (1 - a) + 反射 x F + rgb にする。水より後に描かれる水中の半透明はこの上に重なる)
+         */
+        if (isEyeInWater == 1) {
+            vec3 Nw = dot(geoNormal, V) < 0.0 ? -normal : normal;
+            float F = fresnelDielectric(dot(Nw, V), 1.0 / WATER_IOR);
+            float a = 1.0 - (1.0 - outColor.a) * (1.0 - F);
+            outColor = vec4(outColor.rgb * (outColor.a / max(a, 1e-4)), a);
+        }
         return;
     }
 #endif
