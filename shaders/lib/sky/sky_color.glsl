@@ -129,7 +129,7 @@ const float END_AMBIENT_UP = 1.6;   // 上向きの面の環境光の倍率
 const float END_AMBIENT_DOWN = 0.2; // 下向きの面 (虚空側)
 
 // 大気上端での太陽照度
-vec3 getSunIlluminanceTOA() { return vec3(SUN_ILLUMINANCE * SUN_BRIGHTNESS); }
+vec3 getSunIlluminanceTOA() { return vec3(SUN_ILLUMINANCE * optSunBrightness); }
 
 /*
  * ルックの日向の色 (LK_SUN_WARMTH)。地表に届く太陽の直達光だけを暖色に寄せる (輝度は保つ)

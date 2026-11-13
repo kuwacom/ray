@@ -323,8 +323,8 @@ float focusTapDistance(vec2 uv) {
 
 float updateFocus(float dt) {
 #if DOF_FOCUS_MODE == 1
-    frameData.postParams[1].x = DOF_MANUAL_FOCUS;
-    return DOF_MANUAL_FOCUS;
+    frameData.postParams[1].x = optDofManualFocus;
+    return optDofManualFocus;
 #else
     float taps[9];
     for (int i = 0; i < 9; i++) {
@@ -344,14 +344,15 @@ float updateFocus(float dt) {
     float target = taps[4];
     #if DOF_FOCUS_MODE == 2
         // オート + オフセット: マニュアル距離 8 m を基準にした倍率でオートの距離をずらす (8 = オフセットなし)
-        target *= DOF_MANUAL_FOCUS / 8.0;
+        target *= optDofManualFocus / 8.0;
     #endif
     target = clamp(target, 0.1, max(far, 1.0));
     frameData.postParams[1].x = target;
 
     float prev = frameData.focusDistance;
-    if (!(prev > 0.0) || isinf(prev)) prev = target;
-    float t = 1.0 - exp(-DOF_FOCUS_SPEED * dt);
+    if (prev == 0.0) prev = optDofManualFocus;  // setup の初期値 (cameraFocusDistance と同じ)
+    else if (!(prev > 0.0) || isinf(prev)) prev = target;
+    float t = 1.0 - exp(-optDofFocusSpeed * dt);
     return exp2(mix(log2(prev), log2(target), t));
 #endif
 }

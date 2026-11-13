@@ -305,7 +305,7 @@ void main() {
         float focusFade = POINT_SPREAD_GAIN;
     #ifdef DOF
         float cocDist = depth >= 1.0 ? far * 4.0 : linearizeDepth(fixHandDepth(depth));
-        float cocPx = isHandDepth(depth) ? 0.0 : circleOfConfusion(cocDist, max(frameData.focusDistance, 0.1));
+        float cocPx = isHandDepth(depth) ? 0.0 : circleOfConfusion(cocDist, max(cameraFocusDistance(), 0.1));
         focusFade *= saturate(1.0 - abs(cocPx) / POINT_SPREAD_COC_FADE);
     #endif
         // 配るのは点の光の全部まで。強さで先に裾を増やし、芯は残りの分 (和が 1 を超えると中心の地まで引かれて黒く抜けた)

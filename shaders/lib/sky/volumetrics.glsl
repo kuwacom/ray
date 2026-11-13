@@ -224,7 +224,7 @@ vec4 marchAirFog(vec3 dir, float endDist, float dither, vec2 farVisibility) {
         vec3 light = (density.x * hazeLight + density.y * mistLight) / extinction;
 #else
         float phase = (density.x * fl.phaseHaze + density.y * fl.phaseMist) / extinction;
-        vec3 light = fl.light * shadow * (phase * sunVisibility * VL_STRENGTH);
+        vec3 light = fl.light * shadow * (phase * sunVisibility * optVlStrength);
         light += fl.ambient * ambientVisibility;
 #endif
 #ifdef FOG_BLOCKLIGHT
@@ -304,7 +304,7 @@ vec3 marchWaterFog(vec3 dir, float endDist, float dither) {
         vec3 lightT = exp(-extinction * column);
         // 空の光は水面からの深さ (光源方向の水の厚さ x 光源の高さ) だけ減衰する
         vec3 ambientT = exp(-extinction * column * lightY);
-        vec3 light = celestial.irradiance * shadow * lightT * phase * VL_STRENGTH + skyUp * ambientT * (0.5 * RCP_PI);
+        vec3 light = celestial.irradiance * shadow * lightT * phase * optVlStrength + skyUp * ambientT * (0.5 * RCP_PI);
 #ifdef FOG_BLOCKLIGHT
         vec3 blockE = sampleBlockLightVolume(p);
         if (maxOf(blockE) > 1e-5) {

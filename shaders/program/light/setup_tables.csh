@@ -102,7 +102,8 @@ void main() {
         frameData.exposure = 1.0;
         frameData.exposureTarget = 1.0;
         frameData.averageLuminance = 0.18;
-        frameData.focusDistance = DOF_MANUAL_FOCUS;
+        // 0 は未初期化の印。設定の値 (カスタム uniform) は setup に渡らないので、読む側が補う (cameraFocusDistance)
+        frameData.focusDistance = 0.0;
         frameData.lightStats = uvec4(0u);
         globalLights.cullDistance = LIGHT_CULL_NONE;
         globalLights.culled = 0u;

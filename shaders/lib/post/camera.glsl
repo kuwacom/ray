@@ -8,8 +8,17 @@
 //@include "/lib/settings.glsl"
 //@include "/lib/common/constants.glsl"
 //@include "/lib/common/uniforms.glsl"
+//@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/post/lens_presets.glsl"
 //@include "/lib/post/post_constants.glsl"
+
+/*
+ * ピントを合わせる距離 (ブロック): composite25 が前フレームに平滑化して書いた値
+ * setup は 0 を書く。Iris は setup にカスタム uniform を渡さないので、設定の値 (DOF_MANUAL_FOCUS) で始める分はここで補う
+ */
+float cameraFocusDistance() {
+    return frameData.focusDistance > 0.0 ? frameData.focusDistance : optDofManualFocus;
+}
 
 // 焦点距離 (mm)。gbufferProjection[1][1] = 1 / tan(縦 FOV / 2)
 float cameraFocalLength() {
@@ -30,7 +39,7 @@ float cameraApertureDiameter() {
 #elif DOF_APERTURE_MODE == 2
     return cameraFocalLength() / DOF_F_NUMBER;
 #else
-    return DOF_APERTURE_DIAMETER * DOF_STRENGTH * (DOF_SENSOR_HEIGHT / DOF_SENSOR_HEIGHT_FULL);
+    return DOF_APERTURE_DIAMETER * optDofStrength * (DOF_SENSOR_HEIGHT / DOF_SENSOR_HEIGHT_FULL);
 #endif
 }
 

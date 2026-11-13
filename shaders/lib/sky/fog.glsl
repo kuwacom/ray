@@ -111,7 +111,7 @@ const float FOG_HAZE_SUN_SHARE = 0.8;
 // 影の中のもやに残す空の色の割合の下限
 const float FOG_HAZE_SHADOW_FLOOR = 0.1;
 // 日の当たるもやと霧の太陽の分の強さ (光芒の強さ x スタイルの前方の輝き)
-const float FOG_VL_STRENGTH = VL_STRENGTH * FS_FORWARD;
+#define FOG_VL_STRENGTH float(optVlStrength * FS_FORWARD)
 // もやの上端の柔らかさ (テンプレート x スタイル)
 const float FOG_HAZE_SOFT = FOG_T_HAZE_SOFT * FS_HAZE_SOFT;
 

@@ -36,6 +36,7 @@
 #include "/lib/post/lens_presets.glsl"
 #include "/lib/post/sampling.glsl"
 #include "/lib/post/exposure.glsl"
+#include "/lib/buffers/frame_data.glsl"
 #include "/lib/post/camera.glsl"
 #include "/lib/post/grading.glsl"
 #include "/lib/post/bloom.glsl"

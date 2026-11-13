@@ -102,6 +102,16 @@ uniform float shadowAngle;
 uniform int moonPhase;
 uniform float rainStrength;
 uniform float rainWetness; // 雨の濡れ (shaders.properties のカスタム uniform。Iris の wetness は乾く側の半減期を変えられないので使わない)
+
+// 値を掛けるだけの設定 (shaders.properties のカスタム uniform)。変えても本文が変わらないので、再読み込みで再コンパイルされない
+// グローバルの const の初期化には使わない (関数の中で読む)
+uniform float optFogDensity;     // FOG_DENSITY
+uniform float optVlStrength;     // VL_STRENGTH
+uniform float optSunBrightness;  // SUN_BRIGHTNESS
+uniform float optExposureBias;   // EXPOSURE_BIAS
+uniform float optDofStrength;    // DOF_STRENGTH
+uniform float optDofManualFocus; // DOF_MANUAL_FOCUS
+uniform float optDofFocusSpeed;  // DOF_FOCUS_SPEED
 uniform float thunderStrength;
 uniform vec4 lightningBoltPosition;
 uniform int worldTime;

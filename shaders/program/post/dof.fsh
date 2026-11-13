@@ -138,7 +138,7 @@ void main() {
         cocMag = sqrt(warpMag.x * warpMag.y);
     }
     // 像面湾曲: 正は周辺ほどピントが手前に来る (背景のボケが周辺で増える)、負は奥に来る
-    float focus = max(frameData.focusDistance, 0.1) / max(1.0 + FIELD_CURVATURE * r2, LENS_FIELD_CURVATURE_MIN);
+    float focus = max(cameraFocusDistance(), 0.1) / max(1.0 + FIELD_CURVATURE * r2, LENS_FIELD_CURVATURE_MIN);
     float maxRadius = dofMaxRadius();
     /*
      * 処方の像面湾曲・非点収差 (lib/post/lens.glsl lensFieldDefocus): 像面の焦点ずれをボケ半径に足す

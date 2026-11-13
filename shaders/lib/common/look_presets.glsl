@@ -10,6 +10,7 @@
 #define COMMON_LOOK_PRESETS_GLSL
 
 //@include "/lib/settings.glsl"
+//@include "/lib/common/uniforms.glsl"
 
 #if LOOK_PRESET == 1
 /*
@@ -383,11 +384,11 @@
  */
 #define LOOK_SATURATION float(SATURATION * LK_SATURATION)
 #define LOOK_CONTRAST float(CONTRAST * LK_CONTRAST)
-#define LOOK_EXPOSURE_BIAS float(EXPOSURE_BIAS + LK_EXPOSURE_EV)
+#define LOOK_EXPOSURE_BIAS float(optExposureBias + LK_EXPOSURE_EV)
 #define LOOK_BLOOM_STRENGTH float(BLOOM_STRENGTH * LK_BLOOM)
 #define LOOK_BLOOM_FOG float(BLOOM_FOG * LK_BLOOM_FOG)
 #define LOOK_GI_SKY_OCCLUSION min(float(GI_SKY_OCCLUSION * LK_SKY_OCCLUSION), 1.0)
 #define LOOK_SKY_AMBIENT_SATURATION float(SKY_AMBIENT_SATURATION * LK_SKY_AMBIENT_SAT)
-#define LOOK_FOG_DENSITY float(FOG_DENSITY * LK_FOG)
+#define LOOK_FOG_DENSITY float(optFogDensity * LK_FOG)
 
 #endif
