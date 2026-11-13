@@ -131,7 +131,8 @@ bool storeEntityTriangle(vec3 p0, vec3 p1, vec3 p2, vec2 uv0, vec2 uv1, vec2 uv2
             region = 2;
 #ifdef FLOODFILL
             ivec3 cell = ivec3(floor(playerToVoxel(c)));
-            if (!isInVoxelVolume(cell) || maxOf(fetchFlood(cell)) < ENTITY_TRI_FAR_MIN_FLOOD) return false;
+            // 影パスは今フレームの floodfill より前なので前フレームの値を読む。ずれて読むと動いている間だけ箱の影に落ちていた
+            if (!isInVoxelVolume(cell) || maxOf(fetchFloodPrevious(cell)) < ENTITY_TRI_FAR_MIN_FLOOD) return false;
 #endif
         } else {
             return false;

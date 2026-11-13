@@ -25,6 +25,16 @@ vec3 fetchFlood(ivec3 cell) {
 }
 
 /*
+ * 今フレームの伝搬 (deferred) より前に読むプログラム (影パス) 用。前フレームに書かれた方を、カメラのブロック移動を補正して読む
+ * fetchFlood で読むと 2 フレーム前の値を今のセルの座標で読むことになり、動いている間は 1〜2 セルずれて床や壁 (照度 0) を拾う
+ */
+vec3 fetchFloodPrevious(ivec3 cell) {
+    ivec3 prev = cell + getVoxelFrameOffset();
+    if (!isInVoxelVolume(prev)) return vec3(0.0);
+    return floodWritesA() ? texelFetch(floodSamplerB, prev, 0).rgb : texelFetch(floodSamplerA, prev, 0).rgb;
+}
+
+/*
  * 固体セルを除外した手動トリリニア (漏れ対策)
  * ハードウェアのトリリニアは壁の向こうのセルや光を持たない固体セルを混ぜるので、
  * 角や薄い壁の際で光が漏れたり不自然に暗くなったりする。固体セルの重みを 0 にして正規化し直す
