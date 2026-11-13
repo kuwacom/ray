@@ -319,6 +319,19 @@ vec3 voxelIndirect(vec3 playerPos, vec3 normal, vec3 geoNormal, float skyLm, vec
 }
 #endif
 
+/*
+ * GI のレイの乱数: ブルーノイズを低解像度の画素で読み (2x2 の巡回の画素で読むと 2 画素おきになり、ブルーノイズの性質が崩れる)、
+ * 全画素を同じだけずらす回転 (Cranley-Patterson) を r2(フレーム x サンプル数) で進める
+ * 1 画素の方向がフレームをまたいで 1 本の R2 列になるので、時間方向の蓄積で方向が層別され、空間フィルタも隣と打ち消し合う
+ * (テクスチャの位置を毎フレームずらすだけでは、1 画素の時間方向の並びは白色ノイズに近い)
+ * 周期で回すのは、frameCounter を掛けたままだと float の精度で列が崩れるため
+ */
+const int GI_NOISE_PERIOD = 1023;
+vec4 giRayNoise(ivec2 low) {
+    int n = (frameCounter & GI_NOISE_PERIOD) * GI_SAMPLES;
+    return fract(blueNoise(low, 0) + vec4(r2Sequence(n), vec2(r1Sequence(n))));
+}
+
 void main() {
     ivec2 low = ivec2(gl_GlobalInvocationID.xy);
     ivec2 screen = ivec2(viewSize());
@@ -357,13 +370,16 @@ void main() {
     ao = pow(ao, AO_STRENGTH);
 
     vec3 gi = vec3(0.0);
+#if GI_MODE > 0
+    vec4 giNoise = giRayNoise(low);
+#endif
 #if GI_MODE == 1 && defined HAS_SUN_SHADOWS
     // RSM は可視性を見ないので、空の見えない屋内・洞窟へ壁越しに漏れないようスカイライトで絞る
-    gi = rsmIndirect(playerPos, g.geoNormal, noise.z * TAU) * smoothstep(RSM_SKYLIGHT_MIN, RSM_SKYLIGHT_MAX, g.lightmap.y);
+    gi = rsmIndirect(playerPos, g.geoNormal, giNoise.z * TAU) * smoothstep(RSM_SKYLIGHT_MIN, RSM_SKYLIGHT_MAX, g.lightmap.y);
 #elif GI_MODE == 2
-    gi = ssgiIndirect(viewPos, g.geoNormal, g.lightmap.y, noise);
+    gi = ssgiIndirect(viewPos, g.geoNormal, g.lightmap.y, giNoise);
 #elif GI_MODE == 3
-    gi = voxelIndirect(playerPos, g.geoNormal, g.geoNormal, g.lightmap.y, noise);
+    gi = voxelIndirect(playerPos, g.geoNormal, g.geoNormal, g.lightmap.y, giNoise);
 #endif
     gi *= GI_EFFECTIVE_STRENGTH;
 
