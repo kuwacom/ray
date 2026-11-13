@@ -91,6 +91,10 @@ shared uint sharedHistogram[256];
 const uint VIS_SCALE = 1024u;
 shared uint sharedVisible;
 shared uint sharedFarHidden;
+#if defined LENS_FLARE && SUN_MOON_STYLE == 0
+// 見えている点の格子位置の重み付きモーメント: x, y, x^2, y^2 (バニラの四角のどこが見えているか)
+shared uint sharedMoments[4];
+#endif
 
 /*
  * 光源 (昼は太陽, 夜は月) の形の中の index 番目の点。画面の端へ寄せた座標と、画面の外へのはみ出し (UV) を返す。光源が後ろなら false
@@ -141,6 +145,8 @@ uint farHiddenTap(uint index) {
  * - 雲: その点の明るさと空の平均の比 (雲に隠れると円盤が空と同じ明るさに落ちる)
  * - 画面の外: 一番近い画面端の画素で判定し、外へ離れるほど弱める (画面のすぐ外の太陽からもフレアは出る)
  * 1 画素ごとに final で判定していたのをここへ移し、時間方向にも平滑化してちらつきを抑える
+ * バニラの四角では、見えている点の格子位置のモーメントも同じ重みで集計する (FrameData.postParams[3])。final が見えている部分の
+ * 中心と広がりを求め、フレアの光源の位置と大きさを遮られていない部分に合わせる
  */
 uint flareVisibilityTap(uint index) {
     vec2 clamped;
@@ -358,12 +364,26 @@ void main() {
     if (index == 0u) {
         sharedVisible = 0u;
         sharedFarHidden = 0u;
+    #if defined LENS_FLARE && SUN_MOON_STYLE == 0
+        sharedMoments[0] = 0u;
+        sharedMoments[1] = 0u;
+        sharedMoments[2] = 0u;
+        sharedMoments[3] = 0u;
+    #endif
     }
 #endif
     barrier();
 #ifdef HAS_SKY
     #ifdef LENS_FLARE
-    atomicAdd(sharedVisible, flareVisibilityTap(index));
+    uint tapVisible = flareVisibilityTap(index);
+    atomicAdd(sharedVisible, tapVisible);
+        #if SUN_MOON_STYLE == 0
+    uvec2 tapCell = uvec2(index % LENS_VIS_SQUARE_GRID, index / LENS_VIS_SQUARE_GRID);
+    atomicAdd(sharedMoments[0], tapVisible * tapCell.x);
+    atomicAdd(sharedMoments[1], tapVisible * tapCell.y);
+    atomicAdd(sharedMoments[2], tapVisible * tapCell.x * tapCell.x);
+    atomicAdd(sharedMoments[3], tapVisible * tapCell.y * tapCell.y);
+        #endif
     #endif
     atomicAdd(sharedFarHidden, farHiddenTap(index));
 #endif
@@ -448,11 +468,20 @@ void main() {
     frameData.skyParams[3].z = mix(hiddenPrev, hiddenNow, 1.0 - exp(-LENS_VIS_SPEED * dt));
 #endif
 #if defined LENS_FLARE && defined HAS_SKY
-    float visNow = float(sharedVisible) / float(VIS_SCALE * 256u) * (1.0 - 0.85 * rainStrength);
+    float visScale = (1.0 - 0.85 * rainStrength) / float(VIS_SCALE * 256u);
+    float visNow = float(sharedVisible) * visScale;
     float visPrev = frameData.postParams[2].x;
     if (!initialized || isnan(visPrev) || isinf(visPrev)) visPrev = visNow;
     // 隠れる向きは速く追う (平滑化はちらつきを抑えるためで、遮られた光源のフレアを残すためではない)
     float visSpeed = visNow < visPrev ? LENS_VIS_HIDE_SPEED : LENS_VIS_SPEED;
-    frameData.postParams[2].xy = vec2(mix(visPrev, visNow, 1.0 - exp(-visSpeed * dt)), visNow);
+    float visBlend = 1.0 - exp(-visSpeed * dt);
+    frameData.postParams[2].xy = vec2(mix(visPrev, visNow, visBlend), visNow);
+    #if SUN_MOON_STYLE == 0
+    // 見えている部分の位置と広がり。見え具合と同じ重みと平滑で持つので、final が割れば同じ時刻の重心と分散になる
+    vec4 momentsNow = vec4(sharedMoments[0], sharedMoments[1], sharedMoments[2], sharedMoments[3]) * visScale;
+    vec4 momentsPrev = frameData.postParams[3];
+    if (!initialized || any(isnan(momentsPrev)) || any(isinf(momentsPrev))) momentsPrev = momentsNow;
+    frameData.postParams[3] = mix(momentsPrev, momentsNow, visBlend);
+    #endif
 #endif
 }

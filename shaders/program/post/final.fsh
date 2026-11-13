@@ -191,6 +191,25 @@ float flareVisibility() {
     float v = frameData.postParams[2].x;
     return isnan(v) ? 0.0 : saturate(v);
 }
+
+/*
+ * バニラの四角のうち見えている部分: 四角の半幅に対する中心 xy と半幅 zw。composite25 が持つ格子位置の重み付きモーメント
+ * (見え具合と同じ重みと平滑) から、同じ分散を持つ長方形に直す。格子 n 点幅の一様な長方形の分散は (n^2 - 1) / 12
+ */
+vec4 flareVisibleBox(float vis) {
+    const vec4 whole = vec4(0.0, 0.0, 1.0, 1.0);
+#if SUN_MOON_STYLE == 0
+    float grid = float(LENS_VIS_SQUARE_GRID);
+    vec4 m = frameData.postParams[3];
+    if (vis < 1e-4 || any(isnan(m)) || any(isinf(m))) return whole;
+    vec2 mean = m.xy / vis;
+    vec2 variance = max(m.zw / vis - mean * mean, 0.0);
+    vec2 cells = min(sqrt(12.0 * variance + 1.0), grid);
+    return vec4(((mean + 0.5) / grid) * 2.0 - 1.0, cells / grid);
+#else
+    return whole;
+#endif
+}
 #endif
 
 /*
@@ -379,7 +398,7 @@ void main() {
             float day = smoothstep(-0.1, 0.1, getSunDir().y);
             float gain = mix(LENS_MOON_FLARE, 1.0, day);
             float starGain = mix(LENS_MOON_STARBURST, 1.0, day);
-            hdr += lensFlare(uvFlare, lightUv, lightTint, starGain) * lightColor * (vis * gain * FLARE_GAIN);
+            hdr += lensFlare(uvFlare, lightUv, lightTint, starGain, flareVisibleBox(vis)) * lightColor * (vis * gain * FLARE_GAIN);
         }
     }
 #endif

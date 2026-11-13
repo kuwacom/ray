@@ -3,6 +3,8 @@
  * 設定の EV は EV100 (反射光式 EV100 = log2(L * 100 / 12.5)) として扱う。L はシーン単位の輝度
  * FrameData.postParams[0]: x = 順応済みの計測 EV100, y = 今フレームの計測 EV100, z = 初期化済みマーカー, w = 適用 EV100
  * FrameData.postParams[1]: x = オートフォーカスの目標距離 (デバッグ用), y = 順応済みの暗い側の計測 EV100 (夜の持ち上げ用)
+ * FrameData.postParams[2]: x = 平滑化済みのフレアの見え具合, y = 今フレーム
+ * FrameData.postParams[3]: バニラの四角の見えている点の格子位置の重み付きモーメント (x, y, x^2, y^2。見え具合と同じ重みと平滑)
  */
 #ifndef POST_EXPOSURE_GLSL
 #define POST_EXPOSURE_GLSL

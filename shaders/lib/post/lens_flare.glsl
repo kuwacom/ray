@@ -47,16 +47,20 @@ float ghostScaleClamp(float a) {
  * フレアの光源 (昼は太陽、夜は月) の形を tan 座標に写したもの。光源の向きでの tan 座標の微分で写す (光源の近くの 1 次近似)
  * u, v: バニラの四角の 2 軸 (長さが半幅)。ex と halfSize は u を x にした直交座標と、その座標での半幅 (画面の端の透視の斜交は無視する)
  * radius: 丸い円盤の半径
+ * offset: 四角の中心から、見えている部分の中心へのずれ (tan)
+ * visible: バニラの四角のうち見えている部分 (四角の半幅に対する中心 xy と半幅 zw)。遮られた部分には光源が無いので、
+ *   光源の位置と大きさをこの部分に合わせる (全体の強さだけ下げると、遮る物の上に四角全体の形のフレアが残る)
  */
 struct LensSource {
     vec2 u;
     vec2 v;
     vec2 ex;
     vec2 halfSize;
+    vec2 offset;
     float radius;
 };
 
-LensSource lensSource() {
+LensSource lensSource(vec4 visible) {
     CelestialShape shape = shadowLightShape();
     LensSource s;
     s.radius = shape.size;
@@ -67,6 +71,13 @@ LensSource lensSource() {
     float rz2 = shape.size / max(c.z * c.z, 1e-6);
     s.u = (r.xy * -c.z + c.xy * r.z) * rz2;
     s.v = (t.xy * -c.z + c.xy * t.z) * rz2;
+#if SUN_MOON_STYLE == 0
+    s.offset = s.u * visible.x + s.v * visible.y;
+    s.u *= visible.z;
+    s.v *= visible.w;
+#else
+    s.offset = vec2(0.0);
+#endif
     s.ex = normalize(s.u);
     s.halfSize = vec2(length(s.u), abs(dot(s.v, vec2(-s.ex.y, s.ex.x))));
     return s;
@@ -246,14 +257,15 @@ float lensDirt(vec2 uv) {
  * (既存のプリセットは歪曲後の元画像の座標、LENS_FLARE_OUTPUT_SPACE では両方とも出力の座標)
  * 戻り値は照度 1 あたりの輝度 (光源の照度と見え具合を掛けて使う)。lightTint は光源の色 (輝度 1 に正規化)
  * starGain は光条だけに掛ける倍率 (夜の月で弱める)
+ * visible はバニラの四角のうち見えている部分 (lensSource)。光源の位置はその中心に置く
  */
-vec3 lensFlare(vec2 uv, vec2 lightUv, vec3 lightTint, float starGain) {
+vec3 lensFlare(vec2 uv, vec2 lightUv, vec3 lightTint, float starGain, vec4 visible) {
     vec2 yTan = uvToTan(uv);
-    vec2 lightTan = uvToTan(lightUv);
+    LensSource src = lensSource(visible);
+    vec2 lightTan = uvToTan(lightUv) + src.offset;
     float fNumber = lensFNumber();
     float pxTan = 2.0 * lensTanHalf().y / viewHeight;
     vec2 d = yTan - lightTan;
-    LensSource src = lensSource();
     vec3 flare = vec3(0.0);
 
 #ifdef LENS_GHOSTS
