@@ -28,12 +28,15 @@ layout(std430, binding = 0) SSBO_FRAME_DATA_ACCESS buffer FrameDataBuffer {
     vec4 skySH[9];               // rgb = 空の放射の SH L2 係数 (照度は shEvalIrradiance で)
     vec4 skyParams[8];           // sky の自由領域 ([4] [5] [7] は prepare2 が書く、カメラの位置の雲の中の霧と、その板の上面・下面までの高さ。[6] は雨の空の置き換え)
 
-    // light (begin / deferred_a で書く)
+    // light (begin / deferred_a で書く。handLights は下)
     uvec4 lightStats;            // x = 前フレームの光源数, y = 溢れ数, z = エンティティ光源の登録締め切りフラグ (light), w = 前フレームに距離で間引いた数
 
     // surface の自由領域 ([0..2] は prepare が書く開けた水面の海の状態。lib/common/water_waves.glsl。[3] は prepare が書くきらめきのフレームの長さ。lib/common/water_glitter.glsl。
     // [4..5] は prepare が書く海・湖・川を混ぜた水の吸収・散乱・波頭の尖り・映り込みの散らし。lib/common/water_waves.glsl)
     vec4 surfaceParams[6];
+
+    // light (deferred_a で書く): 手持ち光源の画素によらない値。手 h (0 = 利き手, 1 = オフハンド) ごとに 3 つ。lib/light/hand_light.glsl の handLightAt
+    vec4 handLights[6];
 
     // post
     uint histogram[256];         // 露出ヒストグラム (composite25 内で毎フレームクリア)

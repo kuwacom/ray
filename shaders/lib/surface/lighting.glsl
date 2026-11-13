@@ -159,13 +159,12 @@ vec3 secondaryHitBlockLight(vec3 playerPos, vec3 normal, ivec2 screenTexel, floa
         bool mainHand = i == 0;
         int level = mainHand ? heldBlockLightValue : heldBlockLightValue2;
         if (level <= 0) continue;
-        LightDef d = getHandLightDef(mainHand ? heldItemId : heldItemId2);
-        vec3 toLight = getHandLightPositionSafe(mainHand) - playerPos;
+        HandLight h = handLightAt(mainHand);
+        vec3 toLight = h.pos - playerPos;
         float dist = length(toLight);
-        float range = lightRange(d, float(level));
-        if (dist >= range) continue;
-        float ndl = sphereLightNdotL(normal, toLight / max(dist, EPS), dist, d.shape.w);
-        E += lightEmission(d, float(level)) * lightFalloff(dist, range) * (ndl * HAND_LIGHT_BRIGHTNESS * handScale);
+        if (dist >= h.range) continue;
+        float ndl = sphereLightNdotL(normal, toLight / max(dist, EPS), dist, h.radius);
+        E += h.emission * lightFalloff(dist, h.range) * (ndl * HAND_LIGHT_BRIGHTNESS * handScale);
     }
     #endif
     return E;

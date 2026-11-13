@@ -19,6 +19,7 @@
 //@include "/lib/common/transforms.glsl"
 //@include "/lib/common/uniforms.glsl"
 //@include "/lib/common/voxel_space.glsl"
+//@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/buffers/images.glsl"
 //@include "/lib/buffers/block_data.glsl"
 //@include "/lib/ids/id_decode.glsl"
@@ -80,6 +81,53 @@ LightDef getHandLightDef(int itemId) {
     return getLightDef(LIGHT_TORCH);
 }
 
+/*
+ * 手持ち光源の画素によらない値 (frameData.handLights。手ごとに 3 つの vec4)
+ * 光源の定義・位置 (壁の中なら戻す)・揺らぎは画素ごとに求めると呼ぶ所ごとに数百行になるので、deferred_a が毎フレーム 1 回だけ求める
+ * 光らない手 (heldBlockLightValue が 0) の値は使わない。読む側は今までどおり uniform のレベルで判定する
+ */
+const int HAND_LIGHT_SLOTS = 3;
+
+struct HandLight {
+    vec3 pos;       // 光源の位置 (player 空間)。固体ブロックの中なら目へ戻した getHandLightPositionSafe
+    float range;    // 届く距離 lightRange
+    vec3 emission;  // lightEmission (HAND_LIGHT_BRIGHTNESS と揺らぎの前)
+    float flicker;  // 揺らぎの倍率 lightFlicker
+    vec3 handPos;   // 戻す前の手の位置 getHandLightPosition (照り返しとフォグの光の暈)
+    float radius;   // 光源の半径 LightDef.shape.w
+};
+
+HandLight handLightAt(bool mainHand) {
+    int base = mainHand ? 0 : HAND_LIGHT_SLOTS;
+    vec4 a = frameData.handLights[base];
+    vec4 b = frameData.handLights[base + 1];
+    vec4 c = frameData.handLights[base + 2];
+    HandLight h;
+    h.pos = a.xyz;
+    h.range = a.w;
+    h.emission = b.rgb;
+    h.flicker = b.a;
+    h.handPos = c.xyz;
+    h.radius = c.w;
+    return h;
+}
+
+#ifdef SSBO_FRAME_DATA_WRITE
+// deferred_a (light_bins.csh) が書く。位置の判定に今フレームのボクセルを読むので shadow の後で、読む側 (deferred10 以降) の前
+void handLightsStore() {
+    for (int i = 0; i < 2; i++) {
+        bool mainHand = i == 0;
+        int level = mainHand ? heldBlockLightValue : heldBlockLightValue2;
+        LightDef d = getHandLightDef(mainHand ? heldItemId : heldItemId2);
+        float flicker = lightFlicker(d.params.y, uvec3(mainHand ? 1u : 2u, 0x51u, 0x7Au));
+        int base = mainHand ? 0 : HAND_LIGHT_SLOTS;
+        frameData.handLights[base] = vec4(getHandLightPositionSafe(mainHand), lightRange(d, float(level)));
+        frameData.handLights[base + 1] = vec4(lightEmission(d, float(level)), flicker);
+        frameData.handLights[base + 2] = vec4(getHandLightPosition(mainHand), d.shape.w);
+    }
+}
+#endif
+
 // 手持ち光源の影に使う値。光源の位置 (player 空間) と半径、光源までの距離 (画面空間の影の長さ)
 struct HandShadowRay {
     vec3 lightPos;
@@ -97,25 +145,22 @@ bool handLightUnshadowed(bool mainHand, vec3 playerPos, vec3 geoNormal, out Ligh
     s = noLight();
     int level = mainHand ? heldBlockLightValue : heldBlockLightValue2;
     if (level <= 0) return false;
-    LightDef d = getHandLightDef(mainHand ? heldItemId : heldItemId2);
-    vec3 lightPos = getHandLightPositionSafe(mainHand);
-    vec3 toLight = lightPos - playerPos;
+    HandLight h = handLightAt(mainHand);
+    vec3 toLight = h.pos - playerPos;
     float dist = length(toLight);
-    float range = lightRange(d, float(level));
-    if (dist >= range) return false;
+    if (dist >= h.range) return false;
 
     s.direction = toLight / max(dist, EPS);
-    s.angularSize = atan(d.shape.w, max(dist, EPS));
-    float flicker = lightFlicker(d.params.y, uvec3(mainHand ? 1u : 2u, 0x51u, 0x7Au));
-    s.irradiance = lightEmission(d, float(level)) * lightFalloff(dist, range) * HAND_LIGHT_BRIGHTNESS * flicker;
+    s.angularSize = atan(h.radius, max(dist, EPS));
+    s.irradiance = h.emission * lightFalloff(dist, h.range) * HAND_LIGHT_BRIGHTNESS * h.flicker;
     r.dist = dist;
 
     // 一人称の手そのものはカメラの直近なので影を計算しない (自分の腕で遮ってしまう)
     bool isSelf = firstPersonCamera && length(playerPos) < HAND_SELF_DIST;
     if (isSelf || dot(geoNormal, s.direction) <= HAND_BACKFACE_COS) return false;
 
-    r.lightPos = lightPos;
-    r.lightRadius = d.shape.w;
+    r.lightPos = h.pos;
+    r.lightRadius = h.radius;
     return true;
 }
 
@@ -192,9 +237,9 @@ vec3 getHandLightFill(vec3 playerPos) {
         bool mainHand = i == 0;
         int level = mainHand ? heldBlockLightValue : heldBlockLightValue2;
         if (level <= 0) continue;
-        LightDef d = getHandLightDef(mainHand ? heldItemId : heldItemId2);
-        float dist = distance(getHandLightPosition(mainHand), playerPos);
-        sum += lightEmission(d, float(level)) * lightFalloff(dist, lightRange(d, float(level)));
+        HandLight h = handLightAt(mainHand);
+        float dist = distance(h.handPos, playerPos);
+        sum += h.emission * lightFalloff(dist, h.range);
     }
     return sum * (HAND_LIGHT_FILL * HAND_LIGHT_BRIGHTNESS * handLightIndirectScale());
 #else

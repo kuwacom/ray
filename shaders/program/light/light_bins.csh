@@ -9,6 +9,7 @@
  *        到着順に関係なく枠 j に j+1 番目に大きいキーが残る (atomic の挿入ソート)。最後の 1 枠には外れたうち最大のキーが残る
  *        重要度は光源とビンの位置関係だけで決まり、カメラの向きや揺らぎに依らないので、止まった光源の組は毎フレーム同じ
  * スレッド 0 は次フレームの光源の間引き距離 (globalLights.cullDistance) も決める (LIGHT_CULL_MODE 1/2)
+ * スレッド 0 は手持ち光源の画素によらない値 (frameData.handLights) も書く (今フレームのボクセルが要り、読むパスはすべてこの後)
  * light モジュール (lib/light)
  */
 // このプログラムで書く SSBO (lib/buffers。ほかのプログラムでは readonly)
@@ -157,6 +158,9 @@ void main() {
     uint i = gl_GlobalInvocationID.x;
     if (i == 0u) {
         frameData.lightStats.z = 1u;
+#ifdef HAND_LIGHT
+        handLightsStore();
+#endif
 #if LIGHT_CULL_MODE != 0
         updateCullDistance();
 #endif

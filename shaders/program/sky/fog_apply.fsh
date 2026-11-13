@@ -162,10 +162,9 @@ vec3 handLightGlow(vec3 dir, float dist, vec3 scatterCoeff, bool inWater) {
         bool mainHand = hand == 0;
         int level = mainHand ? heldBlockLightValue : heldBlockLightValue2;
         if (level <= 0) continue;
-        int index = getItemLightIndex(mainHand ? heldItemId : heldItemId2);
-        LightDef d = getLightDef(index != LIGHT_NONE ? index : LIGHT_TORCH);
-        vec3 intensity = lightEmission(d, float(level)) * HAND_LIGHT_BRIGHTNESS;
-        vec3 lightPos = getHandLightPosition(mainHand);
+        HandLight h = handLightAt(mainHand);
+        vec3 intensity = h.emission * HAND_LIGHT_BRIGHTNESS;
+        vec3 lightPos = h.handPos;
         float t0 = dot(lightPos, dir);
         float h2 = max(dot(lightPos, lightPos) - t0 * t0, 0.0);
         float a = sqrt(h2 + 1.0);

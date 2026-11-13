@@ -220,7 +220,7 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 
 | binding | 名前 (アクセサ) | ファイル | サイズ | 内容 | 書くプログラム (`SSBO_<名前>_WRITE`) |
 |---|---|---|---|---|---|
-| 0 | FrameDataBuffer (`frameData`) | `frame_data.glsl` | 4096 | post: exposure, exposureTarget, averageLuminance, focusDistance, histogram[256], postParams[] (4 個) / sky: sunIrradiance, moonIrradiance, shadowLightIrradiance, skySH[9], skyParams[8] (`[3]` = 目の位置の太陽の見え方: x 今フレーム (フレア用)、y 平滑化済み (影マップより遠いフォグ用)、z 太陽が影マップの範囲より遠い地形に隠れている割合 (post が書く)。`[4]` = (カメラの位置の雲の中の太陽の光 rgb, 雲の濃さ。0 なら雲の外)、`[5]` = (雲の中の空の光 rgb, 雲の中の霧の消散係数 1/ブロック)、`[6]` = (雨の日の雲の向こうの空を置き換える灰色の放射輝度 rgb, 置き換える割合)、`[7]` = (カメラのいる板の上面までの高さ, 下面までの高さ。0 なら板の外) (`[4]` `[5]` `[6]` `[7]` は prepare2 が書く)) / light: lightStats / surface: surfaceParams[6] (`[0..2]` = 開けた水面 (スカイライトが風の当たる上限以上) の海の状態。層の傾き 5・表面張力波の傾き 2・風速・高さの RMS。prepare が毎フレーム書く。`[3]` = WATER_GLITTER の点の寿命に使うフレームの長さ (x 平滑化した frameTime, y 半オクターブの段に丸めた長さ (秒), z 段の番号)。WATER_GLITTER の時だけ prepare が書く。`[4]` = (水の吸収 rgb, 波頭の尖り)、`[5]` = (水の散乱 rgb, 映り込みの散らしの割合)。海・湖・川の設定をカメラのバイオームの重みで混ぜた値で、prepare が毎フレーム書く。prepare より前の shadow パスは 1 フレーム前の値を読む) | `FRAME_DATA`: setup (初期値), begin・deferred_a (lightStats), prepare (sky、surfaceParams[0..5]), prepare2 (skyParams[4..7]), composite25 (post) |
+| 0 | FrameDataBuffer (`frameData`) | `frame_data.glsl` | 4096 | post: exposure, exposureTarget, averageLuminance, focusDistance, histogram[256], postParams[] (4 個) / sky: sunIrradiance, moonIrradiance, shadowLightIrradiance, skySH[9], skyParams[8] (`[3]` = 目の位置の太陽の見え方: x 今フレーム (フレア用)、y 平滑化済み (影マップより遠いフォグ用)、z 太陽が影マップの範囲より遠い地形に隠れている割合 (post が書く)。`[4]` = (カメラの位置の雲の中の太陽の光 rgb, 雲の濃さ。0 なら雲の外)、`[5]` = (雲の中の空の光 rgb, 雲の中の霧の消散係数 1/ブロック)、`[6]` = (雨の日の雲の向こうの空を置き換える灰色の放射輝度 rgb, 置き換える割合)、`[7]` = (カメラのいる板の上面までの高さ, 下面までの高さ。0 なら板の外) (`[4]` `[5]` `[6]` `[7]` は prepare2 が書く)) / light: lightStats、handLights[6] (手持ち光源の画素によらない値。手 h (0 = 利き手、1 = オフハンド) ごとに `[3h]` = (光源の位置 xyz (player 空間、固体ブロックの中なら目へ戻した位置), 届く距離)、`[3h+1]` = (放射 rgb (HAND_LIGHT_BRIGHTNESS と揺らぎの前), 揺らぎの倍率)、`[3h+2]` = (戻す前の手の位置 xyz, 光源の半径)。宣言の並びは surfaceParams の後) / surface: surfaceParams[6] (`[0..2]` = 開けた水面 (スカイライトが風の当たる上限以上) の海の状態。層の傾き 5・表面張力波の傾き 2・風速・高さの RMS。prepare が毎フレーム書く。`[3]` = WATER_GLITTER の点の寿命に使うフレームの長さ (x 平滑化した frameTime, y 半オクターブの段に丸めた長さ (秒), z 段の番号)。WATER_GLITTER の時だけ prepare が書く。`[4]` = (水の吸収 rgb, 波頭の尖り)、`[5]` = (水の散乱 rgb, 映り込みの散らしの割合)。海・湖・川の設定をカメラのバイオームの重みで混ぜた値で、prepare が毎フレーム書く。prepare より前の shadow パスは 1 フレーム前の値を読む) | `FRAME_DATA`: setup (初期値), begin・deferred_a (lightStats)、deferred_a (handLights), prepare (sky、surfaceParams[0..5]), prepare2 (skyParams[4..7]), composite25 (post) |
 | 1 | BlockDataBuffer (`blockData`) | `block_data.glsl` | 65536 | `LightDef lightDefs[256]`, `uvec4 shapes[128]`, `vec4 tints[128]`, `uint albedo[4096]` (ブロックの平均の色), `uint albedoUp[4096]` (上向きの面の色), `uvec4 lightMasks[]` (光るブロックの面の光り方、128 光源 x 上・下・側面・前面の 512 個) | `BLOCK_DATA`: setup のみ |
 | 2 | GlobalLightsBuffer (`globalLights`) | `global_lights.glsl` | 295200 | `count/blockCount/entityCount/overflow`, `cullDistance/culled` + `cullHist[64]` (間引き距離と距離の分布), `LightInstance lights[8192]` (posRadius: ボクセル空間位置 + 到達半径, colorSize: 放射 + 光源半径), `lightPower[]` (揺らぎ前の放射の輝度、8192 個)。使うのは LIGHT_MAX_COUNT 個まで | `GLOBAL_LIGHTS`: setup, begin, deferred, deferred_a |
 | 3 | LightBinsBuffer (`lightBins`) | `light_bins.glsl` | 10944512 (LIGHT_BIN_LIGHTS > 64 で 21430272) | `binCount[40960]`, `entityAcc[32768]` (エンティティ光源の蓄積表), `binLights[]` (40960 x 65 個、> 64 で x 129)。ビン = 8³ ブロック、1 ビン LIGHT_BIN_LIGHTS + 1 枠。枠のキー = 重要度 19 bit + 光源インデックス 13 bit | `LIGHT_BINS`: setup, begin, deferred_a, shadow_entities・shadow_block の gsh と gbuffers_entities・gbuffers_entities_translucent の vsh (蓄積表) |
@@ -390,8 +390,9 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 
 - 両手独立 (`oldHandLight = false`)。強さ = `heldBlockLightValue(2)`、色 = `heldItemId(2)` -> 光源テーブル
 - 位置: 一人称は view 空間の固定オフセット (利き手で左右反転)、三人称は `playerBodyVector` / `relativeEyePosition` から構築 (Shrimple basic_hand 相当)
+- 画素によらない値 (光源の定義から求める届く距離・放射・半径、揺らぎ、位置と壁の中なら目へ戻した位置) は deferred_a が毎フレーム 1 回求めて FrameData.handLights に置き、画素ごとの関数は `handLightAt` で読むだけ (呼ぶ所ごとに数百行の展開になっていたため)。今フレームのボクセルを読むので shadow の後の deferred_a で書き、読むのは deferred10 以降
 - 影: HAND_LIGHT_RAYS = DDA (自分のビットは無視)、HAND_LIGHT_SS_SHADOWS = 深度バッファの短いレイ (手・武器・近くのモブ)。両方掛けると「壁 + エンティティ」の両方が遮る
-- ピクセルごとの直接計算で floodfill には注入しない (二重加算防止)。フォグへの寄与は composite19.fsh が `getHandLightPosition` の位置から点光源の内散乱を視線に沿って解析積分して足す (影は無視。水中は水の吸収と散乱で弱まるので、角度を等分した数値積分にする)
+- ピクセルごとの直接計算で floodfill には注入しない (二重加算防止)。フォグへの寄与は composite19.fsh が戻す前の手の位置 (`handLightAt` の handPos) から点光源の内散乱を視線に沿って解析積分して足す (影は無視。水中は水の吸収と散乱で弱まるので、角度を等分した数値積分にする)
 - 受け渡し: `getHandLights(playerPos, geoNormal, dither, out mainHand, out offHand)` が `LightSample` を返す。設置光源もトレースする所 (前方シェーディングの不透明物・半透明の面の鏡面) は surface の `gatherTracedLights` (`lib/surface/surface_lights.glsl`) が、手持ち光源・光源ごとの鏡面・前方シェーディングのビンの光源を 1 本のループで回し、ボクセルのトレースを 1 か所で呼んで `LightSample` を返す (NVIDIA は関数を全部展開するので、トレースを呼ぶ所の数だけリンクが延びる)
 
 ### ドロップ・投擲・燃焼・発光エンティティ
@@ -624,7 +625,8 @@ light モジュールが提供 (`//@include "/lib/light/light.glsl"`):
 | `selectBlockSpecularLights` / `blockSpecularSample` / `forwardEntityLightUnshadowed` / `forwardEntityBlockLight` | surface (`gatherTracedLights`) | 光源ごとにトレースする鏡面 (半透明の面) と、前方シェーディングのビンの光源の部品。トレースは呼ぶ側の 1 か所 |
 | `void getHandLights(vec3 playerPos, vec3 geoNormal, float dither, out LightSample mainHand, out LightSample offHand)` | surface (`gatherSurfaceLights`。設置光源をトレースしない時) | 両手の光 |
 | `bool handLightUnshadowed(bool mainHand, vec3 playerPos, vec3 geoNormal, out LightSample s, out HandShadowRay r)` / `handShadowTarget` / `applyHandLightTrace` / `applyHandLightContactShadow` / `int handLightCount()` | surface (`gatherTracedLights`) | 影の前の手の光、トレースの終点とフラグ、影の掛け方。トレースは呼ぶ側の 1 か所 |
-| `vec3 getHandLightPosition(bool mainHand)` | sky (composite19 の手持ち光源のフォグ) | 手持ち光源の player 空間位置 |
+| `HandLight handLightAt(bool mainHand)` | surface (lighting の 2 次ヒット)、sky (composite19 の手持ち光源のフォグ) | 手持ち光源の画素によらない値 (位置・届く距離・放射・揺らぎ・戻す前の手の位置・半径)。frameData.handLights を読むだけ |
+| `vec3 getHandLightPosition(bool mainHand)` / `getHandLightPositionSafe` | light 内部 (deferred_a の `handLightsStore`) | 手持ち光源の player 空間位置 (Safe は固体ブロックの中なら目へ戻す) |
 | `vec3 sampleFloodfill(vec3 playerPos, vec3 normal)` / `vec3 sampleFloodfillVolume(vec3 playerPos)` / `float floodCoverage(vec3 playerPos)` | surface (GI), sky | floodfill 照度 |
 | `vec3 sampleBlockLightVolume(vec3 playerPos)` | sky (FOG_BLOCKLIGHT) | 体積内の点のブロックライト |
 | `vec3 traceVisibility(vec3 fromVoxel, vec3 toVoxel, uint flags, float dither, float entSkipStart, float entSkipEnd)` | light 内部, surface (lighting の最強の光源) | 2 点間の色付き透過率。flags = TRACE_ENTITIES / TRACE_PLAYER / TRACE_TINT / TRACE_SHAPES |
@@ -695,7 +697,7 @@ post モジュールが提供 (`//@include "/lib/post/post.glsl"`):
 | voxelBlock / Entity / Emit | 書く | 読む | 読む | 読む (debug) |
 | floodImgA/B | 書く | 読む (関数経由) | 読む (関数経由) | 読む (debug) |
 | SSBO1 BlockData, SSBO2, SSBO3, SSBO4 | 書く | 読む | 読む | 読む |
-| SSBO0 FrameData | lightStats を書く | sun/moon/SH/skyParams[0..3] と surfaceParams[0..5] (開けた水面の海の状態、きらめきのフレームの長さ、海・湖・川を混ぜた水の性質) を書く (prepare2 が skyParams[4..7] を書く) | surfaceParams[0..5] を読む | exposure/focus/histogram/postParams と skyParams[3].z を書く |
+| SSBO0 FrameData | lightStats と handLights (手持ち光源) を書く | sun/moon/SH/skyParams[0..3] と surfaceParams[0..5] (開けた水面の海の状態、きらめきのフレームの長さ、海・湖・川を混ぜた水の性質) を書く (prepare2 が skyParams[4..7] を書く) | surfaceParams[0..5] を読む | exposure/focus/histogram/postParams と skyParams[3].z を書く |
 | shadowtex / shadowcolor | 書く (shadow パス) | 読む | 読む | - |
 | colortex1/2/3/15 | 読む | 読む | 書く | 読む |
 | colortex4/5 | - | colortex4 に雨を書く | 書く | - |
