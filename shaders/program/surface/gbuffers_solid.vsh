@@ -4,9 +4,9 @@
  * surface モジュール (GBUF_ENTITIES の光源登録呼び出しは light モジュールの関数)
  */
 #ifdef GBUF_ENTITIES
-    // injectEntityLight が voxelEmitImg とエンティティ光源の蓄積表に書く (lib/buffers/images.glsl, light_bins.glsl)
+    // injectEntityLight が voxelEmitImg とエンティティ光源の蓄積表に書く (lib/buffers/images.glsl)
+    // 蓄積表に書く SSBO_LIGHT_BINS_WRITE は lib/buffers/light_bins.glsl が定義する
     #define IMG_VOXEL_EMIT
-    #define SSBO_LIGHT_BINS_WRITE
 #endif
 //@include "/lib/common/common.glsl"
 //@include "/lib/common/constants.glsl"

@@ -4,9 +4,9 @@
  * surface モジュール (lib/surface)
  */
 #ifdef GBUF_ENTITIES_TRANSLUCENT
-    // 半透明で描かれる光源エンティティ (アレイ等) も画面内で登録する (lib/buffers/images.glsl, light_bins.glsl)
+    // 半透明で描かれる光源エンティティ (アレイ等) も画面内で登録する (lib/buffers/images.glsl)
+    // 蓄積表に書く SSBO_LIGHT_BINS_WRITE は lib/buffers/light_bins.glsl が定義する
     #define IMG_VOXEL_EMIT
-    #define SSBO_LIGHT_BINS_WRITE
 #endif
 //@include "/lib/common/common.glsl"
 //@include "/lib/common/constants.glsl"

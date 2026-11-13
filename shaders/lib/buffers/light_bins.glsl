@@ -2,12 +2,18 @@
  * SSBO binding 3: ワールド空間のライトビン (light, deferred_a.csh が書く) とエンティティ光源の蓄積表
  * ビン = LIGHT_BIN_SIZE^3 ブロック。index = x + y*GRID.x + z*GRID.x*GRID.y
  * 確保: LIGHT_BIN_LIGHTS <= 64 で 10944512 バイト, それより上で 21430272 バイト (shaders.properties の bufferObject.3)
- * 既定は readonly。書くプログラム (setup・begin・deferred_a、蓄積表に足す shadow_entities / shadow_block と
- * gbuffers_entities / gbuffers_entities_translucent) は include の前に SSBO_LIGHT_BINS_WRITE を定義する
+ * 既定は readonly。書くプログラム (setup・begin・deferred_a、蓄積表に足す shadow_entities / shadow_block) は
+ * include の前に SSBO_LIGHT_BINS_WRITE を定義する。gbuffers_entities / gbuffers_entities_translucent はここで定義する
  * 設定で変わる大きさ (LIGHT_BIN_CAPACITY, LIGHT_BIN_GRID, LIGHT_BIN_KEYS_ALLOC) は lib/light/light_bins.glsl
  */
 #ifndef BUFFERS_LIGHT_BINS_GLSL
 #define BUFFERS_LIGHT_BINS_GLSL
+
+// 同じプログラムの頂点とフラグメントで readonly が食い違うと AMD はリンクで落とす (NVIDIA は通す) ので、
+// 頂点側が書くプログラムはフラグメント側も同じ宣言にする。段ごとに定義せずここで 1 か所にそろえる
+#if (defined GBUF_ENTITIES || defined GBUF_ENTITIES_TRANSLUCENT) && !defined SSBO_LIGHT_BINS_WRITE
+    #define SSBO_LIGHT_BINS_WRITE
+#endif
 
 #ifdef SSBO_LIGHT_BINS_WRITE
     #define SSBO_LIGHT_BINS_ACCESS

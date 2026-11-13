@@ -9,6 +9,7 @@ glslangValidator は仕様の文法しか見ないので、ドライバ固有の
 - 宣言数 (glslang -E で前処理した本文から数える。NVIDIA は未使用でも宣言数で弾くことがある)
 - アクティブ数 (リンク後のイントロスペクション。Iris はこれを image unit / texture unit に割り当てる)
 - compute の local size / workGroups / shared メモリ、カスタムイメージのサイズ、SSBO のサイズ
+- 同じプログラムの段の間でブロック・uniform の宣言 (readonly などの修飾子、layout、メンバー、型) が食い違わないか (AMD はリンクで落とす)
 
 使い方:
     uv run tools/gl_compile_check.py                    # 高速: 既定値 x world0 + 前回成功から変わったプログラムだけ
@@ -51,6 +52,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import validate_shaders as vs  # noqa: E402 - 同じディレクトリの前処理を再利用する
+from lib.glsl_decls import stage_mismatches  # noqa: E402
 from lib.properties import disabled_programs, preprocess_properties  # noqa: E402
 
 try:
@@ -678,6 +680,8 @@ def check_usage(name: str, stages: list[StageSource], res: ProgramResult, limits
             u[f"ssboNeed.{binding}"] = need
             if alloc is not None and need > alloc:
                 problems.append(f"SSBO binding {binding} の {const} 要素で {need} bytes > bufferObject.{binding} = {alloc}")
+    # AMD は段ごとに違う宣言 (readonly の有無など) をリンクで落とす。NVIDIA は通すのでここで拾う
+    problems += stage_mismatches({s.stage: s.preprocessed for s in stages})
     declared_images_total = 0
     for s in stages:
         pre = s.preprocessed
