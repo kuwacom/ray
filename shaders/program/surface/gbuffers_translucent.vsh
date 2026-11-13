@@ -88,6 +88,9 @@
     in vec2 mc_Entity;
     in vec4 at_midBlock;
 #endif
+#ifdef GBUF_ENTITIES_TRANSLUCENT
+    in vec2 mc_midTexCoord;
+#endif
 in vec4 at_tangent;
 
 out vec2 texcoord;
@@ -96,6 +99,9 @@ out vec4 glcolor;
 out vec3 viewPos;
 out vec3 normalPlayer;
 out vec4 tangentPlayer;
+// 面の UV の中心と半幅 (金属の防具の自動法線が隣の面の絵を読まないように。gbuffers_solid.vsh と同じ)
+out vec2 tileMid;
+out vec2 tileHalf;
 flat out int blockId;
 
 void main() {
@@ -108,6 +114,13 @@ void main() {
     blockId = terrainBlockId(int(round(mc_Entity.x)));
 #else
     blockId = 0;
+#endif
+#ifdef GBUF_ENTITIES_TRANSLUCENT
+    tileMid = mc_midTexCoord;
+    tileHalf = abs(texcoord - mc_midTexCoord);
+#else
+    tileMid = vec2(0.5);
+    tileHalf = vec2(0.5);
 #endif
     viewPos = (gl_ModelViewMatrix * gl_Vertex).xyz;
 #ifdef GBUF_ENTITIES_TRANSLUCENT

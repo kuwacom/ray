@@ -90,6 +90,13 @@ vec4 encodeTranslucentData(vec3 normal, vec2 lightmap, int materialId) {
     return vec4(octEncode(normal), pack2x8(lightmap), pack2x8(vec2(float(materialId) / UNORM8_MAX, 0.0)));
 }
 
+/*
+ * 金属の防具の環境光の鏡面の重み (gbuffers_entities_translucent -> composite2) は colortex15 (速度) の rgb に、この倍率で小さくして置く
+ * 速度を読む側は a を見るが双線形で読むので、隣の速度の画素 (a = 1) と混ざった所では rg が速度として使われる。小さくして再投影のずれを 0.1 画素未満にする
+ * (RGBA16F の非正規化数でも 1/1000 程度の精度が残る)
+ */
+const float ARMOR_ENV_WEIGHT_SCALE = 1e-4;
+
 void decodeTranslucentData(vec4 d, out vec3 normal, out vec2 lightmap, out int materialId) {
     normal = octDecode(d.rg);
     lightmap = unpack2x8(d.b);

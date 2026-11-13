@@ -154,7 +154,7 @@ void main() {
             vec3 armorN = dot(nT, armorV) < 0.0 ? -nT : nT;
             float roughness = 1.0 - unpack2x8(data.a).y;
             vec3 armorEnv = reflectionAt(texel, armorDist, reflect(-armorV, armorN), lmT.y, roughness, vec3(0.0))
-                * texelFetch(colortex15, texel, 0).rgb;
+                * (texelFetch(colortex15, texel, 0).rgb / ARMOR_ENV_WEIGHT_SCALE);
             result += armorEnv;
             sparkle += luminance(sparkleExcess(armorEnv, getExposure()));
         }

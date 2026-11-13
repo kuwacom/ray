@@ -18,6 +18,7 @@
 //@include "/lib/light/light.glsl"
 //@include "/lib/surface/surface_lights.glsl"
 //@include "/lib/surface/water_self.glsl"
+//@include "/lib/surface/generated_normal.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -97,6 +98,7 @@
 #include "/lib/light/light.glsl"
 #include "/lib/surface/surface_lights.glsl"
 #include "/lib/surface/water_self.glsl"
+#include "/lib/surface/generated_normal.glsl"
 // END GENERATED includes
 
 in vec2 texcoord;
@@ -105,11 +107,21 @@ in vec4 glcolor;
 in vec3 viewPos;
 in vec3 normalPlayer;
 in vec4 tangentPlayer;
+in vec2 tileMid;
+in vec2 tileHalf;
 flat in int blockId;
 
 #if defined GBUF_ENTITIES_TRANSLUCENT || defined GBUF_BLOCK_TRANSLUCENT
     #define GBUF_FORWARD_OPAQUE
 #endif
+// 金属の防具にだけ、金属ブロックと同じ自動法線を付ける (模様の凹凸が映り込みと照り返しに出る)
+#if defined GBUF_ENTITIES_TRANSLUCENT && defined AUTO_METAL_PARTS && defined GENERATED_NORMALS && PBR_FORMAT == 0 && defined GENERATED_NORMAL_ENTITIES
+    #define ARMOR_GENERATED_NORMALS
+#endif
+// テクスチャ法線と視線の内積の下限 (gbuffers_solid.fsh と同じ)
+const float ARMOR_FRONT_FACING_MIN_NOV = 0.05;
+// 防具の自動法線の強さ (ブロックに対する割合)。防具のテクスチャは明暗の差が大きく、ブロックと同じ強さではテクセルごとに照り返しが散って槌目のように荒れた
+const float ARMOR_GENERATED_NORMAL_SCALE = 0.5;
 
 #ifdef GBUF_PARTICLES_TRANSLUCENT
     /* RENDERTARGETS: 4 */
@@ -237,6 +249,15 @@ void main() {
         g.f0 = metalParams.f0;
     }
 #endif
+    // 照らす法線。金属の防具だけ自動法線 (画面微分を使うので、分岐の外で求めて金属の画素にだけ使う)
+    vec3 shadeNormal = geoNormal;
+#ifdef ARMOR_GENERATED_NORMALS
+    vec3 armorT = normalize(tangentPlayer.xyz - geoNormal * dot(geoNormal, tangentPlayer.xyz));
+    vec3 armorB = cross(armorT, geoNormal) * (tangentPlayer.w < 0.0 ? -1.0 : 1.0);
+    vec3 armorTs = mix(vec3(0.0, 0.0, 1.0), generatedNormal(texcoord, playerPos, tileMid, tileHalf), ARMOR_GENERATED_NORMAL_SCALE);
+    vec3 armorN = normalize(mat3(armorT, armorB, geoNormal) * armorTs);
+    if (shiny) shadeNormal = frontFacingNormal(armorN, V, ARMOR_FRONT_FACING_MIN_NOV);
+#endif
     Material m = decodeMaterial(g);
     float directScale = 1.0;
     if (shiny && m.metalId == METAL_ALBEDO) {
@@ -278,7 +299,7 @@ void main() {
     }
 #endif
 
-    vec3 color = forwardDiffuse(m, playerPos, geoNormal, geoNormal, V, dither, shiny, directScale);
+    vec3 color = forwardDiffuse(m, playerPos, shadeNormal, geoNormal, V, dither, shiny, directScale);
     if (materialId == MAT_NETHER_PORTAL) color += m.albedo * getVisibleEmissionLuminance() * EMISSION_STRENGTH;
 #ifdef GBUF_FORWARD_OPAQUE
     // G バッファ経路 (solid.fsh の estimateEmission) と同じく、発光エンティティは明るい画素だけ光らせる
@@ -323,11 +344,11 @@ void main() {
     /*
      * 金属・宝石の装備は deferred の後に描かれ、G バッファの反射を受けない。半透明の表面 (水・ガラス) と同じく colortex5 に印を残し、
      * composite.csh が反射を辿り、composite2 が 反射 x 重み を足す。予備 8bit は滑らかさ
-     * 重み (方向アルベド x 補償。金属は F0 の色) は colortex15 の rgb に置く。a = 0 の画素の rgb は速度として読まれない (読む側は a を見る)
+     * 重み (方向アルベド x 補償。金属は F0 の色) は colortex15 の rgb に小さくして置く (ARMOR_ENV_WEIGHT_SCALE、lib/common/gbuffer.glsl)
      */
     if (shiny && albedo.a > 0.99) {
-        outData = encodeTranslucentDataTint(geoNormal, lmcoord, MAT_METAL_ARMOR, int(round(g.smoothness * UNORM8_MAX)));
-        outVelocity.rgb = envSpecularWeight(m, max(abs(dot(geoNormal, V)), 1e-3));
+        outData = encodeTranslucentDataTint(shadeNormal, lmcoord, MAT_METAL_ARMOR, int(round(g.smoothness * UNORM8_MAX)));
+        outVelocity.rgb = envSpecularWeight(m, max(dot(shadeNormal, V), 1e-3)) * ARMOR_ENV_WEIGHT_SCALE;
     }
 #endif
 }
