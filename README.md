@@ -1,5 +1,7 @@
 # Ray
 
+[English](README.en.md) | 日本語
+
 ![Version](https://img.shields.io/badge/version-v0.1.0--alpha-orange)
 ![Iris](https://img.shields.io/badge/Iris-1.8%2B-5b6ee1)
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.x%20%E2%80%93%2026.x-62b47a)
@@ -12,6 +14,13 @@ Rayは元々私が欲しかった他のシェーダーにない機能を全て�
 このシェーダーは、外部のCGツールを挟まずシネマティックルックをゲーム内だけで完結させるのが目的です
 
 現在はナチュラル寄りの見た目で制作しています
+
+<p align="center">
+  <img src="images/full_2026-11-13_16.23.29.jpg" width="49%" alt="夜の水辺に映るランタンの光">
+  <img src="images/full_2026-11-13_15.49.47.jpg" width="49%" alt="夕日の光芒と水面に浮かぶボート">
+  <img src="images/full_2026-11-13_17.21.17.jpg" width="49%" alt="魚眼レンズで見上げた桜の木と太陽">
+  <img src="images/full_2026-11-13_17.45.38.jpg" width="49%" alt="夕方の桜並木と雲">
+</p>
 
 ## 特徴
 
@@ -30,8 +39,6 @@ Helios 44-2 や Sonnar のようなオールドレンズから、Hologon や Fle
 > [!WARNING]
 > 現在はまだアルファ版です
 > 見た目と負荷はまだ調整中で、設定項目や既定値は予告なく変わる可能性があります
-
-<!-- スクショ予定 -->
 
 ## 動作環境
 
