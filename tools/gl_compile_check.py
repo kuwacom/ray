@@ -24,6 +24,8 @@ glslangValidator は仕様の文法しか見ないので、ドライバ固有の
     uv run tools/gl_compile_check.py --all-programs     # program.*.enabled で無効なプログラムも検査する
     uv run tools/gl_compile_check.py --time --gpu 1070  # 検査の代わりにコールドのコンパイル時間を測る
     uv run tools/gl_compile_check.py --shaders <dir>    # 別のフォルダのシェーダーを検査する
+    uv run tools/gl_compile_check.py --asm --gpu 1070 --section gbuffers_hand_water   # NV のアセンブリの行数 (時間なし。--time を足すと時間も)
+    uv run tools/gl_compile_check.py --asm --ray --gpu 1070                           # 保存した設定 (Ray.txt) で。パスも渡せる
 
 必要なもの: glfw, PyOpenGL (uv sync で入る)
 """
@@ -38,6 +40,7 @@ import json
 import os
 import re
 import shutil
+import statistics
 import subprocess
 import sys
 import tempfile
@@ -825,9 +828,58 @@ def cold_build_time(stages: list[StageSource], nonce: str) -> tuple[float, float
     return t1 - t0, t2 - t1, ok
 
 
+def asm_stats(stages: list[StageSource], all_stages: bool = False) -> str | None:
+    """
+    ### asm_stats
+    リンク後のドライバのバイナリに入っている NV のアセンブリの行・一時変数・ループの数を数える
+    時間はほかの負荷で ±30〜50% 揺れるが、行は揺れないので、変更の前後の比較に使う
+
+    @param stages - プログラムのステージ
+    @param all_stages - 頂点・ジオメトリも数える (既定はフラグメントとコンピュート)
+    @returns 「ステージ lines=.. temps=.. ...」を `; ` でつないだ文字列。リンクに失敗したら None
+    """
+    p = start_link(stages, "error", start_compiles(stages), retrievable=True)
+    data = program_binary(p.prog) if p.prog and GL.glGetProgramiv(p.prog, GL.GL_LINK_STATUS) else b""
+    if not finish_link(p, "error").ok:
+        return None
+    text = data.decode("latin-1")
+    out = []
+    for m in re.finditer(r"!!NV(\w+)5\.0", text):
+        if m.group(1) not in ("fp", "cp") and not all_stages:
+            continue
+        e = re.compile(r"\nEND\s*(\n|\x00|$)").search(text, m.start())
+        a = text[m.start():e.start() + 4] if e else text[m.start():]
+        temps = sum(len(x.split(",")) for x in re.findall(r"^TEMP (R\d+(?:, R\d+)*);", a, re.M))
+        lmem = sum(int(x) for x in re.findall(r"TEMP lmem\d+\[(\d+)\];", a))
+        calls = len(re.findall(r"^\s*CAL", a, re.M))
+        rep = len(re.findall(r"^\s*REP", a, re.M))
+        tex = len(re.findall(r"^\s*(?:TEX|TXL|TXF|TXD|TXG|TXB|LOAD|LDC)", a, re.M))
+        out.append(f"{m.group(1)} lines={a.count(chr(10))} temps={temps} lmem={lmem} CAL={calls} REP={rep} tex={tex}")
+    return "; ".join(out) or "no-asm"
+
+
+def read_ray_settings(path: str) -> dict[str, str]:
+    """保存済みのシェーダー設定 (Ray.txt) の `KEY=VALUE` を読む。path が空なら $RAY_MC_DIR/shaderpacks/Ray.txt"""
+    if not path:
+        if not os.environ.get("RAY_MC_DIR"):
+            sys.exit("--ray にパスを渡すか、RAY_MC_DIR を指定する")
+        path = str(Path(os.environ["RAY_MC_DIR"]) / "shaderpacks" / "Ray.txt")
+    out: dict[str, str] = {}
+    for ln in Path(path).read_text(encoding="latin-1").splitlines():
+        ln = ln.strip()
+        if ln and not ln.startswith("#") and "=" in ln:
+            k, v = ln.split("=", 1)
+            out[k.strip()] = v.strip()
+    return out
+
+
 def time_programs(configs: list[tuple[str, dict, list[str]]], options: dict[str, vs.Option], features: list[str],
-                  flt: str, sections: list[str], all_programs: bool) -> int:
-    """--time: 有効なプログラムのコールドのコンパイル時間を表示する。同じ本文は 1 回の実行の中で 1 回だけ測る"""
+                  flt: str, sections: list[str], all_programs: bool, reps: int = 1, asm: bool = False,
+                  all_stages: bool = False) -> int:
+    """
+    --time / --asm: 有効なプログラムのコールドのコンパイル時間とアセンブリの統計を表示する。同じ本文は 1 回の実行の中で 1 回だけ測る
+    reps が 2 以上なら回ごとに nonce を変えて繰り返し、時間は中央値 (リンクは全回の値も表示)。0 ならアセンブリだけ
+    """
     nonce = uuid.uuid4().hex[:12]
     seen: set[str] = set()
     total = 0.0
@@ -848,12 +900,23 @@ def time_programs(configs: list[tuple[str, dict, list[str]]], options: dict[str,
                 if key in seen:
                     continue
                 seen.add(key)
-                comp, link, ok = cold_build_time(stages, nonce)
+                comps, links, ok = [], [], True
+                for i in range(reps):
+                    c, l, o = cold_build_time(stages, f"{nonce}{i}")
+                    comps.append(c)
+                    links.append(l)
+                    ok &= o
+                st = asm_stats(stages, all_stages) if asm and ok else None
+                ok &= not asm or st is not None
+                comp, link = (statistics.median(comps), statistics.median(links)) if reps else (0.0, 0.0)
                 total += comp + link
                 count += 1
                 failed += not ok
-                print(f"[{cfg_name}] {prog_key:36s} {comp + link:7.2f}s (compile {comp:6.2f} link {link:6.2f})" + ("" if ok else "  FAIL"),
-                      flush=True)
+                line = f"[{cfg_name}] {prog_key:36s} "
+                if reps:
+                    line += f"{comp + link:7.2f}s (compile {comp:6.2f} link {link:6.2f}"
+                    line += (" all " + " ".join(f"{x:.2f}" for x in links) if reps > 1 else "") + ")"
+                print(line + ("" if ok else "  FAIL") + (f"  [{st}]" if st else ""), flush=True)
     print(f"\n{count} programs, cold sum {total:.1f}s, wall {time.perf_counter() - t_all:.1f}s, {failed} failed")
     return 1 if failed else 0
 
@@ -874,6 +937,10 @@ def main() -> int:
     ap.add_argument("--warnings", action="store_true", help="ドライバの警告も表示")
     ap.add_argument("--all-programs", action="store_true", help="program.*.enabled で無効なプログラムも検査")
     ap.add_argument("--time", action="store_true", help="検査の代わりに、ドライバのキャッシュを外したコンパイル時間をプログラムごとに測る")
+    ap.add_argument("--reps", type=int, default=1, help="--time で同じ本文を回ごとに nonce を変えて繰り返す回数 (中央値を出す)")
+    ap.add_argument("--asm", action="store_true", help="リンク後の NV のアセンブリの行・一時変数・ループの数も出す (--time なしならアセンブリだけ)")
+    ap.add_argument("--all-stages", action="store_true", help="--asm で頂点・ジオメトリも数える")
+    ap.add_argument("--ray", nargs="?", const="", metavar="Ray.txt", help="既定値の代わりに保存した設定 (Ray.txt) を当てる (パス省略で $RAY_MC_DIR/shaderpacks/Ray.txt)")
     ap.add_argument("--shaders", type=Path, help="検査するシェーダーのフォルダ (既定: このリポジトリの shaders/)")
     args = ap.parse_args()
     level = "warning" if args.warnings else "error"
@@ -893,7 +960,8 @@ def main() -> int:
     win = open_context(args.gpu)
     limits = query_limits()
     # 時間を測る時は Iris と同じく逐次にする
-    parallel = False if args.time else enable_parallel_compile(args.jobs)
+    measuring = args.time or args.asm
+    parallel = False if measuring else enable_parallel_compile(args.jobs)
     print(f"GL: {gl_string(GL.GL_VENDOR)} / {gl_string(GL.GL_RENDERER)} / {gl_string(GL.GL_VERSION)}")
     if args.limits:
         for k, v in limits.items():
@@ -915,9 +983,13 @@ def main() -> int:
     else:
         configs.append(("DEFAULT", {}, worlds_opt or ["world0"]))
 
-    if args.time:
+    if args.ray is not None:
+        configs = [("RAY", read_ray_settings(args.ray), worlds_opt or ["world0"])]
+
+    if measuring:
         try:
-            return time_programs(configs, options, features, args.filter, sections, args.all_programs)
+            return time_programs(configs, options, features, args.filter, sections, args.all_programs,
+                                 args.reps if args.time else 0, args.asm, args.all_stages)
         finally:
             glfw.destroy_window(win)
             glfw.terminate()
