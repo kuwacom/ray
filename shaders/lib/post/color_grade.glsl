@@ -18,6 +18,12 @@
 //@include "/lib/common/math.glsl"
 //@include "/lib/post/post_constants.glsl"
 
+// プリセットの色相ごと・トーンカーブの基準 (final だけが読むここに置き、プリセットを変えても他のプログラムの本文を変えない)
+const float LKG_HUE_SHIFT[8] = LKG_HUE_SHIFT_INIT;
+const float LKG_HUE_SAT[8] = LKG_HUE_SAT_INIT;
+const float LKG_HUE_LUM[8] = LKG_HUE_LUM_INIT;
+const float LKG_CURVE[7] = LKG_CURVE_INIT;
+
 // 実効値
 const float G_TINT = GRADE_TINT + LKG_TINT;
 const vec3 G_OFFSET = vec3(GRADE_OFFSET_R, GRADE_OFFSET_G, GRADE_OFFSET_B) + LKG_OFFSET;

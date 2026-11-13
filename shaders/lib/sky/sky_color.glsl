@@ -42,7 +42,7 @@ const vec3 SKY_NIGHT_FLOOR = vec3(0.55, 0.75, 1.0) * 3e-5;
  * そのままだと AgX を通した昼の天頂が灰青、夕方の太陽まわりが白っぽい桃色に寄った
  * iterationT も大気の色を錐体空間の行列で盛っている。環境光 (SH) 側は prepare.csh で別に彩度を落とす
  */
-const float SKY_COLOR_SATURATION = 1.25 * LK_SKY_SAT;
+#define SKY_COLOR_SATURATION float(1.25 * LK_SKY_SAT)
 // 描画距離の外の地面 (skyBelowHorizon)
 const vec3 SKY_DISTANT_GROUND_ALBEDO = vec3(0.16, 0.18, 0.14); // 草地・森・岩の平均
 // 雪原・砂漠では外の地面も明るい。草地の色のままだと、高所から見た夕方の雪原の描画距離の外が暗い灰色の壁に見えた
@@ -217,15 +217,15 @@ vec3 getSkyIrradiance(vec3 n) { return shEvalIrradiance(n); }
  */
 const float SH_GROUND_ALBEDO = 0.2;
 // 輝度を保ったまま SH の彩度を落とす割合と、SH 全体の強さ (理由は prepare.csh)
-const float SH_SKY_SATURATION = LOOK_SKY_AMBIENT_SATURATION;
+#define SH_SKY_SATURATION LOOK_SKY_AMBIENT_SATURATION
 const float SH_SKY_GAIN_BASE = 1.7;
 /*
  * ルックの空の環境光の強さ (LK_SKY_AMBIENT) は SH 全体に掛ける (日陰・GI のレイが運ぶ空の光・水・半透明が揃って変わる)
  * 空そのものの描画は変えないので、SH を空の明るさとして使う所 (霧の内散乱・粗い反射の空・フレアの可視判定) は
  * SH_LOOK_UNDO を掛けて戻す。雲の陰の空の光は prepare が SH_SKY_GAIN_BASE で別に作る
  */
-const float SH_SKY_GAIN = SH_SKY_GAIN_BASE * LK_SKY_AMBIENT;
-const float SH_LOOK_UNDO = 1.0 / LK_SKY_AMBIENT;
+#define SH_SKY_GAIN float(SH_SKY_GAIN_BASE * LK_SKY_AMBIENT)
+#define SH_LOOK_UNDO float(1.0 / LK_SKY_AMBIENT)
 
 vec3 shSkyGrade(vec3 c) {
     c *= SH_SKY_GAIN;
