@@ -539,13 +539,13 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | FOG_MIST | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
 | VL | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
 | VL_SAMPLES | 8 | **4** | **6** | **6** | 8 | 8 | **12** | **12** | **16** | **16** |
-| VL_RES | 2 | **4** | **4** | **4** | **4** | 2 | 2 | 2 | 2 | **1** |
+| VL_RES | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | **1** |
 | VL_COLORED_SHADOWS | OFF | OFF | OFF | OFF | OFF | OFF | **ON** | **ON** | **ON** | **ON** |
 | FOG_BLOCKLIGHT | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
 | FOG_CLOUD_SHADOWS | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
 | VL_FAR | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
 | GODRAYS | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
-| GODRAYS_RES | 2 | **4** | **4** | **4** | **4** | 2 | 2 | 2 | 2 | 2 |
+| GODRAYS_RES | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 |
 | GODRAYS_SAMPLES | 8 | **6** | **6** | **6** | 8 | 8 | **12** | **12** | **16** | **16** |
 
 #### post (`lib/settings/post.glsl`)
