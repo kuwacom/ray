@@ -26,6 +26,8 @@
 #endif
 #ifdef DECOR_AMETHYST
 #endif
+#ifdef GLOW_LICHEN_LIGHT
+#endif
 #ifdef LIGHT_SHADOWS
 #endif
 #ifdef LIGHT_SHAPE_TRACE

@@ -39,7 +39,7 @@ LightDef lightDefStatic(int i) {
         case LIGHT_BEACON:           return makeLight(vec3(0.85, 0.95, 1.0), 1.2, 15.0, 0.4, LT_CENTER, 0.0, LT_BEACON);
         case LIGHT_CONDUIT:          return makeLight(vec3(0.60, 0.90, 1.0), 1.0, 15.0, 0.2, LT_CENTER, 0.0, 0u);
         case LIGHT_SEA_PICKLE:       return makeLight(vec3(0.60, 1.0, 0.75), 0.8, 15.0, 0.15, vec3(0.5, 0.3, 0.5), 0.0, 0u);
-        case LIGHT_GLOW_LICHEN:      return makeLight(vec3(0.60, 1.0, 0.85), 0.6, 7.0, 0.3, LT_CENTER, 0.0, 0u);
+        case LIGHT_GLOW_LICHEN:      return makeLight(vec3(0.60, 1.0, 0.85), GLOW_LICHEN_BRIGHTNESS, 7.0, 0.3, LT_CENTER, 0.0, 0u);
         case LIGHT_AMETHYST:         return makeLight(vec3(0.80, 0.55, 1.0), 0.7, 5.0, 0.2, vec3(0.5, 0.35, 0.5), 0.0, 0u);
         case LIGHT_CRYING_OBSIDIAN:  return makeLight(vec3(0.60, 0.25, 1.0), 0.8, 10.0, 0.5, LT_CENTER, 0.0, LT_OCC);
         case LIGHT_RESPAWN_ANCHOR:   return makeLight(vec3(0.65, 0.30, 1.0), 1.0, 15.0, 0.4, vec3(0.5, 0.9, 0.5), 0.0, LT_OCC);
@@ -62,7 +62,7 @@ LightDef lightDefStatic(int i) {
         case LIGHT_CAVE_VINES:       return makeLight(vec3(1.0, 0.75, 0.40), 0.9, 14.0, 0.15, LT_CENTER, 0.0, 0u);
         case LIGHT_DRAGON_EGG:       return makeLight(vec3(0.70, 0.30, 1.0), 0.5, 1.0, 0.3, LT_CENTER, 0.0, 0u);
         case LIGHT_ENDER_CHEST:      return makeLight(vec3(0.40, 0.90, 0.80), 0.6, 7.0, 0.3, LT_CENTER, 0.0, 0u);
-        case LIGHT_FIREFLY_BUSH:     return makeLight(vec3(0.85, 1.0, 0.50), 0.5, 2.0, 0.4, vec3(0.5, 0.7, 0.5), 0.6, 0u);
+        case LIGHT_FIREFLY_BUSH:     return makeLight(vec3(0.85, 1.0, 0.50), 0.125, 2.0, 0.4, vec3(0.5, 0.7, 0.5), 0.6, LT_FLOOD);
         case LIGHT_TRIAL_SPAWNER:    return makeLight(vec3(1.0, 0.70, 0.40), 0.8, 8.0, 0.4, LT_CENTER, 0.3, 0u);
         // 鉱物ブロック (DECORATIVE_BLOCK_LIGHTS 2 の時だけ光源)。本物の光源より暗く狭い、鉱物の色のほのかな灯り
         case LIGHT_DECOR_FIRST + 0:  return makeLight(vec3(0.25, 0.45, 1.00), DECOR_LIGHT_BRIGHTNESS, DECOR_LIGHT_LEVEL, 0.5, LT_CENTER, 0.0, LT_OCC);

@@ -252,7 +252,7 @@ void main() {
                     flickered * (FLUID_LIGHT_EMISSION_MUL * LAVA_DIRECT_GAIN * LAVA_LIGHT), luminance(emission) * (FLUID_LIGHT_EMISSION_MUL * LAVA_DIRECT_GAIN * LAVA_LIGHT), FLUID_LIGHT_SIZE, true);
             }
             emission *= LAVA_FLOOD_GAIN * LAVA_LIGHT;
-        } else if (level > 0.5) {
+        } else if (level > 0.5 && (d.info.x & LIGHT_FLAG_FLOOD_ONLY) == 0u) {
             registerLight(vec3(cell) + d.shape.xyz, range, flickered, luminance(emission), d.shape.w, true);
         }
     }

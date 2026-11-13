@@ -59,6 +59,9 @@ int getBlockLightIndex(int blockId) {
 #endif
     // 向きのある光源 (東・南・西) は 256 ずつ上の帯。下位 8 bit が光源インデックス
     int r = blockId - BLOCK_LIGHT_BASE;
+#ifndef GLOW_LICHEN_LIGHT
+    if ((r & 255) == LIGHT_GLOW_LICHEN) return LIGHT_NONE;
+#endif
     return (r > 0 && r <= BLOCK_LIGHT_LAST - BLOCK_LIGHT_BASE) ? (r & 255) : LIGHT_NONE;
 }
 

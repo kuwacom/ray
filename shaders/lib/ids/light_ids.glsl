@@ -107,6 +107,7 @@ const uint LIGHT_FLAG_KIND_TORCH = 512u;    // たいまつ (魂・レッドス�
 const uint LIGHT_FLAG_KIND_FIRE = 1024u;    // 炎 (火・魂の火・キャンプファイヤー・ロウソク)
 const uint LIGHT_FLAG_KIND_LANTERN = 2048u; // ランタン (魂・銅を含む)
 const uint LIGHT_FLAG_KIND_BEACON = 4096u;  // ビーコン (ブロック。ビームはマテリアルで分ける)
+const uint LIGHT_FLAG_FLOOD_ONLY = 8192u;   // floodfill の種だけ (点光源の登録と影を持たない。ホタルの茂み)
 
 // 向きのある光源か (LIGHT_FLAG_FACING の光源。光源の表を引かずに gbuffers で判定する)
 bool isFacingLight(int light) {
