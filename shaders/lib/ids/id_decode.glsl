@@ -26,26 +26,31 @@ bool isPlainSolidBlock(int blockId) { return blockId == BLOCK_SOLID || blockId >
 bool isDecorativeBlock(int blockId) { return blockId >= BLOCK_DECOR_LAPIS && blockId <= BLOCK_DECOR_AMETHYST; }
 
 // 種類ごとの設定 (DECOR_*) で発光する鉱物ブロック。発光・光源の両方がこれに従う
-bool isDecorGlowBlock(int blockId) {
+// ビット i が BLOCK_DECOR_LAPIS + i。比較を並べるとトレースの 1 セルごとの判定など呼ぶ所すべてに展開されるので、表と範囲の判定 1 回にする
+const uint DECOR_GLOW_MASK = 0u
 #ifdef DECOR_LAPIS
-    if (blockId == BLOCK_DECOR_LAPIS) return true;
+    | (1u << uint(BLOCK_DECOR_LAPIS - BLOCK_DECOR_LAPIS))
 #endif
 #ifdef DECOR_EMERALD
-    if (blockId == BLOCK_DECOR_EMERALD) return true;
+    | (1u << uint(BLOCK_DECOR_EMERALD - BLOCK_DECOR_LAPIS))
 #endif
 #ifdef DECOR_DIAMOND
-    if (blockId == BLOCK_DECOR_DIAMOND) return true;
+    | (1u << uint(BLOCK_DECOR_DIAMOND - BLOCK_DECOR_LAPIS))
 #endif
 #ifdef DECOR_GOLD
-    if (blockId == BLOCK_DECOR_GOLD) return true;
+    | (1u << uint(BLOCK_DECOR_GOLD - BLOCK_DECOR_LAPIS))
 #endif
 #ifdef DECOR_REDSTONE
-    if (blockId == BLOCK_DECOR_REDSTONE) return true;
+    | (1u << uint(BLOCK_DECOR_REDSTONE - BLOCK_DECOR_LAPIS))
 #endif
 #ifdef DECOR_AMETHYST
-    if (blockId == BLOCK_DECOR_AMETHYST) return true;
+    | (1u << uint(BLOCK_DECOR_AMETHYST - BLOCK_DECOR_LAPIS))
 #endif
-    return false;
+    ;
+
+bool isDecorGlowBlock(int blockId) {
+    uint i = uint(blockId - BLOCK_DECOR_LAPIS);
+    return i <= uint(BLOCK_DECOR_AMETHYST - BLOCK_DECOR_LAPIS) && ((DECOR_GLOW_MASK >> i) & 1u) != 0u;
 }
 
 int getBlockLightIndex(int blockId) {
