@@ -1,0 +1,38 @@
+name: Validate
+
+on:
+  pull_request:
+  workflow_call:
+    inputs:
+      full:
+        description: 全プロファイル・全ディメンションを検証する
+        type: boolean
+        default: false
+
+# fork からの PR でも動くよう読み取りだけ
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # ローカルの検証と同じ版に固定する
+      # GPU が無いので glslang による検証だけを回す (gl_compile_check.py は手元の GPU 専用)
+      - name: Install glslang
+        run: |
+          curl -fsSL -o glslang.zip https://github.com/KhronosGroup/glslang/releases/download/16.6.0/glslang-16.6.0-linux-x86_64-release.zip
+          unzip -q glslang.zip -d glslang
+          chmod +x glslang/bin/*
+          echo "RAY_GLSLANG=$PWD/glslang/bin/glslang" >> "$GITHUB_ENV"
+
+      - run: uv sync --frozen
+
+      - name: Validate shaders
+        run: uv run tools/validate_shaders.py ${{ inputs.full && '--full' || '' }}

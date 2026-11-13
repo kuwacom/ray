@@ -1,0 +1,62 @@
+name: Nightly
+
+on:
+  push:
+    branches: [main]
+
+# 連続した push は順番に処理
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    uses: ./.github/workflows/validate.yml
+    with:
+      full: true
+
+  release:
+    needs: validate
+    if: github.repository == 'kuwacom/ray'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # LICENSE同梱
+      - name: Build and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # バージョンは pyproject.toml を正本にする (上げるときはここだけ直す)
+          version=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          sha=${GITHUB_SHA::7}
+          name="Ray-${version}-${sha}-nightly"
+
+          mkdir -p "dist/${name}"
+          cp -r shaders "dist/${name}/shaders"
+          cp LICENSE CREDITS.md "dist/${name}/"
+          printf 'commit: %s\nbuilt: %s\n' "${GITHUB_SHA}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "dist/${name}/BUILD_INFO.txt"
+          (cd "dist/${name}" && zip -qr "../${name}.zip" .)
+
+          {
+            echo "main の最新を反映した nightly ビルドです。push のたびに置き換わり、動作は保証しません"
+            echo "バグを報告するときは、この zip のファイル名 (\`${name}.zip\`) を書いてください"
+            echo "ライセンス: Ray Shader License 1.0 (zip 内の LICENSE)"
+            echo
+            echo "This is the nightly build of the latest \`main\`. It is replaced on every push and comes with no guarantee."
+            echo "When you report a bug, include the file name of this zip (\`${name}.zip\`)."
+            echo "License: Ray Shader License 1.0 (the LICENSE inside the zip)."
+            echo
+            echo "## 直近の変更 / Recent changes"
+            git log -10 --format='- %s (%h)'
+          } > notes.md
+
+          # 単一の nightly だけを置くため、前のリリースとタグを消して作り直す
+          gh release delete nightly --cleanup-tag --yes || true
+          gh release create nightly "dist/${name}.zip" \
+            --prerelease \
+            --target "${GITHUB_SHA}" \
+            --title "Nightly (${version}, ${sha})" \
+            --notes-file notes.md

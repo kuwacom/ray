@@ -1,0 +1,127 @@
+name: 不具合の報告 / Bug report
+description: 見た目の崩れ、シェーダーのエラー、重さなどの報告 / Visual glitches, shader errors, performance problems
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        報告ありがとうございます。日本語でも英語でも書いてください。再現できる環境がそろうと、直しやすくなります
+        Thanks for the report. Write in Japanese or English. A reproducible setup makes it much easier to fix
+
+        - OptiFine では動きません。Iris で使ってください / Ray does not work with OptiFine. Use Iris
+        - Distant Horizons の LOD 部分の見た目は対象外です / The look of Distant Horizons LODs is out of scope
+        - アルファ版のため、見た目と設定は予告なく変わります / This is an alpha, so visuals and settings may change without notice
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: 種類 / Type
+      options:
+        - 見た目の崩れ・おかしい表示 / Visual glitch
+        - シェーダーのエラー・読み込めない / Shader error or fails to load
+        - 重い・カクつく / Performance problem
+        - クラッシュ / Crash
+        - その他 / Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: 何が起きているか / What is happening
+      description: 見た目の問題は、どこがどうおかしいかを書いてください / For visual problems, describe what looks wrong and where
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待する見た目・動作 / Expected result
+    validations:
+      required: false
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現手順と場所 / Steps to reproduce and location
+      description: 時間帯・天気・バイオーム・座標・向きなど。同じ場所で再現できる形だと助かります / Time of day, weather, biome, coordinates, direction, etc. A setup that reproduces in the same place helps
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: スクリーンショット・動画 / Screenshots or video
+      description: 画像や動画をここへドラッグ&ドロップしてください。可能なら、問題が無い設定 (またはほかのシェーダー) との比較も / Drag and drop images or videos here. If possible, include a comparison with a setting (or another shader) that looks fine
+    validations:
+      required: true
+
+  - type: input
+    id: build
+    attributes:
+      label: Ray のビルド / Ray build
+      description: 入れた zip のファイル名か、コミット / The file name of the zip you installed, or the commit
+      placeholder: Ray-0.1.0a0-abc1234-nightly.zip
+    validations:
+      required: true
+
+  - type: input
+    id: minecraft
+    attributes:
+      label: Minecraft のバージョン / Minecraft version
+      placeholder: "26.1.2"
+    validations:
+      required: true
+
+  - type: input
+    id: iris
+    attributes:
+      label: Iris と Sodium のバージョン / Iris and Sodium versions
+      placeholder: Iris 1.10.5 / Sodium 0.8.0
+    validations:
+      required: true
+
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU とドライバのバージョン / GPU and driver version
+      placeholder: NVIDIA RTX 2080 Ti / 581.57
+    validations:
+      required: true
+
+  - type: input
+    id: settings
+    attributes:
+      label: 品質プリセット・ルック・レンズ / Quality preset, look, and lens
+      description: 既定から変えた設定があれば書いてください / List any settings you changed from the defaults
+      placeholder: 品質は「高」、ルックはビビッド、レンズは Helios 44-2 / Quality High, look Vivid, lens Helios 44-2
+    validations:
+      required: false
+
+  - type: textarea
+    id: mods
+    attributes:
+      label: 一緒に使っている MOD・リソースパック / Other mods and resource packs
+    validations:
+      required: false
+
+  - type: textarea
+    id: log
+    attributes:
+      label: ログ / Log
+      description: シェーダーのエラーやクラッシュのときは、latest.log の該当部分を貼ってください (長いときはファイルで添付) / For shader errors or crashes, paste the relevant part of latest.log (attach it as a file if it is long)
+      render: text
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: 確認 / Checklist
+      options:
+        - label: OptiFine ではなく Iris で動かしています / I am running Iris, not OptiFine
+          required: true
+        - label: 最新の nightly でも再現します / It still happens on the latest nightly
+          required: true
+        - label: 既存の Issue を検索しました / I searched existing issues
+          required: true

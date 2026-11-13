@@ -1,0 +1,39 @@
+name: 機能の要望 / Feature request
+description: 新しい機能や見た目の改善の提案 / Suggest a new feature or a visual improvement
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        日本語でも英語でも書いてください / Write in Japanese or English
+
+  - type: textarea
+    id: what
+    attributes:
+      label: どんな機能か / What the feature is
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: 使いたい場面 / Use case
+      description: どんな見た目や撮影をしたいか、いまの Ray では何が足りないか / What look or shot you want, and what Ray is missing today
+    validations:
+      required: true
+
+  - type: textarea
+    id: reference
+    attributes:
+      label: 参考画像・資料 / References
+      description: 目指す見た目の画像や、参考にした論文・手法があれば。ほかのシェーダーパックのコードは貼らないでください / Images of the look you aim for, or papers and techniques you based it on. Do not paste code from other shader packs
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: 確認 / Checklist
+      options:
+        - label: 既存の Issue を検索しました / I searched existing issues
+          required: true
