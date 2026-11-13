@@ -6,6 +6,8 @@ English | [日本語](README.md)
 ![Iris](https://img.shields.io/badge/Iris-1.8%2B-5b6ee1)
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.x%20%E2%80%93%2026.x-62b47a)
 ![License](https://img.shields.io/badge/license-Ray%20Shader%20License%201.0-lightgrey)
+![Downloads](https://img.shields.io/github/downloads/kuwacom/ray/total)
+![Views](https://hits.sh/github.com/kuwacom/ray.svg?label=views)
 
 Ray is a shader pack for Minecraft Java Edition with Iris. I originally built it privately for myself, packing in every feature I wanted that other shaders don't have  
 It features light sources traced with voxel ray tracing, and a physical lens simulation that reproduces real lenses
