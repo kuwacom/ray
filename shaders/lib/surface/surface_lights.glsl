@@ -16,10 +16,13 @@
 //@include "/lib/common/shadow_volume.glsl"
 //@include "/lib/common/transforms.glsl"
 //@include "/lib/common/uniforms.glsl"
+//@include "/lib/common/voxel_space.glsl"
 //@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/light/blocklight.glsl"
 //@include "/lib/light/floodfill.glsl"
 //@include "/lib/light/hand_light.glsl"
+//@include "/lib/light/light_select.glsl"
+//@include "/lib/light/trace.glsl"
 //@include "/lib/sky/clouds.glsl"
 //@include "/lib/sky/sky_color.glsl"
 //@include "/lib/surface/gi.glsl"
@@ -79,6 +82,8 @@ struct SurfacePoint {
     // SL_SUN_VOLUME で水の下の点にコースティクスを掛けるか (照明の比だけに使う 2 次ヒットは false)。項の組 (terms) に
     // 入れると実行時の値になって全部の項がリンクされるので、点の値で渡す
     bool caustics;
+    // SL_BLOCK_SPECULAR_TRACED を集めるか。装備の金属だけが実行時に決めるので、caustics と同じく点の値で渡す
+    bool blockSpecular;
 };
 
 // 使う項だけ呼ぶ側が上書きする。ほかは項を使わない時の値
@@ -96,6 +101,7 @@ SurfacePoint surfacePoint(vec3 playerPos, vec3 normal) {
     p.sunFade = 0.0;
     p.hand = false;
     p.caustics = true;
+    p.blockSpecular = true;
     return p;
 }
 
@@ -116,6 +122,120 @@ struct SurfaceLights {
     int blockSpecCount;
     LightSample blockSpec[BLOCKLIGHT_SPECULAR_LIGHTS];
 };
+
+/*
+ * ボクセルのトレースで影を出す光 (手持ち光源・設置光源ごとの鏡面・ビンの光源の直接光) を 1 本のループで集める
+ * NVIDIA は関数を全部展開するので、traceVisibility を呼ぶ所が 1 つ増えるごとにトレースの本体 (数百〜千数百行) が増え、リンクが延びる
+ * 番号 t から光の種類と終点・フラグ・dither・無視区間を決め、トレースは 1 か所だけで呼ぶ (結果を配列に溜めるとローカルメモリになるので、番号から都度作る)
+ * 番号の並び: 手持ち光源 -> 鏡面 -> ビンの光源 (FORWARD_TRACED_LIGHTS 個トレースしたら打ち切るので最後)
+ * 始点はどれも着色点を幾何法線へ押し出した点。設置光源のフラグは手持ち光源と同じ変数を通るので、エンティティの判定は実行時の分岐で飛ばす
+ * hand / bins はリテラル、specular は実行時の値 (p.blockSpecular) でもよい
+ */
+void gatherTracedLights(SurfacePoint p, bool hand, bool specular, bool bins, inout SurfaceLights L) {
+    L.handMain = noLight();
+    L.handOff = noLight();
+    for (int j = 0; j < BLOCKLIGHT_SPECULAR_LIGHTS; j++) L.blockSpec[j] = noLight();
+    int handCount = hand ? handLightCount() : 0;
+    int bin = 0;
+    int specCount = 0;
+    int binCount = 0;
+    int topIdx[BLOCKLIGHT_SPECULAR_LIGHTS];
+    float specScale = 0.0;
+#ifdef LIGHT_SHADOWS
+    if (specular || bins) {
+        vec3 fromVoxel = playerToVoxel(p.playerPos + p.geoNormal * TRACE_NORMAL_OFFSET);
+        if (isInVoxelVolume(fromVoxel)) {
+            bin = lightBinIndex(ivec3(fromVoxel));
+            uint n = lightBinCount(bin);
+            if (bins) binCount = int(n);
+    #ifdef LIGHT_SPECULAR
+            if (specular) {
+                selectBlockSpecularLights(bin, n, fromVoxel, p.geoNormal, topIdx);
+                for (int j = 0; j < BLOCKLIGHT_SPECULAR_LIGHTS; j++) specCount += topIdx[j] >= 0 ? 1 : 0;
+                specScale = floodCoverage(p.playerPos);
+            }
+    #endif
+        }
+    }
+#endif
+    // 設置光源: 半影の揺らぎは入れない (半透明の面・前方シェーディングはデノイズも TAA の速度も無い)。自分の体で自分を遮らないよう、エンティティの遮蔽は使わない
+    uint blockFlags = blockLightTraceFlags() & ~(TRACE_ENTITIES | TRACE_PLAYER);
+    vec3 voxelPos = playerToVoxel(p.playerPos);
+    vec3 direct = vec3(0.0);
+    vec3 bounce = vec3(0.0);
+    int traced = 0;
+    int specEnd = handCount + specCount;
+    int total = specEnd + binCount;
+    for (int t = 0; t < total; t++) {
+        // 使わない種類の枝はリテラルの hand / specular / bins で消す (残すと届かない添字の範囲外がリンクの誤りになる)
+        bool isHand = hand && t < handCount;
+        bool isSpec = specular && !isHand && t < specEnd;
+        // 始点はループの中で作る (ループの外に置くと、手持ち光源だけのプログラムでもループの間ずっとレジスタを使う)
+        vec3 fromVoxel = playerToVoxel(p.playerPos + p.geoNormal * TRACE_NORMAL_OFFSET);
+        vec3 target = vec3(0.0);
+        uint flags = blockFlags;
+        float dither = 0.5;
+        float skipStart = 0.0;
+        float skipEnd = 0.0;
+        bool trace = true;
+        bool handShadow = false;
+        /*
+         * トレースの前に影を掛ける前の光を求めておき、トレースの後は可視率を掛けて足すだけにする
+         * (光源の構造体をトレースの後まで持つと、トレースの間のレジスタが増える)
+         * cur: 手持ち光源と鏡面は LightSample、ビンの光源は irradiance に影の前の直接光。box と bounceE はビンの光源だけ
+         */
+        LightSample cur = noLight();
+        vec3 box = vec3(0.0);
+        vec3 bounceE = vec3(0.0);
+        HandShadowRay hr;
+        if (isHand) {
+            handShadow = handLightUnshadowed(t == 0, p.playerPos, p.geoNormal, cur, hr);
+#ifdef HAND_LIGHT_RAYS
+            trace = handShadow && isInVoxelVolume(fromVoxel);
+#else
+            trace = false;
+#endif
+            if (trace) target = handShadowTarget(hr, cur, t == 0, p.dither, flags, skipEnd);
+            dither = p.dither;
+            skipStart = TRACE_ENTITY_SKIP_START;
+        } else if (isSpec) {
+#if defined LIGHT_SPECULAR && defined LIGHT_SHADOWS
+            // 配列の添字を実行時の値にするとローカルメモリに置かれるので、展開されるリテラルの回数のループで選ぶ
+            int slot = 0;
+            for (int j = 0; j < BLOCKLIGHT_SPECULAR_LIGHTS; j++) if (j == t - handCount) slot = topIdx[j];
+            LightInstance B = lightBinLight(bin, uint(slot));
+            cur = blockSpecularSample(B, voxelPos, specScale);
+            target = B.posRadius.xyz;
+#endif
+        } else if (bins) {
+            if (traced >= FORWARD_TRACED_LIGHTS) break;
+            LightInstance B = lightBinLight(bin, uint(t - specEnd));
+            if (distance(B.posRadius.xyz, fromVoxel) >= B.posRadius.w) continue;
+            cur.irradiance = forwardEntityLightUnshadowed(B, fromVoxel, p.normal, p.geoNormal, box, bounceE);
+            target = B.posRadius.xyz;
+        }
+        vec3 vis = vec3(1.0);
+        if (trace) vis = traceVisibility(fromVoxel, target, flags, dither, skipStart, skipEnd);
+        if (isHand) {
+            if (handShadow) {
+                if (trace) applyHandLightTrace(cur, vis);
+                applyHandLightContactShadow(cur, hr, p.playerPos, p.geoNormal, p.dither);
+            }
+            if (t == 0) L.handMain = cur;
+            else L.handOff = cur;
+        } else if (isSpec) {
+            cur.irradiance *= blockLightShadow(vis);
+            for (int j = 0; j < BLOCKLIGHT_SPECULAR_LIGHTS; j++) if (j == t - handCount) L.blockSpec[j] = cur;
+        } else if (bins) {
+            vec3 w = blockLightShadow(vis);
+            direct += cur.irradiance * w + box;
+            bounce += bounceE * w;
+            traced++;
+        }
+    }
+    L.blockSpecCount = specCount;
+    if (bins) L.block = forwardEntityBlockLight(p.playerPos, p.geoNormal, p.lightmap.x, direct, bounce);
+}
 
 SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, uint terms) {
     SurfaceLights L;
@@ -172,21 +292,23 @@ SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, ui
         }
     }
 
-    if ((terms & SL_HAND) != 0u) {
+    // 手持ち光源・鏡面のトレース・ビンの光源のトレースは、同じ呼び出しで集めるとトレースが 1 か所になる
+    // 手持ち光源だけなら getHandLights (分かれ道はリテラルの terms と blockMode で決まる)
+    bool tracedBins = blockMode == SL_BLOCK_FORWARD_ENTITY;
+    if ((terms & SL_BLOCK_SPECULAR_TRACED) != 0u || tracedBins) {
+        gatherTracedLights(p, (terms & SL_HAND) != 0u, (terms & SL_BLOCK_SPECULAR_TRACED) != 0u && p.blockSpecular, tracedBins, L);
+    } else if ((terms & SL_HAND) != 0u) {
         getHandLights(p.playerPos, p.geoNormal, p.dither, L.handMain, L.handOff);
     } else {
         L.handMain = noLight();
         L.handOff = noLight();
     }
-    if ((terms & SL_BLOCK_SPECULAR) != 0u) L.blockSpecCount = getBlockLightSpecular(p.texel, p.playerPos, p.geoNormal, false, L.blockSpec);
-    else if ((terms & SL_BLOCK_SPECULAR_TRACED) != 0u) L.blockSpecCount = getBlockLightSpecular(p.texel, p.playerPos, p.geoNormal, true, L.blockSpec);
+    if ((terms & SL_BLOCK_SPECULAR) != 0u) L.blockSpecCount = getBlockLightSpecular(p.texel, p.playerPos, p.geoNormal, L.blockSpec);
 
     if (blockMode == SL_BLOCK_OPAQUE) {
         L.block = getBlockLightOpaque(p.texel, p.playerPos, p.geoNormal, p.normal, p.lightmap.x);
     } else if (blockMode == SL_BLOCK_FORWARD) {
         L.block = getBlockLightForward(p.playerPos, p.normal, p.lightmap.x);
-    } else if (blockMode == SL_BLOCK_FORWARD_ENTITY) {
-        L.block = getBlockLightForwardEntity(p.playerPos, p.geoNormal, p.normal, p.lightmap.x);
     } else if (blockMode == SL_BLOCK_HIT_FLOOD) {
         L.block = sampleFloodfill(p.playerPos, p.normal);
     }

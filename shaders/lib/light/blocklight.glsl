@@ -71,29 +71,25 @@ const int FORWARD_TRACED_LIGHTS = 8;
 // 三人称で背中も床の照り返しで服の色が見えるよう多めにする (iterationT の三人称の見え方)
 const float FORWARD_ENTITY_BOUNCE = 0.5;
 
-vec3 getBlockLightForwardEntity(vec3 playerPos, vec3 geoNormal, vec3 normal, float lm) {
+/*
+ * 1 光源分の影を掛ける前の直接光 (戻り値)・影を掛けない光る箱の照度 box・照り返し bounceE
+ * vis = blockLightShadow(トレースの可視率) として、直接光は 戻り値 x vis + box、照り返しは bounceE x vis を足す
+ * トレースはビンの枠の順 (k の昇順) に、光の届く光源を FORWARD_TRACED_LIGHTS 個まで。ループは lib/surface/surface_lights.glsl の
+ * gatherTracedLights (手持ち光源・鏡面と同じ 1 か所でトレースする)
+ * 半影の揺らぎは入れない (この経路はデノイズも TAA の速度も無いので、ノイズがそのまま残る)
+ */
+vec3 forwardEntityLightUnshadowed(LightInstance L, vec3 fromVoxel, vec3 normal, vec3 geoNormal, out vec3 box, out vec3 bounceE) {
+    float dist = distance(L.posRadius.xyz, fromVoxel);
+    box = lightBoxIrradiance(L, fromVoxel, geoNormal);
+    bounceE = L.colorSize.rgb * lightFalloff(dist, L.posRadius.w);
+    return evalLightIrradiance(L, fromVoxel, normal, geoNormal);
+}
+
+// 集めた直接光と照り返しに floodfill を合わせ、体積の端でバニラのライトマップへ戻す
+vec3 forwardEntityBlockLight(vec3 playerPos, vec3 geoNormal, float lm, vec3 direct, vec3 bounce) {
     float coverage = floodCoverage(playerPos);
     vec3 flood = sampleFloodfill(playerPos, geoNormal);
 #ifdef LIGHT_SHADOWS
-    vec3 direct = vec3(0.0);
-    vec3 bounce = vec3(0.0);
-    vec3 fromVoxel = playerToVoxel(playerPos + geoNormal * TRACE_NORMAL_OFFSET);
-    if (isInVoxelVolume(fromVoxel)) {
-        int bin = lightBinIndex(ivec3(fromVoxel));
-        uint n = lightBinCount(bin);
-        uint flags = blockLightTraceFlags() & ~(TRACE_ENTITIES | TRACE_PLAYER);
-        int traced = 0;
-        for (uint k = 0u; k < n && traced < FORWARD_TRACED_LIGHTS; k++) {
-            LightInstance L = lightBinLight(bin, k);
-            float dist = distance(L.posRadius.xyz, fromVoxel);
-            if (dist >= L.posRadius.w) continue;
-            // 半影の揺らぎは入れない (この経路はデノイズも TAA の速度も無いので、ノイズがそのまま残る)
-            vec3 vis = blockLightShadow(traceVisibility(fromVoxel, L.posRadius.xyz, flags, 0.5, 0.0, 0.0));
-            direct += evalLightIrradiance(L, fromVoxel, normal, geoNormal) * vis + lightBoxIrradiance(L, fromVoxel, geoNormal);
-            bounce += L.colorSize.rgb * lightFalloff(dist, L.posRadius.w) * vis;
-            traced++;
-        }
-    }
     vec3 voxelLight = direct + bounce * FORWARD_ENTITY_BOUNCE + flood * FLOODFILL_STRENGTH;
 #else
     vec3 voxelLight = flood;
@@ -109,18 +105,13 @@ const int BLOCKLIGHT_SPECULAR_LIGHTS = LIGHT_SPECULAR_COUNT;
  * 代表光源 1 つだけだと、2 つの光源の拡散が釣り合う線で代表が入れ替わり、床の照り返しが斜めの直線で切れた
  * 光源ごとの可視率は無いので、deferred2 の可視率 (colortex7, トレースした光源全体の比) を共通に掛ける。
  * 体積の端ではフォールバックと同じ割合で弱める
- * traced: colortex7 は不透明面の可視率なので、水・ガラスなど半透明の面は光源ごとにトレースして可視率を出す
+ * colortex7 は不透明面の可視率なので、水・ガラスなど半透明の面は光源ごとにトレースして可視率を出す
+ * (lib/surface/surface_lights.glsl の gatherTracedLights。選び方と LightSample はここの関数を使う)
  */
-int getBlockLightSpecular(ivec2 texel, vec3 playerPos, vec3 geoNormal, bool traced, out LightSample s[BLOCKLIGHT_SPECULAR_LIGHTS]) {
-    for (int j = 0; j < BLOCKLIGHT_SPECULAR_LIGHTS; j++) s[j] = noLight();
 #if defined LIGHT_SPECULAR && defined LIGHT_SHADOWS
-    // 光源の選び方は deferred1 と同じ (幾何法線で地平線の下の光源を除く)
-    vec3 fromVoxel = playerToVoxel(playerPos + geoNormal * TRACE_NORMAL_OFFSET);
-    if (!isInVoxelVolume(fromVoxel)) return 0;
-    int bin = lightBinIndex(ivec3(fromVoxel));
-    uint n = lightBinCount(bin);
+// 照度の大きい順の枠の番号を topIdx に入れる (足りない枠は -1)。光源の選び方は deferred1 と同じ (幾何法線で地平線の下の光源を除く)
+void selectBlockSpecularLights(int bin, uint n, vec3 fromVoxel, vec3 geoNormal, out int topIdx[BLOCKLIGHT_SPECULAR_LIGHTS]) {
     // ビンの中の枠の番号 (境界の重みを lightBinLight で掛けるため、光源のインデックスではなく枠で持つ)
-    int topIdx[BLOCKLIGHT_SPECULAR_LIGHTS];
     float topW[BLOCKLIGHT_SPECULAR_LIGHTS];
     for (int j = 0; j < BLOCKLIGHT_SPECULAR_LIGHTS; j++) { topIdx[j] = -1; topW[j] = 0.0; }
     for (uint k = 0u; k < n; k++) {
@@ -135,20 +126,35 @@ int getBlockLightSpecular(ivec2 texel, vec3 playerPos, vec3 geoNormal, bool trac
             }
         }
     }
-    float scale = traced ? floodCoverage(playerPos) : saturate(luminance(texelFetch(colortex7, texel, 0).rgb)) * floodCoverage(playerPos);
-    // 半影の揺らぎは入れない (半透明の面はデノイズも TAA の速度も無い)。エンティティの遮蔽は getBlockLightForwardEntity と同じく使わない
-    uint traceFlags = blockLightTraceFlags() & ~(TRACE_ENTITIES | TRACE_PLAYER);
+}
+
+// 影を掛ける前の鏡面の光。voxelPos は着色点 (押し出し前)、scale は可視率と体積の端の弱め
+LightSample blockSpecularSample(LightInstance L, vec3 voxelPos, float scale) {
+    LightSample s;
+    vec3 toL = L.posRadius.xyz - voxelPos;
+    float dist = length(toL);
+    s.direction = toL / max(dist, EPS);
+    s.irradiance = L.colorSize.rgb * lightFalloff(dist, L.posRadius.w) * scale;
+    s.angularSize = atan(L.colorSize.a, max(dist, EPS));
+    return s;
+}
+#endif
+
+// 不透明面の鏡面 (deferred30)。可視率は deferred2 の colortex7
+int getBlockLightSpecular(ivec2 texel, vec3 playerPos, vec3 geoNormal, out LightSample s[BLOCKLIGHT_SPECULAR_LIGHTS]) {
+    for (int j = 0; j < BLOCKLIGHT_SPECULAR_LIGHTS; j++) s[j] = noLight();
+#if defined LIGHT_SPECULAR && defined LIGHT_SHADOWS
+    vec3 fromVoxel = playerToVoxel(playerPos + geoNormal * TRACE_NORMAL_OFFSET);
+    if (!isInVoxelVolume(fromVoxel)) return 0;
+    int bin = lightBinIndex(ivec3(fromVoxel));
+    int topIdx[BLOCKLIGHT_SPECULAR_LIGHTS];
+    selectBlockSpecularLights(bin, lightBinCount(bin), fromVoxel, geoNormal, topIdx);
+    float scale = saturate(luminance(texelFetch(colortex7, texel, 0).rgb)) * floodCoverage(playerPos);
     vec3 voxelPos = playerToVoxel(playerPos);
     int count = 0;
     for (int j = 0; j < BLOCKLIGHT_SPECULAR_LIGHTS; j++) {
         if (topIdx[j] < 0) break;
-        LightInstance L = lightBinLight(bin, uint(topIdx[j]));
-        vec3 toL = L.posRadius.xyz - voxelPos;
-        float dist = length(toL);
-        s[j].direction = toL / max(dist, EPS);
-        s[j].irradiance = L.colorSize.rgb * lightFalloff(dist, L.posRadius.w) * scale;
-        if (traced) s[j].irradiance *= blockLightShadow(traceVisibility(fromVoxel, L.posRadius.xyz, traceFlags, 0.5, 0.0, 0.0));
-        s[j].angularSize = atan(L.colorSize.a, max(dist, EPS));
+        s[j] = blockSpecularSample(lightBinLight(bin, uint(topIdx[j])), voxelPos, scale);
         count++;
     }
     return count;

@@ -80,69 +80,94 @@ LightDef getHandLightDef(int itemId) {
     return getLightDef(LIGHT_TORCH);
 }
 
-LightSample evalHandLight(bool mainHand, vec3 playerPos, vec3 geoNormal, float dither) {
+// 手持ち光源の影に使う値。光源の位置 (player 空間) と半径、光源までの距離 (画面空間の影の長さ)
+struct HandShadowRay {
+    vec3 lightPos;
+    float lightRadius;
+    float dist;
+};
+
+/*
+ * 影を掛ける前の手持ち光源 s と、影のレイ r。影を計算する点なら true を返す
+ * ボクセルのトレースは呼ぶ側 (lib/surface/surface_lights.glsl の gatherTracedLights) が設置光源のトレースと同じ 1 か所で呼び、
+ * applyHandLightTrace と applyHandLightContactShadow で影を掛ける (NVIDIA は関数を全部展開するので、呼ぶ所ごとにトレースの本体が増える)
+ */
+bool handLightUnshadowed(bool mainHand, vec3 playerPos, vec3 geoNormal, out LightSample s, out HandShadowRay r) {
+    // r は true を返す時だけ使う
+    s = noLight();
     int level = mainHand ? heldBlockLightValue : heldBlockLightValue2;
-    if (level <= 0) return noLight();
+    if (level <= 0) return false;
     LightDef d = getHandLightDef(mainHand ? heldItemId : heldItemId2);
     vec3 lightPos = getHandLightPositionSafe(mainHand);
     vec3 toLight = lightPos - playerPos;
     float dist = length(toLight);
     float range = lightRange(d, float(level));
-    if (dist >= range) return noLight();
+    if (dist >= range) return false;
 
-    LightSample s;
     s.direction = toLight / max(dist, EPS);
     s.angularSize = atan(d.shape.w, max(dist, EPS));
     float flicker = lightFlicker(d.params.y, uvec3(mainHand ? 1u : 2u, 0x51u, 0x7Au));
     s.irradiance = lightEmission(d, float(level)) * lightFalloff(dist, range) * HAND_LIGHT_BRIGHTNESS * flicker;
+    r.dist = dist;
 
     // 一人称の手そのものはカメラの直近なので影を計算しない (自分の腕で遮ってしまう)
     bool isSelf = firstPersonCamera && length(playerPos) < HAND_SELF_DIST;
-    if (isSelf || dot(geoNormal, s.direction) <= HAND_BACKFACE_COS) return s;
+    if (isSelf || dot(geoNormal, s.direction) <= HAND_BACKFACE_COS) return false;
 
-#ifdef HAND_LIGHT_RAYS
-    vec3 fromVoxel = playerToVoxel(playerPos + geoNormal * TRACE_NORMAL_OFFSET);
-    if (isInVoxelVolume(fromVoxel)) {
-        // 光源半径の円板上で終点を揺らして半影を作る
-        float radius = min(d.shape.w * LIGHT_SOURCE_SIZE * LIGHT_SOURCE_SIZE_SCALE, LIGHT_JITTER_MAX_RADIUS);
-        mat3 tbn = tbnFromNormal(s.direction);
-        float a = (dither + (mainHand ? 0.0 : 0.5)) * TAU;
-        vec2 disk = sqrt(fract(dither * HAND_DISK_PHASE_SCALE + HAND_DISK_PHASE_OFFSET)) * vec2(cos(a), sin(a)) * radius;
-        uint flags = blockLightTraceFlags();
-        float skipEnd = TRACE_ENTITY_SKIP_END;
-        vec3 jitter = tbn[0] * disk.x + tbn[1] * disk.y;
-    #ifdef ENTITY_TRI_OCCLUSION
+    r.lightPos = lightPos;
+    r.lightRadius = d.shape.w;
+    return true;
+}
+
+/*
+ * トレースの終点・フラグ・光源側の無視区間 (トレースする時だけ求める)
+ * 光源半径の円板上で終点を揺らして半影を作る
+ */
+vec3 handShadowTarget(HandShadowRay r, LightSample s, bool mainHand, float dither, out uint flags, out float skipEnd) {
+    float radius = min(r.lightRadius * LIGHT_SOURCE_SIZE * LIGHT_SOURCE_SIZE_SCALE, LIGHT_JITTER_MAX_RADIUS);
+    mat3 tbn = tbnFromNormal(s.direction);
+    float a = (dither + (mainHand ? 0.0 : 0.5)) * TAU;
+    vec2 disk = sqrt(fract(dither * HAND_DISK_PHASE_SCALE + HAND_DISK_PHASE_OFFSET)) * vec2(cos(a), sin(a)) * radius;
+    flags = blockLightTraceFlags();
+    skipEnd = TRACE_ENTITY_SKIP_END;
+    vec3 jitter = tbn[0] * disk.x + tbn[1] * disk.y;
+#ifdef ENTITY_TRI_OCCLUSION
+    /*
+     * 三角形方式: 三人称は自分の体の三角形で遮り、光源を持つ手・腕の先だけを無視する
+     * 一人称では自分の体で手の光を遮らない (見えない体の影が足元や視界に出るのは不自然なため)。設置光源・太陽による自分の影は一人称でも残る
+     */
+    vec3 target = playerToVoxel(r.lightPos) + jitter;
+    skipEnd = HAND_TRI_SELF_SKIP;
+    if (firstPersonCamera) flags &= ~TRACE_PLAYER;
+#else
+    vec3 target = playerToVoxel(r.lightPos) + jitter;
+    if (firstPersonCamera) {
+        // 一人称: 光源が体のボクセルの中にあり、粗いサブセルが手の光を不自然に遮るので自分は外す
+        flags &= ~TRACE_PLAYER;
+    } else {
         /*
-         * 三角形方式: 三人称は自分の体の三角形で遮り、光源を持つ手・腕の先だけを無視する
-         * 一人称では自分の体で手の光を遮らない (見えない体の影が足元や視界に出るのは不自然なため)。設置光源・太陽による自分の影は一人称でも残る
+         * 三人称: Iris 26.1 は自分 (半透明エンティティ) を deferred の後に描くので画面空間の影に体が写らない
+         * 手の周り (腕) だけを外して体のボクセルで遮り、反対側の壁に自分の影を落とす
          */
-        vec3 target = playerToVoxel(lightPos) + jitter;
-        skipEnd = HAND_TRI_SELF_SKIP;
-        if (firstPersonCamera) flags &= ~TRACE_PLAYER;
-    #else
-        vec3 target = playerToVoxel(lightPos) + jitter;
-        if (firstPersonCamera) {
-            // 一人称: 光源が体のボクセルの中にあり、粗いサブセルが手の光を不自然に遮るので自分は外す
-            flags &= ~TRACE_PLAYER;
-        } else {
-            /*
-             * 三人称: Iris 26.1 は自分 (半透明エンティティ) を deferred の後に描くので画面空間の影に体が写らない
-             * 手の周り (腕) だけを外して体のボクセルで遮り、反対側の壁に自分の影を落とす
-             */
-            skipEnd = HAND_THIRD_PERSON_SELF_SKIP;
-        }
-    #endif
-        s.irradiance *= mix(vec3(1.0), traceVisibility(fromVoxel, target, flags, dither, TRACE_ENTITY_SKIP_START, skipEnd), HAND_DIRECT_SHADOW_STRENGTH);
+        skipEnd = HAND_THIRD_PERSON_SELF_SKIP;
     }
 #endif
+    return target;
+}
+
+// ボクセルのトレースの可視率 vis (traceVisibility(始点, handShadowTarget(..), flags, dither, TRACE_ENTITY_SKIP_START, skipEnd)) を掛ける
+void applyHandLightTrace(inout LightSample s, vec3 vis) {
+    s.irradiance *= mix(vec3(1.0), vis, HAND_DIRECT_SHADOW_STRENGTH);
+}
+
+void applyHandLightContactShadow(inout LightSample s, HandShadowRay r, vec3 playerPos, vec3 geoNormal, float dither) {
 #ifdef HAND_LIGHT_SS_SHADOWS
     if (maxOf(s.irradiance) > 0.0) {
         // 光源の直前 (手・たいまつ自身の形) までで止める
-        float len = min(dist - HAND_SS_END_MARGIN, HAND_SS_LENGTH);
+        float len = min(r.dist - HAND_SS_END_MARGIN, HAND_SS_LENGTH);
         s.irradiance *= mix(1.0, lightContactShadow(playerPos, geoNormal, s.direction, len, HAND_SS_STEPS, dither), HAND_DIRECT_SHADOW_STRENGTH);
     }
 #endif
-    return s;
 }
 
 /*
@@ -178,28 +203,44 @@ vec3 getHandLightFill(vec3 playerPos) {
 }
 
 /*
+ * 光らせる手の数 (トレースのループの回数)。両手を 1 つのループで回す。2 回並べて呼ぶと光源シャドウのトレースが 2 つ展開され、
+ * NVIDIA のリンクが数秒延びる。回数を uniform で決めてループを展開させない
+ * (左手が光らなければ handLightUnshadowed(false) は noLight なので、1 回で止めても結果は同じ)
+ */
+int handLightCount() {
+#ifdef HAND_LIGHT
+    return heldBlockLightValue2 > 0 ? 2 : 1;
+#else
+    return 0;
+#endif
+}
+
+/*
  * 着色点 playerPos での両手の光。光らない手は irradiance = 0
- * 呼び出し元: deferred30 (不透明), gbuffers_water 等 (半透明)
+ * 手持ち光源だけをトレースするプログラム用 (deferred30, gbuffers_water 等)。設置光源もトレースする所は
+ * lib/surface/surface_lights.glsl の gatherTracedLights が同じ部品で 1 本のループにする (この形のほうが命令と一時変数が少し少ない)
  */
 void getHandLights(vec3 playerPos, vec3 geoNormal, float dither, out LightSample mainHand, out LightSample offHand) {
-#ifdef HAND_LIGHT
-    /*
-     * 両手を 1 つのループで回す。2 回並べて呼ぶと evalHandLight (光源シャドウのトレース) が 2 つ展開され、
-     * NVIDIA のリンクが数秒延びる。回数を uniform で決めてループを展開させない
-     * (左手が光らなければ evalHandLight(false) は noLight なので、1 回で止めても結果は同じ)
-     */
     mainHand = noLight();
     offHand = noLight();
-    int handCount = heldBlockLightValue2 > 0 ? 2 : 1;
-    for (int i = 0; i < handCount; i++) {
-        LightSample s = evalHandLight(i == 0, playerPos, geoNormal, dither);
+    for (int i = 0; i < handLightCount(); i++) {
+        LightSample s;
+        HandShadowRay r;
+        if (handLightUnshadowed(i == 0, playerPos, geoNormal, s, r)) {
+#ifdef HAND_LIGHT_RAYS
+            vec3 fromVoxel = playerToVoxel(playerPos + geoNormal * TRACE_NORMAL_OFFSET);
+            if (isInVoxelVolume(fromVoxel)) {
+                uint flags;
+                float skipEnd;
+                vec3 target = handShadowTarget(r, s, i == 0, dither, flags, skipEnd);
+                applyHandLightTrace(s, traceVisibility(fromVoxel, target, flags, dither, TRACE_ENTITY_SKIP_START, skipEnd));
+            }
+#endif
+            applyHandLightContactShadow(s, r, playerPos, geoNormal, dither);
+        }
         if (i == 0) mainHand = s;
         else offHand = s;
     }
-#else
-    mainHand = noLight();
-    offHand = noLight();
-#endif
 }
 
 #endif

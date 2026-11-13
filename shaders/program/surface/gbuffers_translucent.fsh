@@ -170,9 +170,14 @@ vec3 forwardDiffuse(Material m, vec3 playerPos, vec3 normal, vec3 geoNormal, vec
     // 太陽 -> 手持ち -> 空とブロックライト -> 手持ちの照り返し に分けて集め、拡散を掛ける順番を保つ
     // (まとめて 1 回で集めると、手持ち光源のトレースが太陽の拡散より前に並んでドライバの出す命令の並びが変わる)
 #ifdef GBUF_FORWARD_OPAQUE
-    const int blockMode = SL_BLOCK_FORWARD_ENTITY;
+    // ビンの光源 (SL_BLOCK_FORWARD_ENTITY) と装備の光源ごとの鏡面もトレースするので、トレースを 1 か所にするため手持ち光源と同じ呼び出しで集める
+    const int tracedBlockMode = SL_BLOCK_FORWARD_ENTITY;
+    const uint tracedTerms = SL_HAND | SL_BLOCK_SPECULAR_TRACED;
+    const int ambientBlockMode = SL_BLOCK_NONE;
 #else
-    const int blockMode = SL_BLOCK_FORWARD;
+    const int tracedBlockMode = SL_BLOCK_NONE;
+    const uint tracedTerms = SL_HAND;
+    const int ambientBlockMode = SL_BLOCK_FORWARD;
 #endif
     SurfacePoint p = surfacePoint(playerPos, normal);
     p.geoNormal = geoNormal;
@@ -184,18 +189,19 @@ vec3 forwardDiffuse(Material m, vec3 playerPos, vec3 normal, vec3 geoNormal, vec
     vec3 color = evalDirectDiffuse(direct, normal, V, L.sun);
     // 金属ブロック (opaque_shading.fsh の directLight) と同じ円盤の上限と強さ。夜の月で上限を外すと鉄ブロックより白く飛ぶ
     if (shiny) color += evalDirectSpecular(m, normal, V, L.sun, celestialDiscScale()) * celestialSpecularStrength();
-    L = gatherSurfaceLights(p, SL_SUN_NONE, SL_BLOCK_NONE, SL_HAND);
+    // 設置光源の照り返し。金属ブロックは光源ごとの鏡面を持つので、装備にも同じ光源を 1 つずつ映す
+    p.blockSpecular = shiny;
+    L = gatherSurfaceLights(p, SL_SUN_NONE, tracedBlockMode, tracedTerms);
     color += evalDirectDiffuse(direct, normal, V, L.handMain);
     color += evalDirectDiffuse(direct, normal, V, L.handOff);
     if (shiny) color += (evalDirectSpecular(m, normal, V, L.handMain) + evalDirectSpecular(m, normal, V, L.handOff)) * SPECULAR_BLOCK_STRENGTH;
     if (shiny) {
-        // 設置光源の照り返し。金属ブロックは光源ごとの鏡面を持つので、装備にも同じ光源を 1 つずつ映す
-        L = gatherSurfaceLights(p, SL_SUN_NONE, SL_BLOCK_NONE, SL_BLOCK_SPECULAR_TRACED);
         for (int j = 0; j < L.blockSpecCount; j++) color += evalDirectSpecular(m, normal, V, L.blockSpec[j]) * SPECULAR_BLOCK_STRENGTH;
     }
-    L = gatherSurfaceLights(p, SL_SUN_NONE, blockMode, SL_SKY);
+    vec3 tracedBlock = L.block;
+    L = gatherSurfaceLights(p, SL_SUN_NONE, ambientBlockMode, SL_SKY);
 
-    vec3 ambient = L.sky + L.block + minAmbientIrradiance();
+    vec3 ambient = L.sky + (tracedBlockMode == SL_BLOCK_NONE ? L.block : tracedBlock) + minAmbientIrradiance();
     if (shiny) {
         // 環境光の鏡面のうち最低限の環境光 (映り込みの外れた洞窟でも真っ黒にしない)。ブロックライトは足さない:
         // 灯りは設置光源ごとの鏡面 (上) と周りの映り込み (composite2) が受け持ち、照度をそのまま映すと夜の装備が拡散の白い面のようになる
