@@ -9,7 +9,7 @@
 #define BLOCKLIGHT_BRIGHTNESS 1.0 // [0.1 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0 4.0 5.0 6.0 8.0]
 #define BLOCKLIGHT_WARMTH 0.6 // [0.0 0.25 0.4 0.5 0.6 0.7 0.75 1.0] 0=中性 1=バニラ寄りの暖色
 #define LIGHT_FLICKER // 炎系光源の揺らぎ
-#define DECORATIVE_BLOCK_LIGHTS 0 // [0 1 2] 光らない鉱物ブロック (ラピス・エメラルド・ダイヤ・金・レッドストーン・アメジスト) 0=そのまま 1=発光のみ 2=光源
+#define DECORATIVE_BLOCK_LIGHTS 2 // [0 1 2] 光らない鉱物ブロック (ラピス・エメラルド・ダイヤ・金・レッドストーン・アメジスト) 0=そのまま 1=発光のみ 2=光源
 #define DECOR_LAPIS // ラピスラズリブロックを発光させる (DECORATIVE_BLOCK_LIGHTS が 1 以上の時)
 #define DECOR_EMERALD // エメラルドブロックを発光させる
 //#define DECOR_DIAMOND // ダイヤモンドブロックを発光させる
