@@ -153,8 +153,8 @@ vec4 encodeTranslucentDataTint(vec3 normal, vec2 lightmap, int materialId, int t
  * 金属にした装備の前方シェーディングで残す拡散の割合。環境の映り込み (SSR・ボクセル・空) は composite2 が足すので小さくてよい
  * 金属ブロックは拡散を持たないが、この経路には GI の照り返しが無く、映り込みの外れ (空のフォールバック) だけでは暗い所が黒く沈む
  */
-const float METAL_FORWARD_DIFFUSE = 0.1;
-const float METAL_FORWARD_DIRECT_DIFFUSE = 0.05;
+const float METAL_FORWARD_DIFFUSE = 0.04;
+const float METAL_FORWARD_DIRECT_DIFFUSE = 0.02;
 // 宝石 (ダイヤ) は金属ではなく拡散が主体なので、アルベドを少し落として淡く飛ばない色にする
 const float GEM_FORWARD_DIFFUSE = 0.7;
 
@@ -181,17 +181,24 @@ vec3 forwardDiffuse(Material m, vec3 playerPos, vec3 normal, vec3 geoNormal, vec
     direct.albedo *= directScale;
     SurfaceLights L = gatherSurfaceLights(p, SL_SUN_SHADOW_MAP, SL_BLOCK_NONE, 0u);
     vec3 color = evalDirectDiffuse(direct, normal, V, L.sun);
-    if (shiny) color += evalDirectSpecular(m, normal, V, L.sun);
+    // 金属ブロック (opaque_shading.fsh の directLight) と同じ円盤の上限と強さ。夜の月で上限を外すと鉄ブロックより白く飛ぶ
+    if (shiny) color += evalDirectSpecular(m, normal, V, L.sun, celestialDiscScale()) * celestialSpecularStrength();
     L = gatherSurfaceLights(p, SL_SUN_NONE, SL_BLOCK_NONE, SL_HAND);
     color += evalDirectDiffuse(direct, normal, V, L.handMain);
     color += evalDirectDiffuse(direct, normal, V, L.handOff);
-    if (shiny) color += evalDirectSpecular(m, normal, V, L.handMain) + evalDirectSpecular(m, normal, V, L.handOff);
+    if (shiny) color += (evalDirectSpecular(m, normal, V, L.handMain) + evalDirectSpecular(m, normal, V, L.handOff)) * SPECULAR_BLOCK_STRENGTH;
+    if (shiny) {
+        // 設置光源の照り返し。金属ブロックは光源ごとの鏡面を持つので、装備にも同じ光源を 1 つずつ映す
+        L = gatherSurfaceLights(p, SL_SUN_NONE, SL_BLOCK_NONE, SL_BLOCK_SPECULAR_TRACED);
+        for (int j = 0; j < L.blockSpecCount; j++) color += evalDirectSpecular(m, normal, V, L.blockSpec[j]) * SPECULAR_BLOCK_STRENGTH;
+    }
     L = gatherSurfaceLights(p, SL_SUN_NONE, blockMode, SL_SKY);
 
     vec3 ambient = L.sky + L.block + minAmbientIrradiance();
     if (shiny) {
-        // 環境光の鏡面のうちブロックライトと最低限の環境光 (映り込みの外れた洞窟でも灯りの照り返しを残す)
-        vec3 env = (L.block + minAmbientIrradiance()) * RCP_PI;
+        // 環境光の鏡面のうち最低限の環境光 (映り込みの外れた洞窟でも真っ黒にしない)。ブロックライトは足さない:
+        // 灯りは設置光源ごとの鏡面 (上) と周りの映り込み (composite2) が受け持ち、照度をそのまま映すと夜の装備が拡散の白い面のようになる
+        vec3 env = vec3(minAmbientIrradiance() * RCP_PI);
         color += env * envSpecularWeight(m, max(dot(normal, V), 1e-3));
     }
     /*
@@ -261,7 +268,7 @@ void main() {
     Material m = decodeMaterial(g);
     float directScale = 1.0;
     if (shiny && m.metalId == METAL_ALBEDO) {
-        m.f0 = metalReflectance(g.albedo);
+        m.f0 = gearMetalReflectance(g.albedo);
         m.albedo = g.albedo * METAL_FORWARD_DIFFUSE;
         directScale = METAL_FORWARD_DIRECT_DIFFUSE / METAL_FORWARD_DIFFUSE;
     } else if (shiny) {

@@ -432,7 +432,11 @@ void main() {
     GBufferData g = gbufferDefault();
     g.albedo = srgbToLinear(albedo.rgb);
     if (railMirror) g.albedo = min(g.albedo * RAIL_F0_GAIN, vec3(1.0));
+#if defined GBUF_ENTITIES || defined GBUF_HAND
+    if (autoMetal) g.albedo = gearMetalReflectance(g.albedo);
+#else
     if (autoMetal) g.albedo = metalReflectance(g.albedo);
+#endif
     g.materialId = materialId;
     g.geoNormal = geoNormal;
     g.normal = normal;

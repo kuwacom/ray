@@ -192,7 +192,7 @@ SurfaceParams metalSurfaceParams(vec3 albedoSrgb) {
 }
 
 // 宝石 (ダイヤモンドの道具・防具)。F0 0.17 は屈折率 2.42
-const float GEM_SMOOTHNESS = 0.85;
+const float GEM_SMOOTHNESS = 0.93;
 const float GEM_F0 = 0.17;
 
 SurfaceParams gemSurfaceParams() {
@@ -278,6 +278,22 @@ vec3 metalReflectance(vec3 albedoLinear) {
     float brown = smoothstep(0.1, 0.3, (albedoLinear.r - max(albedoLinear.g, albedoLinear.b)) / rbMax);
     float keep = METAL_PURPLE_DARK_KEEP * max(purple, 0.7 * brown);
     return min(f0 + METAL_DARK_LIFT * (1.0 - keep) * dark * dark * dark, vec3(1.0));
+}
+
+/*
+ * 装備 (防具・道具) の金属の F0。テクスチャの鉄・金は鉄・金ブロックより暗く (線形の輝度で 0.5 前後 / 0.8)、そのままでは艶が弱い
+ * 地の色が明るい画素だけ、色味を保ったまま一定の倍率で持ち上げる (反射率の輝度が GEAR_F0_TARGET に届くまで)。画素ごとに目標へ揃えると
+ * 模様の明暗が消えて平らな灰色になるので、倍率は一定にして暗い画素 (縁・陰) との差を残す。暗い金属 (ネザライト・銅) は持ち上げない
+ */
+const float GEAR_F0_TARGET = 0.9;
+const float GEAR_F0_GAIN = 1.4;
+const vec2 GEAR_F0_LUMINANCE = vec2(0.17, 0.38); // 持ち上げを効かせるアルベドの輝度 (線形) の範囲
+
+vec3 gearMetalReflectance(vec3 albedoLinear) {
+    vec3 f0 = metalReflectance(albedoLinear);
+    float w = smoothstep(GEAR_F0_LUMINANCE.x, GEAR_F0_LUMINANCE.y, luminance(albedoLinear));
+    float gain = clamp(GEAR_F0_TARGET / max(luminance(f0), 1e-3), 1.0, GEAR_F0_GAIN);
+    return min(f0 * mix(1.0, gain, w), vec3(1.0));
 }
 
 /*
