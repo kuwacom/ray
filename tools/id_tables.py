@@ -286,12 +286,17 @@ def metal_blocks() -> dict[str, list[str]]:
                              "copper_chest", "copper_golem_statue", "copper_lantern"),
                 *cut, *[f"waxed_{n}" for n in cut],
                 "chain", "iron_chain", "iron_door", "iron_trapdoor", "iron_bars", "heavy_weighted_pressure_plate",
-                "light_weighted_pressure_plate"],
+                "light_weighted_pressure_plate",
+                # 暗い金属のブロック。判定なし (MAT_METAL) だと暗いテクスチャの輝度で粗くなり、金属に見えない
+                "anvil", "chipped_anvil", "damaged_anvil", "heavy_core", "netherite_block"],
         # 灰色の画素だけが金属 (木の枕木・水・中身の色は除く)
         "gray": ["tripwire_hook", "hopper", "cauldron", "water_cauldron",
                  "lava_cauldron", "powder_snow_cauldron"],
-        # 青みの暗い画素だけが金属 (ランタンの枠。炎は除く)
-        "cool": ["lantern", "soul_lantern"],
+        # 青みの暗い画素だけが金属 (ランタンの枠・スポナーの檻と板。炎や橙の点は除く)
+        # 光らない状態のスポナー・ボルトは表のどこにも無い (未登録の固体) ので状態つきで足す
+        "cool": ["lantern", "soul_lantern", "trial_spawner", "vault", "spawner",
+                 "trial_spawner:trial_spawner_state=inactive", "trial_spawner:trial_spawner_state=waiting_for_players",
+                 "trial_spawner:trial_spawner_state=cooldown", "vault:vault_state=inactive"],
         # 線路 (灰色の鉄と動力レールの明るい金)。走行で磨かれた面としてほぼ鏡にする
         "rail": ["rail", "activator_rail", "detector_rail", "powered_rail"],
         "gold": ["bell"],
@@ -306,12 +311,18 @@ METAL_ITEMS: dict[str, list[str]] = {
     "gray": [*_tools("iron"), "mace", "iron_ingot", "iron_nugget", "bucket", "water_bucket", "milk_bucket", "powder_snow_bucket",
              "axolotl_bucket", "tadpole_bucket", "cod_bucket", "salmon_bucket", "pufferfish_bucket", "tropical_fish_bucket",
              "shears", "flint_and_steel", "compass", "recovery_compass", "minecart", "chest_minecart", "furnace_minecart",
-             "hopper_minecart", "command_block_minecart", "tnt_minecart"],
+             "hopper_minecart", "command_block_minecart", "tnt_minecart", "crossbow"],
     "gold": [*_tools("golden"), "gold_ingot", "gold_nugget", "clock"],
     "copper": [*_tools("copper"), "copper_ingot", "copper_nugget"],
     "netherite": [*_tools("netherite"), "netherite_ingot"],
     "gem": [*_tools("diamond"), *_armor("diamond", "horse_armor"), "diamond_nautilus_armor", "diamond"],
 }
+
+# 光源アイテムの ID を持つ金属のアイテム (光源の ID + 判定の番号 x METAL_GATE_STRIDE の行へ出す)
+METAL_LIGHT_ITEMS: dict[str, list[str]] = {"gray": ["lava_bucket"]}
+
+# 金属のブロックのうち、同じ名前のアイテムが無いもの (大釜は中身ごとにブロックが分かれる。アイテムは cauldron)
+ITEMLESS_METAL_BLOCKS = {"water_cauldron", "lava_cauldron", "powder_snow_cauldron", "chain", "copper_wall_torch"}
 
 METAL_ENTITIES: dict[str, list[str]] = {
     "all": ["minecraft:copper_golem"],

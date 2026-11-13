@@ -166,8 +166,8 @@ const float METAL_SMOOTHNESS_MAX = 0.72;
 
 // 画素の判定で金属にした部分 (感圧板・トラップドア・道具など) の滑らかさの範囲
 // 小さな面は輝度のばらつきがそのまま粗さのまだらときらめきになるので、ブロックより狭くする
-const float METAL_PART_SMOOTHNESS_MIN = 0.45;
-const float METAL_PART_SMOOTHNESS_MAX = 0.6;
+const float METAL_PART_SMOOTHNESS_MIN = 0.55;
+const float METAL_PART_SMOOTHNESS_MAX = 0.65;
 
 // 金属の質感 (鉄・銅のブロックなど)。f0 = 1.0 は labPBR の「アルベドを F0 に使う金属」
 SurfaceParams metalSurfaceParams(vec3 albedoSrgb, float smoothnessMin, float smoothnessMax) {
@@ -208,8 +208,12 @@ SurfaceParams gemSurfaceParams() {
  * 暗い画素の彩度は誤差で大きく振れるので、灰色は最大成分に対する彩度で見る
  */
 const float METAL_GRAY_SATURATION = 0.2;
-const float METAL_GOLD_SATURATION = 0.45;   // 金の持ち手 (木) との境。持ち手は同じ色相で暗いので明るさでも分ける
+const float METAL_GRAY_COOL_SATURATION = 0.3; // 鉄の暗い面 (ミニカートの車体・メイスの頭) は彩度 0.2-0.3 の青みの暗い灰色。水や溶岩 (彩度 0.7 以上) は入らない
+const float METAL_GRAY_COOL_LUMINANCE = 0.4;
+const float METAL_GOLD_SATURATION = 0.4;    // 金の持ち手 (木) との境。持ち手は同じ色相で暗いので明るさでも分ける
 const float METAL_GOLD_LUMINANCE = 0.45;
+const float METAL_GOLD_DARK_SATURATION = 0.8; // 暗い金の面 (インゴットの影) は彩度が高い。持ち手の木は 0.72 以下
+const float METAL_GOLD_DARK_LUMINANCE = 0.15;
 const float METAL_COOL_LUMINANCE = 0.4;     // ランタンの枠 (青みの暗い灰色)。炎は明るいか暖色
 const float METAL_COPPER_GREEN_RATIO = 0.68; // 銅の色相 (赤に対する緑の比) の上限。木の持ち手は 0.75 以上
 const float METAL_COPPER_SATURATION = 0.35;
@@ -220,11 +224,13 @@ bool metalGatePixel(int gate, vec3 c) {
     float lum = luminance(c);
     bool gray = sat < METAL_GRAY_SATURATION;
     bool gold = c.r >= 0.9 * c.g && c.g > c.b && sat > METAL_GOLD_SATURATION && lum > METAL_GOLD_LUMINANCE && c.g > 0.6 * c.r;
-    if (gate == METAL_GATE_GRAY) return gray;
+    if (gate == METAL_GATE_GRAY) return gray || (c.b >= c.r && sat < METAL_GRAY_COOL_SATURATION && lum < METAL_GRAY_COOL_LUMINANCE);
     if (gate == METAL_GATE_COOL) return c.b >= c.r - 0.01 && lum < METAL_COOL_LUMINANCE;
     // 線路は灰色の鉄。動力レールの金の線路は金色で明るく彩度が高い。枕木の木はもっと暗いか彩度が低い
     if (gate == METAL_GATE_RAIL) return gray || (gold && sat > 0.6 && lum > 0.5);
-    if (gate == METAL_GATE_GOLD) return gold;
+    if (gate == METAL_GATE_GOLD) {
+        return gold || (c.r >= 0.9 * c.g && c.g > c.b && c.g > 0.3 * c.r && sat > METAL_GOLD_DARK_SATURATION && lum > METAL_GOLD_DARK_LUMINANCE);
+    }
     if (gate == METAL_GATE_COPPER) return c.g < METAL_COPPER_GREEN_RATIO * c.r && c.b <= c.g && sat > METAL_COPPER_SATURATION;
     if (gate == METAL_GATE_NETHERITE) return gray || c.b > c.g;
     if (gate == METAL_GATE_GEM) return c.g > c.r + 0.02 && c.b > c.r + 0.02;
@@ -253,16 +259,25 @@ SurfaceParams applyMetalGate(SurfaceParams base, int gate, vec3 albedoSrgb) {
 /*
  * 金属のアルベド (線形) を F0 に使うときの持ち上げ。暗い金属 (鉄の鎖・金床・ネザライト) をそのまま F0 にすると黒い鏡になる
  * 灰色を足すので色味の差はそのまま残り (掛けると暗い紫のネザライトがピンクになる)、明るい金属ほど足す量が小さい
+ * 暗い金属 (鎖・金床・鉄の道具。線形 0.03-0.1) だけ F0 を 0.5 前後まで上げ、明るい鉄・金と銅の色味はほぼ変えない (暗さの 6 乗で効かせる。銅ブロックの輝度 0.25 で 0.12)
  */
-const float METAL_DARK_LIFT = 0.2;
+const float METAL_DARK_LIFT = 0.7;
 // 金のように青の反射率がほぼ 0 の金属は、青い空を映すと緑がかったオリーブ色になる。赤緑が強く青が弱い色だけ輝度の灰色へ寄せる
 const float METAL_YELLOW_DESATURATE = 0.25;
+// ネザライトは暗い赤紫の金属 (緑だけが最小)。鉄と同じに持ち上げると銀色になるので、紫がかった画素は持ち上げを弱める。鉄・銅・金は緑が最小にならない
+const float METAL_PURPLE_DARK_KEEP = 0.8;
 
 vec3 metalReflectance(vec3 albedoLinear) {
     float l = luminance(albedoLinear);
     float yellow = smoothstep(0.45, 0.6, albedoLinear.g / max(albedoLinear.r, 1e-4)) * (1.0 - smoothstep(0.2, 0.4, albedoLinear.b / max(albedoLinear.g, 1e-4)));
     vec3 f0 = mix(albedoLinear, vec3(l), METAL_YELLOW_DESATURATE * yellow);
-    return min(f0 + METAL_DARK_LIFT * sqr(1.0 - l), vec3(1.0));
+    float dark = sqr(1.0 - l);
+    float rbMax = max(max(albedoLinear.r, albedoLinear.b), 1e-4);
+    float purple = smoothstep(0.0, 0.06, (min(albedoLinear.r, albedoLinear.b) - albedoLinear.g) / rbMax);
+    // 赤茶の画素 (緑と青が同じ) もネザライトの一部。銅も暖色だが、持ち上げは残したいので弱めに混ぜる
+    float brown = smoothstep(0.1, 0.3, (albedoLinear.r - max(albedoLinear.g, albedoLinear.b)) / rbMax);
+    float keep = METAL_PURPLE_DARK_KEEP * max(purple, 0.7 * brown);
+    return min(f0 + METAL_DARK_LIFT * (1.0 - keep) * dark * dark * dark, vec3(1.0));
 }
 
 /*

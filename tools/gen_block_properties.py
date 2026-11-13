@@ -26,7 +26,8 @@ from id_tables import (  # noqa: E402
     BLOCK_CONSTS, COLOR_BAND_FIRST, COLOR_BAND_LAST, COLORS, COPPER_PREFIX, ENTITIES, ENTITY_LIGHT_ID_BASE, LIGHT_BLOCK_LAST,
     FACINGS, LIGHT_ENTITY_FIRST, LIGHT_ENTITY_LAST, LIGHT_FACING_LAST, LIGHT_FACING_STRIDE, LIGHT_ID_BASE, LIGHT_ITEM_FIRST,
     LIGHT_ITEM_LAST, LIGHTS, Light, STAIRS_FIRST, with_state,
-    ENTITY_METAL_BASE, METAL_ENTITIES, METAL_GATE_STRIDE, METAL_GATES, METAL_ITEMS, metal_blocks,
+    ENTITY_METAL_BASE, ITEMLESS_METAL_BLOCKS, METAL_ENTITIES, METAL_GATE_STRIDE, METAL_GATES, METAL_ITEMS, METAL_LIGHT_ITEMS,
+    metal_blocks,
 )
 from lib.color import linear_to_srgb, srgb_to_linear  # noqa: E402
 from lib.generated import check as generated_check  # noqa: E402
@@ -383,6 +384,21 @@ def all_blocks() -> list[Entry]:
     return BLOCKS + light_block_entries()
 
 
+def item_metal_tables() -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+    """アイテム側の金属の判定。ブロックの金属は同じ名前のアイテム (手持ち・ドロップ・額縁) も同じ判定にする
+    戻り値: (光源アイテムの ID を持つものの判定, 元の ID を持たないアイテムの判定)"""
+    lit = {n for _, _, names in light_item_entries() for n in names}
+    items = {g: list(v) for g, v in METAL_ITEMS.items()}
+    hint = next(names for bid, _, names in BLOCKS if bid == 10)
+    gold = next(names for bid, _, names in BLOCKS if bid == 16)
+    items["all"] += [n for n in [*hint, *gold] if n not in lit]
+    for gate, names in metal_blocks().items():
+        items.setdefault(gate, []).extend(n for n in names if n not in lit and n not in ITEMLESS_METAL_BLOCKS and ":" not in n)
+    items = {g: list(dict.fromkeys(names)) for g, names in items.items()}
+    gates = {g: [*metal_blocks().get(g, []), *METAL_LIGHT_ITEMS.get(g, [])] for g in METAL_GATES}
+    return gates, items
+
+
 def check_tables() -> None:
     """光源の番号帯・ID の重複・定数と properties の対応を確かめる。ずれていれば生成を止める"""
     names: set[str] = set()
@@ -706,9 +722,10 @@ def generated(shaders: Path = SHADERS) -> dict[Path, str]:
     tops: dict[str, list[int]] = data.get("top", {})
     colored, palette, palette_top = color_blocks(colors, tops)
     ids = shaders / "lib" / "ids"
+    item_gates, item_metal = item_metal_tables()
     return {
         shaders / "block.properties": render("block", all_blocks() + colored, metal_blocks()),
-        shaders / "item.properties": render("item", light_item_entries(), metal_blocks(), METAL_ITEMS),
+        shaders / "item.properties": render("item", light_item_entries(), item_gates, item_metal),
         shaders / "entity.properties": render_entity_properties(),
         ids / "block_albedo.glsl": render_albedo_glsl(colors, tops, palette, palette_top),
         ids / "block_ids.glsl": render_block_ids(),
