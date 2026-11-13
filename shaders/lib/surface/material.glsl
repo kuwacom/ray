@@ -235,9 +235,9 @@ bool metalGatePixel(int gate, vec3 c) {
  * 線路の金属は走行で磨かれた面。反射率は高いが、細かな削れと線路の湾曲で映り込みと太陽・月の照り返しはぼやける (完全な鏡にはしない)
  * 輝度で変えると画素ごとの粗さのまだらがきらめきになるので一定
  */
-const float RAIL_SMOOTHNESS = 0.8;
+const float RAIL_SMOOTHNESS = 0.7;
 // 線路のテクスチャの鉄は暗い灰色 (線形 0.33 前後) で、そのまま F0 にすると暗い鏡になる。磨いた金属の高い反射率まで上げる。明暗の模様は残る
-const float RAIL_F0_GAIN = 2.4;
+const float RAIL_F0_GAIN = 1.8;
 
 // 判定に合う画素を金属 (宝石は光沢のある誘電体) に置き換える。AO と高さはそのまま。PBR テクスチャが無い (推定の) 時だけ使う
 SurfaceParams applyMetalGate(SurfaceParams base, int gate, vec3 albedoSrgb) {
