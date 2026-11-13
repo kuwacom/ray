@@ -185,7 +185,13 @@ vec3 forwardDiffuse(Material m, vec3 playerPos, vec3 normal, vec3 geoNormal, vec
     p.dither = dither;
     Material direct = m;
     direct.albedo *= directScale;
+#ifdef GBUF_HAND_WATER
+    // 一人称の手は影マップ上で自分の体の影の中にあるので、不透明の手 (opaque_shading.fsh) と同じくスカイライトから日向を推定する
+    p.hand = true;
+    SurfaceLights L = gatherSurfaceLights(p, SL_SUN_SHADOW_MAP_FALLBACK, SL_BLOCK_NONE, 0u);
+#else
     SurfaceLights L = gatherSurfaceLights(p, SL_SUN_SHADOW_MAP, SL_BLOCK_NONE, 0u);
+#endif
     vec3 color = evalDirectDiffuse(direct, normal, V, L.sun);
     // 金属ブロック (opaque_shading.fsh の directLight) と同じ円盤の上限と強さ。夜の月で上限を外すと鉄ブロックより白く飛ぶ
     if (shiny) color += evalDirectSpecular(m, normal, V, L.sun, celestialDiscScale()) * celestialSpecularStrength();
