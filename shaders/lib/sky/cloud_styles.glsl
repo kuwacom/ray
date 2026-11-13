@@ -31,239 +31,239 @@
 
 #if CLOUD_STYLE == 1
 // Ray: 雲量のほかは各設定がそのまま効く基準
-const float CS_LOW_COVER = 0.75;
-const float CS_MID_COVER = 0.7;
-const float CS_HIGH_COVER = 0.8;
-const float CS_SIZE = 1.0;
-const float CS_HEIGHT = 1.0;
-const float CS_CONVECTION = 1.0;
-const float CS_TYPE_SHIFT = 0.0;
-const float CS_SPACING = 1.0;
-const float CS_LOBES = 1.0;
-const float CS_EROSION = 1.0;
-const float CS_BASE_RAGGED = 1.0;
-const float CS_FRACTUS = 1.0;
-const float CS_HAZE = 1.0;
-const float CS_EDGE = 1.0;
-const float CS_DENSITY = 1.0;
-const float CS_CORE = 1.0;
-const float CS_LOBE_SHADE = 0.3;
-const float CS_SILVER = 1.0;
-const float CS_POWDER = 1.0;
-const float CS_SUN = 1.0;
-const float CS_MS = 1.0;
-const float CS_AMBIENT = 1.0;
-const float CS_BASE_SHADE = 1.0;
+#define CS_LOW_COVER 0.75
+#define CS_MID_COVER 0.7
+#define CS_HIGH_COVER 0.8
+#define CS_SIZE 1.0
+#define CS_HEIGHT 1.0
+#define CS_CONVECTION 1.0
+#define CS_TYPE_SHIFT 0.0
+#define CS_SPACING 1.0
+#define CS_LOBES 1.0
+#define CS_EROSION 1.0
+#define CS_BASE_RAGGED 1.0
+#define CS_FRACTUS 1.0
+#define CS_HAZE 1.0
+#define CS_EDGE 1.0
+#define CS_DENSITY 1.0
+#define CS_CORE 1.0
+#define CS_LOBE_SHADE 0.3
+#define CS_SILVER 1.0
+#define CS_POWDER 1.0
+#define CS_SUN 1.0
+#define CS_MS 1.0
+#define CS_AMBIENT 1.0
+#define CS_BASE_SHADE 1.0
 
 #elif CLOUD_STYLE == 2
 // Bliss 風: 小さめの塊がまばらに浮かび、縁はほつれて粉っぽい。芯は不透明で、日向の頂は白く陰の側は青灰色に沈む
-const float CS_LOW_COVER = 0.6;
-const float CS_MID_COVER = 1.0;
-const float CS_HIGH_COVER = 0.8;
-const float CS_SIZE = 0.7;
-const float CS_HEIGHT = 0.65;
-const float CS_CONVECTION = 1.0;
-const float CS_TYPE_SHIFT = 0.0;
-const float CS_SPACING = 1.25;
-const float CS_LOBES = 1.1;
-const float CS_EROSION = 1.2;
-const float CS_BASE_RAGGED = 1.5;
-const float CS_FRACTUS = 1.0;
-const float CS_HAZE = 0.6;
-const float CS_EDGE = 0.8;
-const float CS_DENSITY = 1.0;
-const float CS_CORE = 1.6;
-const float CS_LOBE_SHADE = 0.38;
-const float CS_SILVER = 1.3;
-const float CS_POWDER = 1.2;
-const float CS_SUN = 1.0;
-const float CS_MS = 1.15;
-const float CS_AMBIENT = 0.95;
-const float CS_BASE_SHADE = 1.1;
+#define CS_LOW_COVER 0.6
+#define CS_MID_COVER 1.0
+#define CS_HIGH_COVER 0.8
+#define CS_SIZE 0.7
+#define CS_HEIGHT 0.65
+#define CS_CONVECTION 1.0
+#define CS_TYPE_SHIFT 0.0
+#define CS_SPACING 1.25
+#define CS_LOBES 1.1
+#define CS_EROSION 1.2
+#define CS_BASE_RAGGED 1.5
+#define CS_FRACTUS 1.0
+#define CS_HAZE 0.6
+#define CS_EDGE 0.8
+#define CS_DENSITY 1.0
+#define CS_CORE 1.6
+#define CS_LOBE_SHADE 0.38
+#define CS_SILVER 1.3
+#define CS_POWDER 1.2
+#define CS_SUN 1.0
+#define CS_MS 1.15
+#define CS_AMBIENT 0.95
+#define CS_BASE_SHADE 1.1
 
 #elif CLOUD_STYLE == 3
 // バニラの形: バニラの雲と同じ高さ・12 ブロックの格子・模様・流れの、角ばった体積雲。
 // 写実の層は描かないので、雲量・大きさ・こぶ・もや・濃さの値は使われない
 // 光の絞りは cloud_vanilla.glsl の VANILLA_CLOUD_* (バニラの形ならどのスタイルでも同じ)
-const float CS_LOW_COVER = 0.75;
-const float CS_MID_COVER = 0.7;
-const float CS_HIGH_COVER = 0.5;
-const float CS_SIZE = 1.0;
-const float CS_HEIGHT = 1.0;
-const float CS_CONVECTION = 1.0;
-const float CS_TYPE_SHIFT = 0.0;
-const float CS_SPACING = 1.0;
-const float CS_LOBES = 1.0;
-const float CS_EROSION = 1.0;
-const float CS_BASE_RAGGED = 1.0;
-const float CS_FRACTUS = 1.0;
-const float CS_HAZE = 1.0;
-const float CS_EDGE = 1.0;
-const float CS_DENSITY = 1.0;
-const float CS_CORE = 1.0;
-const float CS_LOBE_SHADE = 0.0;
-const float CS_SILVER = 1.0;
-const float CS_POWDER = 1.0;
-const float CS_SUN = 1.0;
-const float CS_MS = 1.0;
-const float CS_AMBIENT = 1.0;
-const float CS_BASE_SHADE = 1.0;
+#define CS_LOW_COVER 0.75
+#define CS_MID_COVER 0.7
+#define CS_HIGH_COVER 0.5
+#define CS_SIZE 1.0
+#define CS_HEIGHT 1.0
+#define CS_CONVECTION 1.0
+#define CS_TYPE_SHIFT 0.0
+#define CS_SPACING 1.0
+#define CS_LOBES 1.0
+#define CS_EROSION 1.0
+#define CS_BASE_RAGGED 1.0
+#define CS_FRACTUS 1.0
+#define CS_HAZE 1.0
+#define CS_EDGE 1.0
+#define CS_DENSITY 1.0
+#define CS_CORE 1.0
+#define CS_LOBE_SHADE 0.0
+#define CS_SILVER 1.0
+#define CS_POWDER 1.0
+#define CS_SUN 1.0
+#define CS_MS 1.0
+#define CS_AMBIENT 1.0
+#define CS_BASE_SHADE 1.0
 
 #elif CLOUD_STYLE == 4
 // 現実に忠実: 積雲の芯の実測に近い消散係数 (0.03-0.05 /m)、晴天積雲の雲量 3-5 割。見た目の押し出し (銀の縁・powder) は位相関数と多重散乱だけに任せる
-const float CS_LOW_COVER = 0.7;
-const float CS_MID_COVER = 0.6;
-const float CS_HIGH_COVER = 1.0;
-const float CS_SIZE = 1.0;
-const float CS_HEIGHT = 0.85;
-const float CS_CONVECTION = 1.0;
-const float CS_TYPE_SHIFT = 0.0;
-const float CS_SPACING = 1.0;
-const float CS_LOBES = 1.0;
-const float CS_EROSION = 1.0;
-const float CS_BASE_RAGGED = 1.0;
-const float CS_FRACTUS = 0.6;
-const float CS_HAZE = 0.3;
-const float CS_EDGE = 0.85;
-const float CS_DENSITY = 3.5;
-const float CS_CORE = 1.5;
-const float CS_LOBE_SHADE = 0.3;
-const float CS_SILVER = 0.0;
-const float CS_POWDER = 0.0;
-const float CS_SUN = 1.0;
-const float CS_MS = 1.0;
-const float CS_AMBIENT = 1.0;
-const float CS_BASE_SHADE = 1.0;
+#define CS_LOW_COVER 0.7
+#define CS_MID_COVER 0.6
+#define CS_HIGH_COVER 1.0
+#define CS_SIZE 1.0
+#define CS_HEIGHT 0.85
+#define CS_CONVECTION 1.0
+#define CS_TYPE_SHIFT 0.0
+#define CS_SPACING 1.0
+#define CS_LOBES 1.0
+#define CS_EROSION 1.0
+#define CS_BASE_RAGGED 1.0
+#define CS_FRACTUS 0.6
+#define CS_HAZE 0.3
+#define CS_EDGE 0.85
+#define CS_DENSITY 3.5
+#define CS_CORE 1.5
+#define CS_LOBE_SHADE 0.3
+#define CS_SILVER 0.0
+#define CS_POWDER 0.0
+#define CS_SUN 1.0
+#define CS_MS 1.0
+#define CS_AMBIENT 1.0
+#define CS_BASE_SHADE 1.0
 
 #elif CLOUD_STYLE == 5
 // 綿あめ: 縁のもやが広く、芯まで柔らかく透ける丸い雲。陰は浅く、明るいパステル寄りの白
-const float CS_LOW_COVER = 0.75;
-const float CS_MID_COVER = 0.5;
-const float CS_HIGH_COVER = 0.6;
-const float CS_SIZE = 1.1;
-const float CS_HEIGHT = 0.8;
-const float CS_CONVECTION = 1.0;
-const float CS_TYPE_SHIFT = 0.0;
-const float CS_SPACING = 1.0;
-const float CS_LOBES = 0.5;
-const float CS_EROSION = 0.35;
-const float CS_BASE_RAGGED = 0.5;
-const float CS_FRACTUS = 0.5;
-const float CS_HAZE = 2.5;
-const float CS_EDGE = 1.8;
-const float CS_DENSITY = 0.6;
-const float CS_CORE = 0.5;
-const float CS_LOBE_SHADE = 0.1;
-const float CS_SILVER = 1.5;
-const float CS_POWDER = 0.0;
-const float CS_SUN = 1.0;
-const float CS_MS = 1.4;
-const float CS_AMBIENT = 1.4;
-const float CS_BASE_SHADE = 0.4;
+#define CS_LOW_COVER 0.75
+#define CS_MID_COVER 0.5
+#define CS_HIGH_COVER 0.6
+#define CS_SIZE 1.1
+#define CS_HEIGHT 0.8
+#define CS_CONVECTION 1.0
+#define CS_TYPE_SHIFT 0.0
+#define CS_SPACING 1.0
+#define CS_LOBES 0.5
+#define CS_EROSION 0.35
+#define CS_BASE_RAGGED 0.5
+#define CS_FRACTUS 0.5
+#define CS_HAZE 2.5
+#define CS_EDGE 1.8
+#define CS_DENSITY 0.6
+#define CS_CORE 0.5
+#define CS_LOBE_SHADE 0.1
+#define CS_SILVER 1.5
+#define CS_POWDER 0.0
+#define CS_SUN 1.0
+#define CS_MS 1.4
+#define CS_AMBIENT 1.4
+#define CS_BASE_SHADE 0.4
 
 #elif CLOUD_STYLE == 6
 // 入道雲: 背の高い雄大積雲が間を空けて立つ。輪郭がくっきりし、日向の白と陰の青灰色の差が大きく、底は平らで暗い
-const float CS_LOW_COVER = 0.55;
-const float CS_MID_COVER = 0.3;
-const float CS_HIGH_COVER = 0.6;
-const float CS_SIZE = 1.0;
-const float CS_HEIGHT = 1.6;
-const float CS_CONVECTION = 1.6;
-const float CS_TYPE_SHIFT = 0.1;
-const float CS_SPACING = 1.3;
-const float CS_LOBES = 1.0;
-const float CS_EROSION = 0.5;
-const float CS_BASE_RAGGED = 0.7;
-const float CS_FRACTUS = 0.3;
-const float CS_HAZE = 0.15;
-const float CS_EDGE = 0.5;
-const float CS_DENSITY = 1.5;
-const float CS_CORE = 1.5;
-const float CS_LOBE_SHADE = 0.5;
-const float CS_SILVER = 1.0;
-const float CS_POWDER = 1.0;
-const float CS_SUN = 1.0;
-const float CS_MS = 1.4;
-const float CS_AMBIENT = 1.2;
-const float CS_BASE_SHADE = 1.3;
+#define CS_LOW_COVER 0.55
+#define CS_MID_COVER 0.3
+#define CS_HIGH_COVER 0.6
+#define CS_SIZE 1.0
+#define CS_HEIGHT 1.6
+#define CS_CONVECTION 1.6
+#define CS_TYPE_SHIFT 0.1
+#define CS_SPACING 1.3
+#define CS_LOBES 1.0
+#define CS_EROSION 0.5
+#define CS_BASE_RAGGED 0.7
+#define CS_FRACTUS 0.3
+#define CS_HAZE 0.15
+#define CS_EDGE 0.5
+#define CS_DENSITY 1.5
+#define CS_CORE 1.5
+#define CS_LOBE_SHADE 0.5
+#define CS_SILVER 1.0
+#define CS_POWDER 1.0
+#define CS_SUN 1.0
+#define CS_MS 1.4
+#define CS_AMBIENT 1.2
+#define CS_BASE_SHADE 1.3
 
 #elif CLOUD_STYLE == 7
 // まばらな晴天積雲: 背の低い小さな扁平雲が広い青空に散らばる
-const float CS_LOW_COVER = 0.4;
-const float CS_MID_COVER = 0.3;
-const float CS_HIGH_COVER = 0.7;
-const float CS_SIZE = 0.6;
-const float CS_HEIGHT = 0.45;
-const float CS_CONVECTION = 0.6;
-const float CS_TYPE_SHIFT = 0.0;
-const float CS_SPACING = 1.4;
-const float CS_LOBES = 0.9;
-const float CS_EROSION = 1.0;
-const float CS_BASE_RAGGED = 1.0;
-const float CS_FRACTUS = 0.6;
-const float CS_HAZE = 0.7;
-const float CS_EDGE = 1.0;
-const float CS_DENSITY = 1.0;
-const float CS_CORE = 1.0;
-const float CS_LOBE_SHADE = 0.3;
-const float CS_SILVER = 1.0;
-const float CS_POWDER = 1.0;
-const float CS_SUN = 1.0;
-const float CS_MS = 1.0;
-const float CS_AMBIENT = 1.0;
-const float CS_BASE_SHADE = 1.0;
+#define CS_LOW_COVER 0.4
+#define CS_MID_COVER 0.3
+#define CS_HIGH_COVER 0.7
+#define CS_SIZE 0.6
+#define CS_HEIGHT 0.45
+#define CS_CONVECTION 0.6
+#define CS_TYPE_SHIFT 0.0
+#define CS_SPACING 1.4
+#define CS_LOBES 0.9
+#define CS_EROSION 1.0
+#define CS_BASE_RAGGED 1.0
+#define CS_FRACTUS 0.6
+#define CS_HAZE 0.7
+#define CS_EDGE 1.0
+#define CS_DENSITY 1.0
+#define CS_CORE 1.0
+#define CS_LOBE_SHADE 0.3
+#define CS_SILVER 1.0
+#define CS_POWDER 1.0
+#define CS_SUN 1.0
+#define CS_MS 1.0
+#define CS_AMBIENT 1.0
+#define CS_BASE_SHADE 1.0
 
 #elif CLOUD_STYLE == 8
 // 層積雲の曇り: 平たい塊とロールが空の大半を覆い、所々の切れ間から青空がのぞく
-const float CS_LOW_COVER = 1.35;
-const float CS_MID_COVER = 1.2;
-const float CS_HIGH_COVER = 0.4;
-const float CS_SIZE = 1.2;
-const float CS_HEIGHT = 1.0;
-const float CS_CONVECTION = 0.4;
-const float CS_TYPE_SHIFT = -0.6;
-const float CS_SPACING = 1.0;
-const float CS_LOBES = 1.0;
-const float CS_EROSION = 1.0;
-const float CS_BASE_RAGGED = 1.0;
-const float CS_FRACTUS = 1.0;
-const float CS_HAZE = 1.0;
-const float CS_EDGE = 1.0;
-const float CS_DENSITY = 1.3;
-const float CS_CORE = 1.0;
-const float CS_LOBE_SHADE = 0.2;
-const float CS_SILVER = 1.0;
-const float CS_POWDER = 1.0;
-const float CS_SUN = 1.0;
-const float CS_MS = 1.0;
-const float CS_AMBIENT = 1.0;
-const float CS_BASE_SHADE = 1.2;
+#define CS_LOW_COVER 1.35
+#define CS_MID_COVER 1.2
+#define CS_HIGH_COVER 0.4
+#define CS_SIZE 1.2
+#define CS_HEIGHT 1.0
+#define CS_CONVECTION 0.4
+#define CS_TYPE_SHIFT (-0.6)
+#define CS_SPACING 1.0
+#define CS_LOBES 1.0
+#define CS_EROSION 1.0
+#define CS_BASE_RAGGED 1.0
+#define CS_FRACTUS 1.0
+#define CS_HAZE 1.0
+#define CS_EDGE 1.0
+#define CS_DENSITY 1.3
+#define CS_CORE 1.0
+#define CS_LOBE_SHADE 0.2
+#define CS_SILVER 1.0
+#define CS_POWDER 1.0
+#define CS_SUN 1.0
+#define CS_MS 1.0
+#define CS_AMBIENT 1.0
+#define CS_BASE_SHADE 1.2
 
 #else
 // カスタム (CLOUD_STYLE 0): スタイルにしか無い値は CLOUD_S_*、既存の設定があるものは Ray の基準 (設定がそのまま効く)
-const float CS_LOW_COVER = 0.75;
-const float CS_MID_COVER = 0.7;
-const float CS_HIGH_COVER = 0.8;
-const float CS_SIZE = 1.0;
-const float CS_HEIGHT = CLOUD_S_HEIGHT;
-const float CS_CONVECTION = CLOUD_S_CONVECTION;
-const float CS_TYPE_SHIFT = CLOUD_S_TYPE_SHIFT;
-const float CS_SPACING = CLOUD_S_SPACING;
-const float CS_LOBES = CLOUD_S_LOBES;
-const float CS_EROSION = 1.0;
-const float CS_BASE_RAGGED = CLOUD_S_BASE_RAGGED;
-const float CS_FRACTUS = 1.0;
-const float CS_HAZE = 1.0;
-const float CS_EDGE = 1.0;
-const float CS_DENSITY = 1.0;
-const float CS_CORE = 1.0;
-const float CS_LOBE_SHADE = CLOUD_S_LOBE_SHADE;
-const float CS_SILVER = 1.0;
-const float CS_POWDER = 1.0;
-const float CS_SUN = 1.0;
-const float CS_MS = CLOUD_S_MULTISCATTER;
-const float CS_AMBIENT = 1.0;
-const float CS_BASE_SHADE = 1.0;
+#define CS_LOW_COVER 0.75
+#define CS_MID_COVER 0.7
+#define CS_HIGH_COVER 0.8
+#define CS_SIZE 1.0
+#define CS_HEIGHT float(CLOUD_S_HEIGHT)
+#define CS_CONVECTION float(CLOUD_S_CONVECTION)
+#define CS_TYPE_SHIFT float(CLOUD_S_TYPE_SHIFT)
+#define CS_SPACING float(CLOUD_S_SPACING)
+#define CS_LOBES float(CLOUD_S_LOBES)
+#define CS_EROSION 1.0
+#define CS_BASE_RAGGED float(CLOUD_S_BASE_RAGGED)
+#define CS_FRACTUS 1.0
+#define CS_HAZE 1.0
+#define CS_EDGE 1.0
+#define CS_DENSITY 1.0
+#define CS_CORE 1.0
+#define CS_LOBE_SHADE float(CLOUD_S_LOBE_SHADE)
+#define CS_SILVER 1.0
+#define CS_POWDER 1.0
+#define CS_SUN 1.0
+#define CS_MS float(CLOUD_S_MULTISCATTER)
+#define CS_AMBIENT 1.0
+#define CS_BASE_SHADE 1.0
 #endif
 
 #endif
