@@ -242,6 +242,14 @@ option.GI_DENOISE=GI のノイズ除去
 value.GI_DENOISE.0=なし
 value.GI_DENOISE.1=時間
 value.GI_DENOISE.2=時間 + 空間
+option.GI_HISTORY_MAX=GI の履歴の長さ
+option.GI_HISTORY_MAX.comment=GI を平均する過去のフレーム数の上限。長いほど止まっている時のちらつきが少ない。光の変化には「GI の追従」で追いつく。GI のノイズ除去が必要。重さは変わらない
+value.GI_HISTORY_MAX.8=8 フレーム (速い・粗い)
+value.GI_HISTORY_MAX.16=16 フレーム
+value.GI_HISTORY_MAX.32=32 フレーム
+value.GI_HISTORY_MAX.64=64 フレーム (綺麗)
+option.GI_RESPONSE_STRENGTH=GI の追従
+option.GI_RESPONSE_STRENGTH.comment=光が変わった時に GI の履歴を縮める強さ。上げると光源を置く・壊す時に早く追いつき、ちらつきが少し増える。GI のノイズ除去が必要。重さは変わらない
 option.GI_VOXEL_FADE=ボクセル GI のフェード幅
 option.GI_VOXEL_FADE.comment=ボクセル RT の GI を、ボクセル範囲の端で外側の通常の空の光へ溶かす幅 (ブロック)。大きいほど、空から降りる時や遠景で範囲の境目が目立たない。ボクセル RT のみ
 

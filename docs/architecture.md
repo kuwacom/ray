@@ -102,7 +102,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 14 | deferred1.csh | light | LIGHT_TRACE_COUNT 光源 (上位 N-1 個 + 残りから確率的に 1 個) の DDA トレース (直接光) | SSBO3, voxel*, G バッファ | blockLightRawImg (影あり S), blockLightAuxImg (影なし U) (左上 1/RES) | local 8², workGroupsRender = 1/LIGHT_TRACE_RES | LIGHT_SHADOWS |
 | 15 | deferred2.vsh/fsh | light | 可視率 S/U の時空間デノイズ + フル解像度の影なし照度に掛ける | blockLightRaw/Aux, colortex7 | colortex6, colortex7 | 画面 | LIGHT_SHADOWS |
 | 16 | deferred10.csh | surface | GI / AO の生値 (RSM / SSGI / ボクセル RT)。多重反射は画面に映るヒット点の前フレームの GI (colortex9) | G バッファ, shadowcolor, voxel, flood, colortex9 | giRawImg | local 8², 1/GI_RES | GI_MODE>0 or AO_MODE>0 |
-| 17 | deferred11.vsh/fsh | surface | GI / AO のデノイズ | giRaw, colortex9 | colortex8, colortex9 | 画面 | 同上 |
+| 17 | deferred11.vsh/fsh | surface | GI / AO のデノイズ | giRaw, colortex9, colortex19 | colortex8, colortex9, colortex19 | 画面 | 同上 |
 | 18 | deferred20.vsh/fsh | sky | 体積雲レイマーチ (低解像度 + チェッカーボード) | weather, skyView | colortex10 (左上 1/CLOUD_RES) | 画面 (範囲外は早期終了) | CLOUDS>=2, world0 |
 | 19 | deferred21.vsh/fsh | sky | 雲の時間アップスケール | colortex10, 履歴 | colortex11 | 画面 | 同上 |
 | 20 | deferred30.vsh/fsh | surface | 不透明シェーディング (全モジュールの光を合成) + 空の描画 | G バッファ, colortex6/8/11, SSBO0 | colortex0 | 画面 | 常時 |
@@ -134,7 +134,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 
 ## バッファ設計
 
-### colortex (22 枚。正本は `lib/buffers/formats.glsl`)
+### colortex (23 枚。正本は `lib/buffers/formats.glsl`)
 
 | buf | フォーマット | 内容 | 書く | 読む | クリア |
 |---|---|---|---|---|---|
@@ -157,6 +157,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 16 | R16F | sky: 画面空間の光芒 (低解像度 `size.buffer.colortex16` = 1/GODRAYS_RES)。composite12 -> 13 -> 14 で同じバッファをピンポンして読み書きし、composite19 が足す | sky | sky | 毎フレーム |
 | 17 | RGBA16F | post: 鏡面の白飛び分の履歴 (rgb = 露出前の線形, a 予備)。SPECULAR_SPARKLE の時だけ composite20 が読み書きし、final がミップで読んで点像の芯と裾を作る (LENS_POINT_SPREAD_STRENGTH) | post | post | 永続 |
 | 18 | RGBA16F | surface: 水の屈折先の色 (rgb、吸収の前) + 水の中の経路長 (a)。水の画素だけ書き、ほかは前の値のまま | surface (composite1) | surface (composite2) | なし |
+| 19 | RGBA16F | surface: GI 履歴の付属。r = 履歴の長さ (フレーム、0 = 無効), g = 視線距離 (再投影の遮蔽判定), b / a = 速い履歴の輝度の平均・分散 (変化の検出)。GI_DENOISE >= 1 の時だけ | surface (deferred11) | surface | 永続 |
 | 20 | RGBA16F | surface: 水の鏡面の映り込みのフル解像度の SSR (rgb = 当たりの色 x 画面端の重み, a = 重み、外れは 0)。水の画素のうち映り込みを散らさない凪の水面だけ、REFLECTIONS > 0 | surface (composite1) | surface (composite2) | なし |
 | 21 | RGBA16F | surface: 上向きの水面の太陽の可視率 (影の PCSS + 雲影、rgb。内散乱・泡・波頭の透過光と太陽の照り返しに使う), a = 水の屈折先の白飛び分の輝度 (屈折先の deferred30 の a から)。水の画素だけ | surface (composite1) | surface (composite2) | なし |
 

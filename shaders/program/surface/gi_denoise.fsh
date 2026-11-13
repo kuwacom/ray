@@ -5,8 +5,12 @@
  *
  * 1. 空間: 低解像度テクセルの近傍 (GI_DENOISE=2 で 5x5、それ以外 3x3) を深度・法線の差で重み付けして集める (joint bilateral)
  *    各テクセルが表すフル解像度のピクセルは lowResOffset(frameCounter) で復元し、その深度・法線と比べる
- * 2. 時間 (GI_DENOISE>=1): 前フレームへ再投影した履歴を、近傍の平均 +- k 標準偏差に収めてから指数移動平均
- *    (分散クリップ。ディスオクルージョンで古い値が残るのも同じクリップで抑える)
+ * 2. 時間 (GI_DENOISE>=1): 履歴の長さ n を持ち、GI は 1/n で混ぜる (上限 GI_HISTORY_MAX)
+ *    再投影は 2x2 の双線形で、履歴の視線距離が合わないタップを捨てる (ディスオクルージョンで長さを 0 に戻す)
+ *    変化の検出: 輝度の速い履歴 (平均と分散、混合率 GI_FAST_ALPHA) と GI の履歴の差が、速い履歴の揺れの
+ *    GI_CHANGE_K 倍を超えたら n を縮める (Schied et al. 2017 の時間方向の分散、ReBLUR の速い履歴と同じ考え方)
+ *    生値の近傍の標準偏差で履歴を切る方式は、当たりが稀な暗所ほど幅が狭くなって毎フレーム履歴を捨て、揺れと暗さの偏りが残った
+ *    AO は画面空間で求めていて視点で変わるので、今までどおり近傍の幅に収めてから混ぜる
  */
 //@include "/lib/buffers/images.glsl"
 //@include "/lib/common/common.glsl"
@@ -65,9 +69,17 @@
 
 in vec2 texcoord;
 
+#if GI_DENOISE >= 1
+/* RENDERTARGETS: 8,9,19 */
+#else
 /* RENDERTARGETS: 8,9 */
+#endif
 layout(location = 0) out vec4 outIndirect;
 layout(location = 1) out vec4 outHistory;
+#if GI_DENOISE >= 1
+// r = 履歴の長さ (フレーム), g = 視線距離, b = 速い履歴の輝度の平均, a = その分散
+layout(location = 2) out vec4 outHistoryInfo;
+#endif
 
 #if GI_DENOISE == 2
     const int GI_FILTER_RADIUS = 2;
@@ -76,12 +88,22 @@ layout(location = 1) out vec4 outHistory;
 #endif
 const float GI_DEPTH_SIGMA = 0.04;     // 相対深度差の許容
 const float GI_NORMAL_POWER = 16.0;
-const float GI_HISTORY_CLIP = 1.5;     // 履歴を収める標準偏差の幅
+const float GI_HISTORY_CLIP = 1.5;     // AO の履歴を収める標準偏差の幅
 #if GI_RES == 1
     const float GI_TEMPORAL_ALPHA = 0.1;
 #else
     const float GI_TEMPORAL_ALPHA = 0.16; // 1/4 のピクセルしか毎フレーム更新されないので少し速く追従させる
 #endif
+// 履歴の視線距離の許容 (再投影の遮蔽判定。ブロックライトの履歴と同じ値)
+const float GI_HISTORY_DEPTH_REL = 0.05;
+const float GI_HISTORY_DEPTH_ABS = 0.1;
+const float GI_HISTORY_MIN_WEIGHT = 0.05;
+// 速い履歴の混合率 (約 4 フレーム)。変化の検出の基準で、表示には使わない
+const float GI_FAST_ALPHA = 0.25;
+// 変化とみなす差 = 速い履歴の揺れ x GI_CHANGE_K + 輝度 x GI_CHANGE_REL (揺れの推定が 0 に近い所で小さな差を拾わないため)
+const float GI_CHANGE_K = 2.0 / GI_RESPONSE_STRENGTH;
+const float GI_CHANGE_REL = 0.02;
+const float GI_HISTORY_MIN = 1.0;      // 変化を検出した時に残す長さの下限
 
 // エッジ停止は幾何法線で見る (GI / AO は幾何法線で計算している。テクスチャ法線だとテクセルごとに重みが切れてノイズが残る)
 vec3 readGeoNormal(ivec2 texel) { return octDecode(unpack2x8(texelFetch(colortex2, texel, 0).b)); }
@@ -92,6 +114,9 @@ void main() {
     if (depth >= 1.0 || isHandDepth(depth)) {
         outIndirect = vec4(0.0, 0.0, 0.0, 1.0);
         outHistory = outIndirect;
+#if GI_DENOISE >= 1
+        outHistoryInfo = vec4(0.0);
+#endif
         return;
     }
     float linZ = linearizeDepth(depth);
@@ -113,6 +138,7 @@ void main() {
     vec4 sum = vec4(0.0);
     vec4 sum2 = vec4(0.0);
     float wsum = 0.0;
+    float w2sum = 0.0;
     for (int dy = -GI_FILTER_RADIUS; dy <= GI_FILTER_RADIUS; dy++) {
         for (int dx = -GI_FILTER_RADIUS; dx <= GI_FILTER_RADIUS; dx++) {
             ivec2 L = clamp(center + ivec2(dx, dy), ivec2(0), lowSize - 1);
@@ -127,19 +153,71 @@ void main() {
             sum += raw * w;
             sum2 += raw * raw * w;
             wsum += w;
+            w2sum += w * w;
         }
     }
     vec4 mean = wsum > 0.0 ? sum / wsum : texelFetch(giRawSampler, clamp(center, ivec2(0), lowSize - 1), 0);
     vec4 result = mean;
 
 #if GI_DENOISE >= 1
+    vec4 sigma = momentSigma(sum2, mean, max(wsum, 1e-5));
+    vec4 history = vec4(0.0);
+    vec4 info = vec4(0.0);
     vec2 prevUv = getPreviousUv(texcoord, depth);
     if (reprojectionInside(prevUv)) {
-        vec4 sigma = momentSigma(sum2, mean, max(wsum, 1e-5));
-        vec4 history = texture(colortex9, prevUv);
-        history = clamp(history, mean - sigma * GI_HISTORY_CLIP - 1e-3, mean + sigma * GI_HISTORY_CLIP + 1e-3);
-        result = mix(history, mean, GI_TEMPORAL_ALPHA);
+        // 動くもの (速度ベクトルあり) は距離がほぼ変わらないとみなし、静止物は前フレームのカメラで距離を求める
+        float expected = linZ;
+        if (texelFetch(colortex15, texel, 0).a < 0.5) {
+            vec3 prevPlayer = screenToPlayer(vec3(texcoord, depth)) + (cameraPosition - previousCameraPosition);
+            expected = -(gbufferPreviousModelView * vec4(prevPlayer, 1.0)).z;
+        }
+        float tol = expected * GI_HISTORY_DEPTH_REL + GI_HISTORY_DEPTH_ABS;
+        vec2 pp = prevUv * vec2(screen) - 0.5;
+        ivec2 p0 = ivec2(floor(pp));
+        vec2 f = pp - vec2(p0);
+        float hw = 0.0;
+        for (int i = 0; i < 4; i++) {
+            ivec2 o = ivec2(i & 1, i >> 1);
+            ivec2 p = clamp(p0 + o, ivec2(0), screen - 1);
+            vec4 hi = texelFetch(colortex19, p, 0);
+            vec2 bw = mix(1.0 - f, f, vec2(o));
+            float w = bw.x * bw.y * (hi.r > 0.0 && abs(hi.g - expected) < tol ? 1.0 : 0.0);
+            history += texelFetch(colortex9, p, 0) * w;
+            info += hi * w;
+            hw += w;
+        }
+        if (hw > GI_HISTORY_MIN_WEIGHT) {
+            history /= hw;
+            info /= hw;
+        } else {
+            info = vec4(0.0);
+        }
     }
+
+    float n = info.r;
+    float lumNow = luminance(mean.rgb);
+    if (n > 0.0) {
+        float lumHist = luminance(history.rgb);
+        // 速い履歴: 分散を直接持つ (2 次モーメントの差は fp16 で暗所の桁が落ちる)
+        float af = max(1.0 / (n + 1.0), GI_FAST_ALPHA);
+        float delta = lumNow - info.b;
+        float fastMean = info.b + af * delta;
+        float fastVar = (1.0 - af) * (info.a + af * delta * delta);
+        // 入力の 1 フレームの揺れは、時間方向の推定と、空間の近傍の標準偏差 x 重みの比 (sqrt(Σw²) / Σw) の大きい方
+        float sigmaIn = max(sqrt(fastVar), luminance(sigma.rgb) * sqrt(w2sum) / max(wsum, 1e-5));
+        float tau = GI_CHANGE_K * sigmaIn * sqrt(af / (2.0 - af)) + GI_CHANGE_REL * max(fastMean, lumHist) + 1e-5;
+        float d = abs(fastMean - lumHist);
+        float shrink = min(tau * tau / max(d * d, 1e-12), 1.0);
+        n = max(n * shrink, min(n, GI_HISTORY_MIN));
+        n = min(n + 1.0, float(GI_HISTORY_MAX));
+        result.rgb = mix(history.rgb, mean.rgb, 1.0 / n);
+        float aoHist = clamp(history.a, mean.a - sigma.a * GI_HISTORY_CLIP - 1e-3, mean.a + sigma.a * GI_HISTORY_CLIP + 1e-3);
+        result.a = mix(aoHist, mean.a, max(1.0 / n, GI_TEMPORAL_ALPHA));
+        info = vec4(n, linZ, fastMean, fastVar);
+    } else {
+        info = vec4(1.0, linZ, lumNow, 0.0);
+    }
+    outHistoryInfo = info;
 #endif
 
     outIndirect = result;
