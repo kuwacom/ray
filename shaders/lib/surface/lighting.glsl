@@ -65,7 +65,8 @@ vec3 secondaryHitSky(vec3 playerPos, vec3 normal, float skyLm) {
 vec3 shadeSecondaryHit(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm, bool caustics) {
     SurfacePoint p = surfacePoint(playerPos, normal);
     p.lightmap.y = skyLm;
-    SurfaceLights L = gatherSurfaceLights(p, SL_SUN_VOLUME, SL_BLOCK_HIT_FLOOD, caustics ? SL_SKY : SL_SKY | SL_SUN_NO_CAUSTICS);
+    p.caustics = caustics;
+    SurfaceLights L = gatherSurfaceLights(p, SL_SUN_VOLUME, SL_BLOCK_HIT_FLOOD, SL_SKY);
     return albedo * RCP_PI * (L.sun.irradiance + L.block + L.sky + minAmbientIrradiance());
 }
 
@@ -177,14 +178,6 @@ vec3 secondaryHitBlockLight(vec3 playerPos, vec3 normal, ivec2 screenTexel, floa
 // unitE: shadeSecondaryHit(playerPos, normal, vec3(1.0), skyLm)。アルベドに比例するので、呼び出し側が借りる処理と共有できる
 vec3 shadeSecondaryHitReflectedFrom(vec3 unitE, vec3 playerPos, vec3 normal, vec3 albedo, ivec2 screenTexel) {
     return albedo * (unitE + RCP_PI * secondaryHitBlockLight(playerPos, normal, screenTexel, 1.0, true));
-}
-
-vec3 shadeSecondaryHitReflected(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm, ivec2 screenTexel, bool caustics) {
-    return shadeSecondaryHitReflectedFrom(shadeSecondaryHit(playerPos, normal, vec3(1.0), skyLm, caustics), playerPos, normal, albedo, screenTexel);
-}
-
-vec3 shadeSecondaryHitReflected(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm, ivec2 screenTexel) {
-    return shadeSecondaryHitReflected(playerPos, normal, albedo, skyLm, screenTexel, true);
 }
 
 /*
@@ -299,22 +292,22 @@ bool voxelHitOnScreen(vec3 hitPlayer, vec3 hitNormal, out ivec2 texel, out vec3 
  * 明るさの比は輝度だけで取る (色ごとの比にすると、色付きの影の 1 タップの差で所々が染まった)
  * throughWater: 水越しに映っている点だけ借りる (岸の草ブロックの側面の縁など、水面より上の色を水底に借りない)
  * 借りた色は画面の発光込みなので、発光は足さない
- * Ehit: 当たりの点の shadeSecondaryHit(hitPlayer, hitNormal, vec3(1.0), skyLm, caustics)。借りる点も同じ caustics で照らす
+ * 借りる点を探すこと (findVoxelBorrowPoint) と、照明の比で色を作ること (voxelBorrowColor) に分けてある。重い照明の近似を
+ * 呼ぶ場所が 1 つで済むよう、呼び出し側が借りる点を決めてからループの中で照らす
  */
 const int VOXEL_BORROW_TRIES = 6;
 const vec2 VOXEL_BORROW_RATIO_CLAMP = vec2(0.0, 4.0);
 
-bool borrowVoxelFaceColor(vec3 hitPlayer, vec3 hitNormal, int hitBlock, float skyLm, vec3 Ehit, bool throughWater, bool caustics, out vec3 color) {
-    color = vec3(0.0);
+// q, qt: 借りる点とその画面のテクセル。戻り値 false = 借りる点が無い
+bool findVoxelBorrowPoint(vec3 hitPlayer, vec3 hitNormal, int hitBlock, bool throughWater, out vec3 q, out ivec2 qt) {
+    q = hitPlayer;
+    qt = ivec2(-1);
     if (!voxelFaceTowardsCamera(hitPlayer, hitNormal)) return false;
     vec3 nAbs = abs(hitNormal);
     ivec2 tAxes = nAbs.x > 0.5 ? ivec2(2, 1) : nAbs.y > 0.5 ? ivec2(0, 2) : ivec2(0, 1);
     if (abs(hitPlayer[tAxes.y]) > abs(hitPlayer[tAxes.x])) tAxes = tAxes.yx;
     vec3 awaySign = vec3(sign(hitPlayer.x), -sign(hitPlayer.y), sign(hitPlayer.z));
     // 試す順: 主軸 +1, +2 / 副軸 +1, -1 / 主軸 +3, -1
-    // 照明の近似は重く、ループの中に置くと試行ごとに展開されて反射のパス全体のコードが膨らむ。借りる点を決めてから 1 回だけ呼ぶ
-    vec3 q = hitPlayer;
-    ivec2 qt = ivec2(-1);
     for (int k = 0; k < VOXEL_BORROW_TRIES && qt.x < 0; k++) {
         int axis = (k == 2 || k == 3) ? tAxes.y : tAxes.x;
         float steps = k == 0 ? 1.0 : k == 1 ? 2.0 : k == 2 ? 1.0 : k == 3 ? -1.0 : k == 4 ? 3.0 : -1.0;
@@ -331,11 +324,35 @@ bool borrowVoxelFaceColor(vec3 hitPlayer, vec3 hitNormal, int hitBlock, float sk
         q = p;
         qt = pt;
     }
-    if (qt.x < 0) return false;
-    vec3 Eq = shadeSecondaryHit(q, hitNormal, vec3(1.0), skyLm, caustics);
+    return qt.x >= 0;
+}
+
+// 借りた色 (借りた点の画面の色を、当たりの点と借りた点の照明の明るさの比で直す)。借りた点が暗くて比が取れなければ false
+bool voxelBorrowColor(ivec2 qt, vec3 Ehit, vec3 Eq, out vec3 color) {
+    color = vec3(0.0);
     if (luminance(Eq) <= 1e-6) return false;
     color = texelFetch(colortex0, qt, 0).rgb * clamp(luminance(Ehit) / luminance(Eq), VOXEL_BORROW_RATIO_CLAMP.x, VOXEL_BORROW_RATIO_CLAMP.y);
     return true;
+}
+
+/*
+ * 当たりの点の照明 unitE (shadeSecondaryHit(hitPlayer, hitNormal, vec3(1.0), skyLm)) と、借りた色 (color) を作る
+ * 戻り値 true = 借りられた。false = 借りられない (呼び出し側が unitE で代わりの色を作る)
+ * 照明の近似は重く、呼ぶ所ごとに本体が展開される。当たりの点と借りる点を、回数を実行時に決める 1 つのループの 1 か所で呼んで、
+ * 展開を 1 つにする
+ */
+bool shadeSecondaryHitBorrowing(vec3 hitPlayer, vec3 hitNormal, int hitBlock, float skyLm, out vec3 unitE, out vec3 color) {
+    vec3 q;
+    ivec2 qt;
+    int steps = findVoxelBorrowPoint(hitPlayer, hitNormal, hitBlock, false, q, qt) ? 2 : 1;
+    unitE = vec3(0.0);
+    color = vec3(0.0);
+    for (int i = 0; i < steps; i++) {
+        vec3 E = shadeSecondaryHit(i == 0 ? hitPlayer : q, hitNormal, vec3(1.0), skyLm);
+        if (i == 0) unitE = E;
+        else if (voxelBorrowColor(qt, unitE, E, color)) return true;
+    }
+    return false;
 }
 
 vec4 traceVoxelRadiance(vec3 originPlayer, vec3 dir, float maxDist, float skyLm, bool useSceneColor) {
@@ -367,9 +384,8 @@ vec4 traceVoxelRadiance(vec3 originPlayer, vec3 dir, float maxDist, float skyLm,
     // useSceneColor = false は GI (多重反射込み)、true は反射
     if (useSceneColor) {
         // 借りる処理と代わりのアルベドの照明で、ヒット点の照明 (重い) を共有する
-        vec3 unitE = shadeSecondaryHit(hitPlayer, hitNormal, vec3(1.0), skyLm);
-        vec3 borrowed;
-        if (borrowVoxelFaceColor(hitPlayer, hitNormal, hitBlock, skyLm, unitE, false, true, borrowed)) return vec4(borrowed, 1.0);
+        vec3 unitE, borrowed;
+        if (shadeSecondaryHitBorrowing(hitPlayer, hitNormal, hitBlock, skyLm, unitE, borrowed)) return vec4(borrowed, 1.0);
         return vec4(shadeSecondaryHitReflectedFrom(unitE, hitPlayer, hitNormal, albedo, screenTexel)
             + albedo * secondaryHitEmission(emission, hitBlock, hitMaterial), 1.0);
     }

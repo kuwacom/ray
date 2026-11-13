@@ -113,7 +113,7 @@ float waterRefractScreenWeight(vec2 uv, vec2 tuv) {
 /*
  * 方式 D: 上から見た水面の屈折先をボクセルで辿る (画面外・手前の物の陰の水底)
  * 当たりが画面に映っていればその色。映っていなければ、面に沿って整数ブロックずらした同じブロックの同じ面の画面の色を借りる
- * (borrowVoxelFaceColor)。それも無ければ、ボクセル反射と同じ照明の近似 (太陽の影の 1 タップ・雲影・floodfill・空, shadeSecondaryHit)
+ * (shadeSecondaryHitBorrowing)。それも無ければ、ボクセル反射と同じ照明の近似 (太陽の影の 1 タップ・雲影・floodfill・空, shadeSecondaryHit)
  * でブロックの平均の色の表を照らす。表の色は、この画素からまっすぐ見た水底の周りの平均との明るさの比で、画面の像との段を消す
  * (まっすぐ見た水底の像そのものを使うと、屈折先が画面に無い所が屈折していない像になる)
  * 戻り値 false = ボクセルの範囲外で分からない。true で何にも当たらなければ深い水 (pathLen = WATER_SKY_PATH, 色は 0)
@@ -149,18 +149,52 @@ bool waterRefractVoxel(vec3 surfPlayer, vec3 dir, vec3 floorPlayer, float d1, fl
      * 水底の点はコースティクス (1 点に波テクスチャ 9 回) が照明の費用の大半を占め、画面の外を指す近景の下端と遠景の帯の
      * 画素ごとに 3 回解いていた。借りる色 (同じ面の画面の画素) には借りた点のコースティクスが既に入っていて、比で
      * 当たりの点の模様へ移す必要は無い (数ブロックずれた同じ模様になるだけ) ので、比と明るさの基準はコースティクス抜きで照らす
+     *
+     * 2 次ヒットの照明の近似 (shadeSecondaryHit と、表の色を照らす時の secondaryHitBlockLight) は重く、呼ぶ所ごとに本体が展開される。
+     * 借りる色の 2 点・代わりの色の当たりの点・水底の基準を、入力を選んで 1 つのループの 1 か所で呼ぶ (回数は実行時に決まる)
+     * 0: 当たりの点、1: 借りる点 (どちらもコースティクス抜きで、借りる色の明るさの比)、
+     * 2: 借りられなかった時の当たりの点 (コースティクス付きで、ブロックの表の色を照らす)、3: まっすぐ見た水底 (明るさの基準)
      */
-    vec3 voxelColor;
-    vec3 unitE = shadeSecondaryHit(hitPlayer, hitNormal, vec3(1.0), skyLm, false);
-    bool hasRef = borrowVoxelFaceColor(hitPlayer, hitNormal, hitBlock, skyLm, unitE, true, false, voxelColor);
-    if (!hasRef) {
-        // まっすぐ見た水底の像をそのまま使うと、屈折先が画面に無い所が屈折していない像になった
-        // 像は明るさの基準にだけ使い、色はブロックの表の色を照らして作る (模様は写さない)
-        unitE = shadeSecondaryHit(hitPlayer, hitNormal, vec3(1.0), skyLm, true);
-        voxelColor = shadeSecondaryHitReflectedFrom(unitE, hitPlayer, hitNormal, getBlockAlbedo(hitBlock, hitNormal), ivec2(-1));
+    vec3 q;
+    ivec2 qt;
+    bool found = findVoxelBorrowPoint(hitPlayer, hitNormal, hitBlock, true, q, qt);
+    bool wantFloor = d1 < 1.0 && floorPlayer.y < surfPlayer.y;
+    vec3 voxelColor = vec3(0.0);
+    vec3 Efloor = vec3(0.0);
+    vec3 Ehit = vec3(0.0);
+    bool hasRef = false;
+    for (int i = found ? 0 : 2; i < (wantFloor ? 4 : 3); i++) {
+        vec3 P = i == 1 ? q : hitPlayer;
+        vec3 N = hitNormal;
+        float sky = skyLm;
+        int block = hitBlock;
+        if (i == 3) {
+            GBufferData g = readGBuffer(ivec2(gl_FragCoord.xy));
+            P = floorPlayer;
+            N = g.geoNormal;
+            sky = g.lightmap.y;
+            // 水底のセルのブロック (表の色の基準)
+            ivec3 floorCell = ivec3(floor(playerToVoxel(floorPlayer - N * VOXEL_HIT_INSET)));
+            if (isInVoxelVolume(floorCell)) block = fetchVoxelBlockId(floorCell);
+        }
+        // 水底の基準 (3) は 5 タップの平均でコースティクスの模様がならされているので、基準の側もコースティクス抜きで照らす
+        vec3 E = shadeSecondaryHit(P, N, vec3(1.0), sky, i == 2);
+        if (i == 0) {
+            Ehit = E;
+        } else if (i == 1) {
+            if (voxelBorrowColor(qt, Ehit, E, voxelColor)) {
+                hasRef = true;
+                break;
+            }
+        } else {
+            // まっすぐ見た水底の像をそのまま使うと、屈折先が画面に無い所が屈折していない像になった
+            // 像は明るさの基準にだけ使い、色はブロックの表の色を照らして作る (模様は写さない)
+            vec3 lit = shadeSecondaryHitReflectedFrom(E, P, N, getBlockAlbedo(block, N), ivec2(-1));
+            if (i == 2) voxelColor = lit;
+            else Efloor = lit;
+        }
     }
-    if (!hasRef && d1 < 1.0 && floorPlayer.y < surfPlayer.y) {
-        GBufferData g = readGBuffer(ivec2(gl_FragCoord.xy));
+    if (!hasRef && wantFloor) {
         // 周りの水底の平均 (模様を落とした明るさの基準)
         vec2 r = WATER_REFRACT_D_REF_RADIUS / viewSize();
         float matchDist = WATER_REFRACT_D_REF_MATCH + length(floorPlayer) * 0.02;
@@ -174,11 +208,6 @@ bool waterRefractVoxel(vec3 surfPlayer, vec3 dir, vec3 floorPlayer, float d1, fl
             sum += texture(colortex0, uv).rgb;
             n += 1.0;
         }
-        // 水底のセルのブロック (表の色の基準)
-        ivec3 floorCell = ivec3(floor(playerToVoxel(floorPlayer - g.geoNormal * VOXEL_HIT_INSET)));
-        int floorBlock = isInVoxelVolume(floorCell) ? fetchVoxelBlockId(floorCell) : hitBlock;
-        // 5 タップの平均でコースティクスの模様はならされているので、基準の側もコースティクス抜きで照らす
-        vec3 Efloor = shadeSecondaryHitReflected(floorPlayer, g.geoNormal, getBlockAlbedo(floorBlock, g.geoNormal), g.lightmap.y, ivec2(-1), false);
         if (n > 0.0 && luminance(Efloor) > 1e-6) {
             // 輝度の比だけ (色ごとの比にすると影の 1 タップの色の差で染まる)。表の色と画面の像の明るさの段を消す
             float tone = clamp(luminance(sum / n) / luminance(Efloor), WATER_REFRACT_D_TONE_CLAMP.x, WATER_REFRACT_D_TONE_CLAMP.y);

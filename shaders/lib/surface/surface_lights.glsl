@@ -50,7 +50,6 @@ const uint SL_HAND_FILL = 1u << 6;
 const uint SL_BLOCK_SPECULAR = 1u << 7;
 const uint SL_CELESTIAL = 1u << 8;      // 太陽の影を取らなくても、影を掛ける前の太陽 / 月を celestial に返す
 const uint SL_BLOCK_SPECULAR_TRACED = 1u << 9; // 鏡面の光源を 1 つずつトレースして可視率を出す (colortex7 に無い半透明の面用)
-const uint SL_SUN_NO_CAUSTICS = 1u << 10;      // SL_SUN_VOLUME で水の下の点にコースティクスを掛けない (照明の比だけに使う 2 次ヒット)
 
 // 影マップの外での日向の判定 (スカイライトがこれ以上なら日向とみなす)
 const vec2 SHADOW_FALLBACK_SKYLIGHT = vec2(0.8, 0.97);
@@ -77,6 +76,9 @@ struct SurfacePoint {
     float sss;        // 太陽の影のブロッカー探索の SSS の強さ
     float sunFade;    // 太陽の影を別の呼び出しで集めた時の sunShadow.fade (SL_GI の RSM が空を置き換える範囲)
     bool hand;        // 一人称の手
+    // SL_SUN_VOLUME で水の下の点にコースティクスを掛けるか (照明の比だけに使う 2 次ヒットは false)。項の組 (terms) に
+    // 入れると実行時の値になって全部の項がリンクされるので、点の値で渡す
+    bool caustics;
 };
 
 // 使う項だけ呼ぶ側が上書きする。ほかは項を使わない時の値
@@ -93,6 +95,7 @@ SurfacePoint surfacePoint(vec3 playerPos, vec3 normal) {
     p.sss = 0.0;
     p.sunFade = 0.0;
     p.hand = false;
+    p.caustics = true;
     return p;
 }
 
@@ -165,7 +168,7 @@ SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, ui
         L.sun = L.celestial;
         L.sun.irradiance = vec3(0.0);
         if (NoL > 0.0) {
-            L.sun.irradiance += L.celestial.irradiance * NoL * mix(vec3(1.0), sampleShadowVolume(p.playerPos + p.normal * 0.08, (terms & SL_SUN_NO_CAUSTICS) == 0u), shadowStrength) * getCloudShadow(p.playerPos);
+            L.sun.irradiance += L.celestial.irradiance * NoL * mix(vec3(1.0), sampleShadowVolume(p.playerPos + p.normal * 0.08, p.caustics), shadowStrength) * getCloudShadow(p.playerPos);
         }
     }
 
