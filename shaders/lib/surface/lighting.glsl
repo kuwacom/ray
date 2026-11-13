@@ -48,10 +48,20 @@
  * 二次光線が当たった面の外向き放射輝度 (拡散のみ)
  * 太陽 (1 タップの色付き影 + 雲影) + floodfill + 空 (スカイライト)
  */
+/*
+ * 光源シャドウ ON では、ヒット点の floodfill を受ける面と同じ FLOODFILL_STRENGTH 倍にする。直接光は secondaryHitBlockLight が
+ * 別に足すので、x1 では光源の近くの当たりだけが二重に明るくなり、当たりが稀な暗所でレイの明暗差 (GI のぶつぶつ) を広げていた
+ */
+#ifdef LIGHT_SHADOWS
+const float GI_HIT_FLOOD_SCALE = FLOODFILL_STRENGTH;
+#else
+const float GI_HIT_FLOOD_SCALE = 1.0;
+#endif
+
 vec3 secondaryHitDirect(vec3 playerPos, vec3 normal) {
     // 省く項: 手持ち光源と直接光 (secondaryHitBlockLight が別に返す)、GI と AO と鏡面 (拡散の放射輝度だけ)
     SurfaceLights L = gatherSurfaceLights(surfacePoint(playerPos, normal), SL_SUN_VOLUME, SL_BLOCK_HIT_FLOOD, 0u);
-    return L.sun.irradiance + L.block;
+    return L.sun.irradiance + L.block * GI_HIT_FLOOD_SCALE;
 }
 
 // ヒット点の空の拡散照度 (スカイライトの絞り込み)
