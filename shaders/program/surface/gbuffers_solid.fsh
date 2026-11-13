@@ -393,6 +393,9 @@ void main() {
     // 雨の濡れと水たまり (Lagarde 2013: 空隙が水で満ちると暗くなり、表面に水膜ができて滑らかになる)
     float puddle = 0.0;
     float wetAmount = 0.0;
+    // 濡れで暗くする前の色。暗くした色で発光を推定すると、水たまりの下の光源ブロックが光らなくなる
+    vec3 albedoDry = albedo.rgb;
+    float dryEmission = max(estimateEmission(albedoDry, materialId), sp.emission);
 #if defined RAIN_PUDDLES && defined HAS_SKY && defined GBUF_TERRAIN
     /*
      * 線路は地面より上に浮いた薄い板なので水たまりは溜めず、金属と枕木を濡らすだけにする
@@ -421,7 +424,8 @@ void main() {
             // 水たまりの底は空隙が水で満ちきっているので、多孔度によらず暗くする (暗い底の上に空が映って水たまりが見える)
             // 周りの帯は水がしみて少し暗い (水たまりの縁が地面からいきなり切り替わらないように)
             float soak = max(max(wetStrength * sp.porosity, fringe * PUDDLE_FRINGE_SOAK), puddle * PUDDLE_SOAK);
-            albedo.rgb *= mix(1.0, WET_DARKEN, soak);
+            // 光っている画素は水の下でも光って見えるので暗くしない (艶と水面の法線は掛ける)
+            albedo.rgb *= mix(1.0, WET_DARKEN, soak * (1.0 - dryEmission));
             // 雨が降り続くと空隙が満ちて表面に水膜が張るので、多孔質の面も艶が出る (水を吸う分だけ弱め)
             // 地面全体を水たまり並みに光らせると水たまりとの差が無くなって見えなくなった。艶は水たまりの周りの帯で強める
             float gloss = max(wetStrength * WET_GLOSS * (1.0 - sp.porosity), fringe * PUDDLE_FRINGE_GLOSS);
@@ -471,9 +475,9 @@ void main() {
     g.ao = sp.ao;
 #endif
     g.wetness = max(wetAmount, puddle);
-    g.emission = max(estimateEmission(albedo.rgb, materialId), sp.emission);
+    g.emission = dryEmission;
 #if defined GBUF_TERRAIN
-    if (isFacingLight(getBlockLightIndex(blockBase))) g.emission *= facingLightEmissionMask(albedo.rgb, geoN, blockLightFacing(blockBase));
+    if (isFacingLight(getBlockLightIndex(blockBase))) g.emission *= facingLightEmissionMask(albedoDry, geoN, blockLightFacing(blockBase));
 #endif
 #if defined GBUF_ENTITIES
     // クリーパー・TNT は点滅の白さ (entityColor) の分だけ、発光エンティティと同じ式で明るい画素を光らせる。点滅していない時は光らない
@@ -483,7 +487,7 @@ void main() {
 #endif
 #if defined GBUF_TERRAIN && DECORATIVE_BLOCK_LIGHTS > 0
     // 鉱物ブロック (DECORATIVE_BLOCK_LIGHTS)。光源ブロックより弱く、模様の明るい所ほど光らせる
-    if (isDecorGlowBlock(blockBase)) g.emission = max(g.emission, DECOR_EMISSION * smoothstep(0.15, 0.85, maxOf(albedo.rgb)));
+    if (isDecorGlowBlock(blockBase)) g.emission = max(g.emission, DECOR_EMISSION * smoothstep(0.15, 0.85, maxOf(albedoDry)));
 #endif
     encodeGBuffer(g, outAlbedo, outNormal, outMaterial);
     outMaterial.a = encodeSurfaceExtra(pomShadow, puddle);
