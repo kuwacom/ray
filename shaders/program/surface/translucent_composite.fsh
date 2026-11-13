@@ -139,9 +139,10 @@ void main() {
     float dither = interleavedGradientNoise(gl_FragCoord.xy, frameCounter);
 
     bool hasSurface = d0 < d1 && !isHandDepth(d0) && (matT == MAT_WATER || isReflectiveTranslucent(matT));
+    // 半透明の面が無い画素とガラスの奥で同じ texel / d1 を使う。関数は inline 展開されるので、分岐の前で 1 回だけ呼ぶ (水は使わない)
+    vec3 env = d1 < 1.0 && !(hasSurface && matT == MAT_WATER) ? opaqueEnvSpecular(texel, d1) : vec3(0.0);
     if (!hasSurface) {
         vec3 color = scene;
-        vec3 env = d1 < 1.0 ? opaqueEnvSpecular(texel, d1) : vec3(0.0);
         color += env;
         vec3 result = color * (1.0 - translucent.a) + translucent.rgb;
         // deferred30 が a = 1 + 割合で渡した直接光の鏡面の白飛び分と、ここで足す映り込みの白飛び分を、重なった半透明の分だけ直して渡す
@@ -176,13 +177,26 @@ void main() {
     // 鏡面の白飛び分の輝度。TAA (composite20) は明るい点を近傍の箱で潰すので、割合を a = 1 + 割合で渡して TAA の後に足させる
     float sparkleLum = 0.0;
 
+    // 太陽以外の光: 手持ち光源 (内散乱・泡・鏡面) とブロックライトの鏡面 (光源ごとにトレース)。トレースが重いので水とガラスで分岐の前に 1 回だけ集める
+    // 法線は水が面の向き、ガラスが N。水中から見た水面は集めない (面の裏は掛けない)
+    // 省く項: 太陽 (別に取る)・GI・AO・接触影 (水面の下に不透明面の深度しか無い)
+    vec3 lightN = matT != MAT_WATER ? N : abs(N.y) < 0.5 ? waterSideFaceNormal(N) : vec3(0.0, 1.0, 0.0);
+    SurfacePoint lp = surfacePoint(surfPlayer, lightN);
+    lp.lightmap = lmT;
+    lp.texel = texel;
+    lp.dither = dither;
+    SurfaceLights lights = gatherSurfaceLights(lp, SL_SUN_NONE, SL_BLOCK_NONE, 0u);
+    if (matT != MAT_WATER || isEyeInWater != 1) lights = gatherSurfaceLights(lp, SL_SUN_NONE, SL_BLOCK_NONE, SL_HAND | SL_BLOCK_SPECULAR_TRACED);
+    // 水の floodfill だけ別に足す (ガラスは使わない)
+    if (matT == MAT_WATER && isEyeInWater != 1) lights.block = gatherSurfaceLights(lp, SL_SUN_NONE, SL_BLOCK_FORWARD, 0u).block;
+
     if (matT == MAT_WATER) {
         bool below = isEyeInWater == 1;
         float eta = below ? 1.0 / WATER_IOR : WATER_IOR;
         WaterSea sea = waterSeaState(lmT.y);
         // 側面 (滝・流れの段差・水槽): 幾何の向きは面の軸。波は側面専用の落ちる水の乱れ (lib/common/water.glsl の waterFallNormal)
         bool side = abs(N.y) < 0.5;
-        vec3 faceN = side ? waterSideFaceNormal(N) : vec3(0.0, 1.0, 0.0);
+        vec3 faceN = lightN;
         float NoVGeo = abs(dot(V, faceN));
         WaterLod lod = waterLod(sea, dist, NoVGeo);
         float footprint = lod.footprint;
@@ -207,15 +221,6 @@ void main() {
         }
         vec3 sunSpecVis = sunVis * getCloudSunDiscVisibility();
 
-        // 太陽以外の光: 手持ち光源 (内散乱・泡・鏡面) とブロックライトの鏡面 (光源ごとにトレース)。水中から見た面の裏は掛けない
-        // 省く項: 太陽 (上で別に取る)・GI・AO・接触影 (水面の下に不透明面の深度しか無い)
-        SurfacePoint wp = surfacePoint(surfPlayer, faceN);
-        wp.lightmap = lmT;
-        wp.texel = texel;
-        wp.dither = dither;
-        SurfaceLights WL = gatherSurfaceLights(wp, SL_SUN_NONE, SL_BLOCK_NONE, 0u);
-        if (!below) WL = gatherSurfaceLights(wp, SL_SUN_NONE, SL_BLOCK_FORWARD, SL_HAND | SL_BLOCK_SPECULAR_TRACED);
-
         // 屈折先の色と水の中の経路長は composite1 (water_trace.fsh) が求める。フレネルが 1 の画素は屈折先を使わない
         vec3 behind = vec3(0.0);
         float behindExcess = 0.0;
@@ -233,7 +238,7 @@ void main() {
             vec3 T = exp(-ext * pathLen);
             behindExcess *= luminance(T);
             float muView = dot(refrDir, refrDir) > 0.5 ? saturate(-refrDir.y) : saturate(V.y);
-            behind = behind * T + waterInscatter(lmT.y, sunVis, WL.block + handIrradiance(WL, vec3(0.0, 1.0, 0.0)), muView, pathLen);
+            behind = behind * T + waterInscatter(lmT.y, sunVis, lights.block + handIrradiance(lights, vec3(0.0, 1.0, 0.0)), muView, pathLen);
         }
 
         // 反射と太陽
@@ -299,7 +304,7 @@ void main() {
             }
 #endif
             // 上面の照り返しは傾きの分布をガウスにする (海面の傾きの分布。WATER_GLITTER の点も同じ分布から置く)。側面は落ちる水の乱れの裾を残す
-            vec3 spec = refl * F + sunSpecular(N, V, WATER_F0, sunAlpha, sunSpecVis, glitter, !side) + localLightSpecular(WL, N, V, WATER_F0, lightAlpha, !side);
+            vec3 spec = refl * F + sunSpecular(N, V, WATER_F0, sunAlpha, sunSpecVis, glitter, !side) + localLightSpecular(lights, N, V, WATER_F0, lightAlpha, !side);
             color = behind * (1.0 - F) + spec;
             sparkleLum += luminance(sparkleExcess(spec, getExposure()));
 
@@ -324,7 +329,7 @@ void main() {
                 float cap = smoothstep(WHITECAP_J0, WHITECAP_J1, J) * smoothstep(WHITECAP_WIND0, WHITECAP_WIND1, sea.wind)
                     * smoothstep(0.3, 0.6, pattern) * offshore;
                 float foam = saturate(cap * WATER_FOAM) * FOAM_OPACITY;
-                if (foam > 0.0) color = mix(color, foamRadiance(surfPlayer, vec3(0.0, 1.0, 0.0), lmT, sunVis, WL), foam);
+                if (foam > 0.0) color = mix(color, foamRadiance(surfPlayer, vec3(0.0, 1.0, 0.0), lmT, sunVis, lights), foam);
                 sparkleLum *= 1.0 - foam;
             }
         }
@@ -343,7 +348,6 @@ void main() {
         vec3 behind = behindRaw.rgb;
         float behindExcess = behindSparkle(behindRaw);
         if (d1 < 1.0) {
-            vec3 env = opaqueEnvSpecular(texel, d1);
             behind += env;
             behindExcess += luminance(sparkleExcess(env, getExposure()));
         }
@@ -365,15 +369,9 @@ void main() {
         vec3 refl = reflectionAt(texel, dist, R, lmT.y, roughness, vec3(0.0));
         if (roughness < MIRROR_ROUGHNESS) refl = mirrorReflection(refl, surfView, surfPlayer, N, R, dist, false, false, dither);
         vec3 glassSunVis = surfaceSunVisibility(surfPlayer, N, dither) * getCloudSunDiscVisibility();
-        // 太陽以外の光の鏡面。省く項は水と同じ
-        SurfacePoint gp = surfacePoint(surfPlayer, N);
-        gp.lightmap = lmT;
-        gp.texel = texel;
-        gp.dither = dither;
-        SurfaceLights GL = gatherSurfaceLights(gp, SL_SUN_NONE, SL_BLOCK_NONE, SL_HAND | SL_BLOCK_SPECULAR_TRACED);
         float glassAlpha = max(roughness * roughness, MIN_ROUGHNESS);
         // 前方で照らした拡散 (translucent.rgb) は鏡面で反射する F の分を除く (太陽の鏡面を足すので、その分だけ明るくならないように)
-        vec3 spec = refl * F + sunSpecular(N, V, GLASS_F0, glassAlpha, glassSunVis) + localLightSpecular(GL, N, V, GLASS_F0, glassAlpha, false);
+        vec3 spec = refl * F + sunSpecular(N, V, GLASS_F0, glassAlpha, glassSunVis) + localLightSpecular(lights, N, V, GLASS_F0, glassAlpha, false);
         color = behind * transmit * (1.0 - F) + translucent.rgb * (1.0 - F) + spec;
         float glassSparkle = luminance(sparkleExcess(spec, getExposure())) + behindExcess * luminance(transmit) * (1.0 - F);
         outColor = vec4(color, 1.0 + saturate(glassSparkle / max(luminance(color), 1e-6)));
