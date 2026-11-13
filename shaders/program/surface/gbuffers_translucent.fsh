@@ -275,7 +275,8 @@ void main() {
         m.albedo *= GEM_FORWARD_DIFFUSE;
     }
 
-#ifndef GBUF_PARTICLES_TRANSLUCENT
+// MAT_WATER になるのは水のブロックだけ。materialId は実行時の値なので、他のプログラムに残すとドライバが消せず水の分岐の分だけ重くなる
+#ifdef GBUF_WATER
     if (materialId == MAT_WATER) {
         vec3 worldPos = playerPos + cameraPosition;
         WaterSea sea = waterSeaState(lmcoord.y);
