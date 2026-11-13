@@ -180,11 +180,11 @@ const float DOF_MAX_LOD = 4.0;
 const float DOF_SAMPLE_SPACING = 11.0;
 const float REFERENCE_HEIGHT = 1080.0;  // px: 画素数で決めた値を画面の高さに合わせて拡縮する基準
 #if DOF_QUALITY == 0
-const int DOF_SAMPLE_LIMIT = 256;
+#define DOF_SAMPLE_LIMIT 256
 #elif DOF_QUALITY == 1
-const int DOF_SAMPLE_LIMIT = 384;
+#define DOF_SAMPLE_LIMIT 384
 #else
-const int DOF_SAMPLE_LIMIT = 512;
+#define DOF_SAMPLE_LIMIT 512
 #endif
 // 中心の前ボケ半径 (px) がこれを超えたら、中心も前景層として扱う (前ボケの輪郭の内側も半透明にする)
 const float DOF_NEAR_CENTER_COC = 1.0;
@@ -213,9 +213,9 @@ const vec2 DOF_RIM_COC = vec2(1.5, 4.0);
  * ブルームの混合率、点像の配る割合、フレア系 (ゴースト・光条・ハロー・グレア・汚れ・ストリーク)、球面収差の滲み、ハレーション、玉ボケの縁
  * 配り直す効果 (点像) は総量を変えず、配る割合にだけ掛ける
  */
-const float GLOW_GAIN = LENS_GLOW_STRENGTH;
-const float FLARE_GAIN = LENS_FLARE_STRENGTH * GLOW_GAIN;
-const float POINT_SPREAD_GAIN = LENS_POINT_SPREAD_STRENGTH * GLOW_GAIN;
+#define GLOW_GAIN float(LENS_GLOW_STRENGTH)
+#define FLARE_GAIN float(LENS_FLARE_STRENGTH * GLOW_GAIN)
+#define POINT_SPREAD_GAIN float(LENS_POINT_SPREAD_STRENGTH * GLOW_GAIN)
 
 // ブルーム
 const int BLOOM_LEVELS = 7;          // 1/2 .. 1/128
