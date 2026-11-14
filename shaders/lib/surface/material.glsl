@@ -168,6 +168,9 @@ const float METAL_SMOOTHNESS_MAX = 0.72;
 // 小さな面は輝度のばらつきがそのまま粗さのまだらときらめきになるので、ブロックより狭くする
 const float METAL_PART_SMOOTHNESS_MIN = 0.55;
 const float METAL_PART_SMOOTHNESS_MAX = 0.65;
+// 置いたブロックの金属の部分 (金床・ランタン・鎖・ホッパー・大釜など) は鋳物や塗装の鈍い面。道具と同じ範囲では景色と太陽が強く映ってテカテカに見えた
+const float METAL_BLOCK_PART_SMOOTHNESS_MIN = 0.4;
+const float METAL_BLOCK_PART_SMOOTHNESS_MAX = 0.5;
 
 // 金属の質感 (鉄・銅のブロックなど)。f0 = 1.0 は labPBR の「アルベドを F0 に使う金属」
 SurfaceParams metalSurfaceParams(vec3 albedoSrgb, float smoothnessMin, float smoothnessMax) {
@@ -248,9 +251,14 @@ const float RAIL_F0_GAIN = 1.8;
 // 判定に合う画素を金属 (宝石は光沢のある誘電体) に置き換える。AO と高さはそのまま。PBR テクスチャが無い (推定の) 時だけ使う
 SurfaceParams applyMetalGate(SurfaceParams base, int gate, vec3 albedoSrgb) {
     if (gate == 0 || !metalGatePixel(gate, albedoSrgb)) return base;
+#if defined GBUF_TERRAIN || defined GBUF_BLOCK
+    const vec2 partSmoothness = vec2(METAL_BLOCK_PART_SMOOTHNESS_MIN, METAL_BLOCK_PART_SMOOTHNESS_MAX);
+#else
+    const vec2 partSmoothness = vec2(METAL_PART_SMOOTHNESS_MIN, METAL_PART_SMOOTHNESS_MAX);
+#endif
     SurfaceParams p = gate == METAL_GATE_GEM ? gemSurfaceParams()
         : gate == METAL_GATE_RAIL ? metalSurfaceParams(albedoSrgb, RAIL_SMOOTHNESS, RAIL_SMOOTHNESS)
-        : metalSurfaceParams(albedoSrgb, METAL_PART_SMOOTHNESS_MIN, METAL_PART_SMOOTHNESS_MAX);
+        : metalSurfaceParams(albedoSrgb, partSmoothness.x, partSmoothness.y);
     p.ao = base.ao;
     p.height = base.height;
     return p;
