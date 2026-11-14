@@ -9,25 +9,47 @@ import traceback
 import minescript as m
 
 
+def _script_thread(fn):
+    def call(*args):
+        with m.script_loop:
+            return fn(*args)
+    return call
+
+
+# 既定の render_loop は 1 回の呼び出しに 1 フレーム (30 FPS の上限で 33 ms) かかり、JavaScope の 1 操作で 10〜30 回呼ぶ
+# クラス・メンバーの検索、フィールドの読み取り、値の変換、ハンドルの解放はゲームの状態を変えないので、フレームを待たずにスクリプトのスレッドで行う
+# 状態を変えうるメソッドの呼び出し (java_call_method) とコマンドは描画スレッドのまま
+java_class = _script_thread(m.java_class)
+java_member = _script_thread(m.java_member)
+java_access_field = _script_thread(m.java_access_field)
+java_release = _script_thread(m.java_release)
+java_to_string = _script_thread(m.java_to_string)
+java_string = _script_thread(m.java_string)
+java_int = _script_thread(m.java_int)
+java_bool = _script_thread(m.java_bool)
+java_float = _script_thread(m.java_float)
+java_double = _script_thread(m.java_double)
+
+
 def reload_shaders() -> None:
     # Iris の公式 API にリロードが無いため内部の public static メソッドを直接呼ぶ
-    iris = m.java_class("net.irisshaders.iris.Iris")
-    method = m.java_member(iris, "reload")
+    iris = java_class("net.irisshaders.iris.Iris")
+    method = java_member(iris, "reload")
     try:
         # static メソッドは target に null ハンドル (0) を渡す。クラスハンドルを渡すと java.lang.Class 側で解決されてしまう
         m.java_call_method(0, method)
     finally:
-        m.java_release(method, iris)
+        java_release(method, iris)
 
 
 def load_shader_pack(name: str) -> str:
     # 比較撮影用に別のパックを一時的に読む。Iris.reload() は iris.properties を読み直すので使わず、
     # 設定の保存 (IrisConfig.save) もしないため iris.properties は書き換わらない。戻すときは reload_shaders()
-    iris = m.java_class("net.irisshaders.iris.Iris")
+    iris = java_class("net.irisshaders.iris.Iris")
     handles = [iris]
     try:
         def call(target, clazz, method_name, *args):
-            method = m.java_member(clazz, method_name)
+            method = java_member(clazz, method_name)
             handles.append(method)
             result = m.java_call_method(target, method, *args)
             if result:
@@ -35,9 +57,9 @@ def load_shader_pack(name: str) -> str:
             return result
 
         config = call(0, iris, "getIrisConfig")
-        config_cls = m.java_class("net.irisshaders.iris.config.IrisConfig")
-        manager_cls = m.java_class("net.irisshaders.iris.pipeline.PipelineManager")
-        pack_name = m.java_string(name)
+        config_cls = java_class("net.irisshaders.iris.config.IrisConfig")
+        manager_cls = java_class("net.irisshaders.iris.pipeline.PipelineManager")
+        pack_name = java_string(name)
         handles += [config_cls, manager_cls, pack_name]
         call(config, config_cls, "setShaderPackName", pack_name)
         # 先に破棄すると描画スレッドが古いパックでパイプラインを作り直してしまうので、読み込んでから破棄する
@@ -45,9 +67,9 @@ def load_shader_pack(name: str) -> str:
         manager = call(0, iris, "getPipelineManager")
         call(manager, manager_cls, "destroyPipeline")
         call(manager, manager_cls, "preparePipeline", call(0, iris, "getCurrentDimension"))
-        return m.java_to_string(call(0, iris, "getCurrentPackName"))
+        return java_to_string(call(0, iris, "getCurrentPackName"))
     finally:
-        m.java_release(*handles)
+        java_release(*handles)
 
 
 class JavaScope:
@@ -68,7 +90,7 @@ class JavaScope:
 
     def __exit__(self, *exc):
         if self.handles:
-            m.java_release(*self.handles)
+            java_release(*self.handles)
         return False
 
     def keep(self, handle):
@@ -77,14 +99,14 @@ class JavaScope:
         return handle
 
     def cls(self, name: str):
-        return self.keep(m.java_class(name))
+        return self.keep(java_class(name))
 
     def field(self, target, clazz, name: str):
         # static フィールドは target に 0 を渡す
-        return self.keep(m.java_access_field(target, self.keep(m.java_member(clazz, name))))
+        return self.keep(java_access_field(target, self.keep(java_member(clazz, name))))
 
     def call(self, target, clazz, name: str, *args):
-        return self.keep(m.java_call_method(target, self.keep(m.java_member(clazz, name)), *args))
+        return self.keep(m.java_call_method(target, self.keep(java_member(clazz, name)), *args))
 
     def options(self):
         mc_cls = self.cls("net.minecraft.client.Minecraft")
@@ -96,7 +118,7 @@ def iris_frame_count() -> int:
     # Iris の frameCounter ユニフォームの元 (描画したフレーム数)
     with JavaScope() as j:
         counter = j.field(0, j.cls("net.irisshaders.iris.uniforms.SystemTimeUniforms"), "COUNTER")
-        return int(m.java_to_string(j.call(counter, j.cls("java.util.function.IntSupplier"), "getAsInt")))
+        return int(java_to_string(j.call(counter, j.cls("java.util.function.IntSupplier"), "getAsInt")))
 
 
 # ray_steps はジョブごとに reload されるため、元の設定値はモジュール dict 上の既存値を引き継いで保持する
@@ -112,7 +134,7 @@ PERSPECTIVES = {
 def get_perspective() -> str:
     with JavaScope() as j:
         options, options_cls = j.options()
-        name = m.java_to_string(j.call(options, options_cls, "getCameraType"))
+        name = java_to_string(j.call(options, options_cls, "getCameraType"))
     return next((k for k, v in PERSPECTIVES.items() if v == name), name)
 
 
@@ -132,8 +154,8 @@ def camera_info() -> dict:
         camera_cls = j.cls("net.minecraft.client.Camera")
         camera = j.call(renderer, j.cls("net.minecraft.client.renderer.GameRenderer"), "getMainCamera")
         return {
-            "camera_pos": m.java_to_string(j.call(camera, camera_cls, "position")),
-            "camera_detached": m.java_to_string(j.call(camera, camera_cls, "isDetached")) == "true",
+            "camera_pos": java_to_string(j.call(camera, camera_cls, "position")),
+            "camera_detached": java_to_string(j.call(camera, camera_cls, "isDetached")) == "true",
         }
 
 
@@ -141,7 +163,7 @@ def get_fov() -> int:
     with JavaScope() as j:
         options, options_cls = j.options()
         inst = j.call(options, options_cls, "fov")
-        return int(m.java_to_string(j.call(inst, j.cls("net.minecraft.client.OptionInstance"), "get")))
+        return int(java_to_string(j.call(inst, j.cls("net.minecraft.client.OptionInstance"), "get")))
 
 
 def set_fov(value) -> int:
@@ -154,7 +176,7 @@ def set_fov(value) -> int:
     with JavaScope() as j:
         options, options_cls = j.options()
         inst = j.call(options, options_cls, "fov")
-        j.call(inst, j.cls("net.minecraft.client.OptionInstance"), "set", j.keep(m.java_int(int(value))))
+        j.call(inst, j.cls("net.minecraft.client.OptionInstance"), "set", j.keep(java_int(int(value))))
     return get_fov()
 
 
@@ -171,21 +193,21 @@ def set_render_distance(value) -> int:
         options, options_cls = j.options()
         inst = j.call(options, options_cls, "renderDistance")
         inst_cls = j.cls("net.minecraft.client.OptionInstance")
-        current = int(m.java_to_string(j.call(inst, inst_cls, "get")))
+        current = int(java_to_string(j.call(inst, inst_cls, "get")))
         if value == "restore":
             if "render_distance" not in SAVED:
                 return current
             value = SAVED.pop("render_distance")
         else:
             SAVED.setdefault("render_distance", current)
-        j.call(inst, inst_cls, "set", j.keep(m.java_int(int(value))))
+        j.call(inst, inst_cls, "set", j.keep(java_int(int(value))))
         mc_cls = j.cls("net.minecraft.client.Minecraft")
         server = j.call(j.call(0, mc_cls, "getInstance"), mc_cls, "getSingleplayerServer")
         if server:
             server_cls = j.cls("net.minecraft.server.MinecraftServer")
             players = j.call(server, server_cls, "getPlayerList")
-            j.call(players, j.cls("net.minecraft.server.players.PlayerList"), "setViewDistance", j.keep(m.java_int(int(value))))
-        return int(m.java_to_string(j.call(inst, inst_cls, "get")))
+            j.call(players, j.cls("net.minecraft.server.players.PlayerList"), "setViewDistance", j.keep(java_int(int(value))))
+        return int(java_to_string(j.call(inst, inst_cls, "get")))
 
 
 def set_cloud_status(value) -> str:
@@ -204,17 +226,17 @@ def set_cloud_status(value) -> str:
         status_cls = j.cls("net.minecraft.client.CloudStatus")
         if value == "restore":
             if "cloud_status" not in SAVED:
-                return m.java_to_string(j.call(inst, inst_cls, "get"))
+                return java_to_string(j.call(inst, inst_cls, "get"))
             value = SAVED.pop("cloud_status")
         else:
-            SAVED.setdefault("cloud_status", m.java_to_string(j.call(inst, inst_cls, "get")))
+            SAVED.setdefault("cloud_status", java_to_string(j.call(inst, inst_cls, "get")))
         j.call(inst, inst_cls, "set", j.field(0, status_cls, str(value).upper()))
-        return m.java_to_string(j.call(inst, inst_cls, "get"))
+        return java_to_string(j.call(inst, inst_cls, "get"))
 
 def get_hud() -> bool:
     with JavaScope() as j:
         options, options_cls = j.options()
-        return m.java_to_string(j.field(options, options_cls, "hideGui")) != "true"
+        return java_to_string(j.field(options, options_cls, "hideGui")) != "true"
 
 
 def set_hud(visible: bool) -> bool:
@@ -222,8 +244,8 @@ def set_hud(visible: bool) -> bool:
     with JavaScope() as j:
         options, options_cls = j.options()
         class_cls = j.cls("java.lang.Class")
-        field = j.call(options_cls, class_cls, "getField", j.keep(m.java_string("hideGui")))
-        j.call(field, j.cls("java.lang.reflect.Field"), "setBoolean", options, j.keep(m.java_bool(not visible)))
+        field = j.call(options_cls, class_cls, "getField", j.keep(java_string("hideGui")))
+        j.call(field, j.cls("java.lang.reflect.Field"), "setBoolean", options, j.keep(java_bool(not visible)))
     return get_hud()
 
 
@@ -240,17 +262,17 @@ def set_pause_on_lost_focus(value) -> bool:
         options, options_cls = j.options()
         if value == "restore":
             if "pause_on_lost_focus" not in SAVED:
-                return m.java_to_string(j.field(options, options_cls, "pauseOnLostFocus")) == "true"
+                return java_to_string(j.field(options, options_cls, "pauseOnLostFocus")) == "true"
             value = SAVED.pop("pause_on_lost_focus")
         else:
-            SAVED.setdefault("pause_on_lost_focus", m.java_to_string(j.field(options, options_cls, "pauseOnLostFocus")) == "true")
-        field = j.call(options_cls, j.cls("java.lang.Class"), "getField", j.keep(m.java_string("pauseOnLostFocus")))
-        j.call(field, j.cls("java.lang.reflect.Field"), "setBoolean", options, j.keep(m.java_bool(bool(value))))
+            SAVED.setdefault("pause_on_lost_focus", java_to_string(j.field(options, options_cls, "pauseOnLostFocus")) == "true")
+        field = j.call(options_cls, j.cls("java.lang.Class"), "getField", j.keep(java_string("pauseOnLostFocus")))
+        j.call(field, j.cls("java.lang.reflect.Field"), "setBoolean", options, j.keep(java_bool(bool(value))))
         if not value:
             mc_cls = j.cls("net.minecraft.client.Minecraft")
             mc = j.call(0, mc_cls, "getInstance")
             j.call(mc, mc_cls, "setScreen", 0)
-        return m.java_to_string(j.field(options, options_cls, "pauseOnLostFocus")) == "true"
+        return java_to_string(j.field(options, options_cls, "pauseOnLostFocus")) == "true"
 
 
 def item_name(stack):
@@ -402,13 +424,13 @@ def run_step(step: dict):
         # key_bind "key.freecam.toggle" は押下状態しか変えず、consumeClick で読む Freecam には効かない
         with JavaScope() as j:
             freecam_cls = j.cls("net.xolt.freecam.Freecam")
-            if (m.java_to_string(j.call(0, freecam_cls, "isEnabled")) == "true") != bool(step["freecam"]):
+            if (java_to_string(j.call(0, freecam_cls, "isEnabled")) == "true") != bool(step["freecam"]):
                 j.call(0, freecam_cls, "toggle")
-            return m.java_to_string(j.call(0, freecam_cls, "isEnabled")) == "true"
+            return java_to_string(j.call(0, freecam_cls, "isEnabled")) == "true"
     if "freecam_state" in step:
         # Freecam mod (net.xolt.freecam) の有効状態
         with JavaScope() as j:
-            return m.java_to_string(j.call(0, j.cls("net.xolt.freecam.Freecam"), "isEnabled")) == "true"
+            return java_to_string(j.call(0, j.cls("net.xolt.freecam.Freecam"), "isEnabled")) == "true"
     if "freecam_pose" in step:
         # 例: {"freecam_pose": [x, y, z, yaw, pitch]} フリーカメラの位置 (足元、目は +0.4) と向きを決める (視線の操作はマウス入力しか効かないため)
         x, y, z, yaw, pitch = step["freecam_pose"]
@@ -417,8 +439,8 @@ def run_step(step: dict):
             if not camera:
                 raise RuntimeError("freecam is not enabled")
             j.call(camera, j.cls("net.minecraft.world.entity.Entity"), "absSnapTo",
-                   j.keep(m.java_double(x)), j.keep(m.java_double(y)), j.keep(m.java_double(z)),
-                   j.keep(m.java_float(yaw)), j.keep(m.java_float(pitch)))
+                   j.keep(java_double(x)), j.keep(java_double(y)), j.keep(java_double(z)),
+                   j.keep(java_float(yaw)), j.keep(java_float(pitch)))
         return camera_info()
     if "slot" in step:
         return m.player_inventory_select_slot(int(step["slot"]))
@@ -442,11 +464,11 @@ def run_step(step: dict):
                 options, options_cls = j.options()
                 inst = j.call(options, options_cls, "framerateLimit")
                 inst_cls = j.cls("net.minecraft.client.OptionInstance")
-                saved_limit = int(m.java_to_string(j.call(inst, inst_cls, "get")))
-                j.call(inst, inst_cls, "set", j.keep(m.java_int(260)))
+                saved_limit = int(java_to_string(j.call(inst, inst_cls, "get")))
+                j.call(inst, inst_cls, "set", j.keep(java_int(260)))
                 # 入力なしで 1 分経つと AFK 扱いで 30 FPS に落ちるので、計測中は最小化時だけの制限にする
                 afk = j.call(options, options_cls, "inactivityFpsLimit")
-                SAVED.setdefault("inactivity", m.java_to_string(j.call(afk, inst_cls, "get")))
+                SAVED.setdefault("inactivity", java_to_string(j.call(afk, inst_cls, "get")))
                 j.call(afk, inst_cls, "set", j.field(0, j.cls("net.minecraft.client.InactivityFpsLimit"), "MINIMIZED"))
             time.sleep(1.0)
         samples = []
@@ -455,7 +477,7 @@ def run_step(step: dict):
             time.sleep(1.0)
             with JavaScope() as j:
                 mc_cls = j.cls("net.minecraft.client.Minecraft")
-                samples.append(int(m.java_to_string(j.call(j.call(0, mc_cls, "getInstance"), mc_cls, "getFps"))))
+                samples.append(int(java_to_string(j.call(j.call(0, mc_cls, "getInstance"), mc_cls, "getFps"))))
         # getFps は整数で 1 秒ごとの値なので、遅い場面では Iris のフレーム数を計測区間全体で割った 1 フレームの時間 (ms) も返す
         frames = iris_frame_count() - frames0
         frame_ms = round((time.time() - wall0) * 1000.0 / frames, 2) if frames > 0 else None
@@ -463,11 +485,11 @@ def run_step(step: dict):
         with JavaScope() as j:
             options, options_cls = j.options()
             inst_cls = j.cls("net.minecraft.client.OptionInstance")
-            limits = {name: m.java_to_string(j.call(j.call(options, options_cls, name), inst_cls, "get"))
+            limits = {name: java_to_string(j.call(j.call(options, options_cls, name), inst_cls, "get"))
                       for name in ("framerateLimit", "inactivityFpsLimit")}
             if saved_limit is not None:
                 inst = j.call(options, options_cls, "framerateLimit")
-                j.call(inst, inst_cls, "set", j.keep(m.java_int(saved_limit)))
+                j.call(inst, inst_cls, "set", j.keep(java_int(saved_limit)))
                 afk = j.call(options, options_cls, "inactivityFpsLimit")
                 j.call(afk, inst_cls, "set", j.field(0, j.cls("net.minecraft.client.InactivityFpsLimit"), SAVED.pop("inactivity")))
         return {"fps": samples, "frame_ms": frame_ms, **limits}
@@ -501,11 +523,13 @@ def run_job(job: dict) -> dict:
     results = []
     ok = True
     for i, step in enumerate(job.get("steps", [])):
+        # 検証のループの時間の内訳 (待ち・コマンド・Java の呼び出し) を後から数えられるよう、ステップごとの秒を返す
+        t0 = time.time()
         try:
-            results.append({"i": i, "ok": True, "value": run_step(step)})
+            results.append({"i": i, "ok": True, "value": run_step(step), "sec": round(time.time() - t0, 3)})
         except Exception:
             ok = False
-            results.append({"i": i, "ok": False, "error": traceback.format_exc(limit=3)})
+            results.append({"i": i, "ok": False, "error": traceback.format_exc(limit=3), "sec": round(time.time() - t0, 3)})
             if not job.get("continue_on_error", False):
                 break
     return {"id": job.get("id"), "ok": ok, "results": results, "finished_at": time.time()}
