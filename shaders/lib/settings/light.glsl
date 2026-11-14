@@ -17,7 +17,8 @@
 #define DECOR_REDSTONE // レッドストーンブロックを発光させる
 #define DECOR_AMETHYST // アメジストブロック・芽生えたアメジストを発光させる
 #define GLOW_LICHEN_LIGHT // ヒカリゴケを光源にする (OFF では周りを照らさない)
-#define GLOW_LICHEN_BRIGHTNESS 0.6 // [0.1 0.2 0.3 0.4 0.6 0.8 1.0 1.5] ヒカリゴケが周りを照らす光の強さ
+#define GLOW_LICHEN_BRIGHTNESS 0.45 // [0.1 0.2 0.3 0.4 0.45 0.6 0.8 1.0 1.5] ヒカリゴケが周りを照らす光の強さ
+#define FIREFLY_BUSH_BRIGHTNESS 0.25 // [0.05 0.1 0.15 0.2 0.25 0.3 0.4 0.5 0.75 1.0] ホタルの茂みが周りを照らす光の強さ
 #define LIGHT_SHADOWS // 設置光源の光源シャドウ (直接光のレイトレース)
 #define LIGHT_SHADOW_STRENGTH 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0] 設置光源 (ドロップ・燃焼・発光エンティティの光も) の影の濃さ 0=影なし 1=真っ暗な影
 #define LIGHT_TRACE_COUNT 4 // [1 2 3 4 6 8 12 16] 1 ピクセルあたりトレースする光源数

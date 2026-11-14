@@ -201,7 +201,7 @@ LIGHTS: list[Light] = [
           blocks=_lit("dragon_egg")),
     Light(60, "LIGHT_ENDER_CHEST", "ender chest", "vec3(0.40, 0.90, 0.80), 0.6, 7.0, 0.3, LT_CENTER, 0.0, 0u",
           blocks=_lit("ender_chest")),
-    Light(61, "LIGHT_FIREFLY_BUSH", "firefly bush", "vec3(0.85, 1.0, 0.50), 0.125, 2.0, 0.4, vec3(0.5, 0.7, 0.5), 0.6, LT_FLOOD",
+    Light(61, "LIGHT_FIREFLY_BUSH", "firefly bush", "vec3(0.85, 1.0, 0.50), FIREFLY_BUSH_BRIGHTNESS, 2.0, 0.4, vec3(0.5, 0.7, 0.5), 0.6, LT_FLOOD",
           blocks=_lit("firefly_bush"), items=_lit("firefly_bush")),
     Light(62, "LIGHT_TRIAL_SPAWNER", "trial spawner / vault (active)", "vec3(1.0, 0.70, 0.40), 0.8, 8.0, 0.4, LT_CENTER, 0.3, 0u",
           blocks=tuple([*state_values("trial_spawner", "trial_spawner_state", ["active", "waiting_for_reward_ejection", "ejecting_reward"]),
