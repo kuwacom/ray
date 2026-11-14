@@ -262,6 +262,8 @@ ENTITIES: list[tuple[int, str, str, tuple[str, ...], str]] = [
      "Iris hardcoded IDs (no real shape, excluded from occlusion and shadows)"),
     (5006, "ENTITY_NAME_TAG", "Iris の minecraft:name_tag (ボクセル化しない)", ("minecraft:name_tag",), ""),
     (5007, "ENTITY_BEAM", "Iris の minecraft:end_crystal_beam", ("minecraft:end_crystal_beam",), ""),
+    (5008, "ENTITY_WITHER", "ウィザー (防壁の電気の渦を帯電クリーパーと同じ明るさで光らせる)", ("minecraft:wither",),
+     "Wither (its armor swirl glows like a charged creeper's)"),
 ]
 
 # 一部だけ金属のブロック・アイテム・エンティティの自動メタリック。金属の画素を選ぶ判定 (gate) を ID に載せる

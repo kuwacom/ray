@@ -315,6 +315,7 @@ getLightDef(index) -> lightEmission(d, level), lightRange(d, level), lightFallof
 | 5003 | item | ドロップアイテム (光源化) |
 | 5004 | item_frame, glow_item_frame | 中身を光源化しない |
 | 5005-5007 | entity_shadow / name_tag / end_crystal_beam (Iris 固定) | 遮蔽・影から外す |
+| 5008 | wither | 防壁の電気の渦を帯電クリーパーと同じ明るさで光らせる |
 | 5100-5115 | blaze, magma_cube, glow_squid, allay, end_crystal, experience_orb, spectral_arrow, fireball+small_fireball, dragon_fireball, tnt, creeper, firework_rocket, lightning_bolt, entity_flame (Iris 固定), shulker_bullet, tnt_minecart | 光源エンティティ |
 | 5201-5208 | 金属の判定の番号 (1-8) + 5200 | 一部だけ金属のエンティティ (トロッコ・銅のゴーレム) |
 

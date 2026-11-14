@@ -530,8 +530,9 @@ void main() {
     // バニラの渦は光を受けない加算 (テクスチャ x 頂点色) なので、光源ブロックの発光と同じ明るさの単位で足す
     outSwirl = vec4(0.0);
     if (swirlLayer != 0) {
-        // 帯電したクリーパーは夜でも一目で分かるように、ウィザーの防壁 (バニラと同じ明るさ) より強く光らせる
-        float swirlGain = getEntityLightIndex(entityId) == LIGHT_ENTITY_CREEPER ? 1.0 + EMISSION_CHARGED_CREEPER_BRIGHTNESS * CHARGED_SWIRL_GAIN : 1.0;
+        // 帯電したクリーパーとウィザーの防壁は夜でも一目で分かるように、バニラの明るさより強く光らせる
+        bool strongSwirl = getEntityLightIndex(entityId) == LIGHT_ENTITY_CREEPER || entityId == ENTITY_WITHER;
+        float swirlGain = strongSwirl ? 1.0 + EMISSION_CHARGED_CREEPER_BRIGHTNESS * CHARGED_SWIRL_GAIN : 1.0;
         outSwirl.rgb = srgbToLinear(albedoDry) * (swirlGain * getVisibleEmissionLuminance() * EMISSION_STRENGTH);
     }
 #elif defined GBUF_HAND
