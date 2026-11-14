@@ -436,7 +436,7 @@ void main() {
     hdr = applyPurkinje(hdr, frameData.averageLuminance, exposure);
     vec3 color = hdr * exposure;
     // 現像の前に局所の明暗を縮める (ホワイトバランス・グレーディングは縮めた後の明るさに掛かる)
-#ifdef LOCAL_TONEMAP
+#if LOCAL_TONEMAP > 0
     color = applyLocalTonemap(color, uvL, exposure, frameData.averageLuminance * exposure);
 #endif
 

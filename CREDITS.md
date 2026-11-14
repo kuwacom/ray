@@ -44,6 +44,7 @@
 | 純水の吸収係数 | Pope & Fry, "Absorption spectrum (380-700 nm) of pure water", Applied Optics 1997 | lib/common/water_waves.glsl |
 | POM | Tatarchuk, "Dynamic Parallax Occlusion Mapping with Approximate Soft Shadows", I3D 2006 | program/surface/gbuffers_solid.fsh |
 | AgX トーンマップ | Troy Sobotka の AgX (Blender 4.0 の実装と公開されている多項式近似) | lib/post/tonemap.glsl |
+| 局所トーンマップの局所の明るさ (画素自身をガイドにしたガイデッドフィルタ) | He, Sun, Tang, "Guided Image Filtering", ECCV 2010 | lib/post/local_tonemap.glsl, program/post/bloom_down.fsh, bloom_blur.fsh |
 | ACES fit | Stephen Hill, "ACES Filmic Tone Mapping Curve" (BakingLab, MIT) の近似式 | lib/post/tonemap.glsl |
 | PBR Neutral トーンマップ | Khronos Group, "Khronos PBR Neutral Tone Mapper" 仕様 | lib/post/tonemap.glsl |
 | ブルームの縮小フィルタ | Jimenez, "Next Generation Post Processing in Call of Duty: Advanced Warfare", SIGGRAPH 2014 | program/post/bloom_down.fsh |

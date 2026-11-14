@@ -172,8 +172,6 @@
 #endif
 #ifdef BLOOM
 #endif
-#ifdef LOCAL_TONEMAP
-#endif
 #ifdef GRADING
 #endif
 #ifdef SELECTION_OUTLINE

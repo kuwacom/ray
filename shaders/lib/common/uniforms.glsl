@@ -112,7 +112,7 @@ uniform float optExposureBias;   // EXPOSURE_BIAS
 uniform float optDofStrength;    // DOF_STRENGTH
 uniform float optDofManualFocus; // DOF_MANUAL_FOCUS
 uniform float optDofFocusSpeed;  // DOF_FOCUS_SPEED
-uniform float optLocalTonemapStrength; // LOCAL_TONEMAP_STRENGTH
+uniform float optLocalTonemapStrength; // LOCAL_TONEMAP x 0.05
 uniform float thunderStrength;
 uniform vec4 lightningBoltPosition;
 uniform int worldTime;
