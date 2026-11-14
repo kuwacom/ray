@@ -305,6 +305,8 @@ option.EMISSION_BLOCK_BRIGHTNESS=Light Block Brightness
 option.EMISSION_BLOCK_BRIGHTNESS.comment=How bright blocks that glow as a whole (glowstone, sea lantern, redstone lamp, jack o'lantern, froglights, shroomlight) look on screen. Lower values show more of the texture pattern. Does not change the light they cast
 option.EMISSION_BEACON_BRIGHTNESS=Beacon Brightness
 option.EMISSION_BEACON_BRIGHTNESS.comment=How bright the beacon block and its beam look on screen. The beam is always visible from far away, so a low value keeps it from standing out. Does not change the light the beacon casts
+option.EMISSION_CHARGED_CREEPER_BRIGHTNESS=Charged Creeper Brightness
+option.EMISSION_CHARGED_CREEPER_BRIGHTNESS.comment=How brightly the electric swirl of a creeper charged by lightning glows blue-white, so it stands out at night. 0 = as bright as the wither's shield. Does not cast light on the surroundings
 option.GLOW_LICHEN_LIGHT=Glow Lichen Light
 option.GLOW_LICHEN_LIGHT.comment=Makes glow lichen a light source that lights its surroundings. When off, only the glowing look remains.
 option.GLOW_LICHEN_BRIGHTNESS=Glow Lichen Light Strength
