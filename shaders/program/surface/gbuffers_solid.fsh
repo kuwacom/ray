@@ -349,9 +349,13 @@ void main() {
 #elif defined GBUF_BASIC || defined GBUF_LINE
     materialId = MAT_BASIC;
 #endif
-    // 質感の推定に使う ID。ブロックエンティティ (チェスト・看板・ベッドなど) は、モブの一律の滑らかさではなくブロックと同じ推定にする
+    // 質感の推定に使う ID。手に持った・落ちた・額縁のアイテムとブロックエンティティ (チェスト・看板・ベッドなど) は、モブの一律の滑らかさではなくブロックと同じ推定にする
     int estimateId = materialId;
-#if defined GBUF_BLOCK
+#if defined GBUF_HAND
+    estimateId = itemEstimateMaterial(currentRenderedItemId);
+#elif defined GBUF_ENTITIES
+    if (entityId == ENTITY_ITEM || entityId == ENTITY_ITEM_FRAME) estimateId = itemEstimateMaterial(currentRenderedItemId);
+#elif defined GBUF_BLOCK
     estimateId = itemEstimateMaterial(blockEntityId);
 #endif
 
