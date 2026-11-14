@@ -29,7 +29,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      # 既定の浅いクローン (1 件) だとリリースノートの git log -10 が最新の 1 件だけになる
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 10
 
       # LICENSE同梱
       - name: Build and publish
