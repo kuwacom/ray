@@ -34,8 +34,9 @@ uvec4 packShape(vec3 min0, vec3 max0, vec3 min1, vec3 max1) {
 /*
  * フェンス・塀・鉄格子: 柱 + 接続した向きの腕 (北 = -z、東 = +x)。腕は軸ごとに 1 個の箱にまとめ、柱の中を通して反対側の腕とつなぐ
  * conn = 北 1 東 2 南 4 西 8 の和。post = 柱の半幅、armHalf = 腕の半幅、[y0, y1] = 腕の高さの範囲
+ * bars = 腕を中央の面の棒の並びで判定する (鉄格子)。柱はテクスチャでも中央の 2 列が埋まっているので箱のまま
  */
-uvec4 connectedShape(int conn, float post, float armHalf, float y0, float y1) {
+uvec4 connectedShape(int conn, float post, float armHalf, float y0, float y1, bool bars) {
     float c = 0.5;
     vec3 pmin = vec3(c - post, 0.0, c - post);
     vec3 pmax = vec3(c + post, 1.0, c + post);
@@ -46,8 +47,8 @@ uvec4 connectedShape(int conn, float post, float armHalf, float y0, float y1) {
     bool armZ = (conn & 5) != 0;
     bool armX = (conn & 10) != 0;
     return uvec4(packBox(pmin, pmax),
-                 armZ ? packBox(vec3(c - armHalf, y0, zLo), vec3(c + armHalf, y1, zHi)) : NO_BOX,
-                 armX ? packBox(vec3(xLo, y0, c - armHalf), vec3(xHi, y1, c + armHalf)) : NO_BOX,
+                 armZ ? packBox(vec3(c - armHalf, y0, zLo), vec3(c + armHalf, y1, zHi)) | (bars ? BOX_BARS_PLANE_X : 0u) : NO_BOX,
+                 armX ? packBox(vec3(xLo, y0, c - armHalf), vec3(xHi, y1, c + armHalf)) | (bars ? BOX_BARS_PLANE_Z : 0u) : NO_BOX,
                  NO_BOX);
 }
 
@@ -81,10 +82,10 @@ uvec4 shapeStatic(int i) {
         return packShape(vec3(0.0), vec3(1.0, float(i + 300 - BLOCK_SNOW_LAYER) / 8.0, 1.0), NO_MIN, NO_MAX);
     }
     if (i >= BLOCK_STAIRS_FIRST - 300 && i <= BLOCK_STAIRS_LAST - 300) return stairShape(i - (BLOCK_STAIRS_FIRST - 300));
-    // 腕はフェンスが上下 2 本の横木 (6/16-15/16)、塀は低い腕 14/16 と高い腕 16/16 の間、鉄格子は柱と同じ太さの板
-    if (i >= BLOCK_FENCE_FIRST - 300 && i < BLOCK_FENCE_FIRST - 300 + 16) return connectedShape(i - (BLOCK_FENCE_FIRST - 300), 0.125, 0.0625, 0.375, 0.9375);
-    if (i >= BLOCK_WALL_FIRST - 300 && i < BLOCK_WALL_FIRST - 300 + 16) return connectedShape(i - (BLOCK_WALL_FIRST - 300), 0.25, 0.1875, 0.0, 0.9375);
-    if (i >= BLOCK_PANE_BARS_FIRST - 300 && i < BLOCK_PANE_BARS_FIRST - 300 + 16) return connectedShape(i - (BLOCK_PANE_BARS_FIRST - 300), 0.0625, 0.0625, 0.0, 1.0);
+    // 腕はフェンスが上下 2 本の横木 (6/16-15/16)、塀は低い腕 14/16 と高い腕 16/16 の間、鉄格子は柱と同じ太さの板 (中は棒の並び)
+    if (i >= BLOCK_FENCE_FIRST - 300 && i < BLOCK_FENCE_FIRST - 300 + 16) return connectedShape(i - (BLOCK_FENCE_FIRST - 300), 0.125, 0.0625, 0.375, 0.9375, false);
+    if (i >= BLOCK_WALL_FIRST - 300 && i < BLOCK_WALL_FIRST - 300 + 16) return connectedShape(i - (BLOCK_WALL_FIRST - 300), 0.25, 0.1875, 0.0, 0.9375, false);
+    if (i >= BLOCK_PANE_BARS_FIRST - 300 && i < BLOCK_PANE_BARS_FIRST - 300 + 16) return connectedShape(i - (BLOCK_PANE_BARS_FIRST - 300), 0.0625, 0.0625, 0.0, 1.0, true);
     switch (i) {
         case BLOCK_SLAB_BOTTOM - 300:   return packShape(vec3(0.0), vec3(1.0, 0.5, 1.0), NO_MIN, NO_MAX);
         case BLOCK_SLAB_TOP - 300:      return packShape(vec3(0.0, 0.5, 0.0), vec3(1.0), NO_MIN, NO_MAX);

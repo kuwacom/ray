@@ -27,6 +27,13 @@ struct LightDef {
     uvec4 info;   // x = フラグ (LIGHT_FLAG_*), y = 遮蔽形状 ID (SHAPE_*), zw = 予備
 };
 
+/*
+ * 遮蔽形状の箱の上位 2bit: 鉄格子の腕の印。箱の中央の面 (x = 0.5 か z = 0.5) を通る所でだけ、バニラのテクスチャの棒の並びで遮る
+ * (lib/light/trace.glsl の barsPlaneBlocks)。バニラの鉄格子は厚みのない面に抜きのあるテクスチャを貼った形で、箱のままだと隙間の光まで止める
+ */
+const uint BOX_BARS_PLANE_X = 1u << 30u; // 面 x = 0.5 (南北の腕)
+const uint BOX_BARS_PLANE_Z = 1u << 31u; // 面 z = 0.5 (東西の腕)
+
 layout(std430, binding = 1) SSBO_BLOCK_DATA_ACCESS buffer BlockDataBuffer {
     LightDef lightDefs[LIGHT_TABLE_SIZE];
     uvec4 shapes[SHAPE_TABLE_SIZE]; // AABB 4 個: x/y/z/w = box0-3 (1/16 刻みの min xyz, max xyz を 5bit ずつ。min>max で無効)

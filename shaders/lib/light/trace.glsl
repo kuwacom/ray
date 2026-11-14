@@ -14,6 +14,7 @@
 //@include "/lib/common/transforms.glsl"
 //@include "/lib/common/uniforms.glsl"
 //@include "/lib/common/voxel_space.glsl"
+//@include "/lib/buffers/block_data.glsl"
 //@include "/lib/buffers/images.glsl"
 //@include "/lib/ids/block_ids.glsl"
 //@include "/lib/ids/id_decode.glsl"
@@ -76,6 +77,34 @@ bool isThinConnectedShape(int voxelId) {
 }
 
 /*
+ * 鉄格子のテクスチャ (16x16、バニラの iron_bars / copper_bars は同じ並び) の不透明な画素の列。bit u = 列 u (左が 0)
+ * 縦の棒は列 2-3、7-8、12-13。横木は行 2-3 に列 2-8、行 7-8 に列 0-3 と 12-15、行 12-13 に列 7-13 (行 v は上が 0)
+ * 動的な添字の定数配列はスレッドごとのローカルメモリに展開されることがあるので、行の場合分けで持つ
+ */
+const uint BARS_COLUMNS = 0x318Cu;
+const uint BARS_CROSS_TOP = 0x01FCu;
+const uint BARS_CROSS_MIDDLE = 0xF00Fu;
+const uint BARS_CROSS_BOTTOM = 0x3F80u;
+
+/*
+ * 鉄格子の腕の箱 [tn, tf] で、中央の面を通る点が棒に当たるか。面を通らずに抜ける (箱の上下の端をかすめる) レイは通す
+ * バニラのモデルでは南北の腕の面のテクスチャの u が 16 - z、東西の腕 (南北を 90 度回したもの) は u = x
+ */
+bool barsPlaneBlocks(uint box, vec3 ro, vec3 rdInv, float tn, float tf) {
+    bool planeX = (box & BOX_BARS_PLANE_X) != 0u;
+    float tp = (0.5 - (planeX ? ro.x : ro.z)) * (planeX ? rdInv.x : rdInv.z);
+    if (tp < tn || tp > tf) return false;
+    float s = planeX ? ro.z + tp / rdInv.z : ro.x + tp / rdInv.x;
+    uint u = uint(clamp(s * 16.0, 0.0, 15.0));
+    if (planeX) u = 15u - u;
+    uint v = 15u - uint(clamp((ro.y + tp / rdInv.y) * 16.0, 0.0, 15.0));
+    uint row = BARS_COLUMNS;
+    uint vm = v % 5u;
+    if (vm == 2u || vm == 3u) row |= v < 5u ? BARS_CROSS_TOP : (v < 10u ? BARS_CROSS_MIDDLE : BARS_CROSS_BOTTOM);
+    return ((row >> u) & 1u) != 0u;
+}
+
+/*
  * 部分形状の AABB (最大 4 個) とレイ区間 [tEnter, tLeave] の交差。ro はセルローカルの原点。箱の詰め方は lib/light/light_table.glsl の packBox
  * skipContaining: ro を含む箱は無視する (着色点のセルの判定用。面から押し出した点が、腕でふさがれた柱の面や横木の間の箱の中に入る)
  */
@@ -97,6 +126,7 @@ bool shapeIntersect(int voxelId, vec3 ro, vec3 rdInv, float tEnter, float tLeave
         float tn = max(maxOf(tmin), tEnter);
         float tf = min(minOf(tmax), tLeave);
         if (tn < tf && tn < tHit) {
+            if ((p & (BOX_BARS_PLANE_X | BOX_BARS_PLANE_Z)) != 0u && !barsPlaneBlocks(p, ro, rdInv, tn, tf)) continue;
             tHit = tn;
             hit = true;
             // 入射面の法線 = tmin が最大の軸の逆向き
