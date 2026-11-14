@@ -34,7 +34,10 @@ const uint ENTITY_TRI_OTHER_CAP = (ENTITY_TRI_CAPACITY - ENTITY_TRI_PLAYER_CAP) 
 const float ENTITY_TRI_NEAR_DIST = 16.0;
 const float ENTITY_TRI_FAR_DIST = 48.0;
 // 遠方の三角形は floodfill の照度がこれ以上の所だけ保持する (光の届かない所の影は見えない)
-const float ENTITY_TRI_FAR_MIN_FLOOD = 0.01;
+// floodfill は 6 近傍の平均で広がるので開けた所ではすぐ小さくなり、たいまつから 5 ブロックで 0.01 を下回る
+// 直接光はまだ届いているので、0.01 では照らされたモブが箱の影になり、閾値の前後で動くたびに形と箱が入れ替わった
+// floodfill が少しでも届いている (r11f_g11f_b10f で 0 でない) かだけを見る
+const float ENTITY_TRI_FAR_MIN_FLOOD = 1e-6;
 // アルファの閾値 (shadow_entities.fsh の discard と同じ)
 const float ENTITY_TRI_ALPHA_CUTOFF = 0.1;
 // 着色点側で無視する距離。法線方向の押し出し (TRACE_NORMAL_OFFSET) と合わせて自分の面での即ヒットを防ぐ
