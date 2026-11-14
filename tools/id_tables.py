@@ -35,6 +35,9 @@ STAIRS_LAST = 335
 FENCE_FIRST = 336             # フェンス・塀・鉄格子の ID 帯。各 16 通り (接続の向き。ID = 先頭 + 北 1 東 2 南 4 西 8 の和)
 WALL_FIRST = 352
 BARS_FIRST = 368
+STAIRS_INNER_FIRST = 384      # 階段の内角 384-391 (上下 x 欠けた象限)
+PANEL_OPEN_FIRST = 302        # 開いたドア・トラップドア 302-305 (板の側 北・東・南・西)
+PANEL_CLOSED_FIRST = 392      # 閉じたドア 392-395 (板の側) と閉じたトラップドア 396 (下) 397 (上)
 LIGHT_FACING_STRIDE = 256     # 向きのある光源ブロックの ID = 1000 + 256 x 向き (1 東 2 南 3 西) + 光源インデックス。北は向きなしと同じ ID
 LIGHT_FACING_LAST = LIGHT_ID_BASE + 3 * LIGHT_FACING_STRIDE + LIGHT_BLOCK_LAST
 FACINGS = ["north", "east", "south", "west"]  # 時計回り (上から見て)。ID の向きの番号と同じ順
@@ -375,9 +378,9 @@ BLOCK_CONSTS: list[tuple] = [
     ("raw", ""),
     ("const", 0, "BLOCK_SLAB_BOTTOM", 300, "", True),
     ("const", 0, "BLOCK_SLAB_TOP", 301, "", True),
+    ("const", 40, "BLOCK_PANEL_OPEN_FIRST", PANEL_OPEN_FIRST, "302-305 = 開いたドア・トラップドア (厚さ 3/16 の縦の板が北・東・南・西の側)", True),
     ("const", 40, "BLOCK_LOW", 307, "ベッド・石切台等の背の低いブロック", True),
     ("const", 40, "BLOCK_SNOW_LAYER", 308, "積もった雪 1 層 (高さ 1/8)", True),
-    ("const", 40, "BLOCK_DOOR_CLOSED", 309, "閉じたドア・トラップドア (薄いが光は遮る)", True),
     ("const", 40, "BLOCK_SNOW_LAYER_2", 310, "310-316 = 積もった雪 2-8 層 (層の数 = ID - 308)", True),
     ("const", 40, "BLOCK_SNOW_LAYER_8", 316, "", True),
     ("const", 40, "BLOCK_STAIRS_FIRST", STAIRS_FIRST, "320-335 = 階段 (向き x 上下 x 外角の 16 通り。形は lib/light/light_table.glsl)", True),
@@ -385,6 +388,10 @@ BLOCK_CONSTS: list[tuple] = [
     ("const", 40, "BLOCK_FENCE_FIRST", FENCE_FIRST, "336-351 = フェンス (接続の向き 16 通り: 北 1 東 2 南 4 西 8 の和。形は lib/light/light_table.glsl)", True),
     ("const", 40, "BLOCK_WALL_FIRST", WALL_FIRST, "352-367 = 塀 (同じ接続の 16 通り)", True),
     ("const", 40, "BLOCK_PANE_BARS_FIRST", BARS_FIRST, "368-383 = 鉄格子 (同じ接続の 16 通り)", True),
+    ("const", 40, "BLOCK_STAIRS_INNER_FIRST", STAIRS_INNER_FIRST, "384-391 = 階段の内角 (上下 x 欠けた 1/4 の象限 北西・北東・南東・南西)", True),
+    ("const", 40, "BLOCK_STAIRS_INNER_LAST", STAIRS_INNER_FIRST + 7, "", True),
+    ("const", 40, "BLOCK_PANEL_CLOSED_FIRST", PANEL_CLOSED_FIRST, "392-397 = 閉じたドア (板が北・東・南・西の側) と閉じたトラップドア (下・上)", True),
+    ("const", 40, "BLOCK_PANEL_CLOSED_LAST", PANEL_CLOSED_FIRST + 5, "", True),
     ("raw", ""),
     ("const", 40, "BLOCK_LIGHT_BASE", LIGHT_ID_BASE, "1001-1255 が光源 (光源インデックス = id - 1000)", False),
     ("const", 40, "BLOCK_LIGHT_FACING_STRIDE", LIGHT_FACING_STRIDE, "向きのある光源は 1000 + 256 x 向き (1 東 2 南 3 西) + 光源インデックス", False),

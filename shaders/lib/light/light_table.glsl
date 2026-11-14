@@ -17,7 +17,7 @@
 
 /*
  * 部分形状の遮蔽 AABB (index = ブロック ID - 300)。1 ブロックの 1/16 刻みの座標を 5bit ずつ (min xyz, max xyz の 30bit) に詰めて
- * 1 個を 1 uint にし、4 個まで持つ (lib/light/trace.glsl の unpackShapeBox が読む)。使わない箱は min > max で無効
+ * 1 個を 1 uint にし、4 個まで持つ (lib/buffers/block_data.glsl の unpackShapeBox が読む)。使わない箱は min > max で無効
  */
 uint packBox(vec3 bmin, vec3 bmax) {
     uvec3 a = uvec3(bmin * 16.0 + 0.5);
@@ -54,7 +54,6 @@ uvec4 connectedShape(int conn, float post, float armHalf, float y0, float y1, bo
 
 /*
  * 階段: ハーフ + 段 (上向きの階段は段が下)。並びは tools/gen_block_properties.py の stair_slot
- * 内角は箱 2 個に収まらないので、同じ向きの直線の ID に入っている
  * xy = xz の最小, zw = 最大 (北 = -z、東 = +x)。0-3 = 直線 (段が北・東・南・西の半分)、4-7 = 外角 (段が北西・北東・南東・南西の 1/4)
  */
 const vec4 STAIR_STEP_XZ[8] = vec4[8](
@@ -70,6 +69,73 @@ uvec4 stairShape(int k) {
     return packShape(vec3(0.0, slabY, 0.0), vec3(1.0, slabY + 0.5, 1.0), vec3(s.x, stepY, s.y), vec3(s.z, stepY + 0.5, s.w));
 }
 
+/*
+ * 階段の内角: ハーフ + 段の半分 + 段の 1/4。k = 上下 x 4 + 段の欠けた象限 (北西・北東・南東・南西)
+ * 直線で近似すると欠けた象限の反対側の 1/4 が空き、角の階段で光が抜けた
+ * 段の半分は欠けた象限と反対の北か南の半分、1/4 は欠けた象限の東西の隣 (象限の番号の bit 0 を反転)
+ */
+uvec4 stairInnerShape(int k) {
+    bool top = k >= 4;
+    int q = k & 3;
+    vec4 h = STAIR_STEP_XZ[q >= 2 ? 0 : 2];
+    vec4 s = STAIR_STEP_XZ[4 + (q ^ 1)];
+    float slabY = top ? 0.5 : 0.0;
+    float stepY = top ? 0.0 : 0.5;
+    return uvec4(packBox(vec3(0.0, slabY, 0.0), vec3(1.0, slabY + 0.5, 1.0)),
+                 packBox(vec3(h.x, stepY, h.y), vec3(h.z, stepY + 0.5, h.w)),
+                 packBox(vec3(s.x, stepY, s.y), vec3(s.z, stepY + 0.5, s.w)),
+                 NO_BOX);
+}
+
+// ドア・トラップドアの板 (厚さ 3/16)。side = 0-3 で北・東・南・西の縦の板、4 で下、5 で上の横の板
+const float PANEL_THICKNESS = 0.1875;
+
+uvec4 panelShape(int side) {
+    const vec3 NO_MIN = vec3(1.0), NO_MAX = vec3(0.0);
+    const float t = PANEL_THICKNESS;
+    vec3 bmin = vec3(0.0), bmax = vec3(1.0);
+    if (side == 0) bmax.z = t;
+    else if (side == 1) bmin.x = 1.0 - t;
+    else if (side == 2) bmin.z = 1.0 - t;
+    else if (side == 3) bmax.x = t;
+    else if (side == 4) bmax.y = t;
+    else bmin.y = 1.0 - t;
+    return packShape(bmin, bmax, NO_MIN, NO_MAX);
+}
+
+/*
+ * 形が面全体をふさぐ向き (lib/buffers/block_data.glsl の shapeFaces)。面を 8x8 の点で調べ、どれかの箱が面に接して覆うかを見る
+ * 箱は 1/16 刻みだが、面全体をふさぐ組み合わせ (ハーフ・階段・板) は 1/8 の境界で分かれるので 8x8 で足りる
+ */
+const int SHAPE_FACE_SAMPLES = 8;
+
+uint shapeCoveredFaces(uvec4 s) {
+    uint mask = 0u;
+    for (int f = 0; f < 6; f++) {
+        int a = f >> 1;
+        float plane = (f & 1) == 0 ? 1.0 : 0.0;
+        int u = (a + 1) % 3, v = (a + 2) % 3;
+        bool covered = true;
+        for (int k = 0; k < SHAPE_FACE_SAMPLES * SHAPE_FACE_SAMPLES && covered; k++) {
+            vec3 p;
+            p[a] = plane;
+            p[u] = (float(k % SHAPE_FACE_SAMPLES) + 0.5) / float(SHAPE_FACE_SAMPLES);
+            p[v] = (float(k / SHAPE_FACE_SAMPLES) + 0.5) / float(SHAPE_FACE_SAMPLES);
+            bool hit = false;
+            for (int b = 0; b < 4; b++) {
+                vec3 bmin, bmax;
+                unpackShapeBox(s[b], bmin, bmax);
+                if (any(greaterThan(bmin, bmax))) continue;
+                bool touches = (f & 1) == 0 ? bmax[a] >= 1.0 : bmin[a] <= 0.0;
+                if (touches && p[u] > bmin[u] && p[u] < bmax[u] && p[v] > bmin[v] && p[v] < bmax[v]) hit = true;
+            }
+            covered = hit;
+        }
+        if (covered) mask |= 1u << uint(f);
+    }
+    return mask;
+}
+
 uvec4 shapeStatic(int i) {
     const vec3 NO_MIN = vec3(1.0), NO_MAX = vec3(0.0);
     /*
@@ -82,6 +148,9 @@ uvec4 shapeStatic(int i) {
         return packShape(vec3(0.0), vec3(1.0, float(i + 300 - BLOCK_SNOW_LAYER) / 8.0, 1.0), NO_MIN, NO_MAX);
     }
     if (i >= BLOCK_STAIRS_FIRST - 300 && i <= BLOCK_STAIRS_LAST - 300) return stairShape(i - (BLOCK_STAIRS_FIRST - 300));
+    if (i >= BLOCK_STAIRS_INNER_FIRST - 300 && i <= BLOCK_STAIRS_INNER_LAST - 300) return stairInnerShape(i - (BLOCK_STAIRS_INNER_FIRST - 300));
+    if (i >= BLOCK_PANEL_OPEN_FIRST - 300 && i < BLOCK_PANEL_OPEN_FIRST - 300 + 4) return panelShape(i - (BLOCK_PANEL_OPEN_FIRST - 300));
+    if (i >= BLOCK_PANEL_CLOSED_FIRST - 300 && i <= BLOCK_PANEL_CLOSED_LAST - 300) return panelShape(i - (BLOCK_PANEL_CLOSED_FIRST - 300));
     // 腕はフェンスが上下 2 本の横木 (6/16-15/16)、塀は低い腕 14/16 と高い腕 16/16 の間、鉄格子は柱と同じ太さの板 (中は棒の並び)
     if (i >= BLOCK_FENCE_FIRST - 300 && i < BLOCK_FENCE_FIRST - 300 + 16) return connectedShape(i - (BLOCK_FENCE_FIRST - 300), 0.125, 0.0625, 0.375, 0.9375, false);
     if (i >= BLOCK_WALL_FIRST - 300 && i < BLOCK_WALL_FIRST - 300 + 16) return connectedShape(i - (BLOCK_WALL_FIRST - 300), 0.25, 0.1875, 0.0, 0.9375, false);
@@ -90,7 +159,6 @@ uvec4 shapeStatic(int i) {
         case BLOCK_SLAB_BOTTOM - 300:   return packShape(vec3(0.0), vec3(1.0, 0.5, 1.0), NO_MIN, NO_MAX);
         case BLOCK_SLAB_TOP - 300:      return packShape(vec3(0.0, 0.5, 0.0), vec3(1.0), NO_MIN, NO_MAX);
         case BLOCK_LOW - 300:           return packShape(vec3(0.0), vec3(1.0, 0.5625, 1.0), NO_MIN, NO_MAX);
-        case BLOCK_DOOR_CLOSED - 300:   return packShape(vec3(0.0), vec3(1.0), NO_MIN, NO_MAX);
     }
     return packShape(vec3(0.0), vec3(1.0), NO_MIN, NO_MAX);
 }

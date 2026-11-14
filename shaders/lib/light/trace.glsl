@@ -66,15 +66,15 @@ uint blockLightTraceFlags() {
 // 設置光源の影の濃さ。可視率の遮られた分を LIGHT_SHADOW_STRENGTH 倍にする (1 でそのまま、0 で影なし)
 vec3 blockLightShadow(vec3 vis) { return mix(vec3(1.0), vis, LIGHT_SHADOW_STRENGTH); }
 
-// 部分形状のうち、形状判定なしでも完全なブロックとして遮るもの (階段は 3/4 が埋まっている)
+// 部分形状のうち、形状判定なしでも完全なブロックとして遮るもの (階段は 3/4 が埋まっている。閉じたドア・トラップドアは薄いが光は遮る)
 bool isShapeOccluderWithoutTrace(int voxelId) {
-    return (voxelId >= BLOCK_STAIRS_FIRST && voxelId <= BLOCK_STAIRS_LAST) || voxelId == BLOCK_DOOR_CLOSED;
+    return (voxelId >= BLOCK_STAIRS_FIRST && voxelId <= BLOCK_STAIRS_LAST)
+        || (voxelId >= BLOCK_STAIRS_INNER_FIRST && voxelId <= BLOCK_STAIRS_INNER_LAST)
+        || (voxelId >= BLOCK_PANEL_CLOSED_FIRST && voxelId <= BLOCK_PANEL_CLOSED_LAST);
 }
 
-// 接続の向きごとに ID が分かれた細い形 (フェンス・塀・鉄格子)。着色点のセルでも形を判定する
-bool isThinConnectedShape(int voxelId) {
-    return voxelId >= BLOCK_FENCE_FIRST && voxelId < BLOCK_PANE_BARS_FIRST + 16;
-}
+// 形のあるブロック (ID 300-399)。着色点のセルでも形を判定する
+bool isShapeBlock(int voxelId) { return uint(voxelId - 300) < 100u; }
 
 /*
  * 鉄格子のテクスチャ (16x16、バニラの iron_bars / copper_bars は同じ並び) の不透明な画素の列。bit u = 列 u (左が 0)
@@ -115,8 +115,8 @@ bool shapeIntersect(int voxelId, vec3 ro, vec3 rdInv, float tEnter, float tLeave
     bool hit = false;
     for (int b = 0; b < 4; b++) {
         uint p = s[b];
-        vec3 bmin = vec3(uvec3(p & 31u, (p >> 5) & 31u, (p >> 10) & 31u)) * (1.0 / 16.0);
-        vec3 bmax = vec3(uvec3((p >> 15) & 31u, (p >> 20) & 31u, (p >> 25) & 31u)) * (1.0 / 16.0);
+        vec3 bmin, bmax;
+        unpackShapeBox(p, bmin, bmax);
         if (any(greaterThan(bmin, bmax))) continue;
         if (skipContaining && all(greaterThan(ro, bmin)) && all(lessThan(ro, bmax))) continue;
         vec3 t0 = (bmin - ro) * rdInv;
@@ -246,14 +246,14 @@ vec3 traceVisibility(vec3 fromVoxel, vec3 toVoxel, uint flags, float dither, flo
     /*
      * 着色点が水の中なら、始点のセルの水も通る長さで減衰させる。始点のセルは判定しないので、光が始点のセルを出るまでの
      * 水の分だけ減衰が抜ける。その長さはブロックの中の位置で変わり、水の中の床の明るさがブロックの境目で段になっていた
-     * 着色点のセルが細い形 (フェンス・塀・鉄格子) なら、そのセルの中の形でも遮る。判定しないと、柱や横木の足元の床 (同じセル)
-     * には自分の影が落ちず、影がセルの境目から始まる
+     * 着色点のセルが形のあるブロックなら、そのセルの中の形でも遮る。判定しないと、柱や横木の足元の床 (同じセル)
+     * には自分の影が落ちず、影がセルの境目から始まる。ハーフブロックの上面や階段の段の上 (同じセル) には、床の下の光が抜けていた
      */
     if ((flags & (TRACE_TINT | TRACE_SHAPES)) != 0u && isInVoxelVolume(cell)) {
         int startId = fetchVoxelBlockId(cell);
         float tStartLeave = min(minOf(tMax), len);
         if ((flags & TRACE_TINT) != 0u && startId == BLOCK_WATER) transmit = voxelCellTransmittance(startId, cell, fromVoxel, rdInv, 0.0, tStartLeave, flags);
-        if ((flags & TRACE_SHAPES) != 0u && isThinConnectedShape(startId)) {
+        if ((flags & TRACE_SHAPES) != 0u && isShapeBlock(startId)) {
             float tHit;
             vec3 n;
             if (shapeIntersect(startId, fromVoxel - vec3(cell), rdInv, 0.0, tStartLeave, true, tHit, n)) return vec3(0.0);
@@ -300,7 +300,7 @@ vec3 traceVisibility(vec3 fromVoxel, vec3 toVoxel, uint flags, float dither, flo
 /*
  * 視線方向のレイが最初に当たる固体ボクセル (反射・GI 用, surface モジュールが使う)
  * 戻り値: true なら hitVoxel に交点 (voxel 空間), hitNormal に面法線, hitBlockId にブロック ID
- * 開始セルは判定しない。半透明・植物・光を遮らない光源 (たいまつ等) は素通りする。葉は当たる
+ * 開始セルは形のあるブロックの時だけ判定する。半透明・植物・光を遮らない光源 (たいまつ等) は素通りする。葉は当たる
  * 部分形状は常に AABB で判定する (反射に形が映るため)。エンティティは対象外
  */
 bool traceVoxelRay(vec3 originVoxel, vec3 dir, float maxDist, out vec3 hitVoxel, out vec3 hitNormal, out int hitBlockId) {
@@ -318,6 +318,19 @@ bool traceVoxelRay(vec3 originVoxel, vec3 dir, float maxDist, out vec3 hitVoxel,
     vec3 fr = originVoxel - vec3(cell);
     vec3 tMax = mix(fr, 1.0 - fr, vec3(greaterThan(stepDir, ivec3(0)))) * tDelta;
     int maxSteps = min(int(maxDist * TRACE_STEPS_PER_BLOCK) + 2, TRACE_STEPS_CAP);
+
+    // 開始セルが形のあるブロックなら、そのセルの形で当たる (ハーフブロックの上の壁ぎわから下向きのレイが床の下へ抜けていた)
+    if (isInVoxelVolume(cell)) {
+        int startId = fetchVoxelBlockId(cell);
+        float tHit;
+        vec3 sn;
+        if (isShapeBlock(startId) && shapeIntersect(startId, fr, rdInv, 0.0, minOf(tMax), true, tHit, sn) && tHit < maxDist) {
+            hitVoxel = originVoxel + dir * tHit;
+            hitNormal = sn;
+            hitBlockId = startId;
+            return true;
+        }
+    }
 
     for (int i = 0; i < maxSteps; i++) {
         float tEnter = minOf(tMax);

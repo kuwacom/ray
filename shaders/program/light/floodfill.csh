@@ -281,9 +281,27 @@ void main() {
 #ifdef FLOODFILL
     vec3 light = vec3(0.0);
     if (!isVoxelOpaque(voxelId)) {
-        light = loadPreviousFlood(cell + ivec3(1, 0, 0)) + loadPreviousFlood(cell - ivec3(1, 0, 0))
-              + loadPreviousFlood(cell + ivec3(0, 1, 0)) + loadPreviousFlood(cell - ivec3(0, 1, 0))
-              + loadPreviousFlood(cell + ivec3(0, 0, 1)) + loadPreviousFlood(cell - ivec3(0, 0, 1));
+        vec3 nb[6];
+        for (int i = 0; i < 6; i++) {
+            ivec3 n = cell;
+            n[i >> 1] += (i & 1) == 0 ? 1 : -1;
+            nb[i] = loadPreviousFlood(n);
+            light += nb[i];
+        }
+        /*
+         * 形のあるブロックの面がふさいでいる向きからは受け取らない (自分の面か、隣の向かい合う面のどちらか)
+         * 部分形状をセルごと通すと、ハーフブロックの床・階段の壁・閉じたドアの板の向こうへ間接光が回り込んでいた
+         * 隣の ID を読むのは光が届いているセルだけ (体積の大半は暗い)
+         */
+        if (maxOf(light) > 0.0) {
+            uint selfFaces = getShapeCoveredFaces(voxelId);
+            for (int i = 0; i < 6; i++) {
+                ivec3 n = cell;
+                n[i >> 1] += (i & 1) == 0 ? 1 : -1;
+                uint nFaces = isInVoxelVolume(n) ? getShapeCoveredFaces(unpackVoxelBlockId(imageLoad(voxelBlockImg, n).r)) : 0u;
+                if ((((selfFaces >> uint(i)) | (nFaces >> uint(i ^ 1))) & 1u) != 0u) light -= nb[i];
+            }
+        }
         if (BLOCKLIGHT_BOUNCE > 0.0) light += floodBounce(cell);
         light *= (FLOOD_DECAY / 6.0) * floodCellTransmittance(voxelId);
     }

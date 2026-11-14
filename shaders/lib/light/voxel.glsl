@@ -31,9 +31,9 @@ uint readVoxelEntity(ivec3 cell) {
     return texelFetch(voxelEntitySampler, cell, 0).r;
 }
 
-// 光を完全に通さないボクセルか (floodfill の壁)。部分形状・植物・半透明は通す
+// 光を完全に通さないボクセルか (floodfill の壁)。部分形状・植物・半透明は通す (部分形状の面は getShapeCoveredFaces)
 bool isVoxelOpaque(int voxelId) {
-    if (isPlainSolidBlock(voxelId) || (voxelId >= 10 && voxelId < 100) || voxelId == BLOCK_DOOR_CLOSED) return true;
+    if (isPlainSolidBlock(voxelId) || (voxelId >= 10 && voxelId < 100)) return true;
     int light = getBlockLightIndex(voxelId);
     return light != LIGHT_NONE && (getLightDef(light).info.x & LIGHT_FLAG_OCCLUDES) != 0u;
 }

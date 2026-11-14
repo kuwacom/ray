@@ -15,6 +15,11 @@
 LightDef getLightDef(int index) { return blockData.lightDefs[clamp(index, 0, LIGHT_TABLE_SIZE - 1)]; }
 vec4 getTint(int index) { return blockData.tints[clamp(index, 0, TINT_TABLE_SIZE - 1)]; }
 uvec4 getShape(int index) { return blockData.shapes[clamp(index, 0, SHAPE_TABLE_SIZE - 1)]; }
+// 形のあるブロック (ID 300-399) が面全体をふさぐ向き。それ以外の ID は 0 (lib/buffers/block_data.glsl の shapeFaces)
+uint getShapeCoveredFaces(int voxelId) {
+    uint i = uint(voxelId - 300);
+    return i < 100u ? blockData.shapeFaces[i] : 0u;
+}
 // ボクセル ID の平均の色 (線形アルベド)。floodfill の照り返しとボクセル RT の画面外の当たりに使う
 vec3 getBlockAlbedo(int voxelId) {
     return srgbToLinear(unpackUnorm4x8(blockData.albedo[voxelId & (ALBEDO_TABLE_SIZE - 1)]).rgb);

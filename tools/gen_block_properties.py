@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from id_tables import (  # noqa: E402
     BLOCK_CONSTS, COLOR_BAND_FIRST, COLOR_BAND_LAST, COLORS, COPPER_PREFIX, ENTITIES, ENTITY_LIGHT_ID_BASE, LIGHT_BLOCK_LAST,
     BARS_FIRST, FACINGS, FENCE_FIRST, WALL_FIRST, LIGHT_ENTITY_FIRST, LIGHT_ENTITY_LAST, LIGHT_FACING_LAST, LIGHT_FACING_STRIDE, LIGHT_ID_BASE, LIGHT_ITEM_FIRST,
-    LIGHT_ITEM_LAST, LIGHTS, Light, STAIRS_FIRST, with_state,
+    LIGHT_ITEM_LAST, LIGHTS, Light, PANEL_CLOSED_FIRST, PANEL_OPEN_FIRST, STAIRS_FIRST, STAIRS_INNER_FIRST, with_state,
     ENTITY_METAL_BASE, ITEMLESS_METAL_BLOCKS, METAL_ENTITIES, METAL_GATE_STRIDE, METAL_GATES, METAL_ITEMS, METAL_LIGHT_ITEMS,
     metal_blocks,
 )
@@ -79,22 +79,53 @@ STAIR_SHAPES = ["straight", "inner_left", "inner_right", "outer_left", "outer_ri
 
 
 def stair_slot(facing: str, shape: str) -> int:
-    """0-3 = 直線 (段のある側 N/E/S/W)、4-7 = 外角 (段のある 1/4 が NW/NE/SE/SW)"""
+    """0-3 = 直線 (段のある側 N/E/S/W)、4-7 = 外角 (段のある 1/4 が NW/NE/SE/SW)、8-11 = 内角 (段の欠けた 1/4 が NW/NE/SE/SW)"""
     f = STAIR_FACINGS.index(facing)
-    # 内角は段が 3/4 で、遮蔽の箱 2 個 (lib/light/light_table.glsl) に収まらないので同じ向きの直線で近似する (遮りすぎない側)
-    if shape in ("straight", "inner_left", "inner_right"):
+    if shape == "straight":
         return f
-    # facing=north の外角は left = 北西、right = 北東。向きを時計回りに 1 つ回すと象限も 1 つ回る
-    return 4 + (f + (0 if shape == "outer_left" else 1)) % 4
+    # facing=north の外角は left = 北西、right = 北東。内角は left が南東、right が南西を欠く。向きを時計回りに 1 つ回すと象限も 1 つ回る
+    if shape in ("outer_left", "outer_right"):
+        return 4 + (f + (0 if shape == "outer_left" else 1)) % 4
+    return 8 + (f + (2 if shape == "inner_left" else 3)) % 4
 
 
 def stair_entries() -> list[tuple[int, str, list[str]]]:
     out = []
     for h, half in enumerate(["bottom", "top"]):
-        for slot in range(8):
+        for slot in range(12):
             names = [f"{b}_stairs:half={half}:facing={f}:shape={s}"
                      for b in SLAB_STAIR_BASES for f in STAIR_FACINGS for s in STAIR_SHAPES if stair_slot(f, s) == slot]
-            out.append((STAIRS_FIRST + h * 8 + slot, f"stairs ({half}, shape {slot})", names))
+            # 内角は直線・外角の帯 (320-335) の後ろに空きが無いので別の帯
+            bid = STAIRS_FIRST + h * 8 + slot if slot < 8 else STAIRS_INNER_FIRST + h * 4 + slot - 8
+            out.append((bid, f"stairs ({half}, shape {slot})", names))
+    return out
+
+
+def door_entries() -> list[tuple[int, str, list[str]]]:
+    """ドア・トラップドアを板の位置ごとに分ける。向きの番号は STAIR_FACINGS (時計回り)
+    ドアのモデルは全部同じ板 (西の側) を回したもの。閉じると facing の反対、開くと hinge=left は反時計回りに 1 つ、right は時計回りに 1 つ
+    開いたトラップドアは facing の反対の側、閉じたトラップドアは half で下か上"""
+    open_names: list[list[str]] = [[] for _ in range(4)]
+    closed_names: list[list[str]] = [[] for _ in range(6)]
+    for f, facing in enumerate(STAIR_FACINGS):
+        for w in DOOR_TRAPDOOR:
+            closed_names[(f + 2) % 4] += [f"{w}_door:facing={facing}:open=false"]
+            for hinge, turn in (("left", 3), ("right", 1)):
+                open_names[(f + turn) % 4] += [f"{w}_door:facing={facing}:hinge={hinge}:open=true"]
+            open_names[(f + 2) % 4] += [f"{w}_trapdoor:facing={facing}:open=true"]
+    for k, half in enumerate(["bottom", "top"]):
+        closed_names[4 + k] = [f"{w}_trapdoor:half={half}:open=false" for w in DOOR_TRAPDOOR]
+    return ([(PANEL_OPEN_FIRST + s, f"open doors / trapdoors (panel on side {STAIR_FACINGS[s]})", n) for s, n in enumerate(open_names)]
+            + [(PANEL_CLOSED_FIRST + s, f"closed doors (panel on side {STAIR_FACINGS[s]})", closed_names[s]) for s in range(4)]
+            + [(PANEL_CLOSED_FIRST + 4 + k, f"closed trapdoors ({half})", closed_names[4 + k]) for k, half in enumerate(["bottom", "top"])])
+
+
+def fence_entries() -> list[tuple[int, str, list[str]]]:
+    """フェンスに閉じたフェンスゲートを足す。ゲートは facing=north/south で東西に、east/west で南北に渡る
+    フェンスの東西 (東 2 + 西 8) と南北 (北 1 + 南 4) の腕と同じ形で近似する。開いたゲートは両端の柱だけなので遮らない扱い"""
+    out = connected_entries(FENCE_FIRST, "fences", [*wood_prefixed("fence"), "nether_brick_fence"], ["false", "true"])
+    for facings, mask in ((("north", "south"), 10), (("east", "west"), 5)):
+        out[mask][2].extend(f"{g}:facing={f}:open=false" for g in wood_prefixed("fence_gate") for f in facings)
     return out
 
 
@@ -159,9 +190,7 @@ BLOCKS: list[tuple[int, str, list[str]]] = [
                          "heavy_weighted_pressure_plate", *wood_prefixed("pressure_plate"),
                          *colored("carpet"), *wood_prefixed("sign"), *wood_prefixed("wall_sign"), *wood_prefixed("hanging_sign"),
                          *wood_prefixed("wall_hanging_sign"), *colored("banner"), *colored("wall_banner"),
-                         *wood_prefixed("fence_gate"),
-                         *with_state([f"{w}_door" for w in DOOR_TRAPDOOR], "open=true"),
-                         *with_state([f"{w}_trapdoor" for w in DOOR_TRAPDOOR], "open=true"),
+                         *with_state(wood_prefixed("fence_gate"), "open=true"),
                          "end_portal_frame:eye=false", "big_dripleaf", "big_dripleaf_stem",
                          "campfire:lit=false", "soul_campfire:lit=false"]),
     (107, "cobweb", ["cobweb"]),
@@ -186,11 +215,10 @@ BLOCKS: list[tuple[int, str, list[str]]] = [
     (307, "low blocks", ["stonecutter", "daylight_detector", "lectern", "composter", "farmland", "dirt_path", "sculk_shrieker"]),
     # 積もった雪は層の数で高さが違う (1 層 = 1/8)。遮蔽の形を高さに合わせるため層ごとに分ける (308 = 1 層, 310-316 = 2-8 層)
     (308, "snow layers (1)", ["snow:layers=1"]),
-    (309, "closed doors / trapdoors", [*with_state([f"{w}_door" for w in DOOR_TRAPDOOR], "open=false"),
-                                 *with_state([f"{w}_trapdoor" for w in DOOR_TRAPDOOR], "open=false")]),
     *[(308 + k, f"snow layers ({k})", [f"snow:layers={k}"]) for k in range(2, 9)],
+    *door_entries(),
     *stair_entries(),
-    *connected_entries(FENCE_FIRST, "fences", [*wood_prefixed("fence"), "nether_brick_fence"], ["false", "true"]),
+    *fence_entries(),
     *connected_entries(WALL_FIRST, "walls", [f"{b}_wall" for b in WALL_BASES], ["none", "low", "tall"]),
     *connected_entries(BARS_FIRST, "bars (panes other than glass)",
                        ["iron_bars", *[f"{p}copper_bars" for p in COPPER_PREFIX], *[f"waxed_{p}copper_bars" for p in COPPER_PREFIX]],

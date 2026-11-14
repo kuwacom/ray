@@ -222,7 +222,7 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 | binding | 名前 (アクセサ) | ファイル | サイズ | 内容 | 書くプログラム (`SSBO_<名前>_WRITE`) |
 |---|---|---|---|---|---|
 | 0 | FrameDataBuffer (`frameData`) | `frame_data.glsl` | 4096 | post: exposure, exposureTarget, averageLuminance, focusDistance, histogram[256], postParams[] (4 個) / sky: sunIrradiance, moonIrradiance, shadowLightIrradiance, skySH[9], skyParams[8] (`[3]` = 目の位置の太陽の見え方: x 今フレーム (フレア用)、y 平滑化済み (影マップより遠いフォグ用)、z 太陽が影マップの範囲より遠い地形に隠れている割合 (post が書く)。`[4]` = (カメラの位置の雲の中の太陽の光 rgb, 雲の濃さ。0 なら雲の外)、`[5]` = (雲の中の空の光 rgb, 雲の中の霧の消散係数 1/ブロック)、`[6]` = (雨の日の雲の向こうの空を置き換える灰色の放射輝度 rgb, 置き換える割合)、`[7]` = (カメラのいる板の上面までの高さ, 下面までの高さ。0 なら板の外) (`[4]` `[5]` `[6]` `[7]` は prepare2 が書く)) / light: lightStats、handLights[6] (手持ち光源の画素によらない値。手 h (0 = 利き手、1 = オフハンド) ごとに `[3h]` = (光源の位置 xyz (player 空間、固体ブロックの中なら目へ戻した位置), 届く距離)、`[3h+1]` = (放射 rgb (HAND_LIGHT_BRIGHTNESS と揺らぎの前), 揺らぎの倍率)、`[3h+2]` = (戻す前の手の位置 xyz, 光源の半径)。宣言の並びは surfaceParams の後) / surface: surfaceParams[6] (`[0..2]` = 開けた水面 (スカイライトが風の当たる上限以上) の海の状態。層の傾き 5・表面張力波の傾き 2・風速・高さの RMS。prepare が毎フレーム書く。`[3]` = WATER_GLITTER の点の寿命に使うフレームの長さ (x 平滑化した frameTime, y 半オクターブの段に丸めた長さ (秒), z 段の番号)。WATER_GLITTER の時だけ prepare が書く。`[4]` = (水の吸収 rgb, 波頭の尖り)、`[5]` = (水の散乱 rgb, 映り込みの散らしの割合)。海・湖・川の設定をカメラのバイオームの重みで混ぜた値で、prepare が毎フレーム書く。prepare より前の shadow パスは 1 フレーム前の値を読む) | `FRAME_DATA`: setup (初期値), begin・deferred_a (lightStats)、deferred_a (handLights), prepare (sky、surfaceParams[0..5]), prepare2 (skyParams[4..7]), composite25 (post) |
-| 1 | BlockDataBuffer (`blockData`) | `block_data.glsl` | 65536 | `LightDef lightDefs[256]`, `uvec4 shapes[128]`, `vec4 tints[128]`, `uint albedo[4096]` (ブロックの平均の色), `uint albedoUp[4096]` (上向きの面の色), `uvec4 lightMasks[]` (光るブロックの面の光り方、128 光源 x 上・下・側面・前面の 512 個) | `BLOCK_DATA`: setup のみ |
+| 1 | BlockDataBuffer (`blockData`) | `block_data.glsl` | 65536 | `LightDef lightDefs[256]`, `uvec4 shapes[128]`, `vec4 tints[128]`, `uint shapeFaces[128]` (形が面全体をふさぐ向き), `uint albedo[4096]` (ブロックの平均の色), `uint albedoUp[4096]` (上向きの面の色), `uvec4 lightMasks[]` (光るブロックの面の光り方、128 光源 x 上・下・側面・前面の 512 個) | `BLOCK_DATA`: setup のみ |
 | 2 | GlobalLightsBuffer (`globalLights`) | `global_lights.glsl` | 295200 | `count/blockCount/entityCount/overflow`, `cullDistance/culled` + `cullHist[64]` (間引き距離と距離の分布), `LightInstance lights[8192]` (posRadius: ボクセル空間位置 + 到達半径, colorSize: 放射 + 光源半径), `lightPower[]` (揺らぎ前の放射の輝度、8192 個)。使うのは LIGHT_MAX_COUNT 個まで | `GLOBAL_LIGHTS`: setup, begin, deferred, deferred_a |
 | 3 | LightBinsBuffer (`lightBins`) | `light_bins.glsl` | 10944512 (LIGHT_BIN_LIGHTS > 64 で 21430272) | `binCount[40960]`, `entityAcc[32768]` (エンティティ光源の蓄積表), `binLights[]` (40960 x 65 個、> 64 で x 129)。ビン = 8³ ブロック、1 ビン LIGHT_BIN_LIGHTS + 1 枠。枠のキー = 重要度 19 bit + 光源インデックス 13 bit | `LIGHT_BINS`: setup, begin, deferred_a, shadow_entities・shadow_block の gsh と gbuffers_entities・gbuffers_entities_translucent の vsh (蓄積表) |
 | 4 | EntityTriangleBuffer (`entityTris`) | `entity_tris.glsl` | 838672 | `counts[4]`, `groupBounds`, `clusterBounds` + `EntityTriangle tris[]` (16384 個) (ボクセル空間の三角形 v0/e1/e2 + アルファマスク + テクスチャ x 頂点色の平均の色) | `ENTITY_TRIS`: begin (クリア), shadow_entities・shadow_block の gsh |
@@ -255,7 +255,7 @@ struct LightInstance {
 | 10-19 | マテリアルのヒント付き固体 | 10 金属, 11 光沢石, 12 雪 |
 | 100-129 | 光を遮らない植物・小物 | 100 草花, 101/102 背の高い植物の下/上, 103 葉, 104 つる, 105 作物, 106 小物 (レール・ボタン・看板・開いたドア…), 107 クモの巣, 108 スイレンの葉, 109 サトウキビ, 110 水中植物 |
 | 200-299 | 半透明 (透過色 index = id - 200) | 200 水, 201 氷, 202 ガラス, 203 ガラス板, 204 スライム, 205 ハチミツ, 206 遮光ガラス, 207 流れる水 (level 1-7。頂点で 200 に戻し、ボクセルの発光の欄に印 `VOXEL_WATER_FLOWING` だけ残す), 210-225 色付きガラス, 230-245 色付きガラス板 |
-| 300-399 | 部分形状 (形状 index = id - 300) | 300/301 ハーフ下/上, 307 背の低いブロック, 308 雪の層, 309 閉じたドア・トラップドア, 320-335 階段 (向き 4 x 外角 4 の形 x 下/上。内角は直線に含める), 336-351 フェンス / 352-367 塀 / 368-383 鉄格子 (接続した向き 北 1 東 2 南 4 西 8 の和で 16 通り。柱 + 軸ごとの腕)。形は 1 ブロックの 1/16 刻みの箱 4 個まで |
+| 300-399 | 部分形状 (形状 index = id - 300) | 300/301 ハーフ下/上, 302-305 開いたドア・トラップドア (板の側 北・東・南・西), 307 背の低いブロック, 308/310-316 雪の層, 320-335 階段 (向き 4 x 外角 4 の形 x 下/上), 336-351 フェンス (閉じたフェンスゲートを含む) / 352-367 塀 / 368-383 鉄格子 (接続した向き 北 1 東 2 南 4 西 8 の和で 16 通り。柱 + 軸ごとの腕), 384-391 階段の内角 (下/上 x 欠けた象限), 392-395 閉じたドア (板の側) / 396-397 閉じたトラップドア (下/上)。形は 1 ブロックの 1/16 刻みの箱 4 個まで。面全体をふさぐ向きは floodfill が見る (shapeFaces) |
 | 1001-1255 | 光源 (光源インデックス = id - 1000) | 1001 たいまつ … 1062 トライアルスポナー |
 | 1257-1895 | 向きのある光源の東・南・西 (id = 1000 + 256 x 向き + 光源インデックス。向き 1 東 2 南 3 西。北は向きなしと同じ ID) | かまど・燻製器・溶鉱炉 (点灯) 1305 / 1561 / 1817、ジャック・オ・ランタン 1267 / 1523 / 1779 |
 | 2000-4095 | 色の付いた固体 (遮蔽・マテリアルは未登録の固体と同じ)。上の帯に無いブロックを平均の色ごとにまとめたもの | 羊毛・コンクリート・石・板材 (使用中は 2000-2351) |
@@ -284,7 +284,7 @@ lib/light/light_table_data.glsl  lightDefStatic(index)   (tools/id_tables.py か
 lib/light/light_table.glsl       shapeStatic(i) / tintStatic(i)   (正本)
         | setup.csh が起動時に評価
         v
-SSBO1 blockData.lightDefs[256] / shapes[128] / tints[128] / albedo[4096] / albedoUp[4096] (lib/ids/block_albedo.glsl から)
+SSBO1 blockData.lightDefs[256] / shapes[128] / tints[128] / shapeFaces[128] / albedo[4096] / albedoUp[4096] (lib/ids/block_albedo.glsl から)
         / lightMasks[384] (lib/light/light_mask_data.glsl から。データのある光源に LIGHT_FLAG_EMISSION_MASK を立てる)
         | 実行時 (lib/light/block_data.glsl)
         v

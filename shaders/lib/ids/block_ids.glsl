@@ -55,9 +55,9 @@ const int BLOCK_STAINED_GLASS_PANE = 230; // 230-245 (同順)
 
 const int BLOCK_SLAB_BOTTOM = 300;
 const int BLOCK_SLAB_TOP = 301;
+const int BLOCK_PANEL_OPEN_FIRST = 302; // 302-305 = 開いたドア・トラップドア (厚さ 3/16 の縦の板が北・東・南・西の側)
 const int BLOCK_LOW = 307;              // ベッド・石切台等の背の低いブロック
 const int BLOCK_SNOW_LAYER = 308;       // 積もった雪 1 層 (高さ 1/8)
-const int BLOCK_DOOR_CLOSED = 309;      // 閉じたドア・トラップドア (薄いが光は遮る)
 const int BLOCK_SNOW_LAYER_2 = 310;     // 310-316 = 積もった雪 2-8 層 (層の数 = ID - 308)
 const int BLOCK_SNOW_LAYER_8 = 316;
 const int BLOCK_STAIRS_FIRST = 320;     // 320-335 = 階段 (向き x 上下 x 外角の 16 通り。形は lib/light/light_table.glsl)
@@ -65,6 +65,10 @@ const int BLOCK_STAIRS_LAST = 335;
 const int BLOCK_FENCE_FIRST = 336;      // 336-351 = フェンス (接続の向き 16 通り: 北 1 東 2 南 4 西 8 の和。形は lib/light/light_table.glsl)
 const int BLOCK_WALL_FIRST = 352;       // 352-367 = 塀 (同じ接続の 16 通り)
 const int BLOCK_PANE_BARS_FIRST = 368;  // 368-383 = 鉄格子 (同じ接続の 16 通り)
+const int BLOCK_STAIRS_INNER_FIRST = 384; // 384-391 = 階段の内角 (上下 x 欠けた 1/4 の象限 北西・北東・南東・南西)
+const int BLOCK_STAIRS_INNER_LAST = 391;
+const int BLOCK_PANEL_CLOSED_FIRST = 392; // 392-397 = 閉じたドア (板が北・東・南・西の側) と閉じたトラップドア (下・上)
+const int BLOCK_PANEL_CLOSED_LAST = 397;
 
 const int BLOCK_LIGHT_BASE = 1000;      // 1001-1255 が光源 (光源インデックス = id - 1000)
 const int BLOCK_LIGHT_FACING_STRIDE = 256; // 向きのある光源は 1000 + 256 x 向き (1 東 2 南 3 西) + 光源インデックス

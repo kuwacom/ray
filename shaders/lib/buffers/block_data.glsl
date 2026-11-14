@@ -1,6 +1,6 @@
 /*
  * SSBO binding 1: ブロックデータ表 (setup.csh が起動時に 1 回だけ書く。以降は読み取り専用)
- * 確保: 65536 バイト (使用 61456、shaders.properties の bufferObject.1)
+ * 確保: 65536 バイト (使用 61968、shaders.properties の bufferObject.1)
  * 既定は readonly。書くプログラム (setup) は include の前に SSBO_BLOCK_DATA_WRITE を定義する
  */
 #ifndef BUFFERS_BLOCK_DATA_GLSL
@@ -34,10 +34,21 @@ struct LightDef {
 const uint BOX_BARS_PLANE_X = 1u << 30u; // 面 x = 0.5 (南北の腕)
 const uint BOX_BARS_PLANE_Z = 1u << 31u; // 面 z = 0.5 (東西の腕)
 
+// 遮蔽形状の箱 1 個 (lib/light/light_table.glsl の packBox) を 1/16 刻みの min, max に戻す。min > max は無効な箱
+void unpackShapeBox(uint p, out vec3 bmin, out vec3 bmax) {
+    bmin = vec3(uvec3(p & 31u, (p >> 5) & 31u, (p >> 10) & 31u)) * (1.0 / 16.0);
+    bmax = vec3(uvec3((p >> 15) & 31u, (p >> 20) & 31u, (p >> 25) & 31u)) * (1.0 / 16.0);
+}
+
 layout(std430, binding = 1) SSBO_BLOCK_DATA_ACCESS buffer BlockDataBuffer {
     LightDef lightDefs[LIGHT_TABLE_SIZE];
     uvec4 shapes[SHAPE_TABLE_SIZE]; // AABB 4 個: x/y/z/w = box0-3 (1/16 刻みの min xyz, max xyz を 5bit ずつ。min>max で無効)
     vec4 tints[TINT_TABLE_SIZE];    // rgb = 透過色 (線形), a = 不透明度
+    /*
+     * 遮蔽形状が面全体をふさぐ向き (bit i: 軸 i >> 1、i が偶数で +、奇数で -。floodfill の 6 近傍の順)
+     * floodfill はセル単位で伝わるので、ハーフブロックの床や閉じたドアの板の面ではここを見て光を渡さない
+     */
+    uint shapeFaces[SHAPE_TABLE_SIZE];
     uint initialized;
     /*
      * ボクセル ID ごとの平均の色 (sRGB 8bit を R | G << 8 | B << 16, lib/ids/block_albedo.glsl)

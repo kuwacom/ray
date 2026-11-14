@@ -73,7 +73,11 @@ const ivec3 workGroups = ivec3(1, 1, 1);
 void main() {
     int i = int(gl_LocalInvocationIndex);
     blockData.lightDefs[i] = lightDefStatic(i);
-    if (i < SHAPE_TABLE_SIZE) blockData.shapes[i] = shapeStatic(i);
+    if (i < SHAPE_TABLE_SIZE) {
+        uvec4 s = shapeStatic(i);
+        blockData.shapes[i] = s;
+        blockData.shapeFaces[i] = shapeCoveredFaces(s);
+    }
     if (i < TINT_TABLE_SIZE) blockData.tints[i] = tintStatic(i);
     for (int j = i; j < ALBEDO_TABLE_SIZE; j += 256) {
         blockData.albedo[j] = blockAlbedoPacked(j);
