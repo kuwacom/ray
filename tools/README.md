@@ -60,6 +60,7 @@ uv sync
 | `minescript/ray_steps.py` | 手順の中身 (コマンド実行、視点、撮影、シェーダー再読み込みなど)。ジョブごとに読み直すので、編集しても常駐側を再起動する必要はありません |
 | `mc.py` | ゲームの外から手順 (JSON 配列) を送り、結果と、その間に `latest.log` に出たシェーダー関連の行を表示します |
 | `run_scene.py` | `scenes.json` に書いた定点シーンを再現して撮影します |
+| `ab_scene.py` | 同じ場面に立ったまま、設定やパックのフォルダを替えて再読み込みと撮影を繰り返し、揺れの基準 (同じ版の 2 回の差)・前後の差・比較シートを出します |
 | `shader_options.py` | Iris の設定ファイル `<game>/shaderpacks/Ray.txt` を読み書きします |
 
 ## コンパイルを検証する
@@ -199,6 +200,19 @@ uv run tools/shader_options.py set GI_MODE=0 LIGHT_SHADOWS=false
 # 常駐を終わらせる
 uv run tools/mc.py --stop
 ```
+
+`mc.py` の結果には、ステップごとにかかった秒 (`sec`) が入ります。常駐がジョブを 10 秒受け取らないときは、`--timeout` まで待たずに止まります
+
+設定や版の違いを比べるときは `ab_scene.py` を使うと、場面の準備 (テレポート・召喚・待ち) が 1 回で済みます。版ごとに再読み込みして撮り、2 周目は逆の順 (A B B A) で撮ります
+
+```powershell
+# 始めの Ray.txt (base) と、雲を消したもの (c0) を noon と water_noon で比べる
+uv run tools/ab_scene.py noon water_noon --variant base= --variant c0=CLOUDS=0 --tag cl --out ab_cl
+# パックのフォルダ (shaderpacks/Ray のジャンクションの先) を替えて比べ、frame_ms も測る
+uv run tools/ab_scene.py noon --variant old=dir:<フォルダ> --variant new=dir:<フォルダ> --fps 4 --out ab_ver
+```
+
+再読み込みから撮影までの待ち (`--settle`) は既定 6 秒です (昼・夜とも、再読み込みの後は約 3 秒で画面の明るさが 1% 以内に落ち着きます)。`--out` に、差の表と frame_ms と時間の report.md と、シーンごとの比較シート (版を並べ、差を 8 倍した画像を添える) を書きます。前後の差が揺れの基準と同じ程度なら、見た目は変わっていません
 
 `run_scene.py` は、各シーンの撮影の直前と後片付けの後に、落ちたアイテムと経験値オーブを消します (`tag=ray` のものは残す)。後片付けの間はブロックのドロップを止めるので、壊したたいまつなどが光源として写り込みません
 
