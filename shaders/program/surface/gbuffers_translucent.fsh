@@ -170,7 +170,7 @@ vec3 forwardDiffuse(Material m, vec3 playerPos, vec3 normal, vec3 geoNormal, vec
     // 太陽 -> 手持ち -> 空とブロックライト -> 手持ちの照り返し に分けて集め、拡散を掛ける順番を保つ
     // (まとめて 1 回で集めると、手持ち光源のトレースが太陽の拡散より前に並んでドライバの出す命令の並びが変わる)
 #ifdef GBUF_FORWARD_OPAQUE
-    // ビンの光源 (SL_BLOCK_FORWARD_ENTITY) と装備の光源ごとの鏡面もトレースするので、トレースを 1 か所にするため手持ち光源と同じ呼び出しで集める
+    // ビンの光源 (SL_BLOCK_FORWARD_ENTITY) と装備の光源ごとの鏡面は、トレースを 1 か所にするため手持ち光源と同じ呼び出しで集める
     const int tracedBlockMode = SL_BLOCK_FORWARD_ENTITY;
     const uint tracedTerms = SL_HAND | SL_BLOCK_SPECULAR_TRACED;
     const int ambientBlockMode = SL_BLOCK_NONE;

@@ -75,7 +75,7 @@ const float FORWARD_ENTITY_BOUNCE = 0.5;
  * 1 光源分の影を掛ける前の直接光 (戻り値)・影を掛けない光る箱の照度 box・照り返し bounceE
  * vis = blockLightShadow(トレースの可視率) として、直接光は 戻り値 x vis + box、照り返しは bounceE x vis を足す
  * トレースはビンの枠の順 (k の昇順) に、光の届く光源を FORWARD_TRACED_LIGHTS 個まで。ループは lib/surface/surface_lights.glsl の
- * gatherTracedLights (手持ち光源・鏡面と同じ 1 か所でトレースする)
+ * gatherBlockTracedLights (鏡面と同じ 1 か所でトレースする)
  * 半影の揺らぎは入れない (この経路はデノイズも TAA の速度も無いので、ノイズがそのまま残る)
  */
 vec3 forwardEntityLightUnshadowed(LightInstance L, vec3 fromVoxel, vec3 normal, vec3 geoNormal, out vec3 box, out vec3 bounceE) {
@@ -106,7 +106,7 @@ const int BLOCKLIGHT_SPECULAR_LIGHTS = LIGHT_SPECULAR_COUNT;
  * 光源ごとの可視率は無いので、deferred2 の可視率 (colortex7, トレースした光源全体の比) を共通に掛ける。
  * 体積の端ではフォールバックと同じ割合で弱める
  * colortex7 は不透明面の可視率なので、水・ガラスなど半透明の面は光源ごとにトレースして可視率を出す
- * (lib/surface/surface_lights.glsl の gatherTracedLights。選び方と LightSample はここの関数を使う)
+ * (lib/surface/surface_lights.glsl の gatherBlockTracedLights。選び方と LightSample はここの関数を使う)
  */
 #if defined LIGHT_SPECULAR && defined LIGHT_SHADOWS
 // 照度の大きい順の枠の番号を topIdx に入れる (足りない枠は -1)。光源の選び方は deferred1 と同じ (幾何法線で地平線の下の光源を除く)

@@ -393,7 +393,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 - 画素によらない値 (光源の定義から求める届く距離・放射・半径、揺らぎ、位置と壁の中なら目へ戻した位置) は deferred_a が毎フレーム 1 回求めて FrameData.handLights に置き、画素ごとの関数は `handLightAt` で読むだけ (呼ぶ所ごとに数百行の展開になっていたため)。今フレームのボクセルを読むので shadow の後の deferred_a で書き、読むのは deferred10 以降
 - 影: HAND_LIGHT_RAYS = DDA (自分のビットは無視)、HAND_LIGHT_SS_SHADOWS = 深度バッファの短いレイ (手・武器・近くのモブ)。両方掛けると「壁 + エンティティ」の両方が遮る
 - ピクセルごとの直接計算で floodfill には注入しない (二重加算防止)。フォグへの寄与は composite19.fsh が戻す前の手の位置 (`handLightAt` の handPos) から点光源の内散乱を視線に沿って解析積分して足す (影は無視。水中は水の吸収と散乱で弱まるので、角度を等分した数値積分にする)
-- 受け渡し: `getHandLights(playerPos, geoNormal, dither, out mainHand, out offHand)` が `LightSample` を返す。設置光源もトレースする所 (前方シェーディングの不透明物・半透明の面の鏡面) は surface の `gatherTracedLights` (`lib/surface/surface_lights.glsl`) が、手持ち光源・光源ごとの鏡面・前方シェーディングのビンの光源を 1 本のループで回し、ボクセルのトレースを 1 か所で呼んで `LightSample` を返す (NVIDIA は関数を全部展開するので、トレースを呼ぶ所の数だけリンクが延びる)
+- 受け渡し: `getHandLights(playerPos, geoNormal, dither, out mainHand, out offHand)` が `LightSample` を返す。設置光源のトレース (前方シェーディングの不透明物・半透明の面の鏡面) は surface の `gatherBlockTracedLights` (`lib/surface/surface_lights.glsl`) が、光源ごとの鏡面と前方シェーディングのビンの光源を 1 本のループで回し、ボクセルのトレースを 1 か所で呼ぶ (NVIDIA は関数を全部展開するので、トレースを呼ぶ所の数だけリンクが延びる)。手持ち光源は別 (`getHandLights`): フラグがエンティティの遮蔽を含むので同じループに混ぜると、設置光源のトレースの 1 ステップごとにエンティティの判定が実行時に残り、半透明のエンティティなどが遅くなった
 
 ### ドロップ・投擲・燃焼・発光エンティティ
 
@@ -622,9 +622,8 @@ light モジュールが提供 (`//@include "/lib/light/light.glsl"`):
 | `vec3 getBlockLightOpaque(ivec2 texel, vec3 playerPos, vec3 geoNormal, vec3 normal, float lm)` | surface (`gatherSurfaceLights`) | 不透明面のブロックライト照度 (直接 + 間接 + 体積外フォールバック) |
 | `vec3 getBlockLightForward(vec3 playerPos, vec3 normal, float lm)` | surface (`gatherSurfaceLights`)、パーティクル・雨 | トレースなし版 |
 | `int getBlockLightSpecular(ivec2 texel, vec3 playerPos, vec3 geoNormal, out LightSample s[BLOCKLIGHT_SPECULAR_LIGHTS])` | surface (`gatherSurfaceLights`) | 不透明面のブロックライトの鏡面用の光 (個数を返す。可視率は colortex7) |
-| `selectBlockSpecularLights` / `blockSpecularSample` / `forwardEntityLightUnshadowed` / `forwardEntityBlockLight` | surface (`gatherTracedLights`) | 光源ごとにトレースする鏡面 (半透明の面) と、前方シェーディングのビンの光源の部品。トレースは呼ぶ側の 1 か所 |
-| `void getHandLights(vec3 playerPos, vec3 geoNormal, float dither, out LightSample mainHand, out LightSample offHand)` | surface (`gatherSurfaceLights`。設置光源をトレースしない時) | 両手の光 |
-| `bool handLightUnshadowed(bool mainHand, vec3 playerPos, vec3 geoNormal, out LightSample s, out HandShadowRay r)` / `handShadowTarget` / `applyHandLightTrace` / `applyHandLightContactShadow` / `int handLightCount()` | surface (`gatherTracedLights`) | 影の前の手の光、トレースの終点とフラグ、影の掛け方。トレースは呼ぶ側の 1 か所 |
+| `selectBlockSpecularLights` / `blockSpecularSample` / `forwardEntityLightUnshadowed` / `forwardEntityBlockLight` | surface (`gatherBlockTracedLights`) | 光源ごとにトレースする鏡面 (半透明の面) と、前方シェーディングのビンの光源の部品。トレースは呼ぶ側の 1 か所 |
+| `void getHandLights(vec3 playerPos, vec3 geoNormal, float dither, out LightSample mainHand, out LightSample offHand)` | surface (`gatherSurfaceLights`) | 両手の光 |
 | `HandLight handLightAt(bool mainHand)` | surface (lighting の 2 次ヒット)、sky (composite19 の手持ち光源のフォグ) | 手持ち光源の画素によらない値 (位置・届く距離・放射・揺らぎ・戻す前の手の位置・半径)。frameData.handLights を読むだけ |
 | `vec3 getHandLightPosition(bool mainHand)` / `getHandLightPositionSafe` | light 内部 (deferred_a の `handLightsStore`) | 手持ち光源の player 空間位置 (Safe は固体ブロックの中なら目へ戻す) |
 | `vec3 sampleFloodfill(vec3 playerPos, vec3 normal)` / `vec3 sampleFloodfillVolume(vec3 playerPos)` / `float floodCoverage(vec3 playerPos)` | surface (GI), sky | floodfill 照度 |
