@@ -169,8 +169,8 @@ const float METAL_SMOOTHNESS_MAX = 0.72;
 const float METAL_PART_SMOOTHNESS_MIN = 0.55;
 const float METAL_PART_SMOOTHNESS_MAX = 0.65;
 // 置いたブロックの金属の部分 (金床・ランタン・鎖・ホッパー・大釜など) は鋳物や塗装の鈍い面。道具と同じ範囲では景色と太陽が強く映ってテカテカに見えた
-const float METAL_BLOCK_PART_SMOOTHNESS_MIN = 0.4;
-const float METAL_BLOCK_PART_SMOOTHNESS_MAX = 0.5;
+const float METAL_BLOCK_PART_SMOOTHNESS_MIN = 0.35;
+const float METAL_BLOCK_PART_SMOOTHNESS_MAX = 0.45;
 
 // 金属の質感 (鉄・銅のブロックなど)。f0 = 1.0 は labPBR の「アルベドを F0 に使う金属」
 SurfaceParams metalSurfaceParams(vec3 albedoSrgb, float smoothnessMin, float smoothnessMax) {
