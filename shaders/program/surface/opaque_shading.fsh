@@ -109,6 +109,8 @@ in vec2 texcoord;
 layout(location = 0) out vec4 outColor;
 
 const float AO_BLOCKLIGHT_WEIGHT = 0.5;
+// G バッファで法線を上向きに固定した植物とみなす幾何法線の y (符号化の誤差の分だけ 1 より下げる)
+const float PLANT_UP_NORMAL_Y = 0.99;
 // GI が空の光を運ぶ時 (GI_TRACES_SKY): テクスチャ法線の凹凸の戻し方の範囲、GTAO を掛ける割合
 const float GI_NORMAL_DETAIL_MIN = 0.5;
 const float GI_NORMAL_DETAIL_MAX = 1.5;
@@ -289,13 +291,19 @@ void main() {
 
     // 手持ち光源・ブロックライトの鏡面
     sp.sunFade = L.sunShadow.fade;
-    SurfaceLights H = gatherSurfaceLights(sp, SL_SUN_NONE, SL_BLOCK_NONE, SL_HAND);
+    // 上向きに固定した植物の法線は、手持ち光源にだけ両面として光源の側へ裏返す (影のトレースの始点も同じ側)
+    SurfacePoint hp = sp;
+    bool upPlant = (g.materialId == MAT_PLANT || g.materialId == MAT_UNDERWATER_PLANT) && g.geoNormal.y > PLANT_UP_NORMAL_Y;
+    vec3 handN = upPlant ? handLightTwoSidedNormal(g.normal, playerPos) : g.normal;
+    hp.normal = handN;
+    if (upPlant) hp.geoNormal = handN;
+    SurfaceLights H = gatherSurfaceLights(hp, SL_SUN_NONE, SL_BLOCK_NONE, SL_HAND);
 #ifdef SSS
-    color += directLight(m, g.normal, V, H.handMain, puddleVar, 1.0, 1.0, SPECULAR_BLOCK_STRENGTH, specSum) + evalTranslucency(m, g.normal, V, H.handMain) * SSS_STRENGTH;
-    color += directLight(m, g.normal, V, H.handOff, puddleVar, 1.0, 1.0, SPECULAR_BLOCK_STRENGTH, specSum) + evalTranslucency(m, g.normal, V, H.handOff) * SSS_STRENGTH;
+    color += directLight(m, handN, V, H.handMain, puddleVar, 1.0, 1.0, SPECULAR_BLOCK_STRENGTH, specSum) + evalTranslucency(m, handN, V, H.handMain) * SSS_STRENGTH;
+    color += directLight(m, handN, V, H.handOff, puddleVar, 1.0, 1.0, SPECULAR_BLOCK_STRENGTH, specSum) + evalTranslucency(m, handN, V, H.handOff) * SSS_STRENGTH;
 #else
-    color += directLight(m, g.normal, V, H.handMain, puddleVar, 1.0, 1.0, SPECULAR_BLOCK_STRENGTH, specSum);
-    color += directLight(m, g.normal, V, H.handOff, puddleVar, 1.0, 1.0, SPECULAR_BLOCK_STRENGTH, specSum);
+    color += directLight(m, handN, V, H.handMain, puddleVar, 1.0, 1.0, SPECULAR_BLOCK_STRENGTH, specSum);
+    color += directLight(m, handN, V, H.handOff, puddleVar, 1.0, 1.0, SPECULAR_BLOCK_STRENGTH, specSum);
 #endif
     SurfaceLights S = gatherSurfaceLights(sp, SL_SUN_NONE, SL_BLOCK_NONE, SL_BLOCK_SPECULAR);
     for (int j = 0; j < S.blockSpecCount; j++) directSpecular(m, g.normal, V, S.blockSpec[j], puddleVar, SPECULAR_BLOCK_STRENGTH, specSum);

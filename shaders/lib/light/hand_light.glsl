@@ -38,7 +38,7 @@ const float HAND_SS_LENGTH = 4.0;
 const int HAND_SS_STEPS = 12;
 // 一人称で手そのもの (カメラの直近) を受光面とみなす距離。ここでは影を計算しない
 const float HAND_SELF_DIST = 0.9;
-const float HAND_BACKFACE_COS = -0.2;  // 光源に背を向けた面の影を計算しない cos の下限
+const float HAND_BACKFACE_COS = -0.2;  // 光源に背を向けた面とみなす幾何法線の cos の上限
 const float HAND_SS_END_MARGIN = 0.4;  // 画面空間の影を光源の手前で止める距離 (ブロック)
 const float HAND_DISK_PHASE_SCALE = 7.31;
 const float HAND_DISK_PHASE_OFFSET = 0.27;
@@ -143,8 +143,12 @@ LightSample evalHandLight(bool mainHand, vec3 playerPos, vec3 geoNormal, float d
     s.irradiance = h.emission * lightFalloff(dist, h.range) * HAND_LIGHT_BRIGHTNESS * h.flicker;
 
     // 一人称の手そのものはカメラの直近なので影を計算しない (自分の腕で遮ってしまう)
-    bool isSelf = firstPersonCamera && length(playerPos) < HAND_SELF_DIST;
-    if (isSelf || dot(geoNormal, s.direction) <= HAND_BACKFACE_COS) return s;
+    if (firstPersonCamera && length(playerPos) < HAND_SELF_DIST) return s;
+    /*
+     * 光源に背を向けた面は自分のブロックの影なので 0 にする。影なしで返すと、透過 (evalTranslucency) と
+     * 自動法線で NoL が正に残る画素が、間のブロックを抜けて光った。影を追うと背面の画素の分だけ重くなる
+     */
+    if (dot(geoNormal, s.direction) <= HAND_BACKFACE_COS) return noLight();
 
 #ifdef HAND_LIGHT_RAYS
     vec3 fromVoxel = playerToVoxel(playerPos + geoNormal * TRACE_NORMAL_OFFSET);
@@ -189,6 +193,17 @@ LightSample evalHandLight(bool mainHand, vec3 playerPos, vec3 geoNormal, float d
     }
 #endif
     return s;
+}
+
+/*
+ * 法線を上向きに固定した植物 (十字の草・つた・花など。gbuffers_solid の isPlant) に手持ち光源を当てる時の法線
+ * 上向きのままでは目より上の植物は光源が裏になり、拡散と照り返しが 0 で透過だけになって、
+ * 同じ距離の足元の草と明るさが食い違った。薄い両面の面なので、光らせる手の側へ裏返す (太陽・空は上向きのまま)
+ * 両手の位置の差は 0.4 ブロック程度で、向きが分かれるのは NoL がほぼ 0 の高さだけなので、光る方の手 1 つで決める
+ */
+vec3 handLightTwoSidedNormal(vec3 n, vec3 playerPos) {
+    vec3 lightPos = frameData.handLights[heldBlockLightValue > 0 ? 0 : HAND_LIGHT_SLOTS].xyz;
+    return dot(n, lightPos - playerPos) < 0.0 ? -n : n;
 }
 
 /*
