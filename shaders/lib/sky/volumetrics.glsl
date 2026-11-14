@@ -151,9 +151,10 @@ vec2 vlFarScreenVisibility(vec3 dir, float nearDist, float farDist, float dither
  * 空気中のフォグ (全ディメンション)。endDist: 地形 (空なら描画距離) までの距離
  * farVisibility: 影マップの範囲の外にある遮蔽物による太陽の見え方 (画面空間の光芒。無ければ 1)
  *   x = 範囲より遠い区間の点、y = 範囲内の点 (範囲内の点も、影マップに写らない遠い壁や山には遮られる)
- * 戻り値: rgb = 内散乱, a = 透過率 (灰色)
+ * aerial: 空中遠近を掛ける画素 (空以外)。空中遠近 (composite19) の内散乱は影を見ないので、視線上の影の分をここで引く
+ * 戻り値: rgb = 内散乱 (空中遠近の影の分を引いた後), a = 透過率 (灰色)
  */
-vec4 marchAirFog(vec3 dir, float endDist, float dither, vec2 farVisibility) {
+vec4 marchAirFog(vec3 dir, float endDist, float dither, vec2 farVisibility, bool aerial) {
     FogLighting fl = fogLightingSetup(dir);
     float outdoor = 1.0 - getCaveFactor();
 #ifdef CAVE_LEAK_PREVENTION
@@ -184,6 +185,11 @@ vec4 marchAirFog(vec3 dir, float endDist, float dither, vec2 farVisibility) {
 
     vec3 scattering = vec3(0.0);
     float transmittance = 1.0;
+#if defined HAS_SKY
+    // 空中遠近の光学的深さの重み (写像した距離) と、そのうち日陰の分
+    float aerialWeight = 0.0;
+    float aerialShaded = 0.0;
+#endif
     float tPrev = 0.0;
     for (int i = 0; i < VL_SAMPLES; i++) {
         float tNext = vlStepDistance(float(i + 1) / float(VL_SAMPLES), marchEnd);
@@ -219,6 +225,9 @@ vec4 marchAirFog(vec3 dir, float endDist, float dither, vec2 farVisibility) {
 #if defined HAS_SKY
         // もやは空の色から影の分を引き (fogHazeRadiance)、霧は太陽と空の光で照らす
         float sunShadow = luminance(shadow) * sunVisibility;
+        float aerialStep = fogScenicStretch(t, invD) * dt;
+        aerialWeight += aerialStep;
+        aerialShaded += aerialStep * (1.0 - saturate(sunShadow));
         vec3 hazeLight = fogHazeRadiance(fl, sunShadow, ambientVisibility);
         vec3 mistLight = (fl.light * shadow * (fl.phaseMist * sunVisibility * FOG_VL_STRENGTH) + fl.ambient * ambientVisibility) * FOG_ALBEDO;
         vec3 light = (density.x * hazeLight + density.y * mistLight) / extinction;
@@ -240,7 +249,25 @@ vec4 marchAirFog(vec3 dir, float endDist, float dither, vec2 farVisibility) {
         vec4 rest = fogAnalyticSegment(dir, marchEnd, endDist, fl, farSunVisibility, outdoor);
         scattering += transmittance * rest.rgb;
         transmittance *= rest.a;
+#if defined HAS_SKY
+        float restWeight = fogScenicDistance(endDist, invD) - fogScenicDistance(marchEnd, invD);
+        aerialWeight += restWeight;
+        aerialShaded += restWeight * (1.0 - saturate(farSunVisibility));
+#endif
     }
+#if defined HAS_SKY
+    /*
+     * 空中遠近は地形の色を同じ方位の空の色へ溶かすだけで影を見ない。夕日の方位の空の色は太陽の暈で明るく、
+     * 森や壁の陰を通る視線でも奥が地平線の橙に光った。もやと同じく、日陰の区間の割合だけ影の中の値まで下げる
+     * composite19 は空中遠近の後にこの透過率を掛けるので、引く分にも透過率を掛ける
+     */
+    if (aerial && aerialWeight > 0.0) {
+        float outdoorScale = mix(AERIAL_OUTDOOR_MIN, 1.0, outdoor);
+        vec3 aerialT = exp(-fogAerialExtinction(cameraPosition.y, cameraPosition.y + dir.y * endDist) * fogScenicDistance(endDist, invD) * outdoorScale);
+        vec3 shadedLoss = max(fl.air * outdoor - fogHazeRadiance(fl, 0.0, outdoor), 0.0);
+        scattering -= transmittance * shadedLoss * (1.0 - aerialT) * (aerialShaded / aerialWeight);
+    }
+#endif
     return vec4(scattering, transmittance);
 }
 

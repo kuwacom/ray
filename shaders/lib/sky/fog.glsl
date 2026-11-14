@@ -85,6 +85,8 @@ const float FOG_ALBEDO = 0.95;
 // 空中遠近を実際の大気の何倍の濃さで掛けるか (描画距離は数百ブロックしかないので誇張する)
 const float AERIAL_PERSPECTIVE_SCALE = 10.0;
 const float AERIAL_PERSPECTIVE_RAIN = 1.5;
+// 洞窟の中の空中遠近の濃さの倍率 (遠い洞窟の壁が霞みすぎないように)
+const float AERIAL_OUTDOOR_MIN = 0.2;
 // 描画距離に対する割合。端の霞みは景色の成分の写像 (FOG_EDGE_DEPTH) が作り、その先は虚空 (skyBelowHorizon) が同じ式で続けるので、
 // 端のフォグは地形の切れ目を隠すだけにする
 const float BORDER_FOG_START = 0.95;
@@ -110,6 +112,10 @@ const float FOG_SCENIC_MAX_STRETCH = 20.0;
 const float FOG_HAZE_SUN_SHARE = 0.8;
 // 影の中のもやに残す空の色の割合の下限
 const float FOG_HAZE_SHADOW_FLOOR = 0.1;
+// 影の中のもやの明るさの上限 (等方に入る空の光に対する倍率)。夕方は太陽から離れた方位の影の中の値はこれより小さく、太陽の周りだけで効く
+const float FOG_HAZE_SHADOW_AMBIENT = 1.0;
+// 上限を超えた割合に対する、空の光の色へ寄せる速さ (1 では上限の 2 倍でも半分しか寄らず、赤橙の帯が残った)
+const float FOG_HAZE_SHADOW_HUE = 3.0;
 // 日の当たるもやと霧の太陽の分の強さ (光芒の強さ x スタイルの前方の輝き)
 #define FOG_VL_STRENGTH float(optVlStrength * FS_FORWARD)
 // もやの上端の柔らかさ (テンプレート x スタイル)
@@ -457,7 +463,19 @@ FogLighting fogLightingSetup(vec3 dir) {
  */
 vec3 fogHazeRadiance(FogLighting fl, float sunVisibility, float ambientVisibility) {
     vec3 lit = fl.air * ambientVisibility + fl.airSun * (sunVisibility * FOG_VL_STRENGTH - 1.0);
-    return max(lit, fl.air * (FOG_HAZE_SHADOW_FLOOR * ambientVisibility));
+    vec3 floorLit = fl.air * (FOG_HAZE_SHADOW_FLOOR * ambientVisibility);
+    /*
+     * 影の中の値は等方に入る空の光 (霧の ambient) の FOG_HAZE_SHADOW_AMBIENT 倍で頭打ちにする
+     * 太陽の方位の空の色は太陽の前方散乱の暈がほとんどで、引く分を空の色の FOG_HAZE_SUN_SHARE に留めると、
+     * 森や壁の陰の空気が夕日の方位で地平線の橙に光った。日の当たる所 (sunVisibility 1) は変えない
+     */
+    vec3 shadowed = max(fl.air * ambientVisibility - fl.airSun, floorLit);
+    vec3 ambientLit = fl.ambient * (FOG_ALBEDO * FOG_HAZE_SHADOW_AMBIENT * ambientVisibility);
+    float cap = luminance(ambientLit);
+    float over = max(1.0 - cap / max(luminance(shadowed), 1e-9), 0.0);
+    // 明るさだけ縮めると夕日の方位の赤橙が残って帯に見えたので、上限を大きく超えるほど空の光の色へ寄せる (境では元の色)
+    vec3 capped = mix(shadowed * (1.0 - over), ambientLit, saturate(over * FOG_HAZE_SHADOW_HUE));
+    return max(lit, floorLit) - (shadowed - capped) * (1.0 - saturate(sunVisibility));
 }
 
 /*
@@ -536,7 +554,7 @@ vec3 applyAerialPerspective(vec3 color, vec3 playerPos) {
     vec3 dir = playerPos / max(dist, EPS);
     vec3 extinction = fogAerialExtinction(cameraPosition.y, cameraPosition.y + playerPos.y);
     float outdoor = 1.0 - getCaveFactor();
-    vec3 transmittance = exp(-extinction * fogScenicDistance(dist, fogScenicInvD()) * mix(0.2, 1.0, outdoor));
+    vec3 transmittance = exp(-extinction * fogScenicDistance(dist, fogScenicInvD()) * mix(AERIAL_OUTDOOR_MIN, 1.0, outdoor));
     return color * transmittance + fogAirRadiance(dir) * (1.0 - transmittance) * outdoor;
 #else
     return color;

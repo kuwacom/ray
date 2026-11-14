@@ -268,7 +268,8 @@ void main() {
         sunVisibility *= farSunHiddenShade(dir);
         vec4 fog = fogAnalyticSegment(dir, 0.0, dist, fogLightingSetup(dir), sunVisibility, max(outdoor, 0.05));
 #endif
-        color = color * fog.a + fog.rgb;
+        // VL の内散乱は空中遠近の影の分を引いてあり、深度の境で低解像度の値が隣の画素から来ると負になりうる
+        color = max(color * fog.a + fog.rgb, 0.0);
         sparkle *= fog.a;
 #if defined HAS_SKY
         vec2 localDensity = fogDensityAt(vec3(0.0), fogMedium());

@@ -148,7 +148,7 @@ void main() {
 #else
             vec2 farVisibility = vec2(farSunHiddenShade(dir));
 #endif
-            raw = marchAirFog(dir, dist, dither, farVisibility);
+            raw = marchAirFog(dir, dist, dither, farVisibility, !isSky);
         }
     }
 
