@@ -90,4 +90,5 @@ def main() -> None:
     sys.exit(subprocess.call(cmd, env=os.environ.copy()))
 
 
-main()
+if __name__ == "__main__":
+    main()

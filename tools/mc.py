@@ -15,6 +15,9 @@ import sys
 import time
 from pathlib import Path
 
+# ray_agent が cmd.json を受け取るまでの上限 (agent の見回りは 0.5 秒ごと)
+PICKUP_SEC = 10.0
+
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
@@ -47,25 +50,24 @@ def shader_log_tail(game_dir: Path, since_size: int, limit: int) -> list[str]:
     return hits[-limit:]
 
 
-def main() -> None:
-    args = parse_args()
-    if not args.game_dir:
-        raise SystemExit("--game-dir か RAY_MC_DIR を指定する")
-    game_dir = Path(args.game_dir)
+def send_job(game_dir: Path, job: dict, timeout: float, log_lines: int = 15) -> tuple[dict, list[str]]:
+    """
+    ### send_job
+    ray_agent にジョブを渡して終わるまで待つ
+
+    @param game_dir - ゲームディレクトリ
+    @param job - {"steps": [...]} か {"stop": true}。id はここで付ける
+    @param timeout - 待つ秒。超えたら {"timeout": true, "last_status": ...} を返す
+    @param log_lines - ジョブ中に latest.log へ出たシェーダー関連の行を何行まで返すか
+    @returns (status.json の内容, シェーダー関連の行)
+    """
     ray_dir = game_dir / "minescript" / "ray"
     ray_dir.mkdir(parents=True, exist_ok=True)
     cmd_path = ray_dir / "cmd.json"
     status_path = ray_dir / "status.json"
 
     job_id = f"{time.time():.3f}"
-    job: dict = {"id": job_id}
-    if args.stop:
-        job["stop"] = True
-    else:
-        if not args.steps:
-            raise SystemExit("steps を指定する")
-        job["steps"] = load_steps(args.steps)
-        job["continue_on_error"] = args.continue_on_error
+    job = {"id": job_id, **job}
 
     log_path = game_dir / "logs" / "latest.log"
     log_size = log_path.stat().st_size if log_path.exists() else 0
@@ -74,25 +76,49 @@ def main() -> None:
     tmp.write_text(json.dumps(job, ensure_ascii=False), encoding="utf-8")
     os.replace(tmp, cmd_path)
 
-    deadline = time.time() + args.timeout
+    t0 = time.time()
+    deadline = t0 + timeout
     status: dict = {}
+    picked = False
     while time.time() < deadline:
         time.sleep(0.3)
         try:
             status = json.loads(status_path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
+        picked = picked or status.get("id") == job_id
         if status.get("id") == job_id and status.get("state") not in ("running",):
             break
+        # ray_agent は 0.5 秒ごとに cmd.json を見て、受け取るとすぐ running を書く。受け取らないまま timeout まで待たない
+        if not picked and time.time() - t0 > PICKUP_SEC:
+            return {"timeout": True, "not_picked_up": True, "last_status": status,
+                    "hint": "ray_agent が受け取らない (落ちているか、前のジョブが実行中)"}, []
     else:
-        print(json.dumps({"timeout": True, "last_status": status}, ensure_ascii=False, indent=1))
-        sys.exit(2)
+        return {"timeout": True, "last_status": status}, []
 
+    logs = shader_log_tail(game_dir, log_size, log_lines) if log_path.exists() and log_lines > 0 else []
+    return status, logs
+
+
+def main() -> None:
+    args = parse_args()
+    if not args.game_dir:
+        raise SystemExit("--game-dir か RAY_MC_DIR を指定する")
+    if args.stop:
+        job: dict = {"stop": True}
+    else:
+        if not args.steps:
+            raise SystemExit("steps を指定する")
+        job = {"steps": load_steps(args.steps), "continue_on_error": args.continue_on_error}
+
+    status, logs = send_job(Path(args.game_dir), job, args.timeout, args.log_lines)
     print(json.dumps(status, ensure_ascii=False, indent=1))
-    if log_path.exists() and args.log_lines > 0:
-        for ln in shader_log_tail(game_dir, log_size, args.log_lines):
-            print("LOG:", ln[:300])
+    if status.get("timeout"):
+        sys.exit(2)
+    for ln in logs:
+        print("LOG:", ln[:300])
     sys.exit(0 if status.get("ok") else 1)
 
 
-main()
+if __name__ == "__main__":
+    main()
