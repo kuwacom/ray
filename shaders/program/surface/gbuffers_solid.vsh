@@ -105,8 +105,14 @@ out vec4 tangentPlayer;
 out vec2 tileMid;
 out vec2 tileHalf;
 flat out int blockId;
+#ifdef GBUF_ENTITIES
+    flat out int swirlLayer;
+#endif
 
 const float MID_UV_FIXED_SCALE = 32768.0;
+#ifdef GBUF_ENTITIES
+    const float SWIRL_TEXTURE_MATRIX_EPS = 1e-6;
+#endif
 
 void main() {
     texcoord = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy;
@@ -146,6 +152,14 @@ void main() {
 #endif
 
 #ifdef GBUF_ENTITIES
+    /*
+     * 帯電したクリーパー・ウィザーの電気の渦の層は、UV をテクスチャ行列でずらして流す
+     * gbuffers_entities で来るもののうちテクスチャ行列を使うのはこの層だけなので、単位行列でないことで見分ける
+     */
+    mat4 texMatOffset = gl_TextureMatrix[0] - mat4(1.0);
+    vec4 texMatDiff = abs(texMatOffset[0]) + abs(texMatOffset[1]) + abs(texMatOffset[2]) + abs(texMatOffset[3]);
+    swirlLayer = dot(texMatDiff, vec4(1.0)) > SWIRL_TEXTURE_MATRIX_EPS ? 1 : 0;
+
     // 画面内のエンティティ光源を登録 (4 頂点に 1 回で十分。重複は light モジュール側で排除される)
     if ((gl_VertexID & 3) == 0) injectEntityLight(viewToPlayer(viewPos), entityId, currentRenderedItemId, entityColor);
 #endif

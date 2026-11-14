@@ -11,6 +11,9 @@
 //@include "/lib/surface/surface.glsl"
 //@include "/lib/surface/generated_normal.glsl"
 //@include "/lib/post/post.glsl"
+#ifdef GBUF_ENTITIES
+    //@include "/lib/common/exposure.glsl"
+#endif
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -59,6 +62,9 @@
 #include "/lib/post/velocity.glsl"
 #include "/lib/post/tonemap.glsl"
 #include "/lib/post/post.glsl"
+#ifdef GBUF_ENTITIES
+    #include "/lib/common/exposure.glsl"
+#endif
 // END GENERATED includes
 
 in vec2 texcoord;
@@ -70,6 +76,9 @@ in vec4 tangentPlayer;
 in vec2 tileMid;
 in vec2 tileHalf;
 flat in int blockId;
+#ifdef GBUF_ENTITIES
+    flat in int swirlLayer;
+#endif
 
 #ifdef GBUF_HAND
 /*
@@ -77,6 +86,13 @@ flat in int blockId;
  * 手は深度では勝つが半透明の層を消さないので、composite2 が手の上に重ねる。手の画素では両方を空に戻す
  */
 /* RENDERTARGETS: 1,2,3,15,4,5 */
+#elif defined GBUF_ENTITIES
+/*
+ * 電気の渦の層 (帯電したクリーパー・ウィザーの防壁) は加算ブレンドの層なので、バニラが半透明の物と一緒に deferred の後に描く
+ * G バッファへ書いても deferred が読み終わっていて映らないので、colortex4 へ加算する (shaders.properties の blend)
+ * 渦でない画素は 0 を書いて何も足さない
+ */
+/* RENDERTARGETS: 1,2,3,15,4 */
 #else
 /* RENDERTARGETS: 1,2,3,15 */
 #endif
@@ -87,6 +103,8 @@ layout(location = 3) out vec4 outVelocity;
 #ifdef GBUF_HAND
 layout(location = 4) out vec4 outTranslucentClear;
 layout(location = 5) out vec4 outTranslucentDataClear;
+#elif defined GBUF_ENTITIES
+layout(location = 4) out vec4 outSwirl;
 #endif
 
 #if PBR_FORMAT == 1 && !defined GBUF_BASIC && !defined GBUF_LINE
@@ -507,6 +525,9 @@ void main() {
 
 #if defined GBUF_ENTITIES
     outVelocity = encodeVelocity(viewPos);
+    // バニラの渦は光を受けない加算 (テクスチャ x 頂点色) なので、光源ブロックの発光と同じ明るさの単位で足す
+    outSwirl = vec4(0.0);
+    if (swirlLayer != 0) outSwirl.rgb = srgbToLinear(albedoDry) * (getVisibleEmissionLuminance() * EMISSION_STRENGTH);
 #elif defined GBUF_HAND
     outVelocity = encodeHandVelocity();
     outTranslucentClear = vec4(0.0);
