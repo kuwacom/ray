@@ -95,12 +95,14 @@ layout(location = 5) out vec4 outTranslucentDataClear;
 #if defined POM && defined USE_LABPBR && defined GBUF_TERRAIN
     #define USE_POM
 #endif
-#if defined GENERATED_NORMALS && PBR_FORMAT == 0 && (defined GBUF_TERRAIN || ((defined GBUF_ENTITIES || defined GBUF_HAND) && defined GENERATED_NORMAL_ENTITIES))
+#if defined GENERATED_NORMALS && PBR_FORMAT == 0 && (defined GBUF_TERRAIN || defined GBUF_BLOCK || ((defined GBUF_ENTITIES || defined GBUF_HAND) && defined GENERATED_NORMAL_ENTITIES))
     #define USE_GENERATED_NORMALS
 #endif
 
 // 手に持った物の自動法線の強さ (ブロックに対する割合)。目の前で 1 テクセルが大きく、ブロックと同じ強さでは近くの光源の照り返しが面ごとに散って光った
 const float HAND_GENERATED_NORMAL_SCALE = 0.5;
+// 面の法線の最大成分がこれより大きいツタの面は軸に沿った平らな面 (十字の植物は 0.71)
+const float FLAT_VINE_MIN_AXIS = 0.9;
 const float POM_DISTANCE = 32.0;         // POM を掛ける距離 (ブロック)。この手前 30% で滑らかに消す
 const int POM_SHADOW_STEPS = 12;
 const float POM_SHADOW_SOFTNESS = 6.0;   // 自己影の縁の柔らかさ (高さ差に対する倍率)
@@ -331,6 +333,8 @@ void main() {
     int materialId = MAT_TERRAIN;
 #if defined GBUF_TERRAIN
     materialId = vesselPixelMaterial(blockIdToMaterial(blockBase), metalGateOfId(blockId), texRgb);
+    // 壁や地面に張り付くツタ・スカルクの脈は面が軸に沿う (垂れ下がるつるは十字で斜め)。葉と同じく面の向きと凹凸で照らす
+    if (blockBase == BLOCK_VINES && maxOf(abs(geoN)) > FLAT_VINE_MIN_AXIS) materialId = MAT_LEAVES;
 #elif defined GBUF_ENTITIES
     materialId = entityIdToMaterial(entityId, currentRenderedItemId);
     albedo.rgb = mix(albedo.rgb, entityColor.rgb, entityColor.a);
@@ -345,6 +349,11 @@ void main() {
 #elif defined GBUF_BASIC || defined GBUF_LINE
     materialId = MAT_BASIC;
 #endif
+    // 質感の推定に使う ID。ブロックエンティティ (チェスト・看板・ベッドなど) は、モブの一律の滑らかさではなくブロックと同じ推定にする
+    int estimateId = materialId;
+#if defined GBUF_BLOCK
+    estimateId = itemEstimateMaterial(blockEntityId);
+#endif
 
     // マテリアル
 #ifdef USE_LABPBR
@@ -354,13 +363,13 @@ void main() {
     // _s が無いテクスチャ (Iris の既定は全 0) は ID からの推定で埋める。AO と高さは _n のまま
     bool estimated = dot(specTex, specTex) <= 0.0;
     if (estimated) {
-        SurfaceParams est = estimateSurfaceParams(materialId, albedo.rgb);
+        SurfaceParams est = estimateSurfaceParams(estimateId, albedo.rgb);
         est.ao = sp.ao;
         est.height = sp.height;
         sp = est;
     }
 #else
-    SurfaceParams sp = estimateSurfaceParams(materialId, albedo.rgb);
+    SurfaceParams sp = estimateSurfaceParams(estimateId, albedo.rgb);
     const bool estimated = true;
 #endif
     // 一部だけ金属のものは、PBR テクスチャの値があればそちらを使い、無い (推定の) 時だけ金属の画素を置き換える

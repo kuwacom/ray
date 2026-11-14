@@ -108,6 +108,9 @@ int blockIdToMaterial(int blockId) {
     if (blockId == BLOCK_SNOW || blockId == BLOCK_SNOW_LAYER || (blockId >= BLOCK_SNOW_LAYER_2 && blockId <= BLOCK_SNOW_LAYER_8)) return MAT_SNOW;
     if (blockId == BLOCK_LEAVES) return MAT_LEAVES;
     if (blockId == BLOCK_UNDERWATER_PLANT) return MAT_UNDERWATER_PLANT;
+    // 光を通す小物 (ドア・トラップドア・看板・ボタン・線路など) は植物の帯にあるが、法線と質感はふつうのブロック
+    // 植物にすると法線が上向きに固定され、開いたトラップドアのような立った面まで地面のように照らされててかった
+    if (blockId == BLOCK_NON_OCCLUDING) return MAT_TERRAIN;
     if (isPlantBlock(blockId)) return MAT_PLANT;
     if (blockId == BLOCK_WATER) return MAT_WATER;
     if (blockId == BLOCK_ICE) return MAT_ICE;
@@ -119,6 +122,16 @@ int blockIdToMaterial(int blockId) {
     if (light == LIGHT_NETHER_PORTAL) return MAT_NETHER_PORTAL;
     if (light != LIGHT_NONE) return MAT_EMISSIVE_BLOCK;
     return MAT_TERRAIN;
+}
+
+/*
+ * アイテム・ブロックエンティティの質感の推定に使うマテリアル ID
+ * ブロックのアイテムは Iris が block.properties の ID を渡す (item.properties は見ない) ので、鉄・金のブロックなどはブロックと同じ金属・光沢にする
+ * 植物・発光などはブロックの形や光り方に結び付いた分類なので、手に持った物にはふつうのブロックの推定を使う
+ */
+int itemEstimateMaterial(int itemId) {
+    int m = blockIdToMaterial(stripMetalGate(itemId));
+    return (m == MAT_METAL || m == MAT_GLOSSY) ? m : MAT_TERRAIN;
 }
 
 // 点滅の間だけ光るエンティティ (クリーパー・TNT・TNT 付きトロッコ)

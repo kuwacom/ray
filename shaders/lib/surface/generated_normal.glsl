@@ -20,8 +20,9 @@ const vec2 GENERATED_FLAT_DIFF = vec2(0.01, 0.04); // 隣の輝度差がこの�
 const float GENERATED_FLAT_BUMP = 0.1;      // 一色の面に足す起伏の強さ (テクセルごとの高さ -0.5〜0.5 に対する輝度差)
 
 // 近傍のテクセル。ブロックは繰り返し模様なので範囲で折り返し、エンティティの面は繰り返さないので端で止める
+// ブロックエンティティ (チェスト・看板・ベッドなど) もエンティティと同じ展開図のテクスチャ
 ivec2 generatedTap(ivec2 t, ivec2 tmin, ivec2 tsize) {
-#if defined GBUF_ENTITIES || defined GBUF_ENTITIES_TRANSLUCENT || defined GBUF_HAND
+#if defined GBUF_ENTITIES || defined GBUF_ENTITIES_TRANSLUCENT || defined GBUF_HAND || defined GBUF_BLOCK
     return clamp(t, tmin, tmin + tsize - 1);
 #else
     return tmin + ((t - tmin) % tsize + tsize) % tsize;
