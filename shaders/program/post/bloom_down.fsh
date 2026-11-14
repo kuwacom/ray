@@ -9,6 +9,7 @@
  */
 //@include "/lib/common/common.glsl"
 //@include "/lib/post/post_internal.glsl"
+//@include "/lib/post/local_tonemap.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -47,6 +48,7 @@
 #include "/lib/post/lens_flare.glsl"
 #include "/lib/post/lens.glsl"
 #include "/lib/post/post_internal.glsl"
+#include "/lib/post/local_tonemap.glsl"
 // END GENERATED includes
 
 const bool colortex0MipmapEnabled = true;
@@ -69,6 +71,12 @@ vec4 fetchSource(vec2 uv, float lod) {
 
 void main() {
     ivec4 rect;
+#ifdef LOCAL_TONEMAP
+    if (isInLocalTonemapTile(ivec2(gl_FragCoord.xy), rect)) {
+        outBloom = vec4(sampleLocalTonemapSource(colortex0, (gl_FragCoord.xy - vec2(rect.xy)) / vec2(rect.zw)), 0.0, 0.0);
+        return;
+    }
+#endif
     int level = bloomTileLevelAt(ivec2(gl_FragCoord.xy), rect);
     if (level == 0) {
         outBloom = vec4(0.0);

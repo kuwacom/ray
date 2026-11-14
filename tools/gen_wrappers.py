@@ -238,7 +238,8 @@ DISABLED: list[Disable] = [
     Disable(("composite20",), "#ifndef TAA"),
     Disable(("composite21",), "#ifndef MOTION_BLUR"),
     Disable(("composite22",), "#ifndef DOF"),
-    Disable(("composite23", "composite24"), "#ifndef BLOOM"),
+    # 局所トーンマップもブルームの縮小タイルを読む
+    Disable(("composite23", "composite24"), "#if !defined BLOOM && !defined LOCAL_TONEMAP"),
 ]
 
 ENABLES_BEGIN = "# BEGIN GENERATED program enables (tools/gen_wrappers.py)"

@@ -118,10 +118,10 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 30 | composite20.vsh/fsh | post | TAA (LENS_WARP_TAA の時は歪曲・魚眼の組み立ても) | colortex0/13/15/17 | colortex0, colortex13, colortex17 | 画面 | TAA |
 | 31 | composite21.vsh/fsh | post | モーションブラー | colortex0/15 | colortex0 | 画面 | MOTION_BLUR |
 | 32 | composite22.vsh/fsh | post | DoF (MIP-Bokeh, colortex0 ミップ) | colortex0, SSBO0 focus | colortex0 | 画面 | DOF |
-| 33 | composite23.vsh/fsh | post | ブルーム縮小タイル | colortex0 ミップ | colortex14 | 画面 | BLOOM |
-| 34 | composite24.vsh/fsh | post | ブルームぼかし | colortex14 | colortex14 | 画面 | BLOOM |
+| 33 | composite23.vsh/fsh | post | ブルーム縮小タイル、局所トーンマップの log2 輝度のタイル | colortex0 ミップ | colortex14 | 画面 | BLOOM または LOCAL_TONEMAP |
+| 34 | composite24.vsh/fsh | post | ブルームぼかし | colortex14 | colortex14 | 画面 | BLOOM または LOCAL_TONEMAP |
 | 35 | composite25.csh | post | 自動露出 (ヒストグラム。屋外の夜の持ち上げは画面の暗い側の計測で決める) + オートフォーカス | colortex0, centerDepthSmooth | SSBO0 exposure/focus/histogram | local 16², (1,1,1) | 常時 |
-| 36 | final.vsh/fsh | post | 歪曲と魚眼の再投影・ブルーム合成・点像の芯と裾・フレア・露出・AgX・色調整・CAS・ディザ・デバッグ表示 | colortex0/14/17, SSBO0 | 画面 | 画面 | 常時 |
+| 36 | final.vsh/fsh | post | 歪曲と魚眼の再投影・ブルーム合成・点像の芯と裾・フレア・露出・局所トーンマップ・AgX・色調整・CAS・ディザ・デバッグ表示 | colortex0/14/17, SSBO0 | 画面 | 画面 | 常時 |
 
 補足
 - shadowcomp は使わない。floodfill を deferred に置くのは、gbuffers_entities (deferred より前) が登録した画面内のエンティティ光源を同じフレームで取り込むため (voxelEmitImg は毎フレームクリアされる)
@@ -152,7 +152,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 11 | RGBA16F | sky: 雲 (フル解像度, 時間蓄積) | sky | surface (sky の関数経由), sky | 永続 |
 | 12 | RGBA16F | sky: VL / フォグ (低解像度) rgb 内散乱, a 透過率 | sky | sky | 永続 |
 | 13 | RGBA16F | post: TAA 履歴 | post | post | 永続 |
-| 14 | RGBA16F | post: ブルームタイル | post | post | 毎フレーム |
+| 14 | RGBA16F | post: ブルームタイル (と画面のフレア、LOCAL_TONEMAP の時は局所トーンマップの 1/32 タイル) | post | post | 毎フレーム |
 | 15 | RGBA16F | 速度: rg = 前フレーム UV - 今の UV, a = 1 なら有効 (エンティティ・手)。a = 0 の金属の防具の画素だけ rgb = 環境光の鏡面の重み x 1e-4 (gbuffers_entities_translucent -> composite2。双線形で読まれても速度がずれないよう小さくする) | surface (gbuffers, post の関数) | post | 毎フレーム |
 | 16 | R16F | sky: 画面空間の光芒 (低解像度 `size.buffer.colortex16` = 1/GODRAYS_RES)。composite12 -> 13 -> 14 で同じバッファをピンポンして読み書きし、composite19 が足す | sky | sky | 毎フレーム |
 | 17 | RGBA16F | post: 鏡面の白飛び分の履歴 (rgb = 露出前の線形, a 予備)。SPECULAR_SPARKLE の時だけ composite20 が読み書きし、final がミップで読んで点像の芯と裾を作る (LENS_POINT_SPREAD_STRENGTH) | post | post | 永続 |
@@ -429,7 +429,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | モーションブラー | 速度ベクトルに沿ったサンプル。既定 ON | post |
 | ブルーム | colortex0 のミップからタイル縮小 -> ぼかし -> final で合成。既定 0.5 (控えめ) | post |
 | 露出 | ヒストグラム (FrameData.histogram) + 非対称の順応速度 (明るい方へ 3 倍速) + 範囲制限。屋外の夜の持ち上げは、月が照らす夜 (満ち欠け x 晴れ x 夜。水中は 0) の度合い `moonLit` で、傾き 0.4 -> 0.5 に強め、持ち上げに使う計測を平均 (35..92%) から画面の暗い側 (5..50%) へ寄せる。上限は月夜も 1.3 EV のまま (上げると月の照る暗い草原が灰色に浮いて霧っぽくなる)。新月・雨の夜・水中は `moonLit` が 0 で、前と同じ平均・傾きのまま暗さを残す。EXPOSURE_MODE 1 (平均) は暗い側の計測が無く平均のままだが、傾きは `moonLit` で変わる。MODE 0 (マニュアル) は掛からない。持ち上げの量全体には `EXPOSURE_NIGHT_LIFT_STRENGTH` (既定 1、0 で持ち上げなし) を掛ける | post |
-| トーンマップ | AgX (多項式近似, 公知) を既定、AgX Punchy / ACES / Reinhard-Jodie / AgX Golden / PBR Neutral を選択式 (TONEMAP 0-5)。後段で彩度・コントラスト・ホワイトバランス・CAS・ビネット・8bit ディザ | post |
+| トーンマップ | AgX (多項式近似, 公知) を既定、AgX Punchy / ACES / Reinhard-Jodie / AgX Golden / PBR Neutral を選択式 (TONEMAP 0-5)。その前に HDR モード (LOCAL_TONEMAP、既定 OFF、`lib/post/local_tonemap.glsl`): composite23 が colortex14 のフレアのタイルの右に 1/32 のタイル (rg = log2 輝度の平均と 2 乗の平均) を書き、composite24 がぼかす。final は画素自身をガイドにしたガイデッドフィルタで局所の明るさを求め (窓の分散が小さければ窓の平均、境目の大きな分散なら画素自身。境目の向こうを拾わないので縁に輪が出にくい)、画面の平均輝度へ LOCAL_TONEMAP_STRENGTH の割合で寄せる (上げは 2 EV、下げは 3 EV まで)。後段で彩度・コントラスト・ホワイトバランス・CAS・ビネット・8bit ディザ | post |
 | レンズフレア | 太陽・月のレンズフレア。既定 ON (全プロファイルで ON)。光源の形は `lib/common/celestial_shape.glsl` の影を落とす天体の形 (丸い円盤の半径、SUN_MOON_STYLE=0 はバニラのテクスチャの明るい 8x8 の四角: 太陽の半幅 0.075、月 0.05、板は日周運動の回転軸に沿う) を tan 座標の 2 軸に写して使う。見え具合 (composite25) は形の中の 256 点 (バニラは四角の 16x16 の格子)。バニラの四角が一部だけ遮られている時は、見えている点の格子位置のモーメント (`postParams[3]`) から見えている部分の中心と広がりを求め、光源の位置と四角の大きさをその部分に合わせる (遮る物の上に四角全体の形のフレアを残さない)。ゴーストの縁は縁の向きの光源の幅 (支持関数) でぼかし、バニラの四角ではグレア・汚れを四角で畳み込んだ式 (長方形の立体角の閉じた式)、光条は四角の一番近い点から引いて四角で畳み込んだ明るさへ割り戻す。バニラのテクスチャは明るい四角だけを光源にし、周りの淡い光 (ゲームの描き方の暈) は放射にしない (`sun_moon.fsh`) | post |
 | 点像の芯と裾 | 白を超えた鏡面の点 (1 画素ほど) をレンズの点光源に見せる。芯: final が colortex17 (白飛び分、DoF の前の線形) の一部 (`POINT_CORE_SHARE`) をガウス (`POINT_CORE_SIGMA` px) で配る (双線形 5x5 の読みで 9x9 の重み。2 px で切ると明るい点の周りに縁の立った四角い光が出る)。芯と裾の大きさは LENS_POINT_SPREAD_SIZE の 4 段 (小・中・大・特大。既定は大で、芯 40% / sigma 1.1 px、裾 0.40)。白をわずかに超えた点は 1-2 px のまま、白を大きく超えた点ほど芯の周りまで白く飛び、裾も合わせて明るい点ほど大きな光の塊になる。裾: ミップ 1〜4 段を B スプラインで読み、同じエネルギーずつ芯から周りへ配る (裾は r^-2、総量は変えない)。配る割合は `POINT_SPREAD_BASE + POINT_SPREAD_PER_GLARE x LP_VEILING_GLARE` (散乱の強いレンズほど大きい) に LENS_POINT_SPREAD_STRENGTH (既定 1.5) を掛ける。配る割合の和は 1 まで (強さで先に裾を増やし、芯は残り)。球面収差・ブルーム・ヘイズの mix の前に掛ける。DoF・モーションブラー・色収差の後の像には同じだけの白飛び分が残らないことがあるので、中心から引くのは TAA の出した白飛び分の外の色 (colortex13) を超えて残っている分まで (引きすぎると点の中心が黒・緑・紫に抜ける)。芯と裾は DoF のボケ半径 2 px で消える (ボケた点は玉ボケに任せる)。ミップは final の `colortex17MipmapEnabled` で作る。近くに白飛び分が無い画素は最粗に近い段 1 回で打ち切る。光条は別 (ブルームの帯域) | post |
 | レンズプリセット | LENS_PRESET 0 はカスタム (LENS_C_*)、1 は現代の単焦点 (既定)、2-6 は推定値の味付け、7-18 は特許の処方から計算した値 (ゴースト表 `tools/gen_lens_ghosts.py`、歪曲 K1-K3、魚眼の写像、周辺光量と像面の焦点ずれの 9 点の表、STF のアポダイゼーション `LENS_APODIZATION_BETA` (composite22 のボケのサンプルに瞳の透過率を掛ける)、FA 28 Soft と Canon 50/0.95 の球面収差のハロー `LENS_SOFT_HALO_TABLE` (final で F 値ごとの半径に合うブルームのタイルを混ぜる))。新しいレンズは後ろに足し、既存の番号は変えない。歪曲と魚眼は TAA・DoF・ブルームの後、final の最初で出力 -> 元画像へ再投影し (`lensProjectUv`)、魚眼と歪曲の強い時 (LENS_WARP_IN_TAA の自動) は TAA (composite20) の中で出力の画面を組み立ててジッターで中央の細かさを戻す (以降の colortex0・colortex13・ブルームは出力の座標になり、深度・G バッファ・速度だけ `postSourceUv` で元画像の位置を読む)。太陽・月のフレアは光源を出力側へ写して (`lensForwardUv`) 出力の座標で描く。直線写像で歪曲 0 のプリセットでは再投影は定数畳み込みで消える | post |

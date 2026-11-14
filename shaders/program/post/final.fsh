@@ -10,6 +10,7 @@
 //@include "/lib/common/gbuffer.glsl"
 //@include "/lib/post/post_internal.glsl"
 //@include "/lib/post/color_grade.glsl"
+//@include "/lib/post/local_tonemap.glsl"
 //@include "/lib/ids/id_decode.glsl"
 //@include "/lib/ids/material_ids.glsl"
 //@include "/lib/light/floodfill.glsl"
@@ -57,6 +58,7 @@
 #include "/lib/post/lens.glsl"
 #include "/lib/post/post_internal.glsl"
 #include "/lib/post/color_grade.glsl"
+#include "/lib/post/local_tonemap.glsl"
 #include "/lib/ids/block_ids.glsl"
 #include "/lib/ids/entity_ids.glsl"
 #include "/lib/ids/light_ids.glsl"
@@ -433,6 +435,10 @@ void main() {
     // 目 / センサー: Purkinje 効果 -> 露出
     hdr = applyPurkinje(hdr, frameData.averageLuminance, exposure);
     vec3 color = hdr * exposure;
+    // 現像の前に局所の明暗を縮める (ホワイトバランス・グレーディングは縮めた後の明るさに掛かる)
+#ifdef LOCAL_TONEMAP
+    color = applyLocalTonemap(color, uvL, exposure, frameData.averageLuminance * exposure);
+#endif
 
     /*
      * ---- 現像: ホワイトバランス -> ティント・オフセット -> コントラスト -> 明部の伸び -> ゾーン・圧縮・持ち上げ -> 彩度 ->

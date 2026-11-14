@@ -8,6 +8,7 @@
 //@include "/lib/common/common.glsl"
 //@include "/lib/common/exposure.glsl"
 //@include "/lib/post/post_internal.glsl"
+//@include "/lib/post/local_tonemap.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -47,6 +48,7 @@
 #include "/lib/post/lens_flare.glsl"
 #include "/lib/post/lens.glsl"
 #include "/lib/post/post_internal.glsl"
+#include "/lib/post/local_tonemap.glsl"
 // END GENERATED includes
 
 in vec2 texcoord;
@@ -229,6 +231,10 @@ void main() {
 
     ivec4 rect;
     int level = bloomTileLevelAt(ivec2(gl_FragCoord.xy), rect);
+#ifdef LOCAL_TONEMAP
+    // 局所トーンマップのタイル (log2 輝度の平均と 2 乗の平均) も同じテントでぼかす
+    if (level == 0 && isInLocalTonemapTile(ivec2(gl_FragCoord.xy), rect)) level = -1;
+#endif
     if (level == 0) {
         outBloom = vec4(0.0);
         return;

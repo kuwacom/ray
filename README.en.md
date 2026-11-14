@@ -93,7 +93,7 @@ If you use a clone of the repository, put the folder that directly contains `sha
 | GI / AO | RSM / SSGI / voxel ray traced GI (switched by preset), GTAO / SSAO |
 | Materials | labPBR, normal maps, normals generated from textures, POM, subsurface scattering, rain puddles |
 | Water and reflections | Waves and parallax, refraction (screen space / ray traced), caustics, SSR and rough reflections, voxel fill-in for reflections, underwater light shafts and the glow around light sources (turquoise in shallow water, deep blue in deep water) |
-| Camera | 6 tone maps including AgX (default), histogram-based auto exposure (adapts at different speeds when getting brighter and when getting darker), MIP-Bokeh depth of field and autofocus, TAA, motion blur, bloom, lens flare, color grading (shadows / midtones / highlights, lift / gamma / gain, per-hue adjustments, tone curve, split toning, ASC CDL), a blue shift in the dark, film grain |
+| Camera | 6 tone maps including AgX (default), an HDR mode (local tone mapping that darkens bright areas and brightens dark ones, like a phone's HDR photo), histogram-based auto exposure (adapts at different speeds when getting brighter and when getting darker), MIP-Bokeh depth of field and autofocus, TAA, motion blur, bloom, lens flare, color grading (shadows / midtones / highlights, lift / gamma / gain, per-hue adjustments, tone curve, split toning, ASC CDL), a blue shift in the dark, film grain |
 
 The techniques and sources for each feature are in [docs/architecture.md](docs/architecture.md) (in Japanese) and [CREDITS.md](CREDITS.md) (in Japanese)
 
@@ -178,7 +178,7 @@ To use your own LUT, replace `shaders/textures/look/user_lut.png` and set "LUT" 
 | Split Toning | Adds separate colors to the shadows and highlights (brightness does not change) | After tone map |
 | CDL | ASC CDL (slope, offset, power, saturation). A final adjustment for entering values from other software as they are | After LUT |
 
-The order is white balance -> tint -> offset -> contrast -> shadows / midtones / highlights -> highlight compression and shadow lift -> saturation and vibrance -> per hue -> tone map -> lift / gamma / gain -> tone curve -> split toning -> LUT -> CDL
+The order is (HDR mode) -> white balance -> tint -> offset -> contrast -> shadows / midtones / highlights -> highlight compression and shadow lift -> saturation and vibrance -> per hue -> tone map -> lift / gamma / gain -> tone curve -> split toning -> LUT -> CDL
 
 - Adjustments before the tone map work in exposure stops (EV). They act the same way even when the brightness changes between day, night, and caves, and the tone map folds back anything out of range, so colors are less likely to clip
 - Adjustments after the tone map apply to display values with black at 0 and white at 1. The film-like LUTs are applied after grading, so you can adjust the grade underneath the LUT's colors
