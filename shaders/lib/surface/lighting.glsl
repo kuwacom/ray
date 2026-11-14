@@ -131,6 +131,44 @@ vec3 giHistoryAtPlayer(vec3 playerPos) {
 const float SECONDARY_BLOCKLIGHT_GAIN = 1.5 - 0.5 * GI_MULTI_BOUNCE;
 
 /*
+ * GI の当たりの溶岩の直接光の倍率 (着色点の直接光と反射に映る面は変えない)
+ * 溶岩の洞窟の照り返しは当たりの floodfill (種 10 倍) が主で、受ける面と同じ FLOODFILL_STRENGTH 倍にすると半分以下になる。
+ * 当たりの floodfill を戻すと床の GI の揺れが 1.6 倍になり、floodfill の種・溶岩の直接光を上げると照らされる面そのものが先に明るくなる。
+ * 当たりの直接光は解析的に求めるので揺れを増やさず、照り返しだけを戻せる
+ */
+const float LAVA_GI_DIRECT_GAIN = 3.5;
+
+// 光源が溶岩か (溶岩の光は表面のセルの中に登録している。program/light/floodfill.csh)
+bool isLavaLight(LightInstance L) {
+    ivec3 c = ivec3(floor(L.posRadius.xyz));
+    return isInVoxelVolume(c) && getBlockLightIndex(fetchVoxelBlockId(c)) == LIGHT_LAVA;
+}
+
+/*
+ * 当たりのビンの光源の影なし照度。strongest: 一番強い光源 (無ければ -1)
+ * GI (nearField = false) では溶岩の光を LAVA_GI_DIRECT_GAIN 倍にする
+ */
+vec3 secondaryHitBinLights(vec3 fromVoxel, vec3 normal, bool nearField, out int strongest) {
+    strongest = -1;
+    if (!isInVoxelVolume(fromVoxel)) return vec3(0.0);
+    int bin = lightBinIndex(ivec3(fromVoxel));
+    uint n = lightBinCount(bin);
+    vec3 E = vec3(0.0);
+    float strongestW = 0.0;
+    for (uint k = 0u; k < n; k++) {
+        int ci = lightBinEntry(bin, k);
+        LightInstance L = globalLights.lights[ci];
+        vec3 e = evalLightIrradiance(L, fromVoxel, normal, normal, nearField);
+        if (maxOf(e) <= 0.0) continue;
+        if (!nearField && isLavaLight(L)) e *= LAVA_GI_DIRECT_GAIN;
+        E += e;
+        float w = luminance(e);
+        if (w > strongestW) { strongestW = w; strongest = ci; }
+    }
+    return E;
+}
+
+/*
  * handScale: 手持ち光の分に掛ける倍率。GI では handLightIndirectScale() (HAND_LIGHT_SHADOW_STRENGTH) を渡す
  * GI_MODE 2/3 では手持ち光の陰の中の明るさの半分ほどがこの GI の照り返しで、残りが getHandLightFill なので、両方に同じ倍率を掛ける
  * 反射に映る面は照り返しではなく直接見える面なので 1 を渡す
@@ -140,29 +178,18 @@ vec3 secondaryHitBlockLight(vec3 playerPos, vec3 normal, ivec2 screenTexel, floa
 #ifdef LIGHT_SHADOWS
     vec3 E = vec3(0.0);
     vec3 fromVoxel = playerToVoxel(playerPos + normal * TRACE_NORMAL_OFFSET);
+    int strongest = -1;
     if (screenTexel.x >= 0) {
         // colortex6 は近距離の放射込み。除く時は、近距離の放射の無い影なし照度に deferred2 の可視率 (colortex7) を掛ける
         E = nearField ? texelFetch(colortex6, screenTexel, 0).rgb
-                      : sumBinLightsUnshadowed(fromVoxel, normal, normal, false) * texelFetch(colortex7, screenTexel, 0).rgb;
-    } else {
-        if (isInVoxelVolume(fromVoxel)) {
-            int bin = lightBinIndex(ivec3(fromVoxel));
-            uint n = lightBinCount(bin);
-            int strongest = -1;
-            float strongestW = 0.0;
-            for (uint k = 0u; k < n; k++) {
-                int ci = lightBinEntry(bin, k);
-                vec3 e = evalLightIrradiance(globalLights.lights[ci], fromVoxel, normal, normal, nearField);
-                E += e;
-                float w = luminance(e);
-                if (w > strongestW) { strongestW = w; strongest = ci; }
-            }
-            if (strongest >= 0) {
-                uint flags = blockLightTraceFlags() & ~(TRACE_ENTITIES | TRACE_PLAYER);
-                E *= luminance(blockLightShadow(traceVisibility(fromVoxel, globalLights.lights[strongest].posRadius.xyz, flags, 0.5, 0.0, 0.0)));
-            }
-            if (nearField) E += sumBinBoxIrradiance(fromVoxel, normal);
+                      : secondaryHitBinLights(fromVoxel, normal, false, strongest) * texelFetch(colortex7, screenTexel, 0).rgb;
+    } else if (isInVoxelVolume(fromVoxel)) {
+        E = secondaryHitBinLights(fromVoxel, normal, nearField, strongest);
+        if (strongest >= 0) {
+            uint flags = blockLightTraceFlags() & ~(TRACE_ENTITIES | TRACE_PLAYER);
+            E *= luminance(blockLightShadow(traceVisibility(fromVoxel, globalLights.lights[strongest].posRadius.xyz, flags, 0.5, 0.0, 0.0)));
         }
+        if (nearField) E += sumBinBoxIrradiance(fromVoxel, normal);
     }
     #ifdef HAND_LIGHT
     for (int i = 0; i < 2; i++) {
