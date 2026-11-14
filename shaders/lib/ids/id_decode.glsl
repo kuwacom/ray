@@ -71,7 +71,12 @@ int blockLightFacing(int blockId) {
 }
 
 // 一部だけ金属のブロック・アイテムの ID は、元の ID + 金属の判定の番号 x METAL_GATE_STRIDE (番号 0 = 金属なし)
-int metalGateOfId(int id) { return max(id, 0) / METAL_GATE_STRIDE; }
+// 表に無いアイテム・ブロックエンティティの ID (-1) は、エンティティの頂点属性では 16 bit の符号なし (65535) で来る
+// 判定の番号の範囲外は金属なしにする (パン・本・チェスト・ベッドが丸ごと金属になっていた)
+int metalGateOfId(int id) {
+    int gate = max(id, 0) / METAL_GATE_STRIDE;
+    return gate <= METAL_GATE_GEM ? gate : 0;
+}
 int stripMetalGate(int id) { return id >= METAL_GATE_STRIDE ? id % METAL_GATE_STRIDE : id; }
 
 int entityMetalGate(int entId) {
