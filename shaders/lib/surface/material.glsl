@@ -340,9 +340,10 @@ SurfaceParams estimateSurfaceParams(int materialId, vec3 albedoSrgb) {
         p.smoothness = 0.3;
         p.f0 = 0.028;
         p.sss = 0.3;
-    } else if (isEntityMaterial(materialId) || isHandMaterial(materialId)) {
+    } else if (isEntityMaterial(materialId)) {
         p.smoothness = 0.3;
-    } else if (materialId == MAT_TERRAIN || materialId == MAT_EMISSIVE_BLOCK) {
+    } else if (materialId == MAT_TERRAIN || materialId == MAT_EMISSIVE_BLOCK || isHandMaterial(materialId)) {
+        // 手に持った物 (ブロックのアイテム・道具・食べ物) はブロックと同じ推定。0.3 一定だと、暗い木の持ち手や革まで縁で空を映して金属のように光った
         // 彩度が低く明るい面 (石・石英・コンクリート) ほどやや滑らか。土や砂のような暗い高彩度面は粗い
         p.smoothness = mix(0.08, 0.32, saturate(lum * lum * 1.6 - chroma));
         p.porosity = mix(0.6, 0.15, lum);

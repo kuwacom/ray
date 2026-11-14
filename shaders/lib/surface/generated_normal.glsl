@@ -21,7 +21,7 @@ const float GENERATED_FLAT_BUMP = 0.1;      // 一色の面に足す起伏の強
 
 // 近傍のテクセル。ブロックは繰り返し模様なので範囲で折り返し、エンティティの面は繰り返さないので端で止める
 ivec2 generatedTap(ivec2 t, ivec2 tmin, ivec2 tsize) {
-#if defined GBUF_ENTITIES || defined GBUF_ENTITIES_TRANSLUCENT
+#if defined GBUF_ENTITIES || defined GBUF_ENTITIES_TRANSLUCENT || defined GBUF_HAND
     return clamp(t, tmin, tmin + tsize - 1);
 #else
     return tmin + ((t - tmin) % tsize + tsize) % tsize;
@@ -84,7 +84,7 @@ vec3 generatedNormal(vec2 uv, vec3 playerPos, vec2 tileMid, vec2 tileHalf) {
     float hu = luminance(u.rgb) * u.a;
     float hd = luminance(d.rgb) * d.a;
     vec2 diff = vec2(hr - hl, hd - hu);
-#if defined GBUF_ENTITIES || defined GBUF_ENTITIES_TRANSLUCENT
+#if defined GBUF_ENTITIES || defined GBUF_ENTITIES_TRANSLUCENT || defined GBUF_HAND
     /*
      * 一色の面 (ラヴェジャーの鼻・角など) は輝度差が 0 で凹凸が出ない。輝度差が小さい所にだけ、テクセルの位置から決まる弱い起伏を足す
      * テクセルに固定した値なので画素や時間で変わらずちらつかず、距離で差を取る幅が画素に近づくと上の fade で一緒に消える

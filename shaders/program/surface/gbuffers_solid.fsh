@@ -95,10 +95,12 @@ layout(location = 5) out vec4 outTranslucentDataClear;
 #if defined POM && defined USE_LABPBR && defined GBUF_TERRAIN
     #define USE_POM
 #endif
-#if defined GENERATED_NORMALS && PBR_FORMAT == 0 && (defined GBUF_TERRAIN || (defined GBUF_ENTITIES && defined GENERATED_NORMAL_ENTITIES))
+#if defined GENERATED_NORMALS && PBR_FORMAT == 0 && (defined GBUF_TERRAIN || ((defined GBUF_ENTITIES || defined GBUF_HAND) && defined GENERATED_NORMAL_ENTITIES))
     #define USE_GENERATED_NORMALS
 #endif
 
+// 手に持った物の自動法線の強さ (ブロックに対する割合)。目の前で 1 テクセルが大きく、ブロックと同じ強さでは近くの光源の照り返しが面ごとに散って光った
+const float HAND_GENERATED_NORMAL_SCALE = 0.5;
 const float POM_DISTANCE = 32.0;         // POM を掛ける距離 (ブロック)。この手前 30% で滑らかに消す
 const int POM_SHADOW_STEPS = 12;
 const float POM_SHADOW_SOFTNESS = 6.0;   // 自己影の縁の柔らかさ (高さ差に対する倍率)
@@ -376,6 +378,9 @@ void main() {
 #elif defined USE_GENERATED_NORMALS
     // 磨いた線路は平らなまま (テクセルごとに向きが違う法線は、滑らかな面の映り込みを砂目にする)
     if (!isPlant && !railMirror) normalTs = generatedNormal(uv, playerPos, tileMid, tileHalf);
+    #ifdef GBUF_HAND
+        normalTs = normalize(mix(vec3(0.0, 0.0, 1.0), normalTs, HAND_GENERATED_NORMAL_SCALE));
+    #endif
 #endif
     vec3 normal = normalize(tbn * normalTs);
     vec3 geoNormal = geoN;

@@ -89,7 +89,7 @@
     in vec2 mc_Entity;
     in vec4 at_midBlock;
 #endif
-#if defined GBUF_TERRAIN || defined GBUF_ENTITIES
+#if defined GBUF_TERRAIN || defined GBUF_ENTITIES || defined GBUF_HAND
     in vec2 mc_midTexCoord;
 #endif
 in vec4 at_tangent;
@@ -127,7 +127,7 @@ void main() {
     if (any(greaterThan(midUv, vec2(2.0)))) midUv = uintBitsToFloat(uvec2(midUv * MID_UV_FIXED_SCALE)) / MID_UV_FIXED_SCALE;
     tileMid = midUv;
     tileHalf = abs(texcoord - midUv);
-#elif defined GBUF_ENTITIES
+#elif defined GBUF_ENTITIES || defined GBUF_HAND
     blockId = 0;
     tileMid = mc_midTexCoord;
     tileHalf = abs(texcoord - mc_midTexCoord);
