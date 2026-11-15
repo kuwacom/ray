@@ -86,7 +86,13 @@ void main() {
     // 光るブロックエンティティ (エンダーチェスト・コンジット等) を三角形の重心で登録する
     injectBlockEntityLight((vPlayerPos[0] + vPlayerPos[1] + vPlayerPos[2]) / 3.0, blockEntityId);
 #else
-    bool isPlayer = entityId == ENTITY_CURRENT_PLAYER;
+    /*
+     * Iris 1.11 は影のパスのブロックエンティティを描き方 (RenderPipeline) で振り分け、shadow_block に回すのは
+     * エンドポータル・エンドゲートウェイだけ。チェスト型・コンジットなどはこちらに来るので、blockEntityId で見分けて
+     * 光源・影・遮蔽を shadow_block と同じ扱いにする
+     */
+    bool isBlockEntity = isBlockEntityDraw(blockEntityId);
+    bool isPlayer = !isBlockEntity && entityId == ENTITY_CURRENT_PLAYER;
     int entLight = getEntityLightIndex(entityId);
     // 名札・丸影・ビーム・炎・雷は形を持たないので遮蔽物にも影にもしない
     bool ignored = entityId == ENTITY_NAME_TAG || entityId == ENTITY_SHADOW || entityId == ENTITY_BEAM
@@ -100,21 +106,28 @@ void main() {
     #endif
     voxelize = voxelize && !ignored;
     // 手持ちのランタンはエンティティ ID が付かずに描かれるので、光る物を持つ手の近くなら外す (lib/light/hand_pose.glsl)
-    if (!isPlayer && entityId <= 0 && voxelize && isNearLitHand((vPlayerPos[0] + vPlayerPos[1] + vPlayerPos[2]) / 3.0)) voxelize = false;
+    if (!isPlayer && !isBlockEntity && entityId <= 0 && voxelize && isNearLitHand((vPlayerPos[0] + vPlayerPos[1] + vPlayerPos[2]) / 3.0)) voxelize = false;
     #ifdef ENTITY_SHADOWS
         bool castShadow = !ignored;
     #else
         bool castShadow = isPlayer;
     #endif
+    if (isBlockEntity) {
+    #ifdef LIGHT_ENTITY_OCCLUSION
+        voxelize = true;
+    #else
+        voxelize = false;
+    #endif
+    #ifdef BLOCK_ENTITY_SHADOWS
+        castShadow = true;
+    #else
+        castShadow = false;
+    #endif
+    }
 
     // 画面外のエンティティ光源もここで登録する (gbuffers_entities と同じセルなら重複しない)
-    injectEntityLight((vPlayerPos[0] + vPlayerPos[1] + vPlayerPos[2]) / 3.0, entityId, currentRenderedItemId, entityColor);
-    /*
-     * Iris 1.11 は影のパスのブロックエンティティを描き方 (RenderPipeline) で振り分け、shadow_block に回すのは
-     * エンドポータル・エンドゲートウェイだけ。エンダーチェスト・コンジットなどはこちらに来るので、ここでも登録する
-     * エンティティを描く間の blockEntityId は光源でない値 (0 / 1) なので、エンティティでは何もしない
-     */
-    injectBlockEntityLight((vPlayerPos[0] + vPlayerPos[1] + vPlayerPos[2]) / 3.0, blockEntityId);
+    if (isBlockEntity) injectBlockEntityLight((vPlayerPos[0] + vPlayerPos[1] + vPlayerPos[2]) / 3.0, blockEntityId);
+    else injectEntityLight((vPlayerPos[0] + vPlayerPos[1] + vPlayerPos[2]) / 3.0, entityId, currentRenderedItemId, entityColor);
     #ifdef CHARGED_CREEPER_LIGHT
         if (vSwirlLayer[0] != 0) injectSwirlLight((vPlayerPos[0] + vPlayerPos[1] + vPlayerPos[2]) / 3.0, entityId);
     #endif

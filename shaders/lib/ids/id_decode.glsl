@@ -93,6 +93,14 @@ int getEntityLightIndex(int entId) {
     return (entId >= ENTITY_LIGHT_BASE && entId <= ENTITY_LIGHT_LAST) ? LIGHT_ENTITY_BLAZE + (entId - ENTITY_LIGHT_BASE) : LIGHT_NONE;
 }
 
+/*
+ * blockEntityId がブロックエンティティを描いている間の値か
+ * Iris はそれ以外では 0、ブロックのアイテムを描く間は 1 を入れる。block.properties は 0 と 1 を使わない (表に無いものは -1 / 65535)
+ */
+const int BLOCK_ENTITY_ID_NONE = 0;
+const int BLOCK_ENTITY_ID_BLOCK_ITEM = 1;
+bool isBlockEntityDraw(int beId) { return beId != BLOCK_ENTITY_ID_NONE && beId != BLOCK_ENTITY_ID_BLOCK_ITEM; }
+
 bool isTintBlock(int blockId) { return blockId >= 200 && blockId < 300; }
 int getTintIndex(int blockId) { return blockId - 200; }
 int getShapeIndex(int blockId) { return blockId - 300; }
