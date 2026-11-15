@@ -302,8 +302,20 @@ def expanded(wrapper: Path) -> tuple[tuple[str, ...], tuple[tuple[str, int], ...
     candidates = tuple(i for i, ln in enumerate(lines) if is_setting_line(ln))
     return lines, linemap, candidates
 
+def env_named(name: str | None) -> Env:
+    """ローダーの名前 -> Env。None なら最新 (ENVS の先頭)"""
+    if name is None:
+        return ENVS[0]
+    for e in ENVS:
+        if e.name == name:
+            return e
+    sys.exit(f"--env {name}: 未知のローダー (候補: {', '.join(e.name for e in ENVS)})")
+
+
 def build_source(wrapper: Path, overrides: dict[str, str | bool], options: dict[str, Option], features: list[str],
-                 env: Env = ENVS[0]) -> tuple[str, list[tuple[str, int]]]:
+                 env: Env | None = None) -> tuple[str, list[tuple[str, int]]]:
+    # 既定値を定義時の ENVS[0] にすると、呼び出し側で選んだローダーが届かない経路が残るので呼ぶ時に決める
+    env = env or ENVS[0]
     raw, raw_map, candidates = expanded(wrapper)
     linemap = list(raw_map)
     lines = apply_overrides(list(raw), overrides, options, candidates)
@@ -393,8 +405,9 @@ def find_glslang() -> str:
 
 
 def compile_one(glslang: str, tmpdir: Path, wrapper: Path, cfg_name: str, overrides, options, features,
-                cache: SuccessCache | None = None, glslang_id: str = "", env: Env = ENVS[0]) -> tuple[str, list[str], str | None]:
+                cache: SuccessCache | None = None, glslang_id: str = "", env: Env | None = None) -> tuple[str, list[str], str | None]:
     """戻り値: (表示名, メッセージ, 成功時に記録するキャッシュキー。キャッシュから返した時と失敗時は None)"""
+    env = env or ENVS[0]
     label = f"[{env.name}/{cfg_name}] {wrapper.relative_to(SHADERS).as_posix()}"
     try:
         src, linemap = build_source(wrapper, overrides, options, features, env)
@@ -438,7 +451,7 @@ def scan_one(shaders: str, wrapper: str, cfg_name: str, overrides: dict, env_nam
         req, opt = parse_features()
         _SCAN_STATE[shaders] = (parse_settings(), req + opt)
     options, features = _SCAN_STATE[shaders]
-    env = next(e for e in ENVS if e.name == env_name)
+    env = env_named(env_name)
     path = Path(wrapper)
     src, linemap = build_source(path, overrides, options, features, env)
     return f"[{env.name}/{cfg_name}]", loader_checks.program_scan(env, cfg_name, f"{path.parent.name}/{path.name}", src, linemap)

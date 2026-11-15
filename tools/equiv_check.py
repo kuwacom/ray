@@ -17,6 +17,7 @@ NVIDIA のバイナリには本文のハッシュ (コメントを変えても�
     uv run tools/equiv_check.py --text                  # バイナリの代わりに glslang -E の本文 (コメント・空行・#line を除く) を比べる
     uv run tools/equiv_check.py --layout                # SSBO のメンバーのオフセットと間隔を比べる (片方だけが宣言するブロックは違いに数えない)
     uv run tools/equiv_check.py --gpu 1070 --filter deferred -v
+    uv run tools/equiv_check.py --env 1.7.6             # ローダーを選ぶ (tools/capabilities.py の ENVS。既定 latest)
 """
 
 from __future__ import annotations
@@ -90,8 +91,8 @@ def load_tree(label: str, shaders: Path) -> Tree:
     return Tree(label, vs.SHADERS, vs.parse_settings(), vs.parse_profiles(), required + optional)
 
 
-def programs(tree: Tree, cfg: str, world: str, flt: str) -> dict[str, list[gcc.StageSource]] | None:
-    """設定 cfg で有効なプログラム -> 前処理したステージ。そのツリーに無いプロファイルなら None"""
+def programs(tree: Tree, cfg: str, world: str, flt: str, env: vs.Env | None = None) -> dict[str, list[gcc.StageSource]] | None:
+    """設定 cfg とローダー env で有効なプログラム -> 前処理したステージ。そのツリーに無いプロファイルなら None"""
     tree.activate()
     if cfg == "DEFAULT":
         ov: dict = {}
@@ -99,14 +100,14 @@ def programs(tree: Tree, cfg: str, world: str, flt: str) -> dict[str, list[gcc.S
         ov = vs.resolve_profile(cfg, tree.profiles)
     else:
         return None
-    disabled = gcc.disabled_programs(gcc.preprocess_properties(vs.PROPERTIES, gcc.effective_macros(ov, tree.options)))
+    disabled = gcc.unread_programs(ov, tree.options, env)
     out: dict[str, list[gcc.StageSource]] = {}
     for pname, files in gcc.collect_programs(world, flt).items():
         if f"{world}/{pname.removesuffix('.csh')}" in disabled:
             continue
         stages = []
         for f in files:
-            src, lm = vs.build_source(f, ov, tree.options, tree.features)
+            src, lm = vs.build_source(f, ov, tree.options, tree.features, env)
             stages.append(gcc.StageSource(f, vs.STAGE_OF_EXT[f.suffix], src, lm))
         out[f"{world}/{pname}"] = stages
     return out
@@ -207,7 +208,9 @@ def main() -> int:
     ap.add_argument("--gpu", default="", help="NVIDIA の描画 GPU を番号か名前の一部で選ぶ (例 1070)")
     ap.add_argument("-j", "--jobs", type=int, help=f"ドライバのコンパイルと glslang -E の並列数 (既定: glslang は CPU 数、ドライバは {gcc.DRIVER_THREADS})")
     ap.add_argument("-v", "--verbose", action="store_true", help="SAME のプログラムも表示し、DIFF の中身を詳しく出す")
+    ap.add_argument("--env", help=f"ローダー (tools/capabilities.py の ENVS の名前。既定 {vs.ENVS[0].name})。両方のツリーに同じものを当てる")
     args = ap.parse_args()
+    env = vs.env_named(args.env)
     if args.text and args.layout:
         sys.exit("--text と --layout は同時に使えない")
     mode = "text" if args.text else "layout" if args.layout else "binary"
@@ -221,7 +224,7 @@ def main() -> int:
     work_shaders = vs.SHADERS
     base = load_tree(f"base {args.base} ({base_sha})", base_dir)
     new = load_tree(f"new {args.new or 'worktree'} ({new_sha})", new_dir)
-    print(f"{base.label} -> {new.label}, mode {mode}")
+    print(f"{base.label} -> {new.label}, mode {mode}, ローダー {env.name} {env.macros}")
 
     worlds = [w for w in args.world.split(",") if w]
     for w in worlds:
@@ -276,8 +279,8 @@ def main() -> int:
         with cf.ThreadPoolExecutor(max_workers=args.jobs) as ex:
             for cfg, cfg_worlds in configs:
                 for world in cfg_worlds:
-                    bp = programs(base, cfg, world, args.filter)
-                    np_ = programs(new, cfg, world, args.filter)
+                    bp = programs(base, cfg, world, args.filter, env)
+                    np_ = programs(new, cfg, world, args.filter, env)
                     if bp is None or np_ is None:
                         if bp is None and np_ is None:
                             print(f"[{cfg}] どちらのツリーにも無い設定")
