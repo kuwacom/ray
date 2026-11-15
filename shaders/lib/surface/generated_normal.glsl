@@ -1,6 +1,6 @@
 /*
  * テクスチャの輝度を高さとみなした自動法線 (PBR テクスチャが無いリソースパック用。surface モジュール)
- * G バッファ経路 (gbuffers_solid.fsh) と、半透明の経路で描かれる金属の防具 (gbuffers_translucent.fsh) が使う
+ * G バッファ経路 (gbuffers_solid.fsh) と、半透明のエンティティ・ブロックエンティティの経路 (gbuffers_translucent.fsh) が使う
  * tileMid / tileHalf: スプライト (エンティティは面) の UV の中心と半幅。近傍の参照をその範囲に収める
  */
 #ifndef SURFACE_GENERATED_NORMAL_GLSL
@@ -22,7 +22,7 @@ const float GENERATED_FLAT_BUMP = 0.1;      // 一色の面に足す起伏の強
 // 近傍のテクセル。ブロックは繰り返し模様なので範囲で折り返し、エンティティの面は繰り返さないので端で止める
 // ブロックエンティティ (チェスト・看板・ベッドなど) もエンティティと同じ展開図のテクスチャ
 ivec2 generatedTap(ivec2 t, ivec2 tmin, ivec2 tsize) {
-#if defined GBUF_ENTITIES || defined GBUF_ENTITIES_TRANSLUCENT || defined GBUF_HAND || defined GBUF_BLOCK
+#if defined GBUF_ENTITIES || defined GBUF_ENTITIES_TRANSLUCENT || defined GBUF_HAND || defined GBUF_BLOCK || defined GBUF_BLOCK_TRANSLUCENT
     return clamp(t, tmin, tmin + tsize - 1);
 #else
     return tmin + ((t - tmin) % tsize + tsize) % tsize;
