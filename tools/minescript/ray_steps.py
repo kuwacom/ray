@@ -30,6 +30,44 @@ java_bool = _script_thread(m.java_bool)
 java_float = _script_thread(m.java_float)
 java_double = _script_thread(m.java_double)
 
+# 1.20.1 の Fabric は Minecraft のクラス・メンバーが intermediary の名前で動き、Minescript 4.0 は名前の対応表を持たない
+# 公式の client mappings と FabricMC/intermediary の 1.20.1.tiny から引いた。キーは 26.1 の名前 (版で名前が変わったものも 26.1 の名前で引く)
+INTERMEDIARY = {
+    "1.20.1": {
+        "net.minecraft.client.Minecraft": ("net.minecraft.class_310", {
+            "getInstance": "method_1551", "options": "field_1690", "gameRenderer": "field_1773",
+            "getSingleplayerServer": "method_1576", "setScreen": "method_1507", "getFps": "method_47599"}),
+        "net.minecraft.client.Options": ("net.minecraft.class_315", {
+            "getCameraType": "method_31044", "setCameraType": "method_31043", "fov": "method_41808",
+            "renderDistance": "method_42503", "cloudStatus": "method_42528", "framerateLimit": "method_42524",
+            "hideGui": "field_1842", "pauseOnLostFocus": "field_1837"}),
+        "net.minecraft.client.CameraType": ("net.minecraft.class_5498", {
+            "FIRST_PERSON": "field_26664", "THIRD_PERSON_BACK": "field_26665", "THIRD_PERSON_FRONT": "field_26666"}),
+        # 1.20.1 は Camera.getPosition()
+        "net.minecraft.client.Camera": ("net.minecraft.class_4184", {"position": "method_19326", "isDetached": "method_19333"}),
+        "net.minecraft.client.renderer.GameRenderer": ("net.minecraft.class_757", {"getMainCamera": "method_19418"}),
+        "net.minecraft.client.OptionInstance": ("net.minecraft.class_7172", {"get": "method_41753", "set": "method_41748"}),
+        "net.minecraft.client.CloudStatus": ("net.minecraft.class_4063", {
+            "OFF": "field_18162", "FAST": "field_18163", "FANCY": "field_18164"}),
+        "net.minecraft.server.MinecraftServer": ("net.minecraft.server.MinecraftServer", {"getPlayerList": "method_3760"}),
+        "net.minecraft.server.players.PlayerList": ("net.minecraft.class_3324", {"setViewDistance": "method_14608"}),
+        # 1.20.1 は Entity.absMoveTo(x, y, z, yaw, pitch) (1.21.5 で absSnapTo に改名)
+        "net.minecraft.world.entity.Entity": ("net.minecraft.class_1297", {"absSnapTo": "method_5641"}),
+    },
+}
+
+# 26.1 で改名されたゲームルール。1.20.1 では旧名でないと効かない (scenes.json と run_scene.py は 26.1 の名前で書いてある)
+GAMERULES = {
+    "1.20.1": {"advance_time": "doDaylightCycle", "advance_weather": "doWeatherCycle",
+               "spawn_mobs": "doMobSpawning", "block_drops": "doTileDrops"},
+}
+
+# ray_steps はジョブごとに reload されるので、版はモジュール dict 上の既存値を引き継いで 1 回だけ問い合わせる
+MC_VERSION: str = globals().get("MC_VERSION") or m.version_info().minecraft
+NAMES: dict = INTERMEDIARY.get(MC_VERSION, {})
+# 1.20.1 には非アクティブ時の FPS 制限 (inactivityFpsLimit, InactivityFpsLimit) が無い
+HAS_INACTIVITY_LIMIT = MC_VERSION not in INTERMEDIARY
+
 
 def reload_shaders() -> None:
     # Iris の公式 API にリロードが無いため内部の public static メソッドを直接呼ぶ
@@ -80,10 +118,13 @@ class JavaScope:
     ### 特徴
     - with を抜けると取得したハンドルを全て java_release する
     - MC 26.1 は難読化なしなので公式名 (net.minecraft.client.*) で引ける
+    - 1.20.1 は INTERMEDIARY の表で 26.1 の名前を intermediary の名前に置き換えて引く
     """
 
     def __init__(self):
         self.handles = []
+        # クラスのハンドル -> 26.1 の名前。メンバー名の置き換えに使う
+        self.names = {}
 
     def __enter__(self):
         return self
@@ -99,14 +140,20 @@ class JavaScope:
         return handle
 
     def cls(self, name: str):
-        return self.keep(java_class(name))
+        handle = self.keep(java_class(NAMES.get(name, (name,))[0]))
+        self.names[handle] = name
+        return handle
+
+    def member_name(self, clazz, name: str) -> str:
+        # 表に無いもの (Minecraft 以外のクラス、難読化の無い版) はそのまま
+        return NAMES.get(self.names.get(clazz), (None, {}))[1].get(name, name)
 
     def field(self, target, clazz, name: str):
         # static フィールドは target に 0 を渡す
-        return self.keep(java_access_field(target, self.keep(java_member(clazz, name))))
+        return self.keep(java_access_field(target, self.keep(java_member(clazz, self.member_name(clazz, name)))))
 
     def call(self, target, clazz, name: str, *args):
-        return self.keep(m.java_call_method(target, self.keep(java_member(clazz, name)), *args))
+        return self.keep(m.java_call_method(target, self.keep(java_member(clazz, self.member_name(clazz, name))), *args))
 
     def options(self):
         mc_cls = self.cls("net.minecraft.client.Minecraft")
@@ -244,7 +291,7 @@ def set_hud(visible: bool) -> bool:
     with JavaScope() as j:
         options, options_cls = j.options()
         class_cls = j.cls("java.lang.Class")
-        field = j.call(options_cls, class_cls, "getField", j.keep(java_string("hideGui")))
+        field = j.call(options_cls, class_cls, "getField", j.keep(java_string(j.member_name(options_cls, "hideGui"))))
         j.call(field, j.cls("java.lang.reflect.Field"), "setBoolean", options, j.keep(java_bool(not visible)))
     return get_hud()
 
@@ -266,7 +313,7 @@ def set_pause_on_lost_focus(value) -> bool:
             value = SAVED.pop("pause_on_lost_focus")
         else:
             SAVED.setdefault("pause_on_lost_focus", java_to_string(j.field(options, options_cls, "pauseOnLostFocus")) == "true")
-        field = j.call(options_cls, j.cls("java.lang.Class"), "getField", j.keep(java_string("pauseOnLostFocus")))
+        field = j.call(options_cls, j.cls("java.lang.Class"), "getField", j.keep(java_string(j.member_name(options_cls, "pauseOnLostFocus"))))
         j.call(field, j.cls("java.lang.reflect.Field"), "setBoolean", options, j.keep(java_bool(bool(value))))
         if not value:
             mc_cls = j.cls("net.minecraft.client.Minecraft")
@@ -320,8 +367,12 @@ KEY_FUNCS = {
 
 def run_step(step: dict):
     if "cmd" in step:
-        cmd = step["cmd"]
-        m.execute(cmd if cmd.startswith("/") else "/" + cmd)
+        cmd = step["cmd"].removeprefix("/")
+        rules = GAMERULES.get(MC_VERSION)
+        if rules and cmd.startswith("gamerule "):
+            _, rule, *rest = cmd.split(" ")
+            cmd = " ".join(["gamerule", rules.get(rule, rule), *rest])
+        m.execute("/" + cmd)
         return None
     if "orient" in step:
         yaw, pitch = step["orient"]
@@ -467,9 +518,10 @@ def run_step(step: dict):
                 saved_limit = int(java_to_string(j.call(inst, inst_cls, "get")))
                 j.call(inst, inst_cls, "set", j.keep(java_int(260)))
                 # 入力なしで 1 分経つと AFK 扱いで 30 FPS に落ちるので、計測中は最小化時だけの制限にする
-                afk = j.call(options, options_cls, "inactivityFpsLimit")
-                SAVED.setdefault("inactivity", java_to_string(j.call(afk, inst_cls, "get")))
-                j.call(afk, inst_cls, "set", j.field(0, j.cls("net.minecraft.client.InactivityFpsLimit"), "MINIMIZED"))
+                if HAS_INACTIVITY_LIMIT:
+                    afk = j.call(options, options_cls, "inactivityFpsLimit")
+                    SAVED.setdefault("inactivity", java_to_string(j.call(afk, inst_cls, "get")))
+                    j.call(afk, inst_cls, "set", j.field(0, j.cls("net.minecraft.client.InactivityFpsLimit"), "MINIMIZED"))
             time.sleep(1.0)
         samples = []
         frames0, wall0 = iris_frame_count(), time.time()
@@ -485,18 +537,28 @@ def run_step(step: dict):
         with JavaScope() as j:
             options, options_cls = j.options()
             inst_cls = j.cls("net.minecraft.client.OptionInstance")
+            limit_names = ("framerateLimit", "inactivityFpsLimit") if HAS_INACTIVITY_LIMIT else ("framerateLimit",)
             limits = {name: java_to_string(j.call(j.call(options, options_cls, name), inst_cls, "get"))
-                      for name in ("framerateLimit", "inactivityFpsLimit")}
+                      for name in limit_names}
             if saved_limit is not None:
                 inst = j.call(options, options_cls, "framerateLimit")
                 j.call(inst, inst_cls, "set", j.keep(java_int(saved_limit)))
-                afk = j.call(options, options_cls, "inactivityFpsLimit")
-                j.call(afk, inst_cls, "set", j.field(0, j.cls("net.minecraft.client.InactivityFpsLimit"), SAVED.pop("inactivity")))
+                if HAS_INACTIVITY_LIMIT:
+                    afk = j.call(options, options_cls, "inactivityFpsLimit")
+                    j.call(afk, inst_cls, "set", j.field(0, j.cls("net.minecraft.client.InactivityFpsLimit"), SAVED.pop("inactivity")))
         return {"fps": samples, "frame_ms": frame_ms, **limits}
     if "java_methods" in step:
         # 例: {"java_methods": "net.minecraft.client.Camera"} java_* API で呼ぶメソッド名を調べる用
+        # 1.20.1 では intermediary の名前 (method_*) が返る
         with JavaScope() as j:
-            return sorted(set(m.java_method_names(j.cls(step["java_methods"]))))
+            clazz = j.cls(step["java_methods"])
+            if hasattr(m, "java_method_names"):
+                return sorted(set(m.java_method_names(clazz)))
+            # Minescript 4.0 には java_method_names が無いので Class.getMethods() を読む
+            methods = j.call(clazz, j.cls("java.lang.Class"), "getMethods")
+            method_cls = j.cls("java.lang.reflect.Method")
+            return sorted({java_to_string(j.call(j.keep(m.java_array_index(methods, i)), method_cls, "getName"))
+                           for i in range(m.java_array_length(methods))})
     if "clear_hostiles" in step:
         # 例: {"clear_hostiles": [x, y, z, r]} シーンで summon したもの (tag=ray) は残す
         # kill だとドロップ品が床に残って写り込むので奈落へ送る
