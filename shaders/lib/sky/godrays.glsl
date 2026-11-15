@@ -4,7 +4,7 @@
  * 手法: Mitchell, "Volumetric Light Scattering as a Post-Process", GPU Gems 3, Chapter 13 (放射状のぼかしと減衰の重み)
  * 入力は明るさの閾値ではなく解析的なマスク (空の画素 x 雲の透過率 x 光源からの角度) にする。
  * 明るい雪・雲の縁・水面の輝点を拾わず、閾値の揺れでちらつかない
- * ぼかしは入れ子の 3 パス (1 パス N タップで実効 N^3 タップ) を低解像度の colortex16 で行い、足すのはフォグの適用 (composite19)
+ * ぼかしは入れ子の 3 パス (1 パス N タップで実効 N^3 タップ) を低解像度 (colortex4 の左上) で行い、足すのはフォグの適用 (composite19)
  */
 #ifndef SKY_GODRAYS_GLSL
 #define SKY_GODRAYS_GLSL
@@ -69,10 +69,21 @@ float evalGodraysSource(vec2 uv, vec3 lightView) {
     return sky * w * getCloudLayer(ivec2(uv * viewSize())).a;
 }
 
+/*
+ * 画面の UV を、光芒の枠 (全画面の大きさのバッファの左上 1/GODRAYS_RES。scale.composite12-14 の viewport) の UV へ写す
+ * 各軸を外側のテクセルの中心までに clamp し、低解像度のバッファを CLAMP_TO_EDGE で読むのと同じ値にする
+ * (clamp しないと範囲の外に残る半透明の色が双一次で混ざる)。大きさは Iris の viewport と同じ切り捨て
+ */
+vec2 godraysTexUv(vec2 uv) {
+    vec2 screen = viewSize();
+    vec2 lowSize = floor(screen / float(GODRAYS_RES));
+    return clamp(uv * lowSize, vec2(0.5), lowSize - 0.5) / screen;
+}
+
 // 低解像度の前のパスの結果 (双一次)。画面の外は 0
 float fetchGodrays(vec2 uv) {
     if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) return 0.0;
-    return textureLod(TEX_GODRAYS, uv, 0.0).r;
+    return textureLod(TEX_GODRAYS, godraysTexUv(uv), 0.0).r;
 }
 
 /*
@@ -100,7 +111,7 @@ vec3 evalGodraysRadiance(vec2 uv, bool isSky, float dist, float localExtinction)
     if (!godraysLightUv(lightUv, outside)) return vec3(0.0);
     float medium = mix(GODRAYS_CLEAR_SHARE, 1.0, saturate(localExtinction / GODRAYS_FOG_REF));
     float nearFade = isSky ? 1.0 : saturate(dist / GODRAYS_NEAR_FADE);
-    return textureLod(TEX_GODRAYS, uv, 0.0).r * frameData.shadowLightIrradiance.rgb
+    return textureLod(TEX_GODRAYS, godraysTexUv(uv), 0.0).r * frameData.shadowLightIrradiance.rgb
          * (GODRAYS_GAIN * GODRAYS_STRENGTH * medium * nearFade * evalGodraysScale(outside));
 }
 

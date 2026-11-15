@@ -17,7 +17,7 @@ uniform sampler2D colortex0;  // シーン HDR
 uniform sampler2D colortex1;  // G: アルベド + マテリアル ID
 uniform sampler2D colortex2;  // G: 法線 + ライトマップ
 uniform sampler2D colortex3;  // G: PBR マテリアル + AO
-uniform sampler2D colortex4;  // 半透明の色 (乗算済みアルファ)
+uniform sampler2D colortex4;  // 半透明の色 (乗算済みアルファ)。composite12 以降は B: 画面空間の光芒 (左上の低解像度)
 uniform sampler2D colortex5;  // 半透明のデータ
 uniform sampler2D colortex6;  // A: ブロックライト (デノイズ済み)
 uniform sampler2D colortex7;  // A: ブロックライト履歴
@@ -29,7 +29,6 @@ uniform sampler2D colortex12; // B: ボリューメトリック (低解像度)
 uniform sampler2D colortex13; // D: TAA 履歴
 uniform sampler2D colortex14; // D: ブルームタイル
 uniform sampler2D colortex15; // 速度ベクトル
-uniform sampler2D colortex16; // B: 画面空間の光芒 (低解像度)
 
 uniform sampler2D depthtex0; // 半透明・手を含む深度
 uniform sampler2D depthtex1; // 半透明を含まない深度

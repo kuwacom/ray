@@ -20,7 +20,7 @@
 #define TEX_GI_HIST       colortex9   // deferred11 (永続) -> deferred10 / composite
 #define TEX_CLOUD_LOW     colortex14  // deferred20 -> deferred21
 #define TEX_BLOOM         colortex14  // composite23 -> final
-#define TEX_GODRAYS       colortex16  // composite12 -> composite19 (size.buffer.colortex16 の低解像度)
+#define TEX_GODRAYS       colortex4   // composite12 -> composite19 (左上 1/GODRAYS_RES、scale.composite12-14)
 #define TEX_SPARKLE_HIST  colortex8   // composite20 (永続) -> final
 #define TEX_WATER_REFR    colortex14  // composite1 -> composite2
 #define TEX_GI_AUX        colortex10  // deferred11 (永続)

@@ -7,7 +7,7 @@ const int colortex0Format  = RGBA16F; // シーン HDR          | deferred30 -> 
 const int colortex1Format  = RGBA8;   // G: アルベド + ID    | gbuffers (不透明) -> deferred*
 const int colortex2Format  = RGBA16;  // G: 法線 + ライトマップ | gbuffers (不透明) -> deferred* / composite*
 const int colortex3Format  = RGBA16;  // G: PBR + AO          | gbuffers (不透明) -> deferred*
-const int colortex4Format  = RGBA16F; // 半透明の色 (乗算済み) | gbuffers (半透明) -> composite2
+const int colortex4Format  = RGBA16F; // 半透明の色 (乗算済み) | gbuffers (半透明) -> composite2。後に B: 画面空間の光芒 (左上 1/GODRAYS_RES、.r) | composite12 -> 13 -> 14 -> composite19
 const int colortex5Format  = RGBA16;  // 半透明のデータ       | gbuffers (半透明) -> composite*
 const int colortex6Format  = RGBA16F; // A: ブロックライト    | deferred2 -> deferred30 / composite*
 const int colortex7Format  = RGBA16F; // A: ブロックライト履歴 | deferred2 (永続)
@@ -19,7 +19,6 @@ const int colortex12Format = RGBA16F; // B: ボリューメトリック | compos
 const int colortex13Format = RGBA16F; // D: TAA 履歴          | composite20 (永続)
 const int colortex14Format = RGBA16F; // B: 雲 (低解像度) | deferred20 -> deferred21、水の屈折先の色 + 水の中の経路長 | composite1 -> composite2 (水の画素だけ)、D: ブルームタイル | composite23 -> composite24 -> final
 const int colortex15Format = RGBA16F; // 速度ベクトル         | gbuffers (エンティティ/手) -> composite20 / 21
-const int colortex16Format = R16F;    // B: 画面空間の光芒 (低解像度) | composite12 -> 13 -> 14 -> composite19
 
 const bool colortex0Clear  = true;
 const bool colortex1Clear  = true;
@@ -37,7 +36,6 @@ const bool colortex12Clear = false;
 const bool colortex13Clear = false;
 const bool colortex14Clear = true;
 const bool colortex15Clear = true;
-const bool colortex16Clear = true;
 
 const vec4 colortex0ClearColor  = vec4(0.0, 0.0, 0.0, 0.0);
 const vec4 colortex1ClearColor  = vec4(0.0, 0.0, 0.0, 0.0);
@@ -48,7 +46,6 @@ const vec4 colortex5ClearColor  = vec4(0.0, 0.0, 0.0, 0.0);
 const vec4 colortex6ClearColor  = vec4(0.0, 0.0, 0.0, 0.0);
 const vec4 colortex14ClearColor = vec4(0.0, 0.0, 0.0, 0.0);
 const vec4 colortex15ClearColor = vec4(0.0, 0.0, 0.0, 0.0);
-const vec4 colortex16ClearColor = vec4(0.0, 0.0, 0.0, 0.0);
 
 const int shadowcolor0Format = RGBA8;  // 最も太陽側の面の色 (半透明は透過色, a = 不透明度)
 const int shadowcolor1Format = RGBA16; // rg = 法線 (oct), b = スカイライト, a = 種別 (0=不透明 0.5=半透明 1=水)

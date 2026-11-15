@@ -5,7 +5,8 @@
  *   composite14 (GODRAYS_PASS_2): 全長のスパン
  * 小さいスパンを先にして、深度のマス目 (低解像度の折り返し) をならしてから長く伸ばす。
  * 3 つの箱 (幅 L/N^2・L/N・L、それぞれ N タップ) を順に畳み込むと、全長 L を間隔 L/N^3 でなぞったのと同じになる
- * 低解像度のバッファ (colortex16) に書くので、texcoord は 0..1 のまま画面の UV として使える
+ * scale.composite12-14 で viewport を colortex4 の左上 1/GODRAYS_RES に絞るので、texcoord は 0..1 のまま画面の UV として使える
+ * (colortex4 は composite2 で半透明の色を読み終えて空いている)
  * sky モジュール (lib/sky)
  */
 //@include "/lib/common/common.glsl"
@@ -41,7 +42,7 @@
 
 in vec2 texcoord;
 
-/* RENDERTARGETS: 16 */
+/* RENDERTARGETS: 4 */
 layout(location = 0) out float outRays;
 
 #if defined GODRAYS_PASS_0
