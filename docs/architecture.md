@@ -102,7 +102,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 14 | deferred1.csh | light | LIGHT_TRACE_COUNT 光源 (上位 N-1 個 + 残りから確率的に 1 個) の DDA トレース (直接光) | SSBO3, voxel*, G バッファ | blockLightRawImg (影あり S), blockLightAuxImg (影なし U) (左上 1/RES) | local 8², workGroupsRender = 1/LIGHT_TRACE_RES | LIGHT_SHADOWS |
 | 15 | deferred2.vsh/fsh | light | 可視率 S/U の時空間デノイズ + フル解像度の影なし照度に掛ける | blockLightRaw/Aux, colortex7 | colortex6, colortex7 | 画面 | LIGHT_SHADOWS |
 | 16 | deferred10.csh | surface | GI / AO の生値 (RSM / SSGI / ボクセル RT)。多重反射は画面に映るヒット点の前フレームの GI (colortex9) | G バッファ, shadowcolor, voxel, flood, colortex9 | giRawImg | local 8², 1/GI_RES | GI_MODE>0 or AO_MODE>0 |
-| 17 | deferred11.vsh/fsh | surface | GI / AO のデノイズ | giRaw, colortex9, colortex19 | colortex8, colortex9, colortex19 | 画面 | 同上 |
+| 17 | deferred11.vsh/fsh | surface | GI / AO のデノイズ | giRaw, colortex9, colortex19 | colortex9, colortex19 | 画面 | 同上 |
 | 18 | deferred20.vsh/fsh | sky | 体積雲レイマーチ (低解像度 + チェッカーボード) | weather, skyView | colortex14 (左上 1/CLOUD_RES) | 画面 (範囲外は早期終了) | CLOUDS>=2, world0 |
 | 19 | deferred21.vsh/fsh | sky | 雲の時間アップスケール | colortex14, 履歴 | colortex11 | 画面 | 同上 |
 | 20 | deferred30.vsh/fsh | surface | 不透明シェーディング (全モジュールの光を合成) + 空の描画 | G バッファ, colortex6/8/11, SSBO0 | colortex0 | 画面 | 常時 |
@@ -146,8 +146,8 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 5 | RGBA16 | 半透明のデータ: rg 法線, b ライトマップ, a マテリアル ID + 予備 8bit (ガラスの透過色の index、金属の防具は滑らかさ) | surface | surface, sky | 毎フレーム |
 | 6 | RGBA16F | light: ブロックライト直接光 (拡散照度, デノイズ済み) | light (deferred2) | surface (light の関数経由) | 毎フレーム |
 | 7 | RGBA16F | light: ブロックライト履歴 | light | light | 永続 |
-| 8 | RGBA16F | surface: rgb 間接光照度, a AO | surface (deferred11) | surface, post(debug) | 毎フレーム |
-| 9 | RGBA16F | surface: GI 履歴 | surface | surface | 永続 |
+| 8 | RGBA16F | 未使用 | - | - | なし |
+| 9 | RGBA16F | surface: rgb 間接光照度, a AO。deferred11 の出力が次のフレームの GI の履歴を兼ねる | surface (deferred11) | surface, post(debug) | 永続 |
 | 10 | RGBA16F | 未使用 | - | - | なし |
 | 11 | RGBA16F | sky: 雲 (フル解像度, 時間蓄積) | sky | surface (sky の関数経由), sky | 永続 |
 | 12 | RGBA16F | sky: VL / フォグ (低解像度) rgb 内散乱, a 透過率 | sky | sky | 永続 |
@@ -162,7 +162,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 21 | RGBA16F | surface: 上向きの水面の太陽の可視率 (影の PCSS + 雲影、rgb。内散乱・泡・波頭の透過光と太陽の照り返しに使う), a = 水の屈折先の白飛び分の輝度 (屈折先の deferred30 の a から)。水の画素だけ | surface (composite1) | surface (composite2) | なし |
 
 - gbuffers では colortex0-3 を読めない (Iris の仕様)
-- 4, 8, 9, 10, 14, 16〜21 は `lib/buffers/slots.glsl` の論理名 (`TEX_*`、用途ごとの区間付き) で読む。番号を変えるときは slots.glsl と RENDERTARGETS の数字を一緒に直す (`tools/check_slots.py` が直接書きと区間の外の読み書きを調べる)
+- 4, 9, 14, 16〜21 は `lib/buffers/slots.glsl` の論理名 (`TEX_*`、用途ごとの区間付き) で読む。番号を変えるときは slots.glsl と RENDERTARGETS の数字を一緒に直す (`tools/check_slots.py` が直接書きと区間の外の読み書きを調べる)
 - `shadowcolor0` RGBA8: 最も太陽側の面の色 (半透明は透過色 + a 不透明度、不透明は a=1)。`shadowcolor1` RGBA16: rg 法線 (oct), b スカイライト, a 種別 (0 不透明 / 0.5 半透明 / 1 水)。RSM (surface) と色付き影 (surface) と色付き光芒 (sky) が読む
 
 ### カスタムイメージ (16 枚すべて使用。正本は `lib/buffers/images.glsl` + shaders.properties。GLSL の宣言は下の「opt-in」を参照)
@@ -708,7 +708,7 @@ post モジュールが提供 (`//@include "/lib/post/post.glsl"`):
 | colortex1/2/3/15 | 読む | 読む | 書く | 読む |
 | colortex4/5 | - | colortex4 に雨を書く | 書く | - |
 | colortex6/7, blockLightRaw/Aux | 書く | 読む (6) | 読む (6, 関数経由) | 読む (debug) |
-| colortex8/9/18-21, giRaw, reflection | 読む (8) | 読む | 書く | 読む (debug) |
+| colortex9/18-21, giRaw, reflection | 読む (9) | 読む | 書く | 読む (debug) |
 | colortex11/12/16, colortex14 (deferred), sky LUT, cloud*, fogHistory | 読む | 書く | 読む (11, 関数経由) | 読む (debug) |
 | colortex0 | - | 空テクスチャ (gbuffers), composite19 で書く | deferred30 / composite2 で書く | composite20 以降で書く |
 | colortex13/14/17 | - | - | - | 書く |

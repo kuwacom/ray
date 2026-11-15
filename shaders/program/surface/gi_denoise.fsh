@@ -1,6 +1,6 @@
 /*
- * deferred11: GI / AO のアップサンプル + デノイズ (giRawImg + colortex9 -> colortex8, colortex9)
- * 出力 colortex8: rgb = 間接光の照度, a = AO
+ * deferred11: GI / AO のアップサンプル + デノイズ (giRawImg + colortex9 -> colortex9)
+ * 出力 colortex9: rgb = 間接光の照度, a = AO。今フレームの出力と次フレームの履歴を兼ねる
  * surface モジュール (lib/surface)
  *
  * 1. 空間: 低解像度テクセルの近傍 (GI_DENOISE=2 で 5x5、それ以外 3x3) を深度・法線の差で重み付けして集める (joint bilateral)
@@ -72,15 +72,14 @@
 in vec2 texcoord;
 
 #if GI_DENOISE >= 1
-/* RENDERTARGETS: 8,9,19 */
+/* RENDERTARGETS: 9,19 */
 #else
-/* RENDERTARGETS: 8,9 */
+/* RENDERTARGETS: 9 */
 #endif
-layout(location = 0) out vec4 outIndirect;
-layout(location = 1) out vec4 outHistory;
+layout(location = 0) out vec4 outHistory;
 #if GI_DENOISE >= 1
 // r = 履歴の長さ (フレーム), g = 視線距離, b = 速い履歴の輝度の平均, a = その分散
-layout(location = 2) out vec4 outHistoryInfo;
+layout(location = 1) out vec4 outHistoryInfo;
 #endif
 
 #if GI_DENOISE == 2
@@ -114,8 +113,7 @@ void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
     float depth = texelFetch(depthtex1, texel, 0).r;
     if (depth >= 1.0 || isHandDepth(depth)) {
-        outIndirect = vec4(0.0, 0.0, 0.0, 1.0);
-        outHistory = outIndirect;
+        outHistory = vec4(0.0, 0.0, 0.0, 1.0);
 #if GI_DENOISE >= 1
         outHistoryInfo = vec4(0.0);
 #endif
@@ -222,6 +220,5 @@ void main() {
     outHistoryInfo = info;
 #endif
 
-    outIndirect = result;
     outHistory = result;
 }

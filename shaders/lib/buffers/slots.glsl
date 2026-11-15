@@ -15,7 +15,7 @@
 //@include "/lib/common/samplers.glsl"
 
 #define TEX_TRANSLUCENT   colortex4   // gbuffers -> composite2
-#define TEX_GI            colortex8   // deferred11 -> composite2 / final (final は DEBUG_VIEW=6)
+#define TEX_GI            TEX_GI_HIST // deferred11 -> composite2 / final (今フレームの出力と次フレームの履歴は同じ値。final は DEBUG_VIEW=6)
 #define TEX_GI_HIST       colortex9   // deferred11 (永続) -> deferred10 / composite
 #define TEX_CLOUD_LOW     colortex14  // deferred20 -> deferred21
 #define TEX_BLOOM         colortex14  // composite23 -> final

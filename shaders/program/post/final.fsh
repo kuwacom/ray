@@ -17,6 +17,7 @@
 //@include "/lib/light/voxel.glsl"
 //@include "/lib/buffers/formats.glsl"
 //@include "/lib/buffers/slots.glsl"
+//@include "/lib/surface/gi.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -74,6 +75,8 @@
 #include "/lib/light/voxel.glsl"
 #include "/lib/light/floodfill.glsl"
 #include "/lib/buffers/formats.glsl"
+#include "/lib/common/frame_offset.glsl"
+#include "/lib/surface/gi.glsl"
 // END GENERATED includes
 
 #ifdef SPECULAR_SPARKLE
@@ -99,7 +102,8 @@ vec3 debugView(ivec2 texel, vec3 color) {
     vec3 playerPos = screenToPlayer(vec3(texcoord, depth));
     return linearToSrgb(tonemap(sampleFloodfillVolume(playerPos - normalize(playerPos) * 0.5)));
 #elif DEBUG_VIEW == 6
-    vec4 gi = texelFetch(TEX_GI, texel, 0);
+    // GI/AO なしでは colortex9 が書かれないので、枠を直接読まず定数を返す口を通す
+    vec4 gi = getIndirectLight(texel);
     return linearToSrgb(tonemap(gi.rgb)) * gi.a;
 #elif DEBUG_VIEW == 7
     // 雲の散乱光に露出を掛けて見る (掛けないと夜や薄明では真っ黒になる)

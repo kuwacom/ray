@@ -15,7 +15,7 @@
 //@include "/lib/buffers/slots.glsl"
 
 /*
- * deferred11 のデノイズ済み結果 (colortex8)
+ * deferred11 のデノイズ済み結果 (colortex9。GI の履歴と同じ枠)
  * rgb = 間接光の照度 (空・ブロックライトの拡散に加算), a = AO (空の照度に掛ける)
  */
 vec4 getIndirectLight(ivec2 texel) {
