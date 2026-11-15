@@ -1,6 +1,6 @@
 /*
  * deferred20: 体積雲のレイマーチ (CLOUD_RES 分の 1 解像度, CLOUD_TEMPORAL ならチェッカーボード)
- * 出力: colortex10 の左上領域。rgb = 散乱光, a = 透過率
+ * 出力: TEX_CLOUD_LOW (colortex14) の左上領域。rgb = 散乱光, a = 透過率
  * 低解像度の 1 テクセル = フル解像度の CLOUD_RES 四方のブロック。今フレームはブロック内の 1 ピクセルだけを計算する
  * sky モジュール (lib/sky)
  */
@@ -54,7 +54,7 @@
 
 in vec2 texcoord;
 
-/* RENDERTARGETS: 10 */
+/* RENDERTARGETS: 14 */
 layout(location = 0) out vec4 outClouds;
 
 void main() {

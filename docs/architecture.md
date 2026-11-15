@@ -103,8 +103,8 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 15 | deferred2.vsh/fsh | light | 可視率 S/U の時空間デノイズ + フル解像度の影なし照度に掛ける | blockLightRaw/Aux, colortex7 | colortex6, colortex7 | 画面 | LIGHT_SHADOWS |
 | 16 | deferred10.csh | surface | GI / AO の生値 (RSM / SSGI / ボクセル RT)。多重反射は画面に映るヒット点の前フレームの GI (colortex9) | G バッファ, shadowcolor, voxel, flood, colortex9 | giRawImg | local 8², 1/GI_RES | GI_MODE>0 or AO_MODE>0 |
 | 17 | deferred11.vsh/fsh | surface | GI / AO のデノイズ | giRaw, colortex9, colortex19 | colortex8, colortex9, colortex19 | 画面 | 同上 |
-| 18 | deferred20.vsh/fsh | sky | 体積雲レイマーチ (低解像度 + チェッカーボード) | weather, skyView | colortex10 (左上 1/CLOUD_RES) | 画面 (範囲外は早期終了) | CLOUDS>=2, world0 |
-| 19 | deferred21.vsh/fsh | sky | 雲の時間アップスケール | colortex10, 履歴 | colortex11 | 画面 | 同上 |
+| 18 | deferred20.vsh/fsh | sky | 体積雲レイマーチ (低解像度 + チェッカーボード) | weather, skyView | colortex14 (左上 1/CLOUD_RES) | 画面 (範囲外は早期終了) | CLOUDS>=2, world0 |
+| 19 | deferred21.vsh/fsh | sky | 雲の時間アップスケール | colortex14, 履歴 | colortex11 | 画面 | 同上 |
 | 20 | deferred30.vsh/fsh | surface | 不透明シェーディング (全モジュールの光を合成) + 空の描画 | G バッファ, colortex6/8/11, SSBO0 | colortex0 | 画面 | 常時 |
 | 21 | gbuffers_water / hand_water / particles_translucent / weather / clouds | surface (weather・clouds は sky) | 半透明の前方シェーディング (clouds は CLOUDS=1 のバニラの雲。deferred の後に描かれるので前方で色を決め、colortex4 だけに書く) | アトラス, 影, flood | colortex4 (乗算済み), colortex5 | 画面 | 常時 |
 | 22 | composite.csh | surface | 反射 (SSR / ラフ / ボクセル補完) | colortex0/2/3/5, voxel | reflectionImg | local 8², 0.5 | REFLECTIONS>0 |
@@ -148,11 +148,11 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 7 | RGBA16F | light: ブロックライト履歴 | light | light | 永続 |
 | 8 | RGBA16F | surface: rgb 間接光照度, a AO | surface (deferred11) | surface, post(debug) | 毎フレーム |
 | 9 | RGBA16F | surface: GI 履歴 | surface | surface | 永続 |
-| 10 | RGBA16F | sky: 雲 (低解像度) rgb 散乱, a 透過率 | sky | sky | 永続 |
+| 10 | RGBA16F | 未使用 | - | - | なし |
 | 11 | RGBA16F | sky: 雲 (フル解像度, 時間蓄積) | sky | surface (sky の関数経由), sky | 永続 |
 | 12 | RGBA16F | sky: VL / フォグ (低解像度) rgb 内散乱, a 透過率 | sky | sky | 永続 |
 | 13 | RGBA16F | post: TAA 履歴 | post | post | 永続 |
-| 14 | RGBA16F | post: ブルームタイル (と画面のフレア、LOCAL_TONEMAP > 0 の時は局所トーンマップの 1/32 タイル) | post | post | 毎フレーム |
+| 14 | RGBA16F | sky: 雲 (低解像度、deferred20 -> 21) rgb 散乱, a 透過率。post: ブルームタイル (composite23 -> final) (と画面のフレア、LOCAL_TONEMAP > 0 の時は局所トーンマップの 1/32 タイル) | sky, post | sky, post | 毎フレーム |
 | 15 | RGBA16F | 速度: rg = 前フレーム UV - 今の UV, a = 1 なら有効 (エンティティ・手)。a = 0 の金属の防具の画素だけ rgb = 環境光の鏡面の重み x 1e-4 (gbuffers_entities_translucent -> composite2。双線形で読まれても速度がずれないよう小さくする) | surface (gbuffers, post の関数) | post | 毎フレーム |
 | 16 | R16F | sky: 画面空間の光芒 (低解像度 `size.buffer.colortex16` = 1/GODRAYS_RES)。composite12 -> 13 -> 14 で同じバッファをピンポンして読み書きし、composite19 が足す | sky | sky | 毎フレーム |
 | 17 | RGBA16F | post: 鏡面の白飛び分の履歴 (rgb = 露出前の線形, a 予備)。SPECULAR_SPARKLE の時だけ composite20 が読み書きし、final がミップで読んで点像の芯と裾を作る (LENS_POINT_SPREAD_STRENGTH) | post | post | 永続 |
@@ -709,7 +709,7 @@ post モジュールが提供 (`//@include "/lib/post/post.glsl"`):
 | colortex4/5 | - | colortex4 に雨を書く | 書く | - |
 | colortex6/7, blockLightRaw/Aux | 書く | 読む (6) | 読む (6, 関数経由) | 読む (debug) |
 | colortex8/9/18-21, giRaw, reflection | 読む (8) | 読む | 書く | 読む (debug) |
-| colortex10/11/12/16, sky LUT, cloud*, fogHistory | 読む | 書く | 読む (11, 関数経由) | 読む (debug) |
+| colortex11/12/16, colortex14 (deferred), sky LUT, cloud*, fogHistory | 読む | 書く | 読む (11, 関数経由) | 読む (debug) |
 | colortex0 | - | 空テクスチャ (gbuffers), composite19 で書く | deferred30 / composite2 で書く | composite20 以降で書く |
 | colortex13/14/17 | - | - | - | 書く |
 | debugImg | 書ける (IMG_DEBUG) | 書ける (IMG_DEBUG) | 書ける (IMG_DEBUG) | 表示 (DEBUG_VIEW=12) |

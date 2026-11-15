@@ -17,7 +17,7 @@
 #define TEX_TRANSLUCENT   colortex4   // gbuffers -> composite2
 #define TEX_GI            colortex8   // deferred11 -> composite2 / final (final は DEBUG_VIEW=6)
 #define TEX_GI_HIST       colortex9   // deferred11 (永続) -> deferred10 / composite
-#define TEX_CLOUD_LOW     colortex10  // deferred20 -> deferred21
+#define TEX_CLOUD_LOW     colortex14  // deferred20 -> deferred21
 #define TEX_BLOOM         colortex14  // composite23 -> final
 #define TEX_GODRAYS       colortex16  // composite12 -> composite19 (size.buffer.colortex16 の低解像度)
 #define TEX_SPARKLE_HIST  colortex17  // composite20 (永続) -> final
