@@ -80,7 +80,7 @@
 // END GENERATED includes
 
 #ifdef SPECULAR_SPARKLE
-const bool colortex17MipmapEnabled = true;
+const bool colortex8MipmapEnabled = true;
 #endif
 
 in vec2 texcoord;
@@ -305,7 +305,7 @@ void main() {
     /*
      * レンズ: 点像の芯と裾。白を超えた鏡面の点は 1 画素ほどで、実際のカメラでは回折・センサーの芯 (半径 1-2 px) と、収差と
      * 散乱の裾 (r^-2) を引いて丸い光の塊に見える。芯は双線形の 3 x 3 の読みで配る (POINT_CORE_SHARE)
-     * 白飛び分 (colortex17) のミップは箱の平均でエネルギーを保つので、4 段を同じエネルギーずつ読んで芯から裾へ配る (総量は変えない)
+     * 白飛び分 (colortex8) のミップは箱の平均でエネルギーを保つので、4 段を同じエネルギーずつ読んで芯から裾へ配る (総量は変えない)
      * DoF の前の値なので、ボケている点には重ねない (玉ボケに任せる)
      * 球面収差・ブルーム・ヘイズの mix より前に掛ける。後に掛けると、mix で縮んだ hdr から縮む前の白飛び分を引き、点の中心が地まで削られて黒く抜けた
      */
@@ -331,7 +331,7 @@ void main() {
                 coreBlur += max(textureLod(TEX_SPARKLE_HIST, uvL + offset * texelSize(), 0.0).rgb, 0.0) * (POINT_CORE_TAP_W[a.x] * POINT_CORE_TAP_W[a.y]);
             }
             /*
-             * 芯と裾へ配る分は中心から引く。colortex17 は DoF・モーションブラー・色収差の前の値なので、ボケた点や色ごとにずれた点では
+             * 芯と裾へ配る分は中心から引く。colortex8 は DoF・モーションブラー・色収差の前の値なので、ボケた点や色ごとにずれた点では
              * hdr の中心に同じだけの白飛び分が残っていない。引くのは、TAA の出した白飛び分の外の色 (colortex13) を超えて残っている分まで
              * (ピントの前後で中心だけ地まで引かれ、周りが光って中心が黒・緑・紫の 1 画素に抜けた)
              */

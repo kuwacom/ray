@@ -21,7 +21,7 @@ uniform sampler2D colortex4;  // 半透明の色 (乗算済みアルファ)
 uniform sampler2D colortex5;  // 半透明のデータ
 uniform sampler2D colortex6;  // A: ブロックライト (デノイズ済み)
 uniform sampler2D colortex7;  // A: ブロックライト履歴
-uniform sampler2D colortex8;  // (未使用)
+uniform sampler2D colortex8;  // D: 鏡面の白飛び分の履歴
 uniform sampler2D colortex9;  // C: GI / AO (出力と履歴)
 uniform sampler2D colortex10; // B: 雲 (低解像度)
 uniform sampler2D colortex11; // B: 雲履歴 (フル解像度)
@@ -30,7 +30,6 @@ uniform sampler2D colortex13; // D: TAA 履歴
 uniform sampler2D colortex14; // D: ブルームタイル
 uniform sampler2D colortex15; // 速度ベクトル
 uniform sampler2D colortex16; // B: 画面空間の光芒 (低解像度)
-uniform sampler2D colortex17; // D: 鏡面の白飛び分の履歴
 uniform sampler2D colortex18; // 水の屈折先の色 + 経路長
 uniform sampler2D colortex19; // C: GI 履歴の付属 (長さ・視線距離・速い履歴)
 uniform sampler2D colortex20; // 水の鏡面の SSR
