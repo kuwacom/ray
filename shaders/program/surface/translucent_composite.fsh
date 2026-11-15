@@ -116,8 +116,10 @@
 #include "/lib/common/jitter.glsl"
 // END GENERATED includes
 
-/* RENDERTARGETS: 0 */
+/* RENDERTARGETS: 0,14 */
 layout(location = 0) out vec4 outColor;
+// r = 半透明の不透明度。composite19 のビーコンの光線が読む (colortex4 は composite2 の後に光芒が使う)
+layout(location = 1) out vec4 outTranslucentAlpha;
 
 const float GLASS_IOR = 1.5;
 const float GLASS_F0 = 0.04;
@@ -130,6 +132,7 @@ void main() {
     vec4 sceneIn = texelFetch(colortex0, texel, 0);
     vec3 scene = sceneIn.rgb;
     vec4 translucent = texelFetch(TEX_TRANSLUCENT, texel, 0);
+    outTranslucentAlpha = vec4(translucent.a, 0.0, 0.0, 0.0);
     float d0 = texelFetch(depthtex0, texel, 0).r;
     float d1 = texelFetch(depthtex1, texel, 0).r;
     vec4 data = texelFetch(colortex5, texel, 0);

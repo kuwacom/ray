@@ -17,7 +17,7 @@ const int colortex10Format = RGBA16F; // C: GI 履歴の付属 (長さ, 視線�
 const int colortex11Format = RGBA16F; // B: 雲履歴            | deferred21 (永続) -> deferred30 / composite*
 const int colortex12Format = RGBA16F; // B: ボリューメトリック | composite1_a -> composite19
 const int colortex13Format = RGBA16F; // D: TAA 履歴          | composite20 (永続)
-const int colortex14Format = RGBA16F; // B: 雲 (低解像度) | deferred20 -> deferred21、水の屈折先の色 + 水の中の経路長 | composite1 -> composite2 (水の画素だけ)、D: ブルームタイル | composite23 -> composite24 -> final
+const int colortex14Format = RGBA16F; // B: 雲 (低解像度) | deferred20 -> deferred21、水の屈折先の色 + 水の中の経路長 | composite1 -> composite2 (水の画素だけ)、半透明の不透明度 | composite2 -> composite19、D: ブルームタイル | composite23 -> composite24 -> final
 const int colortex15Format = RGBA16F; // 速度ベクトル         | gbuffers (エンティティ/手) -> composite20 / 21
 
 const bool colortex0Clear  = true;

@@ -8,6 +8,8 @@
  * - (永続) は前フレームの値を読む枠で、1 フレームの全体を占める
  * - 他の括弧の中は説明で、検査は読まない
  * - 値に別の TEX_* を書くと同じ中身の別名になり、区間の重なりを問わない
+ * - colortex は deferred / composite の 1 つのパスで前の用途を読み次の用途を書いてよい (Iris は読む側と書く側を分ける)。
+ *   その時は前の用途の最後と次の用途の最初に同じパスを書く (composite2 の TEX_WATER_REFR -> TEX_TRANSLUCENT_ALPHA)
  */
 #ifndef BUFFERS_SLOTS_GLSL
 #define BUFFERS_SLOTS_GLSL
@@ -23,6 +25,7 @@
 #define TEX_GODRAYS       colortex4   // composite12 -> composite19 (左上 1/GODRAYS_RES、scale.composite12-14)
 #define TEX_SPARKLE_HIST  colortex8   // composite20 (永続) -> final
 #define TEX_WATER_REFR    colortex14  // composite1 -> composite2
+#define TEX_TRANSLUCENT_ALPHA colortex14 // composite2 -> composite19 (r = 半透明の不透明度。ビーコンの光線が手前の半透明を掛ける)
 #define TEX_GI_AUX        colortex10  // deferred11 (永続)
 #define TEX_WATER_MIRROR  giRawSampler          // composite1 -> composite2 (image は TEX_GI_RAW と共用)
 #define TEX_WATER_SUNVIS  blockLightRawSampler  // composite1 -> composite2 (image は TEX_BLOCKLIGHT_RAW と共用)

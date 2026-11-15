@@ -16,6 +16,7 @@
 //@include "/lib/sky/beacon_beam.glsl"
 //@include "/lib/common/jitter.glsl"
 //@include "/lib/light/light.glsl"
+//@include "/lib/buffers/slots.glsl"
 #ifdef FIREWORK_LIGHT
     //@include "/lib/light/firework_light.glsl"
 #endif
@@ -306,7 +307,7 @@ void main() {
             float depthOpaque = texelFetch(depthtex1, texel, 0).r;
             float opaqueDist = depthOpaque >= 1.0 ? BEACON_BEAM_FAR : length(screenToPlayer(vec3(texcoord, fixHandDepth(depthOpaque))));
             bool front = depth < depthOpaque;
-            float frontAlpha = front ? texelFetch(colortex4, texel, 0).a : 0.0;
+            float frontAlpha = front ? texelFetch(TEX_TRANSLUCENT_ALPHA, texel, 0).r : 0.0;
             // 地形と同じくジッターの分ずれた視線で求め、TAA で画素より細かく均す
             vec3 beamDir = normalize(viewToPlayerDir(screenToView(vec3(removeTaaJitter(texcoord), 1.0))));
             color += evalBeaconBeams(beamDir, opaqueDist, front ? dist : opaqueDist, frontAlpha, fog.a, dist, texel);

@@ -6,7 +6,8 @@ slots.glsl は、時間で分け合う枠と番号を移す枠に TEX_* の名�
 
 静的な検査 (validate_shaders.py が毎回呼ぶ。glslang を使わない)
 - 表の書式: 区間のパスが実在のプログラムか、最初より最後が前でないか
-- 同じ枠の名前どうしの区間が重ならないか ((永続) の名前は 1 フレームの全体を占める。別名は問わない)
+- 同じ枠の名前どうしの区間が重ならないか ((永続) の名前は 1 フレームの全体を占める。別名は問わない。
+  colortex の deferred / composite のパスは、前の用途の最後と次の用途の最初を兼ねてよい (handoff_ok)
 - 名前の付いた枠を、slots.glsl と宣言のファイル (formats・samplers・images) 以外で colortexN / colorimgN と直接書いていないか (コメントは除く)
 
 区間の検査 (--intervals。glslang を全プログラムに掛けるので重い)
@@ -167,6 +168,26 @@ def intervals(slots: list[Slot], kinds) -> tuple[dict[str, tuple[Pos, Pos] | Non
     return out, problems
 
 
+def handoff_ok(slot: str, sa: tuple[Pos, Pos], sb: tuple[Pos, Pos]) -> bool:
+    """
+    ### handoff_ok
+    片方の最後のパスが他方の最初のパスと同じでも、そのパスで前の用途を読んで次の用途を書くだけなら重ならない。
+    Iris は composite / deferred のパスで書く colortex の読む側と書く側を分け、パスの後に入れ替える (composite20 の読み書きと同じ) ので、
+    そのパスの読みは前の用途の値のまま。gbuffers (入れ替えない) と image (同じ面を読み書きする) は除く
+
+    @param slot - 枠 (colortexN / xxxSampler)
+    @param sa - 一方の区間
+    @param sb - 他方の区間
+    @returns 端の 1 パスだけを共有する colortex の区間なら True
+    """
+    if not re.fullmatch(r"colortex\d+", slot):
+        return False
+    shared = sa[1] if sa[1] == sb[0] else sb[1] if sb[1] == sa[0] else None
+    if shared is None or sa[0] == sa[1] or sb[0] == sb[1]:
+        return False
+    return shared[0] in (GROUPS.index("deferred"), GROUPS.index("composite"))
+
+
 def overlap_problems(slots: list[Slot], spans) -> list[str]:
     target = resolve(slots)
     problems = []
@@ -176,6 +197,8 @@ def overlap_problems(slots: list[Slot], spans) -> list[str]:
             if target[a.name] != target[b.name]:
                 continue
             sa, sb = spans[a.name], spans[b.name]
+            if sa is not None and sb is not None and handoff_ok(target[a.name], sa, sb):
+                continue
             if sa is None or sb is None or not (sa[1] < sb[0] or sb[1] < sa[0]):
                 problems.append(f"{SLOTS}:{b.line}: {b.name} と {a.name} ({target[a.name]}) の区間が重なる")
     return problems

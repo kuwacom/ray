@@ -27,7 +27,7 @@ uniform sampler2D colortex10; // C: GI 履歴の付属 (長さ・視線距離・
 uniform sampler2D colortex11; // B: 雲履歴 (フル解像度)
 uniform sampler2D colortex12; // B: ボリューメトリック (低解像度)
 uniform sampler2D colortex13; // D: TAA 履歴
-uniform sampler2D colortex14; // D: ブルームタイル
+uniform sampler2D colortex14; // B: 雲 (低解像度)、水の屈折先、半透明の不透明度、D: ブルームタイル (区間は lib/buffers/slots.glsl)
 uniform sampler2D colortex15; // 速度ベクトル
 
 uniform sampler2D depthtex0; // 半透明・手を含む深度
