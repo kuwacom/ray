@@ -240,6 +240,15 @@ vec3 forwardDiffuse(Material m, vec3 playerPos, vec3 normal, vec3 geoNormal, vec
     return forwardDiffuse(m, playerPos, normal, geoNormal, V, dither, false, 1.0);
 }
 
+#if defined GBUF_ENTITIES_TRANSLUCENT || defined GBUF_HAND_WATER
+// 立方体の形の半透明のブロックのアイテム (ガラス・色付きガラス・氷・スライム・ハチミツ)。板ガラスは平らな絵なので裏の面も要る
+bool isTranslucentCubeItem(int itemId) {
+    int id = stripMetalGate(itemId);
+    return id == BLOCK_ICE || id == BLOCK_GLASS || id == BLOCK_SLIME || id == BLOCK_HONEY || id == BLOCK_TINTED_GLASS
+        || (id >= BLOCK_STAINED_GLASS && id < BLOCK_STAINED_GLASS + 16);
+}
+#endif
+
 void main() {
     vec4 tex = texture(gtexture, texcoord);
     vec4 albedo = tex * glcolor;
@@ -278,6 +287,13 @@ void main() {
     vec3 geoNormal = normalize(normalPlayer);
     vec3 V = -normalize(playerPos);
     float dither = interleavedGradientNoise(gl_FragCoord.xy, frameCounter);
+#if defined GBUF_ENTITIES_TRANSLUCENT || defined GBUF_HAND_WATER
+    /*
+     * アイテムの立方体はカリングなしで奥の面も描かれ、手前と奥の 2 枚の散乱 (白いガラスでは白) が重なって不透明に見えた
+     * 置いたブロックと同じく、カメラを向いた面だけにする (左手の物は鏡映しで巻き順が逆になるので gl_FrontFacing ではなく法線で決める)
+     */
+    if (isTranslucentCubeItem(currentRenderedItemId) && dot(geoNormal, V) < 0.0) discard;
+#endif
 
     GBufferData g = gbufferDefault();
     g.albedo = srgbToLinear(albedo.rgb);
