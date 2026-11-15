@@ -117,7 +117,11 @@ def main() -> None:
     p.add_argument("--tag", default="ab")
     p.add_argument("--rounds", type=int, default=2, help="周の数。2 以上で揺れの基準が出る")
     # 再読み込みの後、自動露出と TAA の履歴がそろうまでの待ち。run_scene の再読み込みの後の待ち (6 秒) と同じ
-    p.add_argument("--settle", type=float, default=6.0, help="再読み込みから撮影までの秒")
+    # 壁時計で待つと、パイプラインの作成が速い版 (ドライバのキャッシュあり) は作成の後の最初のフレームの詰まりと待ちが重なり、
+    # 履歴・露出が溜まる前の 1〜数フレーム目を撮る。また霧・葉・波は frameTimeCounter で動くので、版ごとに位相がずれる (mv-s2dbg)
+    # 新しいフレームを数えた後、Iris の frameTimeCounter (再読み込みで 0) が settle 秒になった所で撮る
+    p.add_argument("--settle", type=float, default=6.0, help="再読み込みから撮影までの frameTimeCounter の秒")
+    p.add_argument("--settle-frames", type=int, default=10, help="再読み込みの後、settle の前に待つ新しいフレームの数")
     p.add_argument("--fps", type=int, default=0, help="撮影の後に fps ステップを N 回 (frame_ms を版ごとに比べる)")
     p.add_argument("--crop", help="シートの切り出し x0,y0,x1,y1[:倍率] (既定は縮小した全体)")
     p.add_argument("--out", type=Path, help="report.md とシートの置き場 (既定 ./ab_<tag>)")
@@ -191,14 +195,15 @@ def main() -> None:
             for rnd, v in order:
                 apply(v)
                 name = f"{shot_base}_{v[0]}{rnd}"
-                steps = [{"reload_shaders": True}, {"wait": args.settle}, {"screenshot": name}]
+                steps = [{"reload_shaders": True}, {"wait_frames": args.settle_frames, "timeout": args.timeout},
+                         {"wait_frame_time": args.settle, "timeout": args.timeout}, {"screenshot": name}]
                 if args.fps:
                     steps.append({"fps": args.fps, "unlimited": True})
                 st = run(steps, "reload+settle+shot")
                 shots[scene_name][v[0]].append(game / "screenshots" / f"{name}.png")
                 if args.fps:
-                    timing["fps"] += st["results"][3].get("sec", 0.0)
-                    ms = st["results"][3]["value"].get("frame_ms")
+                    timing["fps"] += st["results"][4].get("sec", 0.0)
+                    ms = st["results"][4]["value"].get("frame_ms")
                     if ms:
                         frame_ms.setdefault((scene_name, v[0]), []).append(ms)
             after = scene.get("after", [])

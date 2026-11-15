@@ -168,6 +168,14 @@ def iris_frame_count() -> int:
         return int(java_to_string(j.call(counter, j.cls("java.util.function.IntSupplier"), "getAsInt")))
 
 
+def iris_frame_time() -> float:
+    # Iris の frameTimeCounter ユニフォームの元 (秒。再読み込みで 0 に戻る)
+    with JavaScope() as j:
+        timer_cls = j.cls("net.irisshaders.iris.uniforms.SystemTimeUniforms$Timer")
+        timer = j.field(0, j.cls("net.irisshaders.iris.uniforms.SystemTimeUniforms"), "TIMER")
+        return float(java_to_string(j.call(timer, timer_cls, "getFrameTimeCounter")))
+
+
 # ray_steps はジョブごとに reload されるため、元の設定値はモジュール dict 上の既存値を引き継いで保持する
 SAVED: dict = globals().get("SAVED", {})
 
@@ -381,6 +389,33 @@ def run_step(step: dict):
         x, y, z = step["look_at"]
         m.player_look_at(x, y, z)
         return None
+    if "wait_frames" in step:
+        # 例: {"wait_frames": 30, "timeout": 300} 新しいフレームが N 枚描かれるまで待つ
+        # 再読み込みの直後はパイプラインの作成 (ドライバのキャッシュの有無で 10〜150 秒) と最初のフレームの詰まりがあり、
+        # 秒の待ちだけでは版によって履歴・露出が溜まる前の数フレーム目を撮ってしまう。カウンタが戻ったら作り直しとみなし 0 から数える
+        need = int(step["wait_frames"])
+        deadline = time.time() + float(step.get("timeout", 300))
+        start = prev = iris_frame_count()
+        while time.time() < deadline:
+            now = iris_frame_count()
+            if now < prev:
+                start = 0
+            prev = now
+            if now - start >= need:
+                return now - start
+            time.sleep(0.1)
+        raise RuntimeError(f"wait_frames: {prev - start} / {need} frames before timeout")
+    if "wait_frame_time" in step:
+        # 例: {"wait_frame_time": 8, "timeout": 300} Iris の frameTimeCounter (再読み込みで 0 に戻る) が N 秒になるまで待つ
+        # 霧・葉・波は frameTimeCounter で動くので、版ごとに再読み込みからの壁時計で撮ると動きの位相がずれ、版の差に見える
+        target = float(step["wait_frame_time"])
+        deadline = time.time() + float(step.get("timeout", 300))
+        while time.time() < deadline:
+            now = iris_frame_time()
+            if now >= target:
+                return round(now, 3)
+            time.sleep(min(0.05, max(target - now, 0.0)))
+        raise RuntimeError(f"wait_frame_time: {iris_frame_time():.2f} / {target} s before timeout")
     if "wait" in step:
         time.sleep(float(step["wait"]))
         return None

@@ -63,7 +63,9 @@ def main() -> None:
     steps = list(conf["setup"]) + NO_TILE_DROPS
     if args.reload:
         # 再読み込み直後はコンパイルと履歴バッファの蓄積待ちが必要
-        steps += [{"reload_shaders": True}, {"wait": 6}]
+        # パイプラインの作成が速い (ドライバのキャッシュあり) と壁時計の待ちが最初のフレームの詰まりと重なるので、
+        # フレームを数えてから frameTimeCounter (再読み込みで 0) で待つ
+        steps += [{"reload_shaders": True}, {"wait_frames": 10}, {"wait_frame_time": 6}]
     for i, name in enumerate(names):
         # シーンは steps の配列か、撮影後の後始末 (設置ブロックの撤去など) を持つ {"steps", "after"}
         scene = conf["scenes"][name]
