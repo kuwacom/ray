@@ -280,7 +280,8 @@ def gl_string(enum: int) -> str:
 
 def effective_macros(overrides: dict[str, str | bool], options: dict[str, vs.Option]) -> dict[str, str]:
     """設定の実効値 -> マクロ表 (ブール設定は定義の有無, 値設定は値)"""
-    macros: dict[str, str] = {k: v for k, v in vs.IRIS_MACROS.items()}
+    # ローダーは最新の Iris (capabilities.ENVS の先頭) として検証する
+    macros: dict[str, str] = {**vs.IRIS_MACROS, **vs.ENVS[0].macros}
     for name, opt in options.items():
         val = overrides.get(name, opt.default)
         if opt.kind == "bool":
