@@ -376,7 +376,8 @@ void main() {
 #if defined GBUF_HAND
     estimateId = itemEstimateMaterial(currentRenderedItemId);
 #elif defined GBUF_ENTITIES
-    if (entityId == ENTITY_ITEM || entityId == ENTITY_ITEM_FRAME) estimateId = itemEstimateMaterial(currentRenderedItemId);
+    // モブ・防具立てが持つ物と頭にかぶった物は entityId が持ち主なので、アイテムを描いている間 (currentRenderedItemId が 0 以外) で分ける
+    if (entityId == ENTITY_ITEM || entityId == ENTITY_ITEM_FRAME || currentRenderedItemId != 0) estimateId = itemEstimateMaterial(currentRenderedItemId);
 #elif defined GBUF_BLOCK
     estimateId = itemEstimateMaterial(blockEntityId);
 #endif
