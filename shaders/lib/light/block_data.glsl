@@ -11,6 +11,7 @@
 //@include "/lib/common/noise.glsl"
 //@include "/lib/common/uniforms.glsl"
 //@include "/lib/buffers/block_data.glsl"
+//@include "/lib/ids/material_ids.glsl"
 
 LightDef getLightDef(int index) { return blockData.lightDefs[clamp(index, 0, LIGHT_TABLE_SIZE - 1)]; }
 vec4 getTint(int index) { return blockData.tints[clamp(index, 0, TINT_TABLE_SIZE - 1)]; }
@@ -86,6 +87,20 @@ float lightNearField(float dist, float radius) {
 float sphereLightNdotL(vec3 n, vec3 dir, float dist, float radius) {
     float sinA = saturate(radius / max(dist, EPS));
     return saturate((dot(n, dir) + sinA) / (1.0 + sinA));
+}
+
+/*
+ * 法線を上向きに固定した植物 (十字の草・つた・花など。gbuffers_solid の isPlant) が点光源 (設置光源・手持ち光源) から受ける NdotL
+ * 薄い両面の葉が向きばらばらに立っているので、光源の向きによらず縦の面の |cos| の平均 2/π とする
+ * 上向きの法線のままでは、光源より上の植物は裏から照らされて暗く、光源と同じ高さではかすめ角の拡散 (EON の逆光側の持ち上げ) で
+ * 明るくなり、上下で見え方が食い違った。太陽と空は地面と同じ明るさにするため上向きの法線のまま
+ */
+const float PLANT_LIGHT_NDOTL = 2.0 / PI;
+// G バッファで法線を上向きに固定した植物とみなす幾何法線の y (符号化の誤差の分だけ 1 より下げる)
+const float PLANT_UP_NORMAL_Y = 0.99;
+
+bool isUpNormalPlant(int materialId, vec3 geoNormal) {
+    return (materialId == MAT_PLANT || materialId == MAT_UNDERWATER_PLANT) && geoNormal.y > PLANT_UP_NORMAL_Y;
 }
 
 // フリッカーの速さ (1 秒あたりの揺らぎ数) と最大の暗くなり幅

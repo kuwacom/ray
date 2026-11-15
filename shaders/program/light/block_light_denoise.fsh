@@ -12,6 +12,7 @@
  */
 //@include "/lib/common/common.glsl"
 //@include "/lib/common/encoding.glsl"
+//@include "/lib/common/gbuffer.glsl"
 //@include "/lib/common/joint_bilateral.glsl"
 //@include "/lib/common/temporal.glsl"
 //@include "/lib/light/light.glsl"
@@ -33,11 +34,12 @@
 #include "/lib/common/shading_types.glsl"
 #include "/lib/common/common.glsl"
 #include "/lib/common/encoding.glsl"
+#include "/lib/common/color.glsl"
+#include "/lib/common/gbuffer.glsl"
 #include "/lib/common/joint_bilateral.glsl"
 #include "/lib/common/temporal.glsl"
 #include "/lib/buffers/light_bins.glsl"
 #include "/lib/light/light_bins.glsl"
-#include "/lib/common/color.glsl"
 #include "/lib/buffers/block_data.glsl"
 #include "/lib/ids/block_ids.glsl"
 #include "/lib/ids/light_ids.glsl"
@@ -45,11 +47,11 @@
 #include "/lib/light/light_table_data.glsl"
 #include "/lib/light/light_table.glsl"
 #include "/lib/common/noise.glsl"
+#include "/lib/ids/material_ids.glsl"
 #include "/lib/light/block_data.glsl"
 #include "/lib/common/voxel_space.glsl"
 #include "/lib/buffers/images.glsl"
 #include "/lib/ids/entity_ids.glsl"
-#include "/lib/ids/material_ids.glsl"
 #include "/lib/ids/id_decode.glsl"
 #include "/lib/light/voxel_read.glsl"
 #include "/lib/light/voxel.glsl"
@@ -134,7 +136,7 @@ void main() {
     // 離れた所の広がりの分は光源の影を掛ける full に入れる (同じ形態係数なので 1 回で求める)
     vec3 boxSpread;
     vec3 box = sumBinBoxIrradiance(voxelPos, geoNormal, true, boxSpread);
-    vec3 full = sumBinLightsUnshadowed(voxelPos, normal, geoNormal, true, false) + boxSpread;
+    vec3 full = sumBinLightsUnshadowed(voxelPos, normal, geoNormal, true, false, isUpNormalPlant(readMaterialId(texel), geoNormal)) + boxSpread;
     if (maxOf(full) <= 0.0) {
         outBlockLight = vec4(box, 1.0);
         outHistory = vec4(1.0, 1.0, 1.0, viewDist);

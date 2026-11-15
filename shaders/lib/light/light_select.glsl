@@ -508,16 +508,35 @@ vec3 evalLightIrradiance(LightInstance L, vec3 voxelPos, vec3 n, vec3 gateNormal
     return evalLightIrradiance(L, voxelPos, n, gateNormal, true);
 }
 
-// 着色点のビンの全光源の影なし照度の和 (deferred2 がフル解像度で使う)
-vec3 sumBinLightsUnshadowed(vec3 voxelPos, vec3 normal, vec3 geoNormal, bool nearField, bool boxSpread) {
+/*
+ * 上向きに固定した植物 (isUpNormalPlant) は、光源ごとに光源の方を向いた面として照らし、向きによらない PLANT_LIGHT_NDOTL を掛ける
+ * 法線を差し替えて evalLightIrradiance を 1 か所で呼ぶため、法線 (n, gateNormal) と倍率を返す
+ */
+float plantLightNormal(LightInstance L, vec3 voxelPos, inout vec3 n, inout vec3 gateNormal) {
+    vec3 toL = L.posRadius.xyz - voxelPos;
+    n = toL / max(length(toL), EPS);
+    gateNormal = n;
+    return PLANT_LIGHT_NDOTL;
+}
+
+// 着色点のビンの全光源の影なし照度の和 (deferred2 がフル解像度で使う)。plant は isUpNormalPlant
+vec3 sumBinLightsUnshadowed(vec3 voxelPos, vec3 normal, vec3 geoNormal, bool nearField, bool boxSpread, bool plant) {
     if (!isInVoxelVolume(voxelPos)) return vec3(0.0);
     int bin = lightBinIndex(ivec3(voxelPos));
     uint n = lightBinCount(bin);
     vec3 sum = vec3(0.0);
     for (uint k = 0u; k < n; k++) {
-        sum += evalLightIrradiance(lightBinLight(bin, k), voxelPos, normal, geoNormal, nearField, boxSpread);
+        LightInstance L = lightBinLight(bin, k);
+        vec3 ln = normal;
+        vec3 lg = geoNormal;
+        float scale = plant ? plantLightNormal(L, voxelPos, ln, lg) : 1.0;
+        sum += evalLightIrradiance(L, voxelPos, ln, lg, nearField, boxSpread) * scale;
     }
     return sum;
+}
+
+vec3 sumBinLightsUnshadowed(vec3 voxelPos, vec3 normal, vec3 geoNormal, bool nearField, bool boxSpread) {
+    return sumBinLightsUnshadowed(voxelPos, normal, geoNormal, nearField, boxSpread, false);
 }
 
 vec3 sumBinLightsUnshadowed(vec3 voxelPos, vec3 normal, vec3 geoNormal, bool nearField) {

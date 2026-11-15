@@ -84,6 +84,8 @@ struct SurfacePoint {
     bool caustics;
     // SL_BLOCK_SPECULAR_TRACED を集めるか。装備の金属だけが実行時に決めるので、caustics と同じく点の値で渡す
     bool blockSpecular;
+    // 法線を上向きに固定した植物 (isUpNormalPlant)。SL_HAND の影の始点と画面空間の影を植物用にする (点の値)
+    bool plant;
 };
 
 // 使う項だけ呼ぶ側が上書きする。ほかは項を使わない時の値
@@ -102,6 +104,7 @@ SurfacePoint surfacePoint(vec3 playerPos, vec3 normal) {
     p.hand = false;
     p.caustics = true;
     p.blockSpecular = true;
+    p.plant = false;
     return p;
 }
 
@@ -256,7 +259,7 @@ SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, ui
     }
 
     if ((terms & SL_HAND) != 0u) {
-        getHandLights(p.playerPos, p.geoNormal, p.dither, L.handMain, L.handOff);
+        getHandLights(p.playerPos, p.geoNormal, p.dither, p.plant, L.handMain, L.handOff);
     } else {
         L.handMain = noLight();
         L.handOff = noLight();

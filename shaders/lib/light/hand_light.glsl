@@ -128,7 +128,12 @@ void handLightsStore() {
 }
 #endif
 
-LightSample evalHandLight(bool mainHand, vec3 playerPos, vec3 geoNormal, float dither) {
+/*
+ * plant: 法線を上向きに固定した植物 (isUpNormalPlant)。影の始点は光源の方へ押し出し、画面空間の影は付けない
+ * (細い葉どうしを厚み LIGHT_CONTACT_THICKNESS の板として遮るので、葉ごとの縁に黒いギザギザの線が出た。
+ * 植物はボクセルのトレースでは光を通すので、ブロック・エンティティの影はボクセルのトレースで付く)
+ */
+LightSample evalHandLight(bool mainHand, vec3 playerPos, vec3 geoNormal, float dither, bool plant) {
     int level = mainHand ? heldBlockLightValue : heldBlockLightValue2;
     if (level <= 0) return noLight();
     HandLight h = handLightAt(mainHand);
@@ -141,6 +146,7 @@ LightSample evalHandLight(bool mainHand, vec3 playerPos, vec3 geoNormal, float d
     s.direction = toLight / max(dist, EPS);
     s.angularSize = atan(h.radius, max(dist, EPS));
     s.irradiance = h.emission * lightFalloff(dist, h.range) * HAND_LIGHT_BRIGHTNESS * h.flicker;
+    if (plant) geoNormal = s.direction;
 
     // 一人称の手そのものはカメラの直近なので影を計算しない (自分の腕で遮ってしまう)
     if (firstPersonCamera && length(playerPos) < HAND_SELF_DIST) return s;
@@ -186,24 +192,13 @@ LightSample evalHandLight(bool mainHand, vec3 playerPos, vec3 geoNormal, float d
     }
 #endif
 #ifdef HAND_LIGHT_SS_SHADOWS
-    if (maxOf(s.irradiance) > 0.0) {
+    if (!plant && maxOf(s.irradiance) > 0.0) {
         // 光源の直前 (手・たいまつ自身の形) までで止める
         float len = min(dist - HAND_SS_END_MARGIN, HAND_SS_LENGTH);
         s.irradiance *= mix(1.0, lightContactShadow(playerPos, geoNormal, s.direction, len, HAND_SS_STEPS, dither), HAND_DIRECT_SHADOW_STRENGTH);
     }
 #endif
     return s;
-}
-
-/*
- * 法線を上向きに固定した植物 (十字の草・つた・花など。gbuffers_solid の isPlant) に手持ち光源を当てる時の法線
- * 上向きのままでは目より上の植物は光源が裏になり、拡散と照り返しが 0 で透過だけになって、
- * 同じ距離の足元の草と明るさが食い違った。薄い両面の面なので、光らせる手の側へ裏返す (太陽・空は上向きのまま)
- * 両手の位置の差は 0.4 ブロック程度で、向きが分かれるのは NoL がほぼ 0 の高さだけなので、光る方の手 1 つで決める
- */
-vec3 handLightTwoSidedNormal(vec3 n, vec3 playerPos) {
-    vec3 lightPos = frameData.handLights[heldBlockLightValue > 0 ? 0 : HAND_LIGHT_SLOTS].xyz;
-    return dot(n, lightPos - playerPos) < 0.0 ? -n : n;
 }
 
 /*
@@ -242,7 +237,7 @@ vec3 getHandLightFill(vec3 playerPos) {
  * 着色点 playerPos での両手の光。光らない手は irradiance = 0
  * 呼び出し元: deferred30 (不透明), gbuffers_water 等 (半透明)
  */
-void getHandLights(vec3 playerPos, vec3 geoNormal, float dither, out LightSample mainHand, out LightSample offHand) {
+void getHandLights(vec3 playerPos, vec3 geoNormal, float dither, bool plant, out LightSample mainHand, out LightSample offHand) {
 #ifdef HAND_LIGHT
     /*
      * 両手を 1 つのループで回す。2 回並べて呼ぶと evalHandLight (光源シャドウのトレース) が 2 つ展開され、
@@ -253,7 +248,7 @@ void getHandLights(vec3 playerPos, vec3 geoNormal, float dither, out LightSample
     offHand = noLight();
     int handCount = heldBlockLightValue2 > 0 ? 2 : 1;
     for (int i = 0; i < handCount; i++) {
-        LightSample s = evalHandLight(i == 0, playerPos, geoNormal, dither);
+        LightSample s = evalHandLight(i == 0, playerPos, geoNormal, dither, plant);
         if (i == 0) mainHand = s;
         else offHand = s;
     }

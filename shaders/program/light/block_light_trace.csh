@@ -50,11 +50,11 @@
 #include "/lib/light/light_table_data.glsl"
 #include "/lib/light/light_table.glsl"
 #include "/lib/common/noise.glsl"
+#include "/lib/ids/material_ids.glsl"
 #include "/lib/light/block_data.glsl"
 #include "/lib/common/voxel_space.glsl"
 #include "/lib/buffers/images.glsl"
 #include "/lib/ids/entity_ids.glsl"
-#include "/lib/ids/material_ids.glsl"
 #include "/lib/ids/id_decode.glsl"
 #include "/lib/light/voxel_read.glsl"
 #include "/lib/light/voxel.glsl"
@@ -135,6 +135,9 @@ void main() {
     vec3 playerPos = viewToPlayer(viewPos);
     vec3 geoNormal = octDecode(unpack2x8(texelFetch(colortex2, src, 0).b));
     int material = readMaterialId(src);
+    // 上向きに固定した植物は光源の方を向いた面として選び (light_select.glsl の plantLightNormal)、接触影は付けない
+    // (細い葉どうしを厚みのある板として遮り、葉ごとの縁に黒い線が出る。植物の影はボクセルのトレースで付く)
+    bool plant = isUpNormalPlant(material, geoNormal);
 
     vec3 shadowed = vec3(0.0);
     vec3 unshadowed = vec3(0.0);
@@ -158,7 +161,11 @@ void main() {
 
         for (uint k = 0u; k < n; k++) {
             int li = lightBinEntry(bin, k);
-            vec3 e = evalLightIrradiance(lightBinLight(bin, k), fromVoxel, geoNormal, geoNormal);
+            LightInstance L = lightBinLight(bin, k);
+            vec3 ln = geoNormal;
+            vec3 lg = geoNormal;
+            float scale = plant ? plantLightNormal(L, fromVoxel, ln, lg) : 1.0;
+            vec3 e = evalLightIrradiance(L, fromVoxel, ln, lg) * scale;
             float w = luminance(e);
             if (w <= 0.0) continue;
             // 上位 DET_COUNT 個を挿入ソートで保つ。押し出された光源は残りの集合 (リザーバ) へ
@@ -197,7 +204,7 @@ void main() {
             if (topIdx[j] < 0) break;
             vec2 xi = fract(bn.xy + r2Sequence(j));
             float dither = fract(bn.z + DITHER_STEP * float(j));
-            vec3 vis = traceBlockLight(topIdx[j], fromVoxel, playerPos, geoNormal, flags, skipStart, xi, dither, j < CONTACT_SHADOW_LIGHTS);
+            vec3 vis = traceBlockLight(topIdx[j], fromVoxel, playerPos, geoNormal, flags, skipStart, xi, dither, j < CONTACT_SHADOW_LIGHTS && !plant);
             shadowed += topE[j] * vis;
             unshadowed += topE[j];
     #ifndef STOCHASTIC_SLOT
