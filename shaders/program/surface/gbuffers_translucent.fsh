@@ -116,9 +116,10 @@ flat in int blockId;
 #if defined GBUF_ENTITIES_TRANSLUCENT || defined GBUF_BLOCK_TRANSLUCENT
     #define GBUF_FORWARD_OPAQUE
 #endif
-// 金属の防具にだけ、金属ブロックと同じ自動法線を付ける (模様の凹凸が映り込みと照り返しに出る)
-#if defined GBUF_ENTITIES_TRANSLUCENT && defined AUTO_METAL_PARTS && defined GENERATED_NORMALS && PBR_FORMAT == 0 && defined GENERATED_NORMAL_ENTITIES
-    #define ARMOR_GENERATED_NORMALS
+// 半透明のエンティティ・ブロックエンティティにも不透明の経路 (gbuffers_solid.fsh) と同じ条件で自動法線を付ける
+// 金属の防具は模様の凹凸が映り込みと照り返しに、非金属 (スキンの半透明部分・旗の模様など) は拡散の陰影に出る
+#if defined GENERATED_NORMALS && PBR_FORMAT == 0 && (defined GBUF_BLOCK_TRANSLUCENT || (defined GBUF_ENTITIES_TRANSLUCENT && defined GENERATED_NORMAL_ENTITIES))
+    #define FORWARD_GENERATED_NORMALS
 #endif
 // テクスチャ法線と視線の内積の下限 (gbuffers_solid.fsh と同じ)
 const float ARMOR_FRONT_FACING_MIN_NOV = 0.05;
@@ -270,14 +271,15 @@ void main() {
         g.f0 = metalParams.f0;
     }
 #endif
-    // 照らす法線。金属の防具だけ自動法線 (画面微分を使うので、分岐の外で求めて金属の画素にだけ使う)
+    // 照らす法線 (画面微分を使うので分岐の外で求める)。非金属は不透明の経路と同じ強さ、金属の防具は弱める
     vec3 shadeNormal = geoNormal;
-#ifdef ARMOR_GENERATED_NORMALS
-    vec3 armorT = normalize(tangentPlayer.xyz - geoNormal * dot(geoNormal, tangentPlayer.xyz));
-    vec3 armorB = cross(armorT, geoNormal) * (tangentPlayer.w < 0.0 ? -1.0 : 1.0);
-    vec3 armorTs = mix(vec3(0.0, 0.0, 1.0), generatedNormal(texcoord, playerPos, tileMid, tileHalf), ARMOR_GENERATED_NORMAL_SCALE);
-    vec3 armorN = normalize(mat3(armorT, armorB, geoNormal) * armorTs);
-    if (shiny) shadeNormal = frontFacingNormal(armorN, V, ARMOR_FRONT_FACING_MIN_NOV);
+#ifdef FORWARD_GENERATED_NORMALS
+    vec3 genT = normalize(tangentPlayer.xyz - geoNormal * dot(geoNormal, tangentPlayer.xyz));
+    vec3 genB = cross(genT, geoNormal) * (tangentPlayer.w < 0.0 ? -1.0 : 1.0);
+    vec3 genTs = generatedNormal(texcoord, playerPos, tileMid, tileHalf);
+    if (shiny) genTs = mix(vec3(0.0, 0.0, 1.0), genTs, ARMOR_GENERATED_NORMAL_SCALE);
+    shadeNormal = normalize(mat3(genT, genB, geoNormal) * genTs);
+    if (shiny || dot(geoNormal, V) > 0.0) shadeNormal = frontFacingNormal(shadeNormal, V, ARMOR_FRONT_FACING_MIN_NOV);
 #endif
     Material m = decodeMaterial(g);
     float directScale = 1.0;

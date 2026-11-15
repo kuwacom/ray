@@ -90,7 +90,7 @@
     in vec2 mc_Entity;
     in vec4 at_midBlock;
 #endif
-#ifdef GBUF_ENTITIES_TRANSLUCENT
+#if defined GBUF_ENTITIES_TRANSLUCENT || defined GBUF_BLOCK_TRANSLUCENT
     in vec2 mc_midTexCoord;
 #endif
 in vec4 at_tangent;
@@ -101,7 +101,7 @@ out vec4 glcolor;
 out vec3 viewPos;
 out vec3 normalPlayer;
 out vec4 tangentPlayer;
-// 面の UV の中心と半幅 (金属の防具の自動法線が隣の面の絵を読まないように。gbuffers_solid.vsh と同じ)
+// 面の UV の中心と半幅 (エンティティ・ブロックエンティティの自動法線が隣の面の絵を読まないように。gbuffers_solid.vsh と同じ)
 out vec2 tileMid;
 out vec2 tileHalf;
 flat out int blockId;
@@ -117,7 +117,7 @@ void main() {
 #else
     blockId = 0;
 #endif
-#ifdef GBUF_ENTITIES_TRANSLUCENT
+#if defined GBUF_ENTITIES_TRANSLUCENT || defined GBUF_BLOCK_TRANSLUCENT
     tileMid = mc_midTexCoord;
     tileHalf = abs(texcoord - mc_midTexCoord);
 #else
