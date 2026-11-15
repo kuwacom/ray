@@ -60,6 +60,7 @@ const int LIGHT_FIREFLY_BUSH = 61;
 const int LIGHT_TRIAL_SPAWNER = 62;
 const int LIGHT_DECOR_FIRST = 63; // 63-68: BLOCK_DECOR_* (lapis, emerald, diamond, gold, redstone, amethyst)。DECORATIVE_BLOCK_LIGHTS 2 の時だけ使う
 const int LIGHT_EYEBLOSSOM = 69;
+const int LIGHT_POTTED_EYEBLOSSOM = 70;
 const int LIGHT_BLOCK_LAST = 127;
 
 // アイテム専用光源 (ドロップ・手持ち)

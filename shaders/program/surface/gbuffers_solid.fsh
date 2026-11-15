@@ -179,6 +179,8 @@ const vec2 EYEBLOSSOM_CORE_SATURATION = vec2(0.4, 0.6);
 const vec2 EYEBLOSSOM_PETAL_RANGE = vec2(0.55, 0.85);
 const float EYEBLOSSOM_PETAL_GLOW = 0.35;
 const vec3 EYEBLOSSOM_PETAL_TINT = vec3(1.0, 0.45, 0.18);
+// 植木鉢の縁の高さ (ブロック内、6/16) に少し足した値。これより上が鉢に植えた花
+const float FLOWER_POT_TOP = 0.39;
 
 /*
  * 向きのある光源 (点灯したかまど・ジャック・オ・ランタン) は前面の火の部分だけが光る
@@ -527,13 +529,16 @@ void main() {
     }
 #endif
 #if defined GBUF_TERRAIN
-    if (blockBase == BLOCK_LIGHT_BASE + LIGHT_EYEBLOSSOM) {
+    if (blockBase == BLOCK_LIGHT_BASE + LIGHT_EYEBLOSSOM || blockBase == BLOCK_LIGHT_BASE + LIGHT_POTTED_EYEBLOSSOM) {
         float mx = maxOf(albedoDry);
         float sat = (mx - min(albedoDry.r, min(albedoDry.g, albedoDry.b))) / max(mx, EPS);
         float core = smoothstep(EYEBLOSSOM_CORE_SATURATION.x, EYEBLOSSOM_CORE_SATURATION.y, sat);
         float petal = (1.0 - core) * smoothstep(EYEBLOSSOM_PETAL_RANGE.x, EYEBLOSSOM_PETAL_RANGE.y, mx);
-        g.albedo *= mix(vec3(1.0), EYEBLOSSOM_PETAL_TINT, petal);
-        g.emission = max(core, petal * EYEBLOSSOM_PETAL_GLOW);
+        // 植木鉢の赤茶の鉢と土は彩度が高く花の橙と見分けられないので、鉢の縁より上 (花) の画素だけ光らせる
+        float flower = 1.0;
+        if (blockBase == BLOCK_LIGHT_BASE + LIGHT_POTTED_EYEBLOSSOM) flower = step(FLOWER_POT_TOP, fract(playerPos.y + cameraPosition.y));
+        g.albedo *= mix(vec3(1.0), EYEBLOSSOM_PETAL_TINT, petal * flower);
+        g.emission = max(core, petal * EYEBLOSSOM_PETAL_GLOW) * flower;
     }
 #endif
 #if defined GBUF_TERRAIN && DECORATIVE_BLOCK_LIGHTS > 0

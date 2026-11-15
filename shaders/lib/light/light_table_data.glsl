@@ -72,6 +72,7 @@ LightDef lightDefStatic(int i) {
         case LIGHT_DECOR_FIRST + 4:  return makeLight(vec3(1.00, 0.15, 0.08), DECOR_LIGHT_BRIGHTNESS, DECOR_LIGHT_LEVEL, 0.5, LT_CENTER, 0.0, LT_OCC);
         case LIGHT_DECOR_FIRST + 5:  return makeLight(vec3(0.75, 0.50, 1.00), DECOR_LIGHT_BRIGHTNESS, DECOR_LIGHT_LEVEL, 0.5, LT_CENTER, 0.0, LT_OCC);
         case LIGHT_EYEBLOSSOM:       return makeLight(vec3(1.0, 0.65, 0.35), EYEBLOSSOM_BRIGHTNESS * 0.2, 3.0, 0.3, vec3(0.5, 0.6, 0.5), 0.0, LT_FLOOD | LT_EYEBLOSSOM);
+        case LIGHT_POTTED_EYEBLOSSOM:return makeLight(vec3(1.0, 0.65, 0.35), EYEBLOSSOM_BRIGHTNESS * 0.2, 3.0, 0.3, vec3(0.5, 0.7, 0.5), 0.0, LT_FLOOD | LT_EYEBLOSSOM);
 
         // アイテム専用光源 (ドロップ / 手持ち)
         case LIGHT_ITEM_LAVA_BUCKET:      return makeLight(LAVA_SRGB, 1.0, 15.0, 0.2, LT_CENTER, 0.2, LT_CAT_ITEM);

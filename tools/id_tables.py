@@ -222,6 +222,10 @@ LIGHTS: list[Light] = [
     # 開いたアイブロッサム (夜)。ホタルの茂みと同じく floodfill の種だけで、点光源と影を持たない。閉じた花は光らない (植物のまま)
     Light(69, "LIGHT_EYEBLOSSOM", "open eyeblossom", "vec3(1.0, 0.65, 0.35), EYEBLOSSOM_BRIGHTNESS * 0.2, 3.0, 0.3, vec3(0.5, 0.6, 0.5), 0.0, LT_FLOOD",
           blocks=_lit("open_eyeblossom"), items=_lit("open_eyeblossom"), kind="eyeblossom"),
+    # 植木鉢の開いたアイブロッサム。揺らさず、鉢の画素は光らせないので花と ID を分ける。花は鉢の上に持ち上がるので発光中心を高くする
+    Light(70, "LIGHT_POTTED_EYEBLOSSOM", "potted open eyeblossom",
+          "vec3(1.0, 0.65, 0.35), EYEBLOSSOM_BRIGHTNESS * 0.2, 3.0, 0.3, vec3(0.5, 0.7, 0.5), 0.0, LT_FLOOD",
+          blocks=_lit("potted_open_eyeblossom"), kind="eyeblossom"),
 
     Light(128, "LIGHT_ITEM_LAVA_BUCKET", "lava bucket", "LAVA_SRGB, 1.0, 15.0, 0.2, LT_CENTER, 0.2, LT_CAT_ITEM", items=_lit("lava_bucket")),
     Light(129, "LIGHT_ITEM_GLOWSTONE_DUST", "glowstone dust", "vec3(1.0, 0.80, 0.52), 0.7, 8.0, 0.1, LT_CENTER, 0.0, LT_CAT_ITEM", items=_lit("glowstone_dust")),
