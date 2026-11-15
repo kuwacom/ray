@@ -45,6 +45,7 @@
 | POM | Tatarchuk, "Dynamic Parallax Occlusion Mapping with Approximate Soft Shadows", I3D 2006 | program/surface/gbuffers_solid.fsh |
 | AgX トーンマップ | Troy Sobotka の AgX (Blender 4.0 の実装と公開されている多項式近似) | lib/post/tonemap.glsl |
 | 局所トーンマップの局所の明るさ (画素自身をガイドにしたガイデッドフィルタ) | He, Sun, Tang, "Guided Image Filtering", ECCV 2010 | lib/post/local_tonemap.glsl, program/post/bloom_down.fsh, bloom_blur.fsh |
+| ビーコンの光線の散乱の積分 (ガウスの円柱を視線で積分する erf の近似) | S. Winitzki, "A handy approximation for the error function and its inverse", 2008 | lib/sky/beacon_beam.glsl |
 | ACES fit | Stephen Hill, "ACES Filmic Tone Mapping Curve" (BakingLab, MIT) の近似式 | lib/post/tonemap.glsl |
 | PBR Neutral トーンマップ | Khronos Group, "Khronos PBR Neutral Tone Mapper" 仕様 | lib/post/tonemap.glsl |
 | ブルームの縮小フィルタ | Jimenez, "Next Generation Post Processing in Call of Duty: Advanced Warfare", SIGGRAPH 2014 | program/post/bloom_down.fsh |
