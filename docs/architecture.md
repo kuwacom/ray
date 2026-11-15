@@ -90,7 +90,8 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 2 | setup1.csh | sky | 大気の透過率 LUT (Hillaire 2020) | - | skyTransmittanceImg 256x64 | local 8x8, (32,8,1) | ATMOSPHERE_MODE=1, world0 |
 | 3 | setup2.csh | sky | 多重散乱 LUT | skyTransmittance | skyMultiScatterImg 32x32 | local 8x8, (4,4,1) | 同上 |
 | 4 | begin.csh | light | 光源リストとライトビン (前フレームに使った枠) とエンティティ光源の蓄積表のクリア | - | SSBO2 カウンタ, SSBO3 binCount/binLights/entityAcc | local 256, (160,1,1) | 常時 |
-| 5 | shadow.vsh/fsh | light | 地形の太陽影マップ + 地形ボクセル化 (頂点シェーダーで imageStore) | mc_Entity, at_midBlock | shadowtex0/1, shadowcolor0/1, voxelBlockImg | shadowMapResolution | 常時 |
+| 5 | shadow_solid / shadow_cutout / shadow_water .vsh/fsh | light | 地形の太陽影マップ + 地形ボクセル化 (頂点シェーダーで imageStore)。本体は 3 つとも `shadow_terrain` | mc_Entity, at_midBlock | shadowtex0/1, shadowcolor0/1, voxelBlockImg | shadowMapResolution | 常時 |
+| 5' | shadow.vsh/gsh/fsh | light | 専用のプログラムが無いジオメトリの受け皿 (本体共通, `PROGRAM_SHADOW_FALLBACK`)。地形用の処理は地形だけ。shadow_entities の無い Iris (1.8 未満、Oculus) では全ジオメトリが来るので、GS で renderStage を見て 6・7 と同じ処理をする (`FX_SHADOW_NON_TERRAIN`)。新しい Iris ではリードなどだけが来て、GS は素通し | renderStage | 5〜7 と同じ | 同上 | 常時 |
 | 6 | shadow_entities.vsh/gsh/fsh | light | エンティティのボクセル化 (GS で表面サンプル)・エンティティ光源登録・影マップ | entityId, currentRenderedItemId | voxelEntityImg, voxelEmitImg, SSBO2, 影マップ | 同上 | shadowEntities |
 | 7 | shadow_block.vsh/gsh/fsh | light | ブロックエンティティ版 (本体共通, `PROGRAM_SHADOW_BLOCK`) | blockEntityId | voxelEntityImg, 影マップ | 同上 | shadowBlockEntities |
 | 8 | prepare.csh | sky | 太陽・月の直達照度、空の SH (全モジュールが使う光の色) | skyView / 解析式 | SSBO0 sun/moon/shadowLight/skySH | (1,1,1) | 常時 |
@@ -343,7 +344,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | 範囲 | カメラ追従の直方体。VOXEL_VOLUME 0-3 = 128x64x128 / 192x96x192 / 256x128x256 / 384x128x384 ブロック。原点セル = `floor(camera) - VOXEL_HALF` (`lib/common/voxel_space.glsl`) |
 | 解像度 | 地形: 1 ブロック = 1 セル (部分形状は形状テーブルの AABB で精度を補う, Shrimple 方式)。エンティティ: 1 セルを 2x2x2 サブセル (0.5 ブロック) のビットマスクで表す |
 | 地形の更新 | shadow パスの頂点シェーダーで、`at_midBlock` からブロック中心を求めて `imageStore` (Photon / Shrimple 方式)。毎フレーム全量 (voxel イメージは毎フレームクリア)。`shadow.culling = reversed` + `voxelDistance` (= 水平半径) でカメラ周辺をカリングさせない |
-| エンティティ | Iris 1.8 の `shadow_entities` / `shadow_block` のジオメトリシェーダーで三角形をサブセル間隔でサンプルし `imageAtomicOr` (閉じた箱は表面を埋めれば十分)。地形には GS を使わないので重くならない。RV の「ラスタライザ流用」より単純で、エンティティ限定なのでコストが小さい |
+| エンティティ | Iris 1.8 の `shadow_entities` / `shadow_block` のジオメトリシェーダーで三角形をサブセル間隔でサンプルし `imageAtomicOr` (閉じた箱は表面を埋めれば十分)。地形には GS を使わないので重くならない (shadow_entities の無い Iris では shadow.gsh で同じ処理をし、地形も GS を通る)。RV の「ラスタライザ流用」より単純で、エンティティ限定なのでコストが小さい |
 | 自分 | `minecraft:current_player` は別ビット (8-15) にも書く。一人称の手持ち光源のレイは自分を無視し、設置光源のレイは自分で遮る |
 | 揺れ | ボクセルは揺れ適用前の位置で書く (影マップは揺れ適用後) |
 | 発光 | 地形の発光は voxelBlockImg の ID + 発光レベル。エンティティ光源は voxelEmitImg (atomicMax で重複排除) |
@@ -793,7 +794,7 @@ shaders.properties の `#if` を評価して `program.*.enabled = false` のプ�
 - 空・雲: aerial perspective は SkyView の地平線色で近似。フォグの透過率は灰色 1ch。雨粒は深度を書かない。上層雲は 160 km まで描くので、地平線際が単調になりうる
 - 影・GI・反射: 水の後ろのガラスが手前に見える。半透明越しの環境反射は空のみ。RSM に可視性はない。F82 は未実装。自動法線は地形とエンティティと手持ち (植物は対象外)
 - ポスト: TAAU は見送り (Iris では gbuffers の解像度を下げられない)
-- エンティティのボクセル化は Iris 1.8 の `shadow_entities` / `shadow_block` に依存。影パスの距離 (`entityShadowDistanceMul`) とフラスタムの外のエンティティは遮蔽物にならない
+- エンティティのボクセル化は `shadow_entities` / `shadow_block` (Iris 1.8 未満と Oculus では shadow.gsh) で行う。影パスの距離 (`entityShadowDistanceMul`) とフラスタムの外のエンティティは遮蔽物にならない
 - 階段は向き・上下・外角を ID に持ち、ハーフ + 段の箱 2 個で遮る。内角 (段が 3/4) は箱 2 個に収まらないので同じ向きの直線で近似する (1/8 ブロック小さい)
 - `minecraft:light` (ライトブロック) の実際のレベルは `at_midBlock.w` が 0 で来る可能性があり、その場合は既定 15 になる (未対処)
 - MOD ブロックは未登録 = 完全な固体扱い。光る MOD ブロックはタグ (`%c:...`) か個別登録が必要

@@ -12,7 +12,7 @@
 #define IMG_VOXEL_ENTITY
 #define IMG_VOXEL_EMIT
 //@include "/lib/common/common.glsl"
-//@include "/lib/common/capabilities_stub.glsl"
+//@include "/lib/settings/capabilities.glsl"
 //@include "/lib/light/shadow_entity.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
@@ -30,7 +30,7 @@
 #include "/lib/common/math.glsl"
 #include "/lib/common/shading_types.glsl"
 #include "/lib/common/common.glsl"
-#include "/lib/common/capabilities_stub.glsl"
+#include "/lib/settings/capabilities.glsl"
 #include "/lib/ids/entity_ids.glsl"
 #include "/lib/ids/block_ids.glsl"
 #include "/lib/ids/light_ids.glsl"
@@ -74,7 +74,8 @@ flat out vec3 tintTransmittance;
 
 void main() {
     bool isEntity = false;
-#ifndef CAP_SHADOW_ENTITIES
+#ifdef FX_SHADOW_NON_TERRAIN
+    // プレイヤーは設定に依らず来る (shadowPlayer) ので、FX_ENTITY_VOXEL_IN_SHADOW ではなく地形以外が来るかで分け、shadow_entities と同じ判定にする
     bool castShadow = true;
     if (renderStage == MC_RENDER_STAGE_ENTITIES) {
         isEntity = true;
