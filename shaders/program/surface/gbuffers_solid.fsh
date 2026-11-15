@@ -174,6 +174,17 @@ float estimateEmission(vec3 albedoSrgb, int materialId) {
 const float DECOR_EMISSION = 0.3;
 
 /*
+ * 開いたアイブロッサム: 発光テクスチャの橙の画素 (彩度が高い) は全力で、花びら (白〜灰) は淡い橙に染めて弱く光らせる
+ * 花びらを白いまま光らせると白い点に見えるので、橙の乗算で色を付ける。茎の暗い画素は光らせない
+ */
+const vec2 EYEBLOSSOM_CORE_SATURATION = vec2(0.4, 0.6);
+const vec2 EYEBLOSSOM_PETAL_RANGE = vec2(0.55, 0.85);
+const float EYEBLOSSOM_PETAL_GLOW = 0.35;
+const vec3 EYEBLOSSOM_PETAL_TINT = vec3(1.0, 0.45, 0.18);
+// 植木鉢の縁の高さ (ブロック内、6/16) に少し足した値。これより上が鉢に植えた花
+const float FLOWER_POT_TOP = 0.39;
+
+/*
  * 向きのある光源 (点灯したかまど・ジャック・オ・ランタン) は前面の火の部分だけが光る
  * 火は彩度の高い橙〜黄か、芯の白熱 (最大成分が FACING_FIRE_CORE 以上)。石の灰色は明るくても彩度が無いので光らせない
  * tools/gen_block_colors.py の面の光り方 (light_masks.json) と同じ式
@@ -364,8 +375,6 @@ void main() {
     materialId = MAT_BLOCK_ENTITY;
 #elif defined GBUF_HAND
     materialId = (heldBlockLightValue > 0 || heldBlockLightValue2 > 0) ? MAT_HAND_EMISSIVE : MAT_HAND;
-#elif defined GBUF_BEACON
-    materialId = MAT_BEACON_BEAM;
 #elif defined GBUF_PARTICLES
     materialId = MAT_PARTICLE;
 #elif defined GBUF_BASIC || defined GBUF_LINE
@@ -519,6 +528,19 @@ void main() {
     // クリーパー・TNT は点滅の白さ (entityColor) の分だけ、発光エンティティと同じ式で明るい画素を光らせる。点滅していない時は光らない
     if (isFlashEntity(entityId)) {
         g.emission = max(g.emission, entityFlashStrength(entityColor) * smoothstep(0.55, 0.9, maxOf(albedo.rgb)));
+    }
+#endif
+#if defined GBUF_TERRAIN
+    if (blockBase == BLOCK_LIGHT_BASE + LIGHT_EYEBLOSSOM || blockBase == BLOCK_LIGHT_BASE + LIGHT_POTTED_EYEBLOSSOM) {
+        float mx = maxOf(albedoDry);
+        float sat = (mx - min(albedoDry.r, min(albedoDry.g, albedoDry.b))) / max(mx, EPS);
+        float core = smoothstep(EYEBLOSSOM_CORE_SATURATION.x, EYEBLOSSOM_CORE_SATURATION.y, sat);
+        float petal = (1.0 - core) * smoothstep(EYEBLOSSOM_PETAL_RANGE.x, EYEBLOSSOM_PETAL_RANGE.y, mx);
+        // 植木鉢の赤茶の鉢と土は彩度が高く花の橙と見分けられないので、鉢の縁より上 (花) の画素だけ光らせる
+        float flower = 1.0;
+        if (blockBase == BLOCK_LIGHT_BASE + LIGHT_POTTED_EYEBLOSSOM) flower = step(FLOWER_POT_TOP, fract(playerPos.y + cameraPosition.y));
+        g.albedo *= mix(vec3(1.0), EYEBLOSSOM_PETAL_TINT, petal * flower);
+        g.emission = max(core, petal * EYEBLOSSOM_PETAL_GLOW) * flower;
     }
 #endif
 #if defined GBUF_TERRAIN && DECORATIVE_BLOCK_LIGHTS > 0

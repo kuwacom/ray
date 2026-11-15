@@ -67,6 +67,7 @@
 #include "/lib/common/shadow_space.glsl"
 #include "/lib/common/shadow_volume.glsl"
 #include "/lib/surface/sun_shadow.glsl"
+#include "/lib/ids/light_ids.glsl"
 #include "/lib/surface/waving.glsl"
 #include "/lib/surface/surface.glsl"
 #include "/lib/sky/sh.glsl"
@@ -85,7 +86,6 @@
 #include "/lib/buffers/light_bins.glsl"
 #include "/lib/light/light_bins.glsl"
 #include "/lib/buffers/block_data.glsl"
-#include "/lib/ids/light_ids.glsl"
 #include "/lib/light/light_def.glsl"
 #include "/lib/light/light_table_data.glsl"
 #include "/lib/light/light_table.glsl"
@@ -150,6 +150,10 @@ void main() {
         // deferred30 が a = 1 + 割合で渡した直接光の鏡面の白飛び分と、ここで足す映り込みの白飛び分を、重なった半透明の分だけ直して渡す
         // (しきい値は別々に掛けるので、両方が白の手前の時は少なめに出る)
         float sparkle = (saturate(sceneIn.a - 1.0) * luminance(scene) + luminance(sparkleExcess(env, getExposure()))) * (1.0 - translucent.a);
+#ifdef FIREWORK_GLOW
+        // 光る粒 (lib/surface/particle_glow.glsl) の白を超えた分も渡す。遠くの数画素の火花が TAA の箱で潰れない (照らされる半透明はほとんど白を超えない)
+        sparkle += luminance(sparkleExcess(translucent.rgb, getExposure()));
+#endif
         if (matT == MAT_METAL_ARMOR && d0 < d1 && !isHandDepth(d0)) {
             // 金属・宝石の装備: 前方で照らした色に、不透明の金属と同じ 反射 x 重み を足す (重みは colortex15 の rgb、gbuffers_translucent.fsh)
             vec3 armorPlayer = screenToPlayer(vec3(texcoord, d0));

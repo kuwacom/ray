@@ -17,6 +17,8 @@
 | 正規直交基底 | Duff et al., "Building an Orthonormal Basis, Revisited", JCGT 2017 | lib/common/math.glsl |
 | 球面調和の放射照度 | Ramamoorthi & Hanrahan, "An Efficient Representation for Irradiance Environment Maps", SIGGRAPH 2001 | lib/sky/sh.glsl |
 | 窓付き逆二乗減衰 | Karis, "Real Shading in Unreal Engine 4", SIGGRAPH 2013 | lib/light/block_data.glsl |
+| 画素より細い物の最小の幅 (幅を画素に広げ、広げた比で明るさを割る) | Persson, "Phone-wire AA", humus.name 2011 | lib/surface/particle_glow.glsl |
+| 一様な媒質の点光源の単散乱 (逆二乗の視線積分を atan で閉じる) | Sun, Ramamoorthi, Narasimhan & Nayar, "A Practical Analytic Single Scattering Model for Real Time Rendering", SIGGRAPH 2005 | lib/light/firework_light.glsl |
 | 黒体放射の近似色 | Tanner Helland の近似式 | lib/common/color.glsl |
 | Light Propagation Volumes | Kaplanyan & Dachsbacher, I3D 2010 | lib/light/floodfill.glsl, program/light/floodfill.csh |
 | 大気散乱 LUT (透過率・多重散乱・SkyView) | Hillaire, "A Scalable and Production Ready Sky and Atmosphere Rendering Technique", EGSR 2020 | lib/sky/atmosphere.glsl, program/sky/transmittance_lut.csh, multiscatter_lut.csh, skyview_lut.csh |
@@ -45,6 +47,7 @@
 | POM | Tatarchuk, "Dynamic Parallax Occlusion Mapping with Approximate Soft Shadows", I3D 2006 | program/surface/gbuffers_solid.fsh |
 | AgX トーンマップ | Troy Sobotka の AgX (Blender 4.0 の実装と公開されている多項式近似) | lib/post/tonemap.glsl |
 | 局所トーンマップの局所の明るさ (画素自身をガイドにしたガイデッドフィルタ) | He, Sun, Tang, "Guided Image Filtering", ECCV 2010 | lib/post/local_tonemap.glsl, program/post/bloom_down.fsh, bloom_blur.fsh |
+| ビーコンの光線の散乱の積分 (ガウスの円柱を視線で積分する erf の近似) | S. Winitzki, "A handy approximation for the error function and its inverse", 2008 | lib/sky/beacon_beam.glsl |
 | ACES fit | Stephen Hill, "ACES Filmic Tone Mapping Curve" (BakingLab, MIT) の近似式 | lib/post/tonemap.glsl |
 | PBR Neutral トーンマップ | Khronos Group, "Khronos PBR Neutral Tone Mapper" 仕様 | lib/post/tonemap.glsl |
 | ブルームの縮小フィルタ | Jimenez, "Next Generation Post Processing in Call of Duty: Advanced Warfare", SIGGRAPH 2014 | program/post/bloom_down.fsh |

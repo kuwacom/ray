@@ -2,6 +2,8 @@
  * begin (shadow パスの前): 今フレームの光源リストとライトビンを空にする
  * エンティティ光源の蓄積表 (lib/light/entity_light.glsl) もここでクリアする
  * エンティティの三角形 (lib/light/entity_tri.glsl) のカウンタと AABB もここで空にする
+ * ビーコンの光線の区間 (FrameData、lib/sky/beacon_beam.glsl) もここで空にする
+ * 花火の光 (lib/light/firework_light.glsl) を前フレームの光る粒から決め、蓄積を空にする
  * light モジュール (lib/light)
  */
 // このプログラムで書く SSBO (lib/buffers。ほかのプログラムでは readonly)
@@ -9,11 +11,15 @@
 #define SSBO_GLOBAL_LIGHTS_WRITE
 #define SSBO_LIGHT_BINS_WRITE
 #define SSBO_ENTITY_TRIS_WRITE
+#define SSBO_FIREWORK_LIGHT_WRITE
 //@include "/lib/common/common.glsl"
 //@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/buffers/global_lights.glsl"
 //@include "/lib/buffers/light_bins.glsl"
 //@include "/lib/light/light.glsl"
+#ifdef FIREWORK_LIGHT
+    //@include "/lib/light/firework_light.glsl"
+#endif
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -62,6 +68,11 @@
 #include "/lib/light/hand_light.glsl"
 #include "/lib/light/blocklight.glsl"
 #include "/lib/light/light.glsl"
+#ifdef FIREWORK_LIGHT
+    #include "/lib/common/phase.glsl"
+    #include "/lib/buffers/firework_light.glsl"
+    #include "/lib/light/firework_light.glsl"
+#endif
 // END GENERATED includes
 
 layout(local_size_x = 256) in;
@@ -81,6 +92,12 @@ void main() {
     // 40960 スレッドで蓄積表 (32768 uint) を覆える
     if (i < uint(ENTITY_ACC_UINTS)) lightBins.entityAcc[i] = 0u;
     clearEntityTriangles(i);
+    // ビーコンの光線の区間は gbuffers_beaconbeam が毎フレーム登録し直す
+    if (i < uint(BEACON_BEAM_MAX)) {
+        frameData.beaconBeamKey[i] = 0u;
+        frameData.beaconBeamYMin[i] = 0x7fffffff;
+        frameData.beaconBeamYMax[i] = -0x7fffffff;
+    }
 
     if (i == 0u) {
         frameData.lightStats.x = globalLights.count;
@@ -94,5 +111,9 @@ void main() {
         globalLights.entityCount = 0u;
         globalLights.overflow = 0u;
         globalLights.culled = 0u;
+#ifdef FIREWORK_LIGHT
+        // 前フレームの光る粒から花火の光を決める (今フレームの粒は gbuffers_particles_translucent が溜める)
+        updateFireworkLight();
+#endif
     }
 }

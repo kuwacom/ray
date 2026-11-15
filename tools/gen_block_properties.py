@@ -165,7 +165,7 @@ BLOCKS: list[tuple[int, str, list[str]]] = [
     (100, "short plants (wave with fixed root)", ["short_grass", "fern", "dead_bush", "dandelion", "poppy", "blue_orchid", "allium",
                                          "azure_bluet", "red_tulip", "orange_tulip", "white_tulip", "pink_tulip", "oxeye_daisy",
                                          "cornflower", "lily_of_the_valley", "wither_rose", "torchflower", "closed_eyeblossom",
-                                         "open_eyeblossom", "pink_petals", "wildflowers", "short_dry_grass", "tall_dry_grass", "bush",
+                                         "pink_petals", "wildflowers", "short_dry_grass", "tall_dry_grass", "bush",
                                          "cactus_flower", "oak_sapling", "spruce_sapling", "birch_sapling", "jungle_sapling",
                                          "acacia_sapling", "dark_oak_sapling", "cherry_sapling", "pale_oak_sapling", "mangrove_propagule",
                                          "brown_mushroom", "red_mushroom", "crimson_fungus", "warped_fungus", "crimson_roots",
@@ -465,7 +465,7 @@ def check_tables() -> None:
             raise SystemExit(f"光源 {light.index} ({light.title}): アイテム専用光源の帯なのにアイテムが無い")
         if light.entities and light.index < LIGHT_ENTITY_FIRST:
             raise SystemExit(f"光源 {light.index} ({light.title}): エンティティはエンティティ光源の帯 ({LIGHT_ENTITY_FIRST}-) に置く")
-        if light.index >= LIGHT_ENTITY_FIRST and not light.entities:
+        if light.index >= LIGHT_ENTITY_FIRST and not light.entities and not light.shader_only:
             raise SystemExit(f"光源 {light.index} ({light.title}): エンティティ光源の帯なのにエンティティが無い")
     ids: dict[int, str] = {}
     for bid, comment, _ in all_blocks():
@@ -542,6 +542,7 @@ def render_light_ids() -> str:
         "const uint LIGHT_FLAG_KIND_LANTERN = 2048u; // ランタン (魂・銅を含む)",
         "const uint LIGHT_FLAG_KIND_BEACON = 4096u;  // ビーコン (ブロック。ビームはマテリアルで分ける)",
         "const uint LIGHT_FLAG_FLOOD_ONLY = 8192u;   // floodfill の種だけ (点光源の登録と影を持たない。ホタルの茂み)",
+        "const uint LIGHT_FLAG_KIND_EYEBLOSSOM = 16384u; // 開いたアイブロッサム (発光の明るさは EYEBLOSSOM_BRIGHTNESS)",
         "",
         "// 向きのある光源か (LIGHT_FLAG_FACING の光源。光源の表を引かずに gbuffers で判定する)",
         "bool isFacingLight(int light) {",

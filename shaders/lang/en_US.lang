@@ -191,6 +191,10 @@ option.BURNING_ENTITY_LIGHTS=Burning Entity Lights
 option.BURNING_ENTITY_LIGHTS.comment=Entities on fire emit light.
 option.GLOWING_ENTITY_LIGHTS=Glowing Entity Lights
 option.GLOWING_ENTITY_LIGHTS.comment=Blazes, glow squids, magma cubes, end crystals and flashing TNT emit light.
+option.CHARGED_CREEPER_LIGHT=Charged Creeper / Wither Armor Light
+option.CHARGED_CREEPER_LIGHT.comment=The electric swirl of a charged creeper and of the wither's armor lights its surroundings blue-white while it is shown. Soft light through Colored Floodfill (no shadows, almost no cost).
+option.CHARGED_CREEPER_LIGHT_BRIGHTNESS=Charged Creeper / Wither Armor Light Strength
+option.CHARGED_CREEPER_LIGHT_BRIGHTNESS.comment=How strongly the electric swirl lights its surroundings. Higher values light farther. Does not change how bright the swirl itself looks.
 
 # Shadows & GI
 option.shadowMapResolution=Shadow Resolution
@@ -305,20 +309,38 @@ option.EMISSION_BLOCK_BRIGHTNESS=Light Block Brightness
 option.EMISSION_BLOCK_BRIGHTNESS.comment=How bright blocks that glow as a whole (glowstone, sea lantern, redstone lamp, jack o'lantern, froglights, shroomlight) look on screen. Lower values show more of the texture pattern. Does not change the light they cast
 option.EMISSION_BEACON_BRIGHTNESS=Beacon Brightness
 option.EMISSION_BEACON_BRIGHTNESS.comment=How bright the beacon block and its beam look on screen. The beam is always visible from far away, so a low value keeps it from standing out. Does not change the light the beacon casts
+option.EMISSION_BEACON_SCATTER=Beacon Beam Scattering
+option.EMISSION_BEACON_SCATTER.comment=Draws the beam as light scattered by the air. It gets brighter when you look down along it from above or along its length, and stronger with a glow around it in fog, haze and rain. Faint against the daytime sky, clear at night. OFF = a thin line of constant brightness. No cost when no beam is on screen
+option.EMISSION_BEACON_SCATTER_STRENGTH=Beacon Beam Glow
+option.EMISSION_BEACON_SCATTER_STRENGTH.comment=How strongly fog, haze and rain around the beam light up and glow. 0 = no glow
 option.EMISSION_CHARGED_CREEPER_BRIGHTNESS=Charged Creeper / Wither Armor Brightness
-option.EMISSION_CHARGED_CREEPER_BRIGHTNESS.comment=How brightly the electric swirl of a creeper charged by lightning and of the wither's armor glows blue-white, so it stands out at night. 0 = vanilla brightness. Does not cast light on the surroundings
+option.EMISSION_CHARGED_CREEPER_BRIGHTNESS.comment=How brightly the electric swirl of a creeper charged by lightning and of the wither's armor glows blue-white, so it stands out at night. 0 = vanilla brightness. Does not change the light it casts
+option.CREAKING_EYE_BRIGHTNESS=Creaking Eye Brightness
+option.CREAKING_EYE_BRIGHTNESS.comment=How brightly the glowing eyes of a creaking shine in eerie orange-red. 0 = no glow. Does not cast light on the surroundings
 option.GLOW_LICHEN_LIGHT=Glow Lichen Light
 option.GLOW_LICHEN_LIGHT.comment=Makes glow lichen a light source that lights its surroundings. When off, only the glowing look remains.
 option.GLOW_LICHEN_BRIGHTNESS=Glow Lichen Light Strength
 option.GLOW_LICHEN_BRIGHTNESS.comment=How strongly glow lichen lights its surroundings. Higher values light farther.
 option.FIREFLY_BUSH_BRIGHTNESS=Firefly Bush Light Strength
 option.FIREFLY_BUSH_BRIGHTNESS.comment=How strongly firefly bushes light their surroundings. Higher values light farther.
+option.EYEBLOSSOM_BRIGHTNESS=Open Eyeblossom Brightness
+option.EYEBLOSSOM_BRIGHTNESS.comment=How brightly open eyeblossoms glow pale orange at night, and how strongly they softly light their surroundings. 0 = no glow.
 option.LAVA_BRIGHTNESS=Lava Brightness
 option.LAVA_BRIGHTNESS.comment=How bright lava itself looks on screen. Higher values shift it from orange toward yellow. Does not change the light it casts. 0 = no extra brightening (darker orange)
 option.LAVA_BLOOM=Lava Bloom
 option.LAVA_BLOOM.comment=Strength of the glow around lava. 0 = same bloom as other objects
 option.LAVA_LIGHT=Lava Light
 option.LAVA_LIGHT.comment=Strength of the light lava casts on the surrounding terrain. Does not change how bright lava itself looks. 0 = lava lights nothing
+option.FIREWORK_GLOW=Firework Glow
+option.FIREWORK_GLOW.comment=Self-lit particles such as firework sparks (also end rod and totem particles) glow brightly in their own color and spread through bloom, as does the flash when a firework bursts. Small distant sparks stay visible. OFF = lit by the surroundings like other particles
+option.FIREWORK_GLOW_STRENGTH=Firework Glow Brightness
+option.FIREWORK_GLOW_STRENGTH.comment=Brightness of glowing particles. Higher = larger white core and wider glow
+option.FIREWORK_TWINKLE_STRENGTH=Firework Twinkle
+option.FIREWORK_TWINKLE_STRENGTH.comment=Brightness flicker of glowing particles. Nearby sparks twinkle slightly out of step. 0 = steady
+option.FIREWORK_LIGHT=Firework Light
+option.FIREWORK_LIGHT.comment=When a firework bursts, it lights the ground and walls under the open sky and the surrounding air (fog, smoke) in its color. No shadows. Low cost
+option.FIREWORK_LIGHT_STRENGTH=Firework Light Strength
+option.FIREWORK_LIGHT_STRENGTH.comment=Strength of the light fireworks cast on their surroundings. Does not change the brightness of the sparks
 
 # Water & reflections
 option.WATER_WAVES=Water Waves

@@ -64,6 +64,9 @@ in float vSkyLight[];
 flat in int vBlockId[];
 flat in vec3 vTint[];
 in vec3 vPlayerPos[];
+#ifdef CHARGED_CREEPER_LIGHT
+    flat in int vSwirlLayer[];
+#endif
 
 out vec2 texcoord;
 out vec4 glcolor;
@@ -79,8 +82,14 @@ void main() {
     bool castShadow = true;
     if (renderStage == MC_RENDER_STAGE_ENTITIES) {
         isEntity = true;
+    #ifdef CHARGED_CREEPER_LIGHT
+        bool swirlLayer = vSwirlLayer[0] != 0;
+    #else
+        bool swirlLayer = false;
+    #endif
         castShadow = shadowEntityTriangle(vPlayerPos[0], vPlayerPos[1], vPlayerPos[2],
-                                          vTexcoord[0], vTexcoord[1], vTexcoord[2], vColor[0], vColor[1], vColor[2]);
+                                          vTexcoord[0], vTexcoord[1], vTexcoord[2], vColor[0], vColor[1], vColor[2],
+                                          swirlLayer);
     } else if (renderStage == MC_RENDER_STAGE_BLOCK_ENTITIES) {
         isEntity = true;
         castShadow = shadowBlockEntityTriangle(vPlayerPos[0], vPlayerPos[1], vPlayerPos[2]);

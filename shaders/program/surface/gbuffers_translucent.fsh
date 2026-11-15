@@ -19,6 +19,9 @@
 //@include "/lib/surface/surface_lights.glsl"
 //@include "/lib/surface/water_self.glsl"
 //@include "/lib/surface/generated_normal.glsl"
+#if defined GBUF_PARTICLES_TRANSLUCENT && defined FIREWORK_GLOW
+    //@include "/lib/surface/particle_glow.glsl"
+#endif
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -60,6 +63,7 @@
 #include "/lib/common/shadow_space.glsl"
 #include "/lib/common/shadow_volume.glsl"
 #include "/lib/surface/sun_shadow.glsl"
+#include "/lib/ids/light_ids.glsl"
 #include "/lib/surface/waving.glsl"
 #include "/lib/surface/surface.glsl"
 #include "/lib/sky/sh.glsl"
@@ -78,7 +82,6 @@
 #include "/lib/buffers/light_bins.glsl"
 #include "/lib/light/light_bins.glsl"
 #include "/lib/buffers/block_data.glsl"
-#include "/lib/ids/light_ids.glsl"
 #include "/lib/light/light_def.glsl"
 #include "/lib/light/light_table_data.glsl"
 #include "/lib/light/light_table.glsl"
@@ -101,6 +104,9 @@
 #include "/lib/surface/surface_lights.glsl"
 #include "/lib/surface/water_self.glsl"
 #include "/lib/surface/generated_normal.glsl"
+#if defined GBUF_PARTICLES_TRANSLUCENT && defined FIREWORK_GLOW
+    #include "/lib/surface/particle_glow.glsl"
+#endif
 // END GENERATED includes
 
 in vec2 texcoord;
@@ -112,6 +118,10 @@ in vec4 tangentPlayer;
 in vec2 tileMid;
 in vec2 tileHalf;
 flat in int blockId;
+#if defined GBUF_PARTICLES_TRANSLUCENT && defined FIREWORK_GLOW
+in vec2 glowCorner;
+in float glowGain;
+#endif
 
 #if defined GBUF_ENTITIES_TRANSLUCENT || defined GBUF_BLOCK_TRANSLUCENT
     #define GBUF_FORWARD_OPAQUE
@@ -231,7 +241,20 @@ vec3 forwardDiffuse(Material m, vec3 playerPos, vec3 normal, vec3 geoNormal, vec
 }
 
 void main() {
-    vec4 albedo = texture(gtexture, texcoord) * glcolor;
+    vec4 tex = texture(gtexture, texcoord);
+    vec4 albedo = tex * glcolor;
+#if defined GBUF_PARTICLES_TRANSLUCENT && defined FIREWORK_GLOW
+    // 光る粒 (花火の火花など) と花火の閃光は照らさず発光だけにする。小さな粒はテクスチャの代わりに丸い点で描くので、捨てる判定もその後
+    vec2 glowCornerWidth = fwidth(glowCorner);
+    // 四角の幅 (ブロック) = 画素数 x 1 画素の長さ
+    float quadSize = 2.0 / max(glowCornerWidth.x, 1e-4) * length(dFdx(viewPos));
+    if (glowGain > 0.0 || isFireworkFlash(quadSize, lmcoord.y)) {
+        vec4 glow = glowGain > 0.0 ? evalParticleGlow(tex, glcolor, glowCorner, glowCornerWidth, glowGain, length(viewPos)) : evalFireworkFlash(glcolor, glowCorner);
+        if (glow.a < 0.01) discard;
+        outColor = glow;
+        return;
+    }
+#endif
     if (albedo.a < 0.01) discard;
 
     vec3 texRgb = albedo.rgb;

@@ -59,6 +59,9 @@ in vec2 vTexcoord[];
 in vec4 vColor[];
 in vec3 vPlayerPos[];
 in vec3 vNormal[];
+#if !defined PROGRAM_SHADOW_BLOCK && defined CHARGED_CREEPER_LIGHT
+    flat in int vSwirlLayer[];
+#endif
 
 out vec2 texcoord;
 out vec4 glcolor;
@@ -68,8 +71,14 @@ void main() {
 #ifdef PROGRAM_SHADOW_BLOCK
     bool castShadow = shadowBlockEntityTriangle(vPlayerPos[0], vPlayerPos[1], vPlayerPos[2]);
 #else
+    #ifdef CHARGED_CREEPER_LIGHT
+        bool swirlLayer = vSwirlLayer[0] != 0;
+    #else
+        bool swirlLayer = false;
+    #endif
     bool castShadow = shadowEntityTriangle(vPlayerPos[0], vPlayerPos[1], vPlayerPos[2],
-                                           vTexcoord[0], vTexcoord[1], vTexcoord[2], vColor[0], vColor[1], vColor[2]);
+                                           vTexcoord[0], vTexcoord[1], vTexcoord[2], vColor[0], vColor[1], vColor[2],
+                                           swirlLayer);
 #endif
 
     if (!castShadow) return;

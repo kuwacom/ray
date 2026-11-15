@@ -49,6 +49,7 @@ const int noiseTextureResolution = 256;
     #undef PROJECTILE_LIGHTS
     #undef BURNING_ENTITY_LIGHTS
     #undef GLOWING_ENTITY_LIGHTS
+    #undef CHARGED_CREEPER_LIGHT
 #endif
 
 // 手持ち光源が OFF ならレイ・影も無効

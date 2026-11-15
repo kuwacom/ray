@@ -28,8 +28,9 @@ bool shadowBlockEntityTriangle(vec3 p0, vec3 p1, vec3 p2) {
 #endif
 }
 
-// c0〜c2: 頂点色 (三角形方式では平均を保持する)
-bool shadowEntityTriangle(vec3 p0, vec3 p1, vec3 p2, vec2 uv0, vec2 uv1, vec2 uv2, vec4 c0, vec4 c1, vec4 c2) {
+// c0〜c2: 頂点色 (三角形方式では平均を保持する)。swirlLayer: 帯電クリーパー・ウィザーの防壁の電気の渦の層か
+bool shadowEntityTriangle(vec3 p0, vec3 p1, vec3 p2, vec2 uv0, vec2 uv1, vec2 uv2, vec4 c0, vec4 c1, vec4 c2,
+                          bool swirlLayer) {
     /*
      * Iris 1.11 は影のパスのブロックエンティティを描き方 (RenderPipeline) で振り分け、shadow_block に回すのは
      * エンドポータル・エンドゲートウェイだけ。チェスト型・コンジットなどはこちらに来るので、blockEntityId で見分けて
@@ -72,6 +73,9 @@ bool shadowEntityTriangle(vec3 p0, vec3 p1, vec3 p2, vec2 uv0, vec2 uv1, vec2 uv
     // 画面外のエンティティ光源もここで登録する (gbuffers_entities と同じセルなら重複しない)
     if (isBlockEntity) injectBlockEntityLight((p0 + p1 + p2) / 3.0, blockEntityId);
     else injectEntityLight((p0 + p1 + p2) / 3.0, entityId, currentRenderedItemId, entityColor);
+#ifdef CHARGED_CREEPER_LIGHT
+    if (swirlLayer) injectSwirlLight((p0 + p1 + p2) / 3.0, entityId);
+#endif
 
 #ifdef ENTITY_TRI_OCCLUSION
     /*

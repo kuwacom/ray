@@ -59,6 +59,8 @@ const int LIGHT_ENDER_CHEST = 60;
 const int LIGHT_FIREFLY_BUSH = 61;
 const int LIGHT_TRIAL_SPAWNER = 62;
 const int LIGHT_DECOR_FIRST = 63; // 63-68: BLOCK_DECOR_* (lapis, emerald, diamond, gold, redstone, amethyst)。DECORATIVE_BLOCK_LIGHTS 2 の時だけ使う
+const int LIGHT_EYEBLOSSOM = 69;
+const int LIGHT_POTTED_EYEBLOSSOM = 70;
 const int LIGHT_BLOCK_LAST = 127;
 
 // アイテム専用光源 (ドロップ・手持ち)
@@ -91,6 +93,7 @@ const int LIGHT_ENTITY_LIGHTNING = 204;
 const int LIGHT_ENTITY_FLAME = 205;
 const int LIGHT_ENTITY_SHULKER_BULLET = 206;
 const int LIGHT_ENTITY_TNT_MINECART = 207;
+const int LIGHT_ENTITY_SWIRL = 208;
 
 // 光源フラグ (LightDef.info.x)
 const uint LIGHT_FLAG_OCCLUDES = 1u;        // 光源ブロック自体が完全遮蔽物 (グロウストーン等)
@@ -108,6 +111,7 @@ const uint LIGHT_FLAG_KIND_FIRE = 1024u;    // 炎 (火・魂の火・キャン�
 const uint LIGHT_FLAG_KIND_LANTERN = 2048u; // ランタン (魂・銅を含む)
 const uint LIGHT_FLAG_KIND_BEACON = 4096u;  // ビーコン (ブロック。ビームはマテリアルで分ける)
 const uint LIGHT_FLAG_FLOOD_ONLY = 8192u;   // floodfill の種だけ (点光源の登録と影を持たない。ホタルの茂み)
+const uint LIGHT_FLAG_KIND_EYEBLOSSOM = 16384u; // 開いたアイブロッサム (発光の明るさは EYEBLOSSOM_BRIGHTNESS)
 
 // 向きのある光源か (LIGHT_FLAG_FACING の光源。光源の表を引かずに gbuffers で判定する)
 bool isFacingLight(int light) {

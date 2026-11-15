@@ -2,7 +2,7 @@
  * composite19: フォグ / VL の適用 (colortex12 をバイラテラルにアップサンプルして colortex0 に合成)
  * 順番 (遠い方から): 地形 -> 空中遠近 -> 描画距離端のフォグ -> カメラ側の媒質 (高さフォグ / 水 / 溶岩 / 粉雪)
  * -> 画面空間の光芒 (composite12-14 の結果) -> 手前の雲 (雲より上にいる時。光芒は雲の下の空気の光なので雲に隠れる)
- * -> 雲の中の霧 (カメラが雲の層の中の時) -> 手持ち光源が霧を照らす光 (点光源の内散乱を解析積分) -> 盲目・暗闇
+ * -> 雲の中の霧 (カメラが雲の層の中の時) -> ビーコンの光線 (光線の点までの媒質を自分で掛ける) -> 手持ち光源と花火が霧を照らす光 (点光源の内散乱を解析積分) -> 盲目・暗闇
  * 光芒をここで足すのは、フォグ・手前の雲・雲の中の霧・盲目の順番に自然に乗せ、全画面の読み書きを増やさないため
  * sky モジュール (lib/sky)
  */
@@ -13,7 +13,12 @@
 //@include "/lib/common/water.glsl"
 //@include "/lib/sky/sky.glsl"
 //@include "/lib/sky/godrays.glsl"
+//@include "/lib/sky/beacon_beam.glsl"
+//@include "/lib/common/jitter.glsl"
 //@include "/lib/light/light.glsl"
+#ifdef FIREWORK_LIGHT
+    //@include "/lib/light/firework_light.glsl"
+#endif
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -60,6 +65,9 @@
 #include "/lib/sky/sky.glsl"
 #include "/lib/buffers/slots.glsl"
 #include "/lib/sky/godrays.glsl"
+#include "/lib/common/exposure.glsl"
+#include "/lib/sky/beacon_beam.glsl"
+#include "/lib/common/jitter.glsl"
 #include "/lib/buffers/light_bins.glsl"
 #include "/lib/light/light_bins.glsl"
 #include "/lib/ids/block_ids.glsl"
@@ -85,6 +93,10 @@
 #include "/lib/light/hand_light.glsl"
 #include "/lib/light/blocklight.glsl"
 #include "/lib/light/light.glsl"
+#ifdef FIREWORK_LIGHT
+    #include "/lib/buffers/firework_light.glsl"
+    #include "/lib/light/firework_light.glsl"
+#endif
 // END GENERATED includes
 
 in vec2 texcoord;
@@ -289,6 +301,16 @@ void main() {
             sparkle *= interiorFog.a;
         }
 #endif
+        // ビーコンの光線は深度を書かないので、光線の点までの雲・フォグ・半透明をここで掛けて足す (光線が無いフレームは 1 回の読みだけ)
+        if (hasBeaconBeams()) {
+            float depthOpaque = texelFetch(depthtex1, texel, 0).r;
+            float opaqueDist = depthOpaque >= 1.0 ? BEACON_BEAM_FAR : length(screenToPlayer(vec3(texcoord, fixHandDepth(depthOpaque))));
+            bool front = depth < depthOpaque;
+            float frontAlpha = front ? texelFetch(colortex4, texel, 0).a : 0.0;
+            // 地形と同じくジッターの分ずれた視線で求め、TAA で画素より細かく均す
+            vec3 beamDir = normalize(viewToPlayerDir(screenToView(vec3(removeTaaJitter(texcoord), 1.0))));
+            color += evalBeaconBeams(beamDir, opaqueDist, front ? dist : opaqueDist, frontAlpha, fog.a, dist, texel);
+        }
 #if defined HAS_SKY
         scatterCoeff = vec3((localDensity.x + localDensity.y) * FOG_ALBEDO);
 #elif defined WORLD_END
@@ -299,6 +321,15 @@ void main() {
     }
 
     if (maxOf(scatterCoeff) > 0.0) color += handLightGlow(dir, min(dist, 32.0), scatterCoeff, isEyeInWater == 1);
+#ifdef FIREWORK_LIGHT
+    // 花火の爆発の光が霧と煙で散乱した暈 (lib/light/firework_light.glsl)。空気中だけ
+    // 長さは不透明の面まで。火花や閃光の粒の深度で切ると、粒の画素だけ暈が欠けて周りより暗い輪になった
+    if (isEyeInWater == 0 && hasFireworkLight()) {
+        float depthOpaque = texelFetch(depthtex1, texel, 0).r;
+        float glowDist = depthOpaque >= 1.0 ? fogRenderDistance() : length(screenToPlayer(vec3(texcoord, fixHandDepth(depthOpaque))));
+        color += evalFireworkGlow(dir, glowDist, scatterCoeff);
+    }
+#endif
 
     // 盲目・暗闇: 近く以外を黒へ (バニラと同じく視界を奪う効果)
     float blindFog = max(blindness, darknessFactor * (0.6 + 0.4 * darknessLightFactor));

@@ -54,7 +54,7 @@ def state_values(block: str, prop: str, values: list[str]) -> list[str]:
 
 
 # 発光の見た目の明るさの種類 -> light_def.glsl の LT_* (値は gen_block_properties.py の LIGHT_FLAG_KIND_*)
-KIND_FLAGS = {"torch": "LT_TORCH", "fire": "LT_FIRE", "lantern": "LT_LANTERN", "beacon": "LT_BEACON"}
+KIND_FLAGS = {"torch": "LT_TORCH", "fire": "LT_FIRE", "lantern": "LT_LANTERN", "beacon": "LT_BEACON", "eyeblossom": "LT_EYEBLOSSOM"}
 
 
 @dataclass(frozen=True)
@@ -75,6 +75,7 @@ class Light:
     mask: str = ""                   # 面の光り方を測るブロックと状態 ("redstone_lamp:lit=true")。空なら LT_OCC の光源だけ blocks[0]
     facing: bool = False             # 前面だけが光る向きのあるブロック (かまど・ジャック・オ・ランタン)。向きごとに ID を分ける。mask は facing=north を指定する
     kind: str = ""                   # 発光の見た目の明るさを設定で分ける種類 (KIND_FLAGS のキー)。光源ブロック (LT_OCC) は種類を付けずフラグで分ける
+    shader_only: bool = False        # エンティティ光源の帯で、エンティティ ID を持たずシェーダーが直接登録するもの
 
     def make_expr(self) -> str:
         make = self.make + " | LIGHT_FLAG_FACING" if self.facing else self.make
@@ -218,6 +219,13 @@ LIGHTS: list[Light] = [
     Light(66, None, "decorative gold", f"vec3(1.00, 0.80, 0.35), {_DECOR}", label="LIGHT_DECOR_FIRST + 3", mask="gold_block"),
     Light(67, None, "decorative redstone", f"vec3(1.00, 0.15, 0.08), {_DECOR}", label="LIGHT_DECOR_FIRST + 4", mask="redstone_block"),
     Light(68, None, "decorative amethyst", f"vec3(0.75, 0.50, 1.00), {_DECOR}", label="LIGHT_DECOR_FIRST + 5", mask="amethyst_block"),
+    # 開いたアイブロッサム (夜)。ホタルの茂みと同じく floodfill の種だけで、点光源と影を持たない。閉じた花は光らない (植物のまま)
+    Light(69, "LIGHT_EYEBLOSSOM", "open eyeblossom", "vec3(1.0, 0.65, 0.35), EYEBLOSSOM_BRIGHTNESS * 0.2, 3.0, 0.3, vec3(0.5, 0.6, 0.5), 0.0, LT_FLOOD",
+          blocks=_lit("open_eyeblossom"), items=_lit("open_eyeblossom"), kind="eyeblossom"),
+    # 植木鉢の開いたアイブロッサム。揺らさず、鉢の画素は光らせないので花と ID を分ける。花は鉢の上に持ち上がるので発光中心を高くする
+    Light(70, "LIGHT_POTTED_EYEBLOSSOM", "potted open eyeblossom",
+          "vec3(1.0, 0.65, 0.35), EYEBLOSSOM_BRIGHTNESS * 0.2, 3.0, 0.3, vec3(0.5, 0.7, 0.5), 0.0, LT_FLOOD",
+          blocks=_lit("potted_open_eyeblossom"), kind="eyeblossom"),
 
     Light(128, "LIGHT_ITEM_LAVA_BUCKET", "lava bucket", "LAVA_SRGB, 1.0, 15.0, 0.2, LT_CENTER, 0.2, LT_CAT_ITEM", items=_lit("lava_bucket")),
     Light(129, "LIGHT_ITEM_GLOWSTONE_DUST", "glowstone dust", "vec3(1.0, 0.80, 0.52), 0.7, 8.0, 0.1, LT_CENTER, 0.0, LT_CAT_ITEM", items=_lit("glowstone_dust")),
@@ -247,6 +255,10 @@ LIGHTS: list[Light] = [
           entities=_lit("minecraft:entity_flame"), entity_note="Flames on burning entities (Iris hardcoded ID)"),
     Light(206, "LIGHT_ENTITY_SHULKER_BULLET", "shulker bullet", "vec3(1.0, 0.95, 0.85), 0.6, 6.0, 0.1, LT_CENTER, 0.0, LT_CAT_PROJ", entities=_lit("minecraft:shulker_bullet")),
     Light(207, "LIGHT_ENTITY_TNT_MINECART", "tnt minecart", "vec3(1.0, 1.0, 1.0), 1.0, 10.0, 0.5, LT_CENTER, 0.0, LT_CAT_GLOW | LIGHT_FLAG_ENTITY_FLASH", entities=_lit("minecraft:tnt_minecart")),
+    # 帯電したクリーパーとウィザーの防壁の電気の渦。ID では帯電が分からないので、渦の層を描く影パスが直接登録する
+    # 直接光 (影のレイ) にすると帯電クリーパーとウィザーの近くで 0.8-1.2 ms 重く、照らし方も強すぎたので floodfill の種だけにする
+    Light(208, "LIGHT_ENTITY_SWIRL", "energy swirl", "vec3(0.80, 0.90, 1.0), CHARGED_CREEPER_LIGHT_BRIGHTNESS, 10.0, 0.4, LT_CENTER, 0.0, LT_FLOOD",
+          shader_only=True),
 ]
 
 # 光源にならないエンティティ: (ID, 定数名, GLSL のコメント, 名前, entity.properties の上のコメント)
@@ -264,6 +276,8 @@ ENTITIES: list[tuple[int, str, str, tuple[str, ...], str]] = [
     (5007, "ENTITY_BEAM", "Iris の minecraft:end_crystal_beam", ("minecraft:end_crystal_beam",), ""),
     (5008, "ENTITY_WITHER", "ウィザー (防壁の電気の渦を帯電クリーパーと同じ明るさで光らせる)", ("minecraft:wither",),
      "Wither (its armor swirl glows like a charged creeper's)"),
+    (5009, "ENTITY_CREAKING", "クリーキング (目の層を不気味な橙〜赤に光らせる)", ("minecraft:creaking",),
+     "Creaking (its glowing eyes get an eerie orange-red emission)"),
 ]
 
 # 一部だけ金属のブロック・アイテム・エンティティの自動メタリック。金属の画素を選ぶ判定 (gate) を ID に載せる

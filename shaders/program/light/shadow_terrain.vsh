@@ -60,6 +60,10 @@ in vec4 at_midBlock;
 #define tintTransmittance vTint
 // エンティティのボクセル化に使う、揺れ適用前の位置
 out vec3 vPlayerPos;
+#ifdef CHARGED_CREEPER_LIGHT
+    flat out int vSwirlLayer;
+    const float SWIRL_TEXTURE_MATRIX_EPS = 1e-6;
+#endif
 #endif
 out vec2 texcoord;
 out vec4 glcolor;
@@ -103,6 +107,12 @@ void main() {
     }
 #ifdef PROGRAM_SHADOW_FALLBACK
     vPlayerPos = playerPos;
+    #ifdef CHARGED_CREEPER_LIGHT
+        // 電気の渦の層だけがテクスチャ行列で UV を流す (shadow_entities.vsh と同じ見分け方)
+        mat4 texMatOffset = gl_TextureMatrix[0] - mat4(1.0);
+        vec4 texMatDiff = abs(texMatOffset[0]) + abs(texMatOffset[1]) + abs(texMatOffset[2]) + abs(texMatOffset[3]);
+        vSwirlLayer = dot(texMatDiff, vec4(1.0)) > SWIRL_TEXTURE_MATRIX_EPS ? 1 : 0;
+    #endif
 #endif
 
     playerPos = applyWaving(playerPos, blockId, at_midBlock.y < 0.0, skyLight);

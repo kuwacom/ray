@@ -19,6 +19,7 @@
 #define GLOW_LICHEN_LIGHT // ヒカリゴケを光源にする (OFF では周りを照らさない)
 #define GLOW_LICHEN_BRIGHTNESS 0.45 // [0.1 0.2 0.3 0.4 0.45 0.6 0.8 1.0 1.5] ヒカリゴケが周りを照らす光の強さ
 #define FIREFLY_BUSH_BRIGHTNESS 0.25 // [0.05 0.1 0.15 0.2 0.25 0.3 0.4 0.5 0.75 1.0] ホタルの茂みが周りを照らす光の強さ
+#define EYEBLOSSOM_BRIGHTNESS 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0] 開いたアイブロッサムの淡い橙の発光と、周りを照らす光の強さ (0 で光らない)
 #define LIGHT_SHADOWS // 設置光源の光源シャドウ (直接光のレイトレース)
 #define LIGHT_SHADOW_STRENGTH 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0] 設置光源 (ドロップ・燃焼・発光エンティティの光も) の影の濃さ 0=影なし 1=真っ暗な影
 #define LIGHT_TRACE_COUNT 4 // [1 2 3 4 6 8 12 16] 1 ピクセルあたりトレースする光源数
@@ -50,5 +51,9 @@
 #define PROJECTILE_LIGHTS // 投擲物 (光る矢・火の玉等)
 #define BURNING_ENTITY_LIGHTS // 燃えているエンティティ
 #define GLOWING_ENTITY_LIGHTS // 発光エンティティ (ブレイズ・グロウイカ等)
+#define CHARGED_CREEPER_LIGHT // 帯電したクリーパーとウィザーの防壁の電気の渦が周りを照らす
+#define CHARGED_CREEPER_LIGHT_BRIGHTNESS 1.0 // [0.25 0.5 0.75 1.0 1.5 2.0] 電気の渦が周りを照らす光の強さ (見た目の明るさは変わらない)
+#define FIREWORK_LIGHT // 花火の爆発が空の見える地面・壁と、空気 (霧・煙) を色付きで照らす
+#define FIREWORK_LIGHT_STRENGTH 1.0 // [0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0] 花火の爆発が周りを照らす光の強さ
 
 #endif

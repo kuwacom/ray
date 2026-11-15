@@ -14,6 +14,7 @@ const int ENTITY_SHADOW = 5005;         // Iris の minecraft:entity_shadow (丸
 const int ENTITY_NAME_TAG = 5006;       // Iris の minecraft:name_tag (ボクセル化しない)
 const int ENTITY_BEAM = 5007;           // Iris の minecraft:end_crystal_beam
 const int ENTITY_WITHER = 5008;         // ウィザー (防壁の電気の渦を帯電クリーパーと同じ明るさで光らせる)
+const int ENTITY_CREAKING = 5009;       // クリーキング (目の層を不気味な橙〜赤に光らせる)
 const int ENTITY_LIGHT_BASE = 5100;     // 5100-5163 は光源エンティティ (光源インデックス 192 + (id - 5100))
 const int ENTITY_LIGHT_LAST = 5163;
 const int ENTITY_METAL_BASE = 5200;     // 5200 + 金属の判定の番号 (METAL_GATE_*) は一部だけ金属のエンティティ

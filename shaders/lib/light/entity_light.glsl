@@ -153,6 +153,20 @@ void injectEntityLight(vec3 playerPos, int entId, int itemId, vec4 entColor) {
 }
 
 /*
+ * 帯電したクリーパー・ウィザーの防壁の電気の渦 (shadow_entities.gsh から、渦の層の三角形ごと)
+ * エンティティ ID では帯電かどうか分からないので、渦の層が描かれている間だけ光らせる
+ * 画面の gbuffers_entities では渦の層が deferred の後に描かれ、登録の締め切りに間に合わないので影パスで登録する
+ */
+void injectSwirlLight(vec3 playerPos, int entId) {
+#ifdef CHARGED_CREEPER_LIGHT
+    if (entityLightsClosed()) return;
+    // テクスチャ行列で見分けた層のうち、ブリーズの風 (別のエンティティ) などを外す
+    if (getEntityLightIndex(entId) != LIGHT_ENTITY_CREEPER && entId != ENTITY_WITHER) return;
+    injectLightAt(playerPos, LIGHT_ENTITY_SWIRL, getLightDef(LIGHT_ENTITY_SWIRL).params.z);
+#endif
+}
+
+/*
  * ブロックエンティティの光源 (エンダーチェスト・コンジット等, shadow_block.gsh から)
  * 地形ボクセルにも同じ光源が乗っている場合は deferred.csh が二重登録を外す
  */

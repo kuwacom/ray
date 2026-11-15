@@ -14,6 +14,8 @@
 #endif
 
 const int FRAME_POST_PARAMS = 4;
+// 1 フレームに描くビーコンの光線の区間 (柱の位置と色ごと) の上限。超えた分は描かない
+const int BEACON_BEAM_MAX = 8;
 layout(std430, binding = 0) SSBO_FRAME_DATA_ACCESS buffer FrameDataBuffer {
     // post (composite25 で書く)
     float exposure;           // 線形の露出倍率。シーン色に掛けて使う
@@ -37,6 +39,14 @@ layout(std430, binding = 0) SSBO_FRAME_DATA_ACCESS buffer FrameDataBuffer {
 
     // light (deferred_a で書く): 手持ち光源の画素によらない値。手 h (0 = 利き手, 1 = オフハンド) ごとに 3 つ。lib/light/hand_light.glsl の handLightAt
     vec4 handLights[6];
+
+    // surface (gbuffers_beaconbeam の頂点が書き、begin が空にする): ビーコンの光線の区間。lib/sky/beacon_beam.glsl
+    // key は柱と色のハッシュ (0 = 空き。前から詰めて使う), yMin / yMax は区間の下端と上端 (ワールドの y), cell は柱のブロックの xz, color は線形色 (packUnorm4x8)
+    uint beaconBeamKey[BEACON_BEAM_MAX];
+    int beaconBeamYMin[BEACON_BEAM_MAX];
+    int beaconBeamYMax[BEACON_BEAM_MAX];
+    uint beaconBeamColor[BEACON_BEAM_MAX];
+    ivec2 beaconBeamCell[BEACON_BEAM_MAX];
 
     // post
     uint histogram[256];         // 露出ヒストグラム (composite25 内で毎フレームクリア)

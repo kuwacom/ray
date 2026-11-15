@@ -72,6 +72,8 @@ BODIES: dict[str, str] = {
     "gbuffers_weather.vsh": "sky/weather.vsh",
     "gbuffers_weather.fsh": "sky/weather.fsh",
     # surface
+    "gbuffers_beaconbeam.vsh": "surface/beacon_beam.vsh",
+    "gbuffers_beaconbeam.fsh": "surface/beacon_beam.fsh",
     "gbuffers_lightning.vsh": "surface/lightning.vsh",
     "gbuffers_lightning.fsh": "surface/lightning.fsh",
     "deferred10.csh": "surface/gi_raw.csh",
@@ -137,7 +139,7 @@ PROGRAMS: dict[str, list[str] | dict[str, Body | None]] = {
     "gbuffers_terrain": shared("surface/gbuffers_solid", "GBUF_TERRAIN"),
     "gbuffers_damagedblock": shared("surface/gbuffers_overlay", "GBUF_DAMAGEDBLOCK"),
     "gbuffers_block": shared("surface/gbuffers_solid", "GBUF_BLOCK"),
-    "gbuffers_beaconbeam": shared("surface/gbuffers_solid", "GBUF_BEACON"),
+    "gbuffers_beaconbeam": ["vsh", "fsh"],
     "gbuffers_entities": shared("surface/gbuffers_solid", "GBUF_ENTITIES"),
     "gbuffers_entities_translucent": shared("surface/gbuffers_translucent", "GBUF_ENTITIES_TRANSLUCENT"),
     "gbuffers_block_translucent": shared("surface/gbuffers_translucent", "GBUF_BLOCK_TRANSLUCENT"),
