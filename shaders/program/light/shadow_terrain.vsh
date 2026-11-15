@@ -1,7 +1,8 @@
 /*
- * shadow (地形: solid / cutout / 半透明): 太陽影マップ + 地形のボクセル化
+ * shadow_solid / shadow_cutout / shadow_water (地形): 太陽影マップ + 地形のボクセル化
  * light モジュール (影マップの出力内容は surface モジュールと調整)
- * shadow_entities / shadow_block が無いジオメトリもここに来るが、Iris 1.8+ ではエンティティは来ない
+ * PROGRAM_SHADOW_FALLBACK が定義されていれば shadow (専用のプログラムが無いジオメトリの受け皿)。
+ * Iris 1.8 未満は地形もエンティティも shadow に来て、新しい Iris でもリードなどが来るので、地形用の処理を isTerrain で閉じる
  */
 // このプログラムで書く image (lib/buffers/images.glsl。宣言は 8 個まで)
 #define IMG_VOXEL_BLOCK
@@ -73,6 +74,16 @@ void main() {
         || renderStage == MC_RENDER_STAGE_TERRAIN_CUTOUT
         || renderStage == MC_RENDER_STAGE_TERRAIN_CUTOUT_MIPPED
         || renderStage == MC_RENDER_STAGE_TERRAIN_TRANSLUCENT;
+#ifdef PROGRAM_SHADOW_FALLBACK
+    /*
+     * エンティティの mc_Entity はブロック ID ではない (Iris は同じ場所にエンティティ ID を入れる)。at_midBlock も無い
+     * 地形以外は BLOCK_AIR にして、色付き影・水・揺れの判定に当てない
+     */
+    if (!isTerrain) {
+        blockId = BLOCK_AIR;
+        tintTransmittance = vec3(1.0);
+    }
+#endif
     if (isTerrain) {
         // ボクセルは揺れ適用前のブロック中心で書く
         // 流れる水は水として書き、発光の欄 (水は光らないので空いている) に印を残す
