@@ -30,7 +30,13 @@ bool shadowBlockEntityTriangle(vec3 p0, vec3 p1, vec3 p2) {
 
 // c0〜c2: 頂点色 (三角形方式では平均を保持する)
 bool shadowEntityTriangle(vec3 p0, vec3 p1, vec3 p2, vec2 uv0, vec2 uv1, vec2 uv2, vec4 c0, vec4 c1, vec4 c2) {
-    bool isPlayer = entityId == ENTITY_CURRENT_PLAYER;
+    /*
+     * Iris 1.11 は影のパスのブロックエンティティを描き方 (RenderPipeline) で振り分け、shadow_block に回すのは
+     * エンドポータル・エンドゲートウェイだけ。チェスト型・コンジットなどはこちらに来るので、blockEntityId で見分けて
+     * 光源・影・遮蔽を shadow_block と同じ扱いにする
+     */
+    bool isBlockEntity = isBlockEntityDraw(blockEntityId);
+    bool isPlayer = !isBlockEntity && entityId == ENTITY_CURRENT_PLAYER;
     int entLight = getEntityLightIndex(entityId);
     // 名札・丸影・ビーム・炎・雷は形を持たないので遮蔽物にも影にもしない
     bool ignored = entityId == ENTITY_NAME_TAG || entityId == ENTITY_SHADOW || entityId == ENTITY_BEAM
@@ -44,21 +50,28 @@ bool shadowEntityTriangle(vec3 p0, vec3 p1, vec3 p2, vec2 uv0, vec2 uv1, vec2 uv
 #endif
     voxelize = voxelize && !ignored;
     // 手持ちのランタンはエンティティ ID が付かずに描かれるので、光る物を持つ手の近くなら外す (lib/light/hand_pose.glsl)
-    if (!isPlayer && entityId <= 0 && voxelize && isNearLitHand((p0 + p1 + p2) / 3.0)) voxelize = false;
+    if (!isPlayer && !isBlockEntity && entityId <= 0 && voxelize && isNearLitHand((p0 + p1 + p2) / 3.0)) voxelize = false;
 #ifdef ENTITY_SHADOWS
     bool castShadow = !ignored;
 #else
     bool castShadow = isPlayer;
 #endif
+    if (isBlockEntity) {
+#ifdef LIGHT_ENTITY_OCCLUSION
+        voxelize = true;
+#else
+        voxelize = false;
+#endif
+#ifdef BLOCK_ENTITY_SHADOWS
+        castShadow = true;
+#else
+        castShadow = false;
+#endif
+    }
 
     // 画面外のエンティティ光源もここで登録する (gbuffers_entities と同じセルなら重複しない)
-    injectEntityLight((p0 + p1 + p2) / 3.0, entityId, currentRenderedItemId, entityColor);
-    /*
-     * Iris 1.11 は影のパスのブロックエンティティを描き方 (RenderPipeline) で振り分け、shadow_block に回すのは
-     * エンドポータル・エンドゲートウェイだけ。エンダーチェスト・コンジットなどはこちらに来るので、ここでも登録する
-     * エンティティを描く間の blockEntityId は光源でない値 (0 / 1) なので、エンティティでは何もしない
-     */
-    injectBlockEntityLight((p0 + p1 + p2) / 3.0, blockEntityId);
+    if (isBlockEntity) injectBlockEntityLight((p0 + p1 + p2) / 3.0, blockEntityId);
+    else injectEntityLight((p0 + p1 + p2) / 3.0, entityId, currentRenderedItemId, entityColor);
 
 #ifdef ENTITY_TRI_OCCLUSION
     /*
