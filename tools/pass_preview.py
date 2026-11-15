@@ -71,6 +71,8 @@ class State:
 def new_tex(target: int, ifmt: int, dims: tuple[int, ...], data: np.ndarray | bytes | None = None, fmt: int = 0, typ: int = 0,
             linear: bool = True, repeat: bool = False) -> int:
     t = GL.glGenTextures(1)
+    # 作る時の結び付けが、パスの sampler に割り当て済みのユニットを上書きしないよう、使わないユニットで行う
+    GL.glActiveTexture(GL.GL_TEXTURE31)
     GL.glBindTexture(target, t)
     GL.glPixelStorei(GL.GL_UNPACK_ALIGNMENT, 1)
     if len(dims) == 2:
