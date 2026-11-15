@@ -78,7 +78,7 @@ void main() {
     #endif
     bool castShadow = shadowEntityTriangle(vPlayerPos[0], vPlayerPos[1], vPlayerPos[2],
                                            vTexcoord[0], vTexcoord[1], vTexcoord[2], vColor[0], vColor[1], vColor[2],
-                                           swirlLayer);
+                                           swirlLayer, true);
 #endif
 
     if (!castShadow) return;

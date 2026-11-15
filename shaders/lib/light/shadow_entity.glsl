@@ -28,15 +28,22 @@ bool shadowBlockEntityTriangle(vec3 p0, vec3 p1, vec3 p2) {
 #endif
 }
 
-// c0〜c2: 頂点色 (三角形方式では平均を保持する)。swirlLayer: 帯電クリーパー・ウィザーの防壁の電気の渦の層か
+/*
+ * c0〜c2: 頂点色 (三角形方式では平均を保持する)。swirlLayer: 帯電クリーパー・ウィザーの防壁の電気の渦の層か
+ * mixedBlockEntities: ブロックエンティティも来うるか (shadow_entities は true、renderStage で分けた shadow.gsh は false)
+ */
 bool shadowEntityTriangle(vec3 p0, vec3 p1, vec3 p2, vec2 uv0, vec2 uv1, vec2 uv2, vec4 c0, vec4 c1, vec4 c2,
-                          bool swirlLayer) {
+                          bool swirlLayer, bool mixedBlockEntities) {
     /*
      * Iris 1.11 は影のパスのブロックエンティティを描き方 (RenderPipeline) で振り分け、shadow_block に回すのは
      * エンドポータル・エンドゲートウェイだけ。チェスト型・コンジットなどはこちらに来るので、blockEntityId で見分けて
      * 光源・影・遮蔽を shadow_block と同じ扱いにする
+     * Iris 1.7 の shadow.gsh では見分けない。1.7 はエンティティとブロックエンティティの描き方を別の render type に包み、
+     * 描くたびに renderStage を合わせる (MixinEntityRenderDispatcher / MixinBlockEntityRenderDispatcher) ので renderStage で足りる。
+     * 頂点に ID の無い形式 (雷の POSITION_COLOR など) では blockEntityId が -1 (表に無いブロックエンティティと同じ値) になり、
+     * blockEntityId で見分けると雷がブロックエンティティとして遮蔽物になる
      */
-    bool isBlockEntity = isBlockEntityDraw(blockEntityId);
+    bool isBlockEntity = mixedBlockEntities && isBlockEntityDraw(blockEntityId);
     bool isPlayer = !isBlockEntity && entityId == ENTITY_CURRENT_PLAYER;
     int entLight = getEntityLightIndex(entityId);
     // 名札・丸影・ビーム・炎・雷は形を持たないので遮蔽物にも影にもしない

@@ -78,7 +78,7 @@ flat out vec3 tintTransmittance;
 void main() {
     bool isEntity = false;
 #ifdef FX_SHADOW_NON_TERRAIN
-    // プレイヤーは設定に依らず来る (shadowPlayer) ので、FX_ENTITY_VOXEL_IN_SHADOW ではなく地形以外が来るかで分け、shadow_entities と同じ判定にする
+    // プレイヤーは設定に依らず来る (shadowPlayer) ので、FX_ENTITY_VOXEL ではなく地形以外が来るかで分け、shadow_entities と同じ判定にする
     bool castShadow = true;
     if (renderStage == MC_RENDER_STAGE_ENTITIES) {
         isEntity = true;
@@ -89,7 +89,7 @@ void main() {
     #endif
         castShadow = shadowEntityTriangle(vPlayerPos[0], vPlayerPos[1], vPlayerPos[2],
                                           vTexcoord[0], vTexcoord[1], vTexcoord[2], vColor[0], vColor[1], vColor[2],
-                                          swirlLayer);
+                                          swirlLayer, false);
     } else if (renderStage == MC_RENDER_STAGE_BLOCK_ENTITIES) {
         isEntity = true;
         castShadow = shadowBlockEntityTriangle(vPlayerPos[0], vPlayerPos[1], vPlayerPos[2]);
