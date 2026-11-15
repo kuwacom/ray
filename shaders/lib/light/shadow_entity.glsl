@@ -53,6 +53,12 @@ bool shadowEntityTriangle(vec3 p0, vec3 p1, vec3 p2, vec2 uv0, vec2 uv1, vec2 uv
 
     // 画面外のエンティティ光源もここで登録する (gbuffers_entities と同じセルなら重複しない)
     injectEntityLight((p0 + p1 + p2) / 3.0, entityId, currentRenderedItemId, entityColor);
+    /*
+     * Iris 1.11 は影のパスのブロックエンティティを描き方 (RenderPipeline) で振り分け、shadow_block に回すのは
+     * エンドポータル・エンドゲートウェイだけ。エンダーチェスト・コンジットなどはこちらに来るので、ここでも登録する
+     * エンティティを描く間の blockEntityId は光源でない値 (0 / 1) なので、エンティティでは何もしない
+     */
+    injectBlockEntityLight((p0 + p1 + p2) / 3.0, blockEntityId);
 
 #ifdef ENTITY_TRI_OCCLUSION
     /*

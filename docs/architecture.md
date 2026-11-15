@@ -410,7 +410,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 - 登録: `injectEntityLight(playerPos, ...)` -> voxelEmitImg に `atomicMax` -> 最初の登録だけ SSBO2 へ追加。呼び出し元は gbuffers_entities.vsh (画面内, 4 頂点に 1 回) と shadow_entities.gsh (画面外, 三角形ごと)
 - 以後はブロック光源と同じ経路 (floodfill へ注入 + ビン + トレース) なので、遮蔽も影も同じ品質で付く
 - 燃えるエンティティは Iris の `entity_flame` が別ドローで来るのでそれを光源化
-- ブロックエンティティの光源 (エンダーチェスト・コンジット・エンドゲートウェイ) は `blockEntityId` -> `getBlockLightIndex` で shadow_block.gsh から登録する
+- ブロックエンティティの光源 (エンダーチェスト・コンジット・エンドゲートウェイ) は `blockEntityId` -> `getBlockLightIndex` で shadow_block.gsh と shadow_entities.gsh から登録する (Iris 1.11 は影のパスで shadow_block に回すのがエンドポータル・エンドゲートウェイだけで、チェスト型などは shadow_entities で描く)
 
 ---
 
