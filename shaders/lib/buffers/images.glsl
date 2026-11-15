@@ -91,23 +91,15 @@ layout(rgba16f) uniform image2D debugImg;
 uniform sampler2D debugSampler;
 
 // colortex を compute から書くための image (フォーマットは formats.glsl と一致)
+// 時間で分け合う枠 (8・10・14。lib/buffers/slots.glsl) は区間を取り違えないよう、ここに置かない (使うなら slots.glsl に区間を足してから)
 #ifdef IMG_COLORIMG0
 layout(rgba16f) uniform image2D colorimg0;
 #endif
 #ifdef IMG_COLORIMG6
 layout(rgba16f) uniform image2D colorimg6;
 #endif
-#ifdef IMG_COLORIMG8
-layout(rgba16f) uniform image2D colorimg8;
-#endif
-#ifdef IMG_COLORIMG10
-layout(rgba16f) uniform image2D colorimg10;
-#endif
 #ifdef IMG_COLORIMG12
 layout(rgba16f) uniform image2D colorimg12;
-#endif
-#ifdef IMG_COLORIMG14
-layout(rgba16f) uniform image2D colorimg14;
 #endif
 
 #endif

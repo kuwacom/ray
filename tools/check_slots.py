@@ -325,8 +325,16 @@ def config_macros(options, ov) -> dict[str, str]:
     return macros
 
 
-def interval_check(shaders: Path, config_names: list[str], jobs: int, verbose: bool) -> list[str]:
-    import validate_shaders as V  # validate_shaders から呼ばれる静的な検査では読み込まない (循環を避ける)
+def interval_check(shaders: Path, config_names: list[str], jobs: int, verbose: bool, V=None) -> list[str]:
+    """
+    ### interval_check
+    区間の検査 (glslang)。validate_shaders.py --full からも呼ぶ
+
+    @param V - validate_shaders のモジュール (validate_shaders から呼ぶ時は自分を渡す。省略で読み込む)
+    @returns 問題の一覧
+    """
+    if V is None:
+        import validate_shaders as V  # validate_shaders から呼ばれる静的な検査では読み込まない (循環を避ける)
     from lib import properties as P
 
     slots, _ = parse_slots(shaders)

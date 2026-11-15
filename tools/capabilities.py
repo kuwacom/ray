@@ -64,11 +64,8 @@ FXS: list[Fx] = [
        "エンティティを影とボクセルに描く (遮蔽とエンティティの光源)", ("shadowEntities",)),
     Fx("FX_BLOCK_ENTITY_VOXEL", BLOCK_ENTITY_VOXEL_SETTINGS,
        "ブロックエンティティを影とボクセルに描く", ("shadowBlockEntities",)),
-    Fx("FX_ENTITY_VOXEL_IN_SHADOW", "defined FX_ENTITY_VOXEL && !defined CAP_SHADOW_ENTITIES",
-       "エンティティのボクセル化を shadow のプログラムで行う (shadow_entities が読まれない環境)"),
-    Fx("FX_BLOCK_ENTITY_VOXEL_IN_SHADOW", "defined FX_BLOCK_ENTITY_VOXEL && !defined CAP_SHADOW_ENTITIES",
-       "ブロックエンティティのボクセル化を shadow のプログラムで行う (shadow_block が読まれない環境)"),
     # shadowPlayer と shadowLightBlockEntities は設定に依らず有効なので、FX_ENTITY_VOXEL が無くても地形以外が来る
+    # (shadow でエンティティを扱うかは、来たものを renderStage で分けるだけなので、FX_ENTITY_VOXEL との組の FX は要らない)
     Fx("FX_SHADOW_NON_TERRAIN", "!defined CAP_SHADOW_ENTITIES",
        "shadow のプログラムに地形以外 (プレイヤー・エンティティ・ブロックエンティティ) が来る。地形用の処理を地形だけに閉じる"),
     Fx("FX_LIGHTNING_IN_ENTITIES", "!defined CAP_LIGHTNING_PROGRAM",

@@ -29,16 +29,6 @@
 #define FX_BLOCK_ENTITY_VOXEL 1
 #endif
 
-// エンティティのボクセル化を shadow のプログラムで行う (shadow_entities が読まれない環境)
-#if defined FX_ENTITY_VOXEL && !defined CAP_SHADOW_ENTITIES
-#define FX_ENTITY_VOXEL_IN_SHADOW 1
-#endif
-
-// ブロックエンティティのボクセル化を shadow のプログラムで行う (shadow_block が読まれない環境)
-#if defined FX_BLOCK_ENTITY_VOXEL && !defined CAP_SHADOW_ENTITIES
-#define FX_BLOCK_ENTITY_VOXEL_IN_SHADOW 1
-#endif
-
 // shadow のプログラムに地形以外 (プレイヤー・エンティティ・ブロックエンティティ) が来る。地形用の処理を地形だけに閉じる
 #if !defined CAP_SHADOW_ENTITIES
 #define FX_SHADOW_NON_TERRAIN 1

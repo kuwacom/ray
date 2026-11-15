@@ -20,7 +20,8 @@ Iris の前処理を簡易再現して glslangValidator で全プログラムを
 
 ローダー (tools/capabilities.py の ENVS: latest / mid / 1.7.6) ごとに、マクロを変えてコンパイルし、次も調べる (tools/loader_checks.py)
 - iris.features.required の flag、bufferObject の添字、image の数、image と customTexture の形式の列挙
-- 前処理の後に有効なプログラムが colortex の上限以上を使っていないか (今は警告。COLORTEX_LIMIT_STRICT か --strict-colortex で失敗)
+- 前処理の後に有効なプログラムが colortex の上限以上を使っていないか (失敗にする)
+--full では、分け合う colortex の区間の外の読み書きも調べる (tools/check_slots.py --intervals の既定値 x 3 ディメンション)
 
 使い方:
     uv run tools/validate_shaders.py                    # 高速: 既定値・world0 のみ + 前回成功から変わったものだけ
@@ -551,11 +552,6 @@ def static_checks(options: dict[str, Option], profiles: dict[str, list[str]]) ->
     return problems
 
 
-# colortex の上限 (Iris 1.10.4 以前と Oculus は 16 枚) を超える使用を失敗にするか。今は再配置の前なので警告で一覧を出す
-# 再配置が終わったら True にする (--strict-colortex でも切り替えられる)
-COLORTEX_LIMIT_STRICT = False
-
-
 def properties_by_loader(env: Env, cfg_name: str, ov: dict, options: dict[str, Option]) -> tuple[set[str], list[str], list[loader_checks.ColortexUse]]:
     """
     ### properties_by_loader
@@ -616,7 +612,6 @@ def main() -> int:
     ap.add_argument("--jobs", type=int, default=os.cpu_count() or 4)
     ap.add_argument("--shaders", type=Path, help="検証するシェーダーのフォルダ (既定: このリポジトリの shaders/)")
     ap.add_argument("--env", help="このローダーだけ検証する (カンマ区切り。tools/capabilities.py の ENVS の名前)")
-    ap.add_argument("--strict-colortex", action="store_true", help="colortex の上限を超える使用を失敗にする")
     ap.add_argument("--colortex-report", type=Path, help="colortex の上限を超える使用の一覧を Markdown で書く")
     args = ap.parse_args()
     if args.shaders:
@@ -698,20 +693,21 @@ def main() -> int:
             print(f"[loader] {p}")
         problems += list(loader.values())
         rows = colortex_rows(uses)
-        strict = COLORTEX_LIMIT_STRICT or args.strict_colortex
         # 上限が同じローダーでは同じ箇所が並ぶので、ローダーの名前をまとめて 1 行にする
         merged: dict[tuple[int, str, str], list[str]] = {}
         for env_name, n, kind, where, _, _ in rows:
             merged.setdefault((n, kind, where), []).append(env_name)
         for (n, kind, where), env_names in merged.items():
             msg = f"colortex{n} を{kind} {where} ({', '.join(env_names)})"
-            print(f"[colortex] {msg}" if strict else f"[warn colortex] {msg}")
-            if strict:
-                problems.append(msg)
-        if merged and not strict:
-            print(f"[warn colortex] {len(merged)} 箇所 (再配置の前なので警告。--strict-colortex で失敗にする)")
+            print(f"[colortex] {msg}")
+            problems.append(msg)
         if args.colortex_report:
             write_colortex_report(args.colortex_report, rows, envs, configs)
+    if args.full and not args.filter:
+        # 分け合う枠の区間の外の読み書き (check_slots.py --intervals の既定値 x 3 ディメンション)。glslang を全プログラムにもう 1 回掛けるので --full だけ
+        for p in check_slots.interval_check(SHADERS, ["DEFAULT"], args.jobs, False, V=sys.modules[__name__]):
+            print(f"[slots] {p}")
+            problems.append(p)
     shutil.rmtree(tmpdir, ignore_errors=True)
     cache.save()
     print(f"\n{len(jobs)} compiled ({cached} unchanged, cached), {failed} failed, {warned} with warnings, {len(problems)} static problem(s)")

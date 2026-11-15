@@ -91,39 +91,39 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 3 | setup2.csh | sky | 多重散乱 LUT | skyTransmittance | skyMultiScatterImg 32x32 | local 8x8, (4,4,1) | 同上 |
 | 4 | begin.csh | light | 光源リストとライトビン (前フレームに使った枠) とエンティティ光源の蓄積表とビーコンの光線の表 (FrameData) のクリア | - | SSBO2 カウンタ, SSBO3 binCount/binLights/entityAcc | local 256, (160,1,1) | 常時 |
 | 5 | shadow_solid / shadow_cutout / shadow_water .vsh/fsh | light | 地形の太陽影マップ + 地形ボクセル化 (頂点シェーダーで imageStore)。本体は 3 つとも `shadow_terrain` | mc_Entity, at_midBlock | shadowtex0/1, shadowcolor0/1, voxelBlockImg | shadowMapResolution | 常時 |
-| 5' | shadow.vsh/gsh/fsh | light | 専用のプログラムが無いジオメトリの受け皿 (本体共通, `PROGRAM_SHADOW_FALLBACK`)。地形用の処理は地形だけ。shadow_entities の無い Iris (1.8 未満、Oculus) では全ジオメトリが来るので、GS で renderStage を見て 6・7 と同じ処理をする (`FX_SHADOW_NON_TERRAIN`)。新しい Iris ではリードなどだけが来て、GS は素通し | renderStage | 5〜7 と同じ | 同上 | 常時 |
-| 6 | shadow_entities.vsh/gsh/fsh | light | エンティティのボクセル化 (GS で表面サンプル)・エンティティ光源登録・影マップ | entityId, currentRenderedItemId | voxelEntityImg, voxelEmitImg, SSBO2, 影マップ | 同上 | shadowEntities |
-| 7 | shadow_block.vsh/gsh/fsh | light | ブロックエンティティ版 (本体共通, `PROGRAM_SHADOW_BLOCK`) | blockEntityId | voxelEntityImg, 影マップ | 同上 | shadowBlockEntities |
-| 8 | prepare.csh | sky | 太陽・月の直達照度、空の SH (全モジュールが使う光の色) | skyView / 解析式 | SSBO0 sun/moon/shadowLight/skySH | (1,1,1) | 常時 |
-| 9 | prepare1.csh | sky | SkyView LUT | transmittance, multiScatter | skyViewImg 192x108 | local 8x4, (24,27,1) | ATMOSPHERE_MODE=1, world0 |
-| 10 | prepare2.csh | sky | 雲の天気マップ (バニラの形は柱の表) と雲影マップ、カメラの位置の雲の中の霧と雨の空の置き換え (FrameData) | - | cloudWeatherImg, cloudShadowImg 512² | local 16², (32,32,1) | CLOUDS>=2, world0 |
-| 11 | gbuffers_* (不透明) | surface (空/雲は sky) | G バッファ書き込み、TAA ジッター、エンティティ光源登録 (light の関数) | アトラス | colortex1,2,3,15 (手は colortex4,5 を 0 で上書きして先に描かれた半透明を消す。エンティティは電気の渦の層 (deferred の後に描かれる帯電したクリーパー・ウィザーの防壁。テクスチャ行列が単位行列でないことで見分ける) だけ colortex4 へ加算する) / voxelEmitImg, SSBO2 | 画面 | 常時 |
-| 12 | deferred.csh | light | floodfill 1 ステップ伝搬 + ブロック光源・エンティティ光源をグローバルリストへ | voxelBlock/Emit, flood(前) | flood(今), SSBO2 | local 8³, VOXEL_SIZE/8 | 常時 |
-| 13 | deferred_a.csh | light | 光源をワールド空間ライトビン (8³ ブロック) に重要度の降順で振り分け (LIGHT_CULL_MODE)、次フレームの間引き距離を更新 | SSBO2 | SSBO3, SSBO2 cullDistance | local 64, (LIGHT_MAX_COUNT/64,1,1) | 常時 |
-| 14 | deferred1.csh | light | LIGHT_TRACE_COUNT 光源 (上位 N-1 個 + 残りから確率的に 1 個) の DDA トレース (直接光) | SSBO3, voxel*, G バッファ | blockLightRawImg (影あり S), blockLightAuxImg (影なし U) (左上 1/RES) | local 8², workGroupsRender = 1/LIGHT_TRACE_RES | LIGHT_SHADOWS |
-| 15 | deferred2.vsh/fsh | light | 可視率 S/U の時空間デノイズ + フル解像度の影なし照度に掛ける | blockLightRaw/Aux, colortex7 | colortex6, colortex7 | 画面 | LIGHT_SHADOWS |
-| 16 | deferred10.csh | surface | GI / AO の生値 (RSM / SSGI / ボクセル RT)。多重反射は画面に映るヒット点の前フレームの GI (colortex9) | G バッファ, shadowcolor, voxel, flood, colortex9 | giRawImg | local 8², 1/GI_RES | GI_MODE>0 or AO_MODE>0 |
-| 17 | deferred11.vsh/fsh | surface | GI / AO のデノイズ | giRaw, colortex9, colortex10 | colortex9, colortex10 | 画面 | 同上 |
-| 18 | deferred20.vsh/fsh | sky | 体積雲レイマーチ (低解像度 + チェッカーボード) | weather, skyView | colortex14 (左上 1/CLOUD_RES) | 画面 (範囲外は早期終了) | CLOUDS>=2, world0 |
-| 19 | deferred21.vsh/fsh | sky | 雲の時間アップスケール | colortex14, 履歴 | colortex11 | 画面 | 同上 |
-| 20 | deferred30.vsh/fsh | surface | 不透明シェーディング (全モジュールの光を合成) + 空の描画 | G バッファ, colortex6/8/11, SSBO0 | colortex0 | 画面 | 常時 |
-| 21 | gbuffers_water / hand_water / particles_translucent / weather / clouds | surface (weather・clouds は sky) | 半透明の前方シェーディング (clouds は CLOUDS=1 のバニラの雲。deferred の後に描かれるので前方で色を決め、colortex4 だけに書く) | アトラス, 影, flood | colortex4 (乗算済み), colortex5 | 画面 | 常時 |
-| 22 | composite.csh | surface | 反射 (SSR / ラフ / ボクセル補完) | colortex0/2/3/5, voxel | reflectionImg | local 8², 0.5 | REFLECTIONS>0 |
-| 23 | composite1_a.csh | sky | VL / 高さフォグのレイマーチ (影マップ空間 + floodfill + 雲影) | 影マップ, flood, cloudShadow | colorimg12 (左上 1/VL_RES), fogHistoryImg | local 8², 1/VL_RES | VL |
-| 24 | composite1.vsh/fsh | surface | 水面の光線を辿る部分: 屈折先の色と水の中の経路長 (画面の歩き + ボクセルの屈折、側面の水の厚み)、上向きの水面の太陽の可視率 (PCSS + 雲影)、鏡面の映り込みのフル解像度の SSR (映り込みを散らさない凪の水面だけ)。水の画素だけ書く。合成と分けるのは、光線を辿る処理と影が合成のシェーダーに入ると、合成の重い経路でレジスタの数が決まってワープが減り、水の画素の全部の処理が遅くなるため | colortex0/5, depthtex0/1, voxel, 影マップ | colortex14, blockLightRawImg (太陽の可視率), giRawImg (SSR、REFLECTIONS>0) (image は imageStore で、deferred の用途から composite1 -> 2 の間だけ借りる) | 画面 | 常時 |
-| 24a | composite2_a.csh | surface | 何もしない compute。Iris が compute の後に出す glMemoryBarrier で、composite1 の fragment の imageStore を composite2 の sampler の読みより前に終わらせる | - | - | (1,1,1) | 常時 |
-| 25 | composite2.vsh/fsh | surface | 半透明合成 (水中吸収・反射・太陽の鏡面・泡、ガラスの透過) | colortex0/4/5/14, blockLightRaw/giRaw (水), reflectionImg | colortex0, colortex14 (r = 半透明の不透明度、composite19 のビーコンの光線が読む) | 画面 | 常時 |
-| 26 | composite12.vsh/fsh | sky | 画面空間の光芒 1/3: 空のマスク (深度 x 雲の透過率 x 光源からの角度) をタップごとに求め、光源へ向かう最短のスパンでぼかす | depthtex2, colortex11 | colortex4 (左上) | 画面 (1/GODRAYS_RES、\scale.*\) | GODRAYS, world0 |
-| 27 | composite13.vsh/fsh | sky | 同 2/3: 中のスパン | colortex4 | colortex4 | 同上 | 同上 |
-| 28 | composite14.vsh/fsh | sky | 同 3/3: 全長のスパン | colortex4 | colortex4 | 同上 | 同上 |
-| 29 | composite19.vsh/fsh | sky | フォグ / VL の適用 (バイラテラルアップサンプル)、水中フォグ、画面空間の光芒の加算 (カメラの位置の霧の濃さで強さを決める)、カメラが雲より上のときの手前の雲 (高さフォグと光芒の後に重ねる。半透明が手前の画素は `cloudFrontPart` でカメラから半透明までの分に割り引く)、ビーコンの光線 (FrameData の表から視線ごとに積分し、光線の点までの雲・フォグ・半透明を掛けて足す) | colortex0/4/12/14 | colortex0 | 画面 | 常時 |
-| 30 | composite20.vsh/fsh | post | TAA (LENS_WARP_TAA の時は歪曲・魚眼の組み立ても) | colortex0/8/13/15 | colortex0, colortex13, colortex8 | 画面 | TAA |
-| 31 | composite21.vsh/fsh | post | モーションブラー | colortex0/15 | colortex0 | 画面 | MOTION_BLUR |
-| 32 | composite22.vsh/fsh | post | DoF (MIP-Bokeh, colortex0 ミップ) | colortex0, SSBO0 focus | colortex0 | 画面 | DOF |
-| 33 | composite23.vsh/fsh | post | ブルーム縮小タイル、局所トーンマップの log2 輝度のタイル | colortex0 ミップ | colortex14 | 画面 | BLOOM または LOCAL_TONEMAP > 0 |
-| 34 | composite24.vsh/fsh | post | ブルームぼかし | colortex14 | colortex14 | 画面 | BLOOM または LOCAL_TONEMAP > 0 |
-| 35 | composite25.csh | post | 自動露出 (ヒストグラム。屋外の夜の持ち上げは画面の暗い側の計測で決める) + オートフォーカス | colortex0, centerDepthSmooth | SSBO0 exposure/focus/histogram | local 16², (1,1,1) | 常時 |
-| 36 | final.vsh/fsh | post | 歪曲と魚眼の再投影・ブルーム合成・点像の芯と裾・フレア・露出・局所トーンマップ・AgX・色調整・CAS・ディザ・デバッグ表示 | colortex0/14/17, SSBO0 | 画面 | 画面 | 常時 |
+| 6 | shadow.vsh/gsh/fsh | light | 専用のプログラムが無いジオメトリの受け皿 (本体共通, `PROGRAM_SHADOW_FALLBACK`)。地形用の処理は地形だけ。shadow_entities の無い Iris (1.8 未満、Oculus) では全ジオメトリが来るので、GS で renderStage を見て 7・8 と同じ処理をする (`FX_SHADOW_NON_TERRAIN`)。新しい Iris ではリードなどだけが来て、GS は素通し | renderStage | 5・7・8 と同じ | 同上 | 常時 |
+| 7 | shadow_entities.vsh/gsh/fsh | light | エンティティのボクセル化 (GS で表面サンプル)・エンティティ光源登録・影マップ | entityId, currentRenderedItemId | voxelEntityImg, voxelEmitImg, SSBO2, 影マップ | 同上 | shadowEntities |
+| 8 | shadow_block.vsh/gsh/fsh | light | ブロックエンティティ版 (本体共通, `PROGRAM_SHADOW_BLOCK`) | blockEntityId | voxelEntityImg, 影マップ | 同上 | shadowBlockEntities |
+| 9 | prepare.csh | sky | 太陽・月の直達照度、空の SH (全モジュールが使う光の色) | skyView / 解析式 | SSBO0 sun/moon/shadowLight/skySH | (1,1,1) | 常時 |
+| 10 | prepare1.csh | sky | SkyView LUT | transmittance, multiScatter | skyViewImg 192x108 | local 8x4, (24,27,1) | ATMOSPHERE_MODE=1, world0 |
+| 11 | prepare2.csh | sky | 雲の天気マップ (バニラの形は柱の表) と雲影マップ、カメラの位置の雲の中の霧と雨の空の置き換え (FrameData) | - | cloudWeatherImg, cloudShadowImg 512² | local 16², (32,32,1) | CLOUDS>=2, world0 |
+| 12 | gbuffers_* (不透明) | surface (空/雲は sky) | G バッファ書き込み、TAA ジッター、エンティティ光源登録 (light の関数) | アトラス | colortex1,2,3,15 (手は colortex4,5 を 0 で上書きして先に描かれた半透明を消す。エンティティは電気の渦の層 (deferred の後に描かれる帯電したクリーパー・ウィザーの防壁。テクスチャ行列が単位行列でないことで見分ける) だけ colortex4 へ加算する) / voxelEmitImg, SSBO2 | 画面 | 常時 |
+| 13 | deferred.csh | light | floodfill 1 ステップ伝搬 + ブロック光源・エンティティ光源をグローバルリストへ | voxelBlock/Emit, flood(前) | flood(今), SSBO2 | local 8³, VOXEL_SIZE/8 | 常時 |
+| 14 | deferred_a.csh | light | 光源をワールド空間ライトビン (8³ ブロック) に重要度の降順で振り分け (LIGHT_CULL_MODE)、次フレームの間引き距離を更新 | SSBO2 | SSBO3, SSBO2 cullDistance | local 64, (LIGHT_MAX_COUNT/64,1,1) | 常時 |
+| 15 | deferred1.csh | light | LIGHT_TRACE_COUNT 光源 (上位 N-1 個 + 残りから確率的に 1 個) の DDA トレース (直接光) | SSBO3, voxel*, G バッファ | blockLightRawImg (影あり S), blockLightAuxImg (影なし U) (左上 1/RES) | local 8², workGroupsRender = 1/LIGHT_TRACE_RES | LIGHT_SHADOWS |
+| 16 | deferred2.vsh/fsh | light | 可視率 S/U の時空間デノイズ + フル解像度の影なし照度に掛ける | blockLightRaw/Aux, colortex7 | colortex6, colortex7 | 画面 | LIGHT_SHADOWS |
+| 17 | deferred10.csh | surface | GI / AO の生値 (RSM / SSGI / ボクセル RT)。多重反射は画面に映るヒット点の前フレームの GI (colortex9) | G バッファ, shadowcolor, voxel, flood, colortex9 | giRawImg | local 8², 1/GI_RES | GI_MODE>0 or AO_MODE>0 |
+| 18 | deferred11.vsh/fsh | surface | GI / AO のデノイズ | giRaw, colortex9, colortex10 | colortex9, colortex10 | 画面 | 同上 |
+| 19 | deferred20.vsh/fsh | sky | 体積雲レイマーチ (低解像度 + チェッカーボード) | weather, skyView | colortex14 (左上 1/CLOUD_RES) | 画面 (範囲外は早期終了) | CLOUDS>=2, world0 |
+| 20 | deferred21.vsh/fsh | sky | 雲の時間アップスケール | colortex14, 履歴 | colortex11 | 画面 | 同上 |
+| 21 | deferred30.vsh/fsh | surface | 不透明シェーディング (全モジュールの光を合成) + 空の描画 | G バッファ, colortex6/8/11, SSBO0 | colortex0 | 画面 | 常時 |
+| 22 | gbuffers_water / hand_water / particles_translucent / weather / clouds | surface (weather・clouds は sky) | 半透明の前方シェーディング (clouds は CLOUDS=1 のバニラの雲。deferred の後に描かれるので前方で色を決め、colortex4 だけに書く) | アトラス, 影, flood | colortex4 (乗算済み), colortex5 | 画面 | 常時 |
+| 23 | composite.csh | surface | 反射 (SSR / ラフ / ボクセル補完) | colortex0/2/3/5, voxel | reflectionImg | local 8², 0.5 | REFLECTIONS>0 |
+| 24 | composite1_a.csh | sky | VL / 高さフォグのレイマーチ (影マップ空間 + floodfill + 雲影) | 影マップ, flood, cloudShadow | colorimg12 (左上 1/VL_RES), fogHistoryImg | local 8², 1/VL_RES | VL |
+| 25 | composite1.vsh/fsh | surface | 水面の光線を辿る部分: 屈折先の色と水の中の経路長 (画面の歩き + ボクセルの屈折、側面の水の厚み)、上向きの水面の太陽の可視率 (PCSS + 雲影)、鏡面の映り込みのフル解像度の SSR (映り込みを散らさない凪の水面だけ)。水の画素だけ書く。合成と分けるのは、光線を辿る処理と影が合成のシェーダーに入ると、合成の重い経路でレジスタの数が決まってワープが減り、水の画素の全部の処理が遅くなるため | colortex0/5, depthtex0/1, voxel, 影マップ | colortex14, blockLightRawImg (太陽の可視率), giRawImg (SSR、REFLECTIONS>0) (image は imageStore で、deferred の用途から composite1 -> 2 の間だけ借りる) | 画面 | 常時 |
+| 26 | composite2_a.csh | surface | 何もしない compute。Iris が compute の後に出す glMemoryBarrier で、composite1 の fragment の imageStore を composite2 の sampler の読みより前に終わらせる | - | - | (1,1,1) | 常時 |
+| 27 | composite2.vsh/fsh | surface | 半透明合成 (水中吸収・反射・太陽の鏡面・泡、ガラスの透過) | colortex0/4/5/14, blockLightRaw/giRaw (水), reflectionImg | colortex0, colortex14 (r = 半透明の不透明度、composite19 のビーコンの光線が読む) | 画面 | 常時 |
+| 28 | composite12.vsh/fsh | sky | 画面空間の光芒 1/3: 空のマスク (深度 x 雲の透過率 x 光源からの角度) をタップごとに求め、光源へ向かう最短のスパンでぼかす | depthtex2, colortex11 | colortex4 (左上) | 画面 (1/GODRAYS_RES、\scale.*\) | GODRAYS, world0 |
+| 29 | composite13.vsh/fsh | sky | 同 2/3: 中のスパン | colortex4 | colortex4 | 同上 | 同上 |
+| 30 | composite14.vsh/fsh | sky | 同 3/3: 全長のスパン | colortex4 | colortex4 | 同上 | 同上 |
+| 31 | composite19.vsh/fsh | sky | フォグ / VL の適用 (バイラテラルアップサンプル)、水中フォグ、画面空間の光芒の加算 (カメラの位置の霧の濃さで強さを決める)、カメラが雲より上のときの手前の雲 (高さフォグと光芒の後に重ねる。半透明が手前の画素は `cloudFrontPart` でカメラから半透明までの分に割り引く)、ビーコンの光線 (FrameData の表から視線ごとに積分し、光線の点までの雲・フォグ・半透明を掛けて足す) | colortex0/4/12/14 | colortex0 | 画面 | 常時 |
+| 32 | composite20.vsh/fsh | post | TAA (LENS_WARP_TAA の時は歪曲・魚眼の組み立ても) | colortex0/8/13/15 | colortex0, colortex13, colortex8 | 画面 | TAA |
+| 33 | composite21.vsh/fsh | post | モーションブラー | colortex0/15 | colortex0 | 画面 | MOTION_BLUR |
+| 34 | composite22.vsh/fsh | post | DoF (MIP-Bokeh, colortex0 ミップ) | colortex0, SSBO0 focus | colortex0 | 画面 | DOF |
+| 35 | composite23.vsh/fsh | post | ブルーム縮小タイル、局所トーンマップの log2 輝度のタイル | colortex0 ミップ | colortex14 | 画面 | BLOOM または LOCAL_TONEMAP > 0 |
+| 36 | composite24.vsh/fsh | post | ブルームぼかし | colortex14 | colortex14 | 画面 | BLOOM または LOCAL_TONEMAP > 0 |
+| 37 | composite25.csh | post | 自動露出 (ヒストグラム。屋外の夜の持ち上げは画面の暗い側の計測で決める) + オートフォーカス | colortex0, centerDepthSmooth | SSBO0 exposure/focus/histogram | local 16², (1,1,1) | 常時 |
+| 38 | final.vsh/fsh | post | 歪曲と魚眼の再投影・ブルーム合成・点像の芯と裾・フレア・露出・局所トーンマップ・AgX・色調整・CAS・ディザ・デバッグ表示 | colortex0/8/13/14, SSBO0 | 画面 | 画面 | 常時 |
 
 補足
 - shadowcomp は使わない。floodfill を deferred に置くのは、gbuffers_entities (deferred より前) が登録した画面内のエンティティ光源を同じフレームで取り込むため (voxelEmitImg は毎フレームクリアされる)
@@ -136,7 +136,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 
 ## バッファ設計
 
-### colortex (23 枚。正本は `lib/buffers/formats.glsl`)
+### colortex (16 枚。正本は `lib/buffers/formats.glsl`)
 
 | buf | フォーマット | 内容 | 書く | 読む | クリア |
 |---|---|---|---|---|---|
@@ -156,13 +156,9 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 13 | RGBA16F | post: TAA 履歴 | post | post | 永続 |
 | 14 | RGBA16F | sky: 雲 (低解像度、deferred20 -> 21) rgb 散乱, a 透過率。surface: 水の屈折先の色 (rgb、吸収の前) + 水の中の経路長 (a) (composite1 -> 2。水の画素だけ書き、composite2 も水の画素だけ読む)。surface: 半透明の不透明度 (r、composite2 -> composite19。ビーコンの光線が手前の半透明を掛ける。colortex4 は composite2 の後は光芒)。post: ブルームタイル (composite23 -> final) (と画面のフレア、LOCAL_TONEMAP > 0 の時は局所トーンマップの 1/32 タイル) | sky, surface, post | sky, surface, post | 毎フレーム |
 | 15 | RGBA16F | 速度: rg = 前フレーム UV - 今の UV, a = 1 なら有効 (エンティティ・手)。a = 0 の金属の防具の画素だけ rgb = 環境光の鏡面の重み x 1e-4 (gbuffers_entities_translucent -> composite2。双線形で読まれても速度がずれないよう小さくする) | surface (gbuffers, post の関数) | post | 毎フレーム |
-| 18 | RGBA16F | 未使用 | - | - | なし |
-| 19 | RGBA16F | 未使用 | - | - | なし |
-| 20 | RGBA16F | 未使用 | - | - | なし |
-| 21 | RGBA16F | 未使用 | - | - | なし |
 
 - gbuffers では colortex0-3 を読めない (Iris の仕様)
-- 4, 8〜10, 14, 18, 20, 21 は `lib/buffers/slots.glsl` の論理名 (`TEX_*`、用途ごとの区間付き) で読む。番号を変えるときは slots.glsl と RENDERTARGETS の数字を一緒に直す (`tools/check_slots.py` が直接書きと区間の外の読み書きを調べる)
+- 4, 8〜10, 14 は `lib/buffers/slots.glsl` の論理名 (`TEX_*`、用途ごとの区間付き) で読む。番号を変えるときは slots.glsl と RENDERTARGETS の数字を一緒に直す (`tools/check_slots.py` が直接書きと区間の外の読み書きを調べる。区間は validate_shaders.py --full でも見る)。Iris 1.10.4 以前と Oculus は 16 枚までなので colortex16 以上は使わない (validate_shaders.py がローダーごとに落とす)
 - 画面相対の image の blockLightRawImg と giRawImg も、deferred の用途 (TEX_BLOCKLIGHT_RAW / TEX_GI_RAW) と composite1 -> 2 の水の用途 (TEX_WATER_SUNVIS / TEX_WATER_MIRROR) で分け合うので、読みは slots.glsl の TEX_*、書きは STORE_* で書く。deferred の側は毎フレーム、読む範囲を全部書き直してから読むので、水の値は次のフレームに残らない
 - `shadowcolor0` RGBA8: 最も太陽側の面の色 (半透明は透過色 + a 不透明度、不透明は a=1)。`shadowcolor1` RGBA16: rg 法線 (oct), b スカイライト, a 種別 (0 不透明 / 0.5 半透明 / 1 水)。RSM (surface) と色付き影 (surface) と色付き光芒 (sky) が読む
 
@@ -208,7 +204,7 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 | IMG_GI_RAW / IMG_REFLECTION | GI / 反射 | deferred10 / composite.csh |
 | IMG_GI_RAW + IMG_BLOCKLIGHT_RAW | 水の鏡面の SSR と太陽の可視率 (image を借りる) | composite1 |
 | IMG_COLORIMG12 + IMG_FOG_HISTORY | VL | composite1_a.csh |
-| IMG_DEBUG, IMG_COLORIMG0/6/8/10/14 | デバッグ / colortex への compute 書き込み | 使うモジュールが追加する |
+| IMG_DEBUG, IMG_COLORIMG0/6 | デバッグ / colortex への compute 書き込み (分け合う 8・10・14 は置かない) | 使うモジュールが追加する |
 
 `tools/gl_compile_check.py` がプログラムごとの宣言数・アクティブ数を実機の上限と比べる。
 
@@ -722,8 +718,8 @@ post モジュールが提供 (`//@include "/lib/post/post.glsl"`):
 | colortex1/2/3/15 | 読む | 読む | 書く | 読む |
 | colortex4/5 | - | colortex4 に雨を書く | 書く | - |
 | colortex6/7, blockLightRaw/Aux | 書く | 読む (6) | 読む (6, 関数経由) | 読む (debug) |
-| colortex9, colortex14 (composite1/2), giRaw, blockLightRaw (composite1/2), reflection | 読む (9) | 読む | 書く | 読む (debug) |
-| colortex11/12/16, colortex14 (deferred), sky LUT, cloud*, fogHistory | 読む | 書く | 読む (11, 関数経由) | 読む (debug) |
+| colortex9, colortex14 (composite1-19), giRaw, blockLightRaw (composite1/2), reflection | 読む (9) | 読む | 書く | 読む (debug) |
+| colortex11/12, colortex4 (composite12-19), colortex14 (deferred), sky LUT, cloud*, fogHistory | 読む | 書く | 読む (11, 関数経由) | 読む (debug) |
 | colortex0 | - | 空テクスチャ (gbuffers), composite19 で書く | deferred30 / composite2 で書く | composite20 以降で書く |
 | colortex8/13/14 | - | - | - | 書く |
 | debugImg | 書ける (IMG_DEBUG) | 書ける (IMG_DEBUG) | 書ける (IMG_DEBUG) | 表示 (DEBUG_VIEW=12) |
@@ -811,6 +807,6 @@ shaders.properties の `#if` を評価して `program.*.enabled = false` のプ�
 - MOD ブロックは未登録 = 完全な固体扱い。光る MOD ブロックはタグ (`%c:...`) か個別登録が必要
 - エンダーチェスト等ブロックエンティティの光源はボクセル地形に乗らない (shadow_block から登録する必要がある。「ドロップ・投擲・燃焼・発光エンティティ」参照)
 - DH / Voxy / Photonics 連携は未対応。DH を入れていると Iris は「DH シェーダーなし」として扱う (LOD の見た目は保証しない)
-- Iris 26.1 は半透明エンティティ (プレイヤーのスキン・マネキン・文字・旗の模様等) を deferred の後 (`renderTranslucentFeatures`) に gbuffers_entities_translucent / gbuffers_block_translucent で描く。G バッファ経路のフォールバック (gbuffers_entities) だと deferred30 で照明されず消えるので、両者は半透明の前方シェーディング (`program/surface/gbuffers_translucent.*`) で用意した。速度は書かず深度再投影に任せる (並べ替えで at_velocity が使えないため)。画面空間の影 (手持ち光源の SS 影等) には写らないので、三人称の自分の影は手持ち光源のボクセル DDA で落とす。この層は水より先に描かれ、水の合成が水の中の自分を水面の上に重ねるので、カメラが水の上の時は、水面より下の自分の画素を捨て、composite1 (`water_trace.fsh`) が屈折した視線を自分の三角形 (光源シャドウ用に影のパスで持っている) に当てて、三角形ごとの平均の色を当たった点で照らして描く (屈折・波の揺れ・水の吸収が付く。一人称は体を描かないので当てない)。三角形を持たない設定 (LIGHT_OCCLUSION_MODE 0 か LIGHT_PLAYER_OCCLUSION OFF か屈折なし) では、捨てずに水の吸収と内散乱だけを掛ける (`lib/surface/water_self.glsl`。水面の高さはボクセルの水のブロックから)。上に水のある水のセルは面が描かれずボクセルに空気として残るので、空気は上に水がある限り水とみなして水面まで辿る。足のあるセルだけは水の入ったハーフブロック・階段などでも上の水を探す。三角形の当たりは捨てる判定と同じ関数で確かめ、捨てた所だけ描く (水面のすぐ下の帯などで二重にならない)。乗り物に乗っている間 (`isRiding`) は捨てない (ボートの中は水を描かず、捨てた脚が消える)。一番上の水が流れる水 (上面が水源より低い) の時も捨てない (高さが分からず、水面より上の体を捨てると欠ける。屈折は付かない)。カメラが水の中の時は逆に、水面より上の自分の画素を捨てる (この層に残すと水面の手前に貼り付き、水の中の色と霧が掛かり、スネルの窓の外でも見える)。composite1 が水面の上へ屈折した視線を三角形に当てて水面越しに描き、全反射の画素は反射した視線を水の中の体に当てて鏡面の映り込み (colortex20) に重ねる (自分は画面の像に無く SSR では映らない。SSR の当たりが体より手前ならそちら。REFLECTIONS 0 では映らない)。高さは真下へ空気のセルを辿った最初の水のセルの水面からで、流れる水・足場のブロックの上・乗り物の中は対象外。ガラス・氷・ほかの半透明の物越しに見た水の中の自分は欠ける (一番手前の半透明が水でない画素は composite1 が三角形を当てず、水の画素も無い。直すには半透明の層の下の水にも三角形を当てる必要があり重い)
+- Iris 26.1 は半透明エンティティ (プレイヤーのスキン・マネキン・文字・旗の模様等) を deferred の後 (`renderTranslucentFeatures`) に gbuffers_entities_translucent / gbuffers_block_translucent で描く。G バッファ経路のフォールバック (gbuffers_entities) だと deferred30 で照明されず消えるので、両者は半透明の前方シェーディング (`program/surface/gbuffers_translucent.*`) で用意した。速度は書かず深度再投影に任せる (並べ替えで at_velocity が使えないため)。画面空間の影 (手持ち光源の SS 影等) には写らないので、三人称の自分の影は手持ち光源のボクセル DDA で落とす。この層は水より先に描かれ、水の合成が水の中の自分を水面の上に重ねるので、カメラが水の上の時は、水面より下の自分の画素を捨て、composite1 (`water_trace.fsh`) が屈折した視線を自分の三角形 (光源シャドウ用に影のパスで持っている) に当てて、三角形ごとの平均の色を当たった点で照らして描く (屈折・波の揺れ・水の吸収が付く。一人称は体を描かないので当てない)。三角形を持たない設定 (LIGHT_OCCLUSION_MODE 0 か LIGHT_PLAYER_OCCLUSION OFF か屈折なし) では、捨てずに水の吸収と内散乱だけを掛ける (`lib/surface/water_self.glsl`。水面の高さはボクセルの水のブロックから)。上に水のある水のセルは面が描かれずボクセルに空気として残るので、空気は上に水がある限り水とみなして水面まで辿る。足のあるセルだけは水の入ったハーフブロック・階段などでも上の水を探す。三角形の当たりは捨てる判定と同じ関数で確かめ、捨てた所だけ描く (水面のすぐ下の帯などで二重にならない)。乗り物に乗っている間 (`isRiding`) は捨てない (ボートの中は水を描かず、捨てた脚が消える)。一番上の水が流れる水 (上面が水源より低い) の時も捨てない (高さが分からず、水面より上の体を捨てると欠ける。屈折は付かない)。カメラが水の中の時は逆に、水面より上の自分の画素を捨てる (この層に残すと水面の手前に貼り付き、水の中の色と霧が掛かり、スネルの窓の外でも見える)。composite1 が水面の上へ屈折した視線を三角形に当てて水面越しに描き、全反射の画素は反射した視線を水の中の体に当てて鏡面の映り込み (TEX_WATER_MIRROR、giRawImg を composite1 -> 2 の間だけ借りる) に重ねる (自分は画面の像に無く SSR では映らない。SSR の当たりが体より手前ならそちら。REFLECTIONS 0 では映らない)。高さは真下へ空気のセルを辿った最初の水のセルの水面からで、流れる水・足場のブロックの上・乗り物の中は対象外。ガラス・氷・ほかの半透明の物越しに見た水の中の自分は欠ける (一番手前の半透明が水でない画素は composite1 が三角形を当てず、水の画素も無い。直すには半透明の層の下の水にも三角形を当てる必要があり重い)
 - gbuffers_item は未用意 (gbuffers_entities にフォールバック)
 - macOS (compute 非対応) は動かない
