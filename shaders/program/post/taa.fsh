@@ -10,6 +10,7 @@
 //@include "/lib/common/exposure.glsl"
 //@include "/lib/common/temporal.glsl"
 //@include "/lib/post/post_internal.glsl"
+//@include "/lib/buffers/slots.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -42,6 +43,7 @@
 #include "/lib/post/exposure.glsl"
 #include "/lib/post/camera.glsl"
 #include "/lib/post/grading.glsl"
+#include "/lib/buffers/slots.glsl"
 #include "/lib/post/bloom.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/post/lens_optics.glsl"
@@ -138,7 +140,7 @@ vec3 gatherSparkle(vec2 pos, ivec2 maxTexel) {
  */
 void writeTaaOutput(vec3 result, vec3 sparkleNow, vec3 sparkleMax, vec2 prevUv, bool valid, float motionPx, float rawA, float historyDist) {
 #ifdef SPECULAR_SPARKLE
-    vec3 sparkleHist = valid ? max(sanitizeColor(textureLod(colortex17, prevUv, 0.0).rgb), 0.0) : vec3(0.0);
+    vec3 sparkleHist = valid ? max(sanitizeColor(textureLod(TEX_SPARKLE_HIST, prevUv, 0.0).rgb), 0.0) : vec3(0.0);
     sparkleHist = min(sparkleHist, max(sparkleMax, sparkleNow));
     float sa = valid ? mix(SPARKLE_HISTORY_BLEND, SPARKLE_HISTORY_BLEND_MOVING, saturate(motionPx / TAA_BLEND_MOTION_PX)) : 1.0;
     vec3 sparkle = mix(sparkleHist, sparkleNow, sa);

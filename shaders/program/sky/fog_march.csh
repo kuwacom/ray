@@ -59,6 +59,7 @@
 #include "/lib/surface/material.glsl"
 #include "/lib/surface/brdf.glsl"
 #include "/lib/common/voxel_space.glsl"
+#include "/lib/buffers/slots.glsl"
 #include "/lib/surface/gi.glsl"
 #include "/lib/common/water_waves.glsl"
 #include "/lib/common/water_glitter.glsl"

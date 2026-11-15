@@ -9,6 +9,7 @@
 //@include "/lib/common/exposure.glsl"
 //@include "/lib/post/post_internal.glsl"
 //@include "/lib/post/local_tonemap.glsl"
+//@include "/lib/buffers/slots.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -40,6 +41,7 @@
 #include "/lib/post/exposure.glsl"
 #include "/lib/post/camera.glsl"
 #include "/lib/post/grading.glsl"
+#include "/lib/buffers/slots.glsl"
 #include "/lib/post/bloom.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/post/lens_optics.glsl"
@@ -251,7 +253,7 @@ void main() {
         for (int x = -1; x <= 1; x++) {
             float w = float((2 - abs(x)) * (2 - abs(y)));
             vec2 p = clamp(uv + vec2(x, y) * BLOOM_BLUR_OFFSET * px, rectMin, rectMax);
-            sum += textureLod(colortex14, p, 0.0) * w;
+            sum += textureLod(TEX_BLOOM, p, 0.0) * w;
         }
     }
     outBloom = sum / 16.0;

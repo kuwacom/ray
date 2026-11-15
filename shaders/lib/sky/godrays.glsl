@@ -16,6 +16,7 @@
 //@include "/lib/common/transforms.glsl"
 //@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/sky/clouds.glsl"
+//@include "/lib/buffers/slots.glsl"
 
 // 光を出す空の範囲 (rad)。重み exp((cos - 1) / (1 - cos(角))) は角で 1/e、2 倍の角で約 1/55
 const float GODRAYS_SOURCE_ANGLE = 0.15;
@@ -71,7 +72,7 @@ float evalGodraysSource(vec2 uv, vec3 lightView) {
 // 低解像度の前のパスの結果 (双一次)。画面の外は 0
 float fetchGodrays(vec2 uv) {
     if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) return 0.0;
-    return textureLod(colortex16, uv, 0.0).r;
+    return textureLod(TEX_GODRAYS, uv, 0.0).r;
 }
 
 /*
@@ -99,7 +100,7 @@ vec3 evalGodraysRadiance(vec2 uv, bool isSky, float dist, float localExtinction)
     if (!godraysLightUv(lightUv, outside)) return vec3(0.0);
     float medium = mix(GODRAYS_CLEAR_SHARE, 1.0, saturate(localExtinction / GODRAYS_FOG_REF));
     float nearFade = isSky ? 1.0 : saturate(dist / GODRAYS_NEAR_FADE);
-    return textureLod(colortex16, uv, 0.0).r * frameData.shadowLightIrradiance.rgb
+    return textureLod(TEX_GODRAYS, uv, 0.0).r * frameData.shadowLightIrradiance.rgb
          * (GODRAYS_GAIN * GODRAYS_STRENGTH * medium * nearFade * evalGodraysScale(outside));
 }
 

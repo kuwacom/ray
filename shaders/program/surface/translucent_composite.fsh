@@ -25,6 +25,7 @@
 //@include "/lib/surface/water_shading.glsl"
 //@include "/lib/common/specular_sparkle.glsl"
 //@include "/lib/common/jitter.glsl"
+//@include "/lib/buffers/slots.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -52,6 +53,7 @@
 #include "/lib/common/frame_offset.glsl"
 #include "/lib/common/look_presets.glsl"
 #include "/lib/common/voxel_space.glsl"
+#include "/lib/buffers/slots.glsl"
 #include "/lib/surface/gi.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/common/transforms.glsl"
@@ -127,7 +129,7 @@ void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
     vec4 sceneIn = texelFetch(colortex0, texel, 0);
     vec3 scene = sceneIn.rgb;
-    vec4 translucent = texelFetch(colortex4, texel, 0);
+    vec4 translucent = texelFetch(TEX_TRANSLUCENT, texel, 0);
     float d0 = texelFetch(depthtex0, texel, 0).r;
     float d1 = texelFetch(depthtex1, texel, 0).r;
     vec4 data = texelFetch(colortex5, texel, 0);
@@ -217,7 +219,7 @@ void main() {
             sunVis = vec3(smoothstep(0.6, 0.95, lmT.y)) * getCloudShadow(surfPlayer);
         } else if (!below) {
             // 上向きの水面の影 (PCSS) は composite1 (water_trace.fsh) が求めた可視率
-            sunVis = texelFetch(colortex21, texel, 0).rgb;
+            sunVis = texelFetch(TEX_WATER_SUNVIS, texel, 0).rgb;
         }
         vec3 sunSpecVis = sunVis * getCloudSunDiscVisibility();
 
@@ -226,10 +228,10 @@ void main() {
         float behindExcess = 0.0;
         float pathLen = WATER_SKY_PATH;
         if (F < 1.0) {
-            vec4 refr = texelFetch(colortex18, texel, 0);
+            vec4 refr = texelFetch(TEX_WATER_REFR, texel, 0);
             behind = refr.rgb;
             pathLen = refr.a;
-            behindExcess = texelFetch(colortex21, texel, 0).a;
+            behindExcess = texelFetch(TEX_WATER_SUNVIS, texel, 0).a;
         }
 
         // 吸収と内散乱 (水の上から見た時だけ。水中側は sky のフォグ)
@@ -263,7 +265,7 @@ void main() {
             refl = fallback;
         }
         // 物の映り込みのフル解像度の SSR は composite1 (water_trace.fsh) が辿った当たり (rgb = 色 x 重み, a = 重み)
-        vec4 mirror = texelFetch(colortex20, texel, 0);
+        vec4 mirror = texelFetch(TEX_WATER_MIRROR, texel, 0);
         refl = refl * (1.0 - mirror.a) + mirror.rgb;
 #else
         refl = below ? vec3(0.0) : skyReflectionFallback(R, lmT.y, 0.0);

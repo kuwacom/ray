@@ -12,6 +12,7 @@
 //@include "/lib/common/transforms.glsl"
 //@include "/lib/post/post_constants.glsl"
 //@include "/lib/post/sampling.glsl"
+//@include "/lib/buffers/slots.glsl"
 
 // xy = タイルの左下 (ピクセル), zw = タイルの大きさ (ピクセル)
 ivec4 bloomTileRectPx(int level) {
@@ -43,7 +44,7 @@ vec4 sampleBloomTile4(int level, vec2 uv) {
     vec2 tileUv = (rect.xy + uv * rect.zw) / screen;
     vec2 rectMin = (rect.xy + 0.5) / screen;
     vec2 rectMax = (rect.xy + rect.zw - 0.5) / screen;
-    return sampleBSplineClamped4(colortex14, tileUv, screen, rectMin, rectMax);
+    return sampleBSplineClamped4(TEX_BLOOM, tileUv, screen, rectMin, rectMax);
 }
 
 /*
@@ -114,7 +115,7 @@ vec3 sampleFlareTile(vec2 uv) {
     vec2 tileUv = (rect.xy + uv * rect.zw) / screen;
     vec2 rectMin = (rect.xy + 0.5) / screen;
     vec2 rectMax = (rect.xy + rect.zw - 0.5) / screen;
-    return sampleBSplineClamped(colortex14, tileUv, screen, rectMin, rectMax);
+    return sampleBSplineClamped(TEX_BLOOM, tileUv, screen, rectMin, rectMax);
 }
 
 // レベル level のタイルを双線形で読む (画面フレアのゴースト用。双三次ほどの滑らかさは要らない)
@@ -122,7 +123,7 @@ vec3 sampleBloomTileLinear(int level, vec2 uv) {
     vec2 screen = viewSize();
     vec4 rect = vec4(bloomTileRectPx(level));
     vec2 p = clamp(rect.xy + uv * rect.zw, rect.xy + 0.5, rect.xy + rect.zw - 0.5);
-    return bloomWithoutLavaGain(textureLod(colortex14, p / screen, 0.0));
+    return bloomWithoutLavaGain(textureLod(TEX_BLOOM, p / screen, 0.0));
 }
 
 #endif

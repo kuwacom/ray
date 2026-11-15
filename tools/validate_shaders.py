@@ -55,6 +55,7 @@ import threading
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import check_slots  # noqa: E402
 import gen_block_properties  # noqa: E402
 import gen_capabilities  # noqa: E402
 import gen_includes  # noqa: E402
@@ -470,6 +471,7 @@ def static_checks(options: dict[str, Option], profiles: dict[str, list[str]]) ->
     problems += include_deps.Tree(SHADERS).problems()
     problems += gen_includes.check(SHADERS)
     problems += gen_wrappers.check(SHADERS)
+    problems += check_slots.check(SHADERS)
     problems += gen_settings.check(SHADERS)
     problems += gen_settings.definition_problems(SHADERS)
     problems += gen_block_properties.check(SHADERS)

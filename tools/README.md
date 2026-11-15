@@ -45,6 +45,7 @@ uv sync
 |---|---|
 | `validate_shaders.py` | Iris の前処理 (include の展開、設定値の差し替え、Iris が注入するマクロ) を再現して glslang でコンパイルし、エラーを元ファイルの行番号で表示します。プロファイルの値、「高」プロファイルと既定値の一致、設定画面と lang の過不足、`*.properties` が ASCII だけか、`//@include` の宣言の漏れ・循環・ガード名と `gen_includes.py` の生成が最新か、も確認します。ローダー (`capabilities.py` の `ENVS`: 最新の Iris / Iris 1.8〜1.10.4 / Iris 1.7 と Oculus) ごとにマクロを変えてコンパイルし、`tools/loader_checks.py` で、そのローダーで読み込めない記述 (flag、`bufferObject` の添字、image の数と形式、`RENDERTARGETS` のカンマの後の空白)、colortex の上限を超える使用 (今は警告。`--strict-colortex` で失敗)、`MC_VERSION` / `IRIS_VERSION` / `MAX_COLOR_BUFFERS` の生成物の外での使用を調べます |
 | `include_deps.py` | `shaders/lib` と `shaders/program` の各ファイルが使う記号 (関数・const・struct・uniform・SSBO・マクロ) の定義元を、そのファイルの `//@include` の宣言から辿れるかを調べます。lib に `#include` の行がないこと、本体の `#include` が生成ブロックの中にだけあることなど、宣言の書き方も確認します。`-v` でファイルごとの不足を表示します。validate_shaders.py からも呼ばれます |
+| `check_slots.py` | `shaders/lib/buffers/slots.glsl` の colortex の論理名 (時間で分け合う枠と番号を移す枠) を調べます。区間の書式と重なり、名前の付いた枠を本体が `colortexN` と直接書いていないかを見ます (validate_shaders.py からも呼ばれます)。`--intervals` では glslang で各プログラムの読み書きを調べ、区間の外で使っていないかを見ます (`--all` で代表の設定の組と全プロファイル) |
 | `gl_compile_check.py` | 同じ前処理の結果を、見えないウィンドウの OpenGL 4.6 compatibility コンテキストで手元の GPU ドライバに compile + link させます。glslang では出ないドライバ固有のエラーと、image / sampler / SSBO / shared メモリの使用数が上限を超えていないかを調べます |
 | `equiv_check.py` | 2 つのコミット (または作業ツリー) のシェーダーをドライバにリンクさせ、バイナリが同じかを比べます。リファクタで計算が変わっていないかを、ゲームを使わずに確かめます |
 | `pixdiff.py` | 2 枚の撮影の画素の差 (平均・p99・最大・4/255 を超える画素の割合・平均色の差) を出します |

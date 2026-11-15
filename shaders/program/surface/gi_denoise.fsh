@@ -18,6 +18,7 @@
 //@include "/lib/common/temporal.glsl"
 //@include "/lib/surface/surface.glsl"
 //@include "/lib/post/post.glsl"
+//@include "/lib/buffers/slots.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/buffers/images.glsl"
 #include "/lib/settings/look.glsl"
@@ -47,6 +48,7 @@
 #include "/lib/common/frame_offset.glsl"
 #include "/lib/common/look_presets.glsl"
 #include "/lib/common/voxel_space.glsl"
+#include "/lib/buffers/slots.glsl"
 #include "/lib/surface/gi.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/common/transforms.glsl"
@@ -179,10 +181,10 @@ void main() {
         for (int i = 0; i < 4; i++) {
             ivec2 o = ivec2(i & 1, i >> 1);
             ivec2 p = clamp(p0 + o, ivec2(0), screen - 1);
-            vec4 hi = texelFetch(colortex19, p, 0);
+            vec4 hi = texelFetch(TEX_GI_AUX, p, 0);
             vec2 bw = mix(1.0 - f, f, vec2(o));
             float w = bw.x * bw.y * (hi.r > 0.0 && abs(hi.g - expected) < tol ? 1.0 : 0.0);
-            history += texelFetch(colortex9, p, 0) * w;
+            history += texelFetch(TEX_GI_HIST, p, 0) * w;
             info += hi * w;
             hw += w;
         }

@@ -12,6 +12,7 @@
 //@include "/lib/common/math.glsl"
 //@include "/lib/common/samplers.glsl"
 //@include "/lib/common/voxel_space.glsl"
+//@include "/lib/buffers/slots.glsl"
 
 /*
  * deferred11 のデノイズ済み結果 (colortex8)
@@ -19,7 +20,7 @@
  */
 vec4 getIndirectLight(ivec2 texel) {
 #if GI_MODE > 0 || AO_MODE > 0
-    return texelFetch(colortex8, texel, 0);
+    return texelFetch(TEX_GI, texel, 0);
 #else
     return vec4(0.0, 0.0, 0.0, 1.0);
 #endif

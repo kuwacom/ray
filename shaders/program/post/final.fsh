@@ -16,6 +16,7 @@
 //@include "/lib/light/floodfill.glsl"
 //@include "/lib/light/voxel.glsl"
 //@include "/lib/buffers/formats.glsl"
+//@include "/lib/buffers/slots.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -49,6 +50,7 @@
 #include "/lib/post/exposure.glsl"
 #include "/lib/post/camera.glsl"
 #include "/lib/post/grading.glsl"
+#include "/lib/buffers/slots.glsl"
 #include "/lib/post/bloom.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/post/lens_optics.glsl"
@@ -97,7 +99,7 @@ vec3 debugView(ivec2 texel, vec3 color) {
     vec3 playerPos = screenToPlayer(vec3(texcoord, depth));
     return linearToSrgb(tonemap(sampleFloodfillVolume(playerPos - normalize(playerPos) * 0.5)));
 #elif DEBUG_VIEW == 6
-    vec4 gi = texelFetch(colortex8, texel, 0);
+    vec4 gi = texelFetch(TEX_GI, texel, 0);
     return linearToSrgb(tonemap(gi.rgb)) * gi.a;
 #elif DEBUG_VIEW == 7
     // 雲の散乱光に露出を掛けて見る (掛けないと夜や薄明では真っ黒になる)
@@ -313,16 +315,16 @@ void main() {
         // 配るのは点の光の全部まで。強さで先に裾を増やし、芯は残りの分 (和が 1 を超えると中心の地まで引かれて黒く抜けた)
         float spreadAmount = min((POINT_SPREAD_BASE + POINT_SPREAD_PER_GLARE * LP_VEILING_GLARE) * focusFade, 1.0);
         float coreAmount = min(POINT_CORE_SHARE * focusFade, 1.0 - spreadAmount);
-        if (any(greaterThan(textureLod(colortex17, uvL, float(POINT_SPREAD_GATE_LEVEL)).rgb, vec3(0.0)))) {
-            vec3 spreadCore = max(textureLod(colortex17, uvL, 0.0).rgb, 0.0);
+        if (any(greaterThan(textureLod(TEX_SPARKLE_HIST, uvL, float(POINT_SPREAD_GATE_LEVEL)).rgb, vec3(0.0)))) {
+            vec3 spreadCore = max(textureLod(TEX_SPARKLE_HIST, uvL, 0.0).rgb, 0.0);
             vec3 spreadTail = vec3(0.0);
-            for (int l = 1; l <= POINT_SPREAD_LEVELS; l++) spreadTail += max(sampleBSplineMip(colortex17, uvL, l), 0.0);
+            for (int l = 1; l <= POINT_SPREAD_LEVELS; l++) spreadTail += max(sampleBSplineMip(TEX_SPARKLE_HIST, uvL, l), 0.0);
             vec3 coreBlur = vec3(0.0);
             for (int i = 0; i < 25; i++) {
                 ivec2 o = ivec2(i % 5, i / 5) - 2;
                 ivec2 a = abs(o);
                 vec2 offset = vec2(sign(o)) * vec2(POINT_CORE_TAP_X[a.x], POINT_CORE_TAP_X[a.y]);
-                coreBlur += max(textureLod(colortex17, uvL + offset * texelSize(), 0.0).rgb, 0.0) * (POINT_CORE_TAP_W[a.x] * POINT_CORE_TAP_W[a.y]);
+                coreBlur += max(textureLod(TEX_SPARKLE_HIST, uvL + offset * texelSize(), 0.0).rgb, 0.0) * (POINT_CORE_TAP_W[a.x] * POINT_CORE_TAP_W[a.y]);
             }
             /*
              * 芯と裾へ配る分は中心から引く。colortex17 は DoF・モーションブラー・色収差の前の値なので、ボケた点や色ごとにずれた点では

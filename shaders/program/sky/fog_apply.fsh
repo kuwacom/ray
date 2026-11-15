@@ -58,6 +58,7 @@
 #include "/lib/sky/fog_styles.glsl"
 #include "/lib/sky/fog.glsl"
 #include "/lib/sky/sky.glsl"
+#include "/lib/buffers/slots.glsl"
 #include "/lib/sky/godrays.glsl"
 #include "/lib/buffers/light_bins.glsl"
 #include "/lib/light/light_bins.glsl"

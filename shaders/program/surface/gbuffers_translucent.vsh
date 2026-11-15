@@ -46,6 +46,7 @@
 #include "/lib/common/frame_offset.glsl"
 #include "/lib/common/look_presets.glsl"
 #include "/lib/common/voxel_space.glsl"
+#include "/lib/buffers/slots.glsl"
 #include "/lib/surface/gi.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/common/transforms.glsl"

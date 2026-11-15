@@ -38,6 +38,7 @@
 //@include "/lib/surface/surface_lights.glsl"
 //@include "/lib/sky/clouds.glsl"
 //@include "/lib/sky/sky_color.glsl"
+//@include "/lib/buffers/slots.glsl"
 
 /*
  * ボクセルのヒット面の色が画面に無い時は、ブロックの平均の色の表 (lib/ids/block_albedo.glsl) を使う
@@ -112,7 +113,7 @@ const float GI_HISTORY_EDGE = 0.002;
 vec3 giHistoryAtPlayer(vec3 playerPos) {
     vec2 uv = playerToPreviousScreen(playerPos).xy;
     if (any(lessThan(uv, vec2(GI_HISTORY_EDGE))) || any(greaterThan(uv, vec2(1.0 - GI_HISTORY_EDGE)))) return vec3(-1.0);
-    return textureLod(colortex9, uv, 0.0).rgb / max(GI_EFFECTIVE_STRENGTH * LK_GI_BOUNCE, 1e-3);
+    return textureLod(TEX_GI_HIST, uv, 0.0).rgb / max(GI_EFFECTIVE_STRENGTH * LK_GI_BOUNCE, 1e-3);
 }
 
 /*
