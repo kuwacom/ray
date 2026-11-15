@@ -23,7 +23,7 @@
 #define TEX_GODRAYS       colortex16  // composite12 -> composite19 (size.buffer.colortex16 の低解像度)
 #define TEX_SPARKLE_HIST  colortex8   // composite20 (永続) -> final
 #define TEX_WATER_REFR    colortex14  // composite1 -> composite2
-#define TEX_GI_AUX        colortex19  // deferred11 (永続)
+#define TEX_GI_AUX        colortex10  // deferred11 (永続)
 #define TEX_WATER_MIRROR  giRawSampler          // composite1 -> composite2 (image は TEX_GI_RAW と共用)
 #define TEX_WATER_SUNVIS  blockLightRawSampler  // composite1 -> composite2 (image は TEX_BLOCKLIGHT_RAW と共用)
 #define TEX_GI_RAW        giRawSampler          // deferred10 -> deferred11

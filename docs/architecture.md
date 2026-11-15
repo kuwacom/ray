@@ -103,7 +103,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 14 | deferred1.csh | light | LIGHT_TRACE_COUNT 光源 (上位 N-1 個 + 残りから確率的に 1 個) の DDA トレース (直接光) | SSBO3, voxel*, G バッファ | blockLightRawImg (影あり S), blockLightAuxImg (影なし U) (左上 1/RES) | local 8², workGroupsRender = 1/LIGHT_TRACE_RES | LIGHT_SHADOWS |
 | 15 | deferred2.vsh/fsh | light | 可視率 S/U の時空間デノイズ + フル解像度の影なし照度に掛ける | blockLightRaw/Aux, colortex7 | colortex6, colortex7 | 画面 | LIGHT_SHADOWS |
 | 16 | deferred10.csh | surface | GI / AO の生値 (RSM / SSGI / ボクセル RT)。多重反射は画面に映るヒット点の前フレームの GI (colortex9) | G バッファ, shadowcolor, voxel, flood, colortex9 | giRawImg | local 8², 1/GI_RES | GI_MODE>0 or AO_MODE>0 |
-| 17 | deferred11.vsh/fsh | surface | GI / AO のデノイズ | giRaw, colortex9, colortex19 | colortex9, colortex19 | 画面 | 同上 |
+| 17 | deferred11.vsh/fsh | surface | GI / AO のデノイズ | giRaw, colortex9, colortex10 | colortex9, colortex10 | 画面 | 同上 |
 | 18 | deferred20.vsh/fsh | sky | 体積雲レイマーチ (低解像度 + チェッカーボード) | weather, skyView | colortex14 (左上 1/CLOUD_RES) | 画面 (範囲外は早期終了) | CLOUDS>=2, world0 |
 | 19 | deferred21.vsh/fsh | sky | 雲の時間アップスケール | colortex14, 履歴 | colortex11 | 画面 | 同上 |
 | 20 | deferred30.vsh/fsh | surface | 不透明シェーディング (全モジュールの光を合成) + 空の描画 | G バッファ, colortex6/8/11, SSBO0 | colortex0 | 画面 | 常時 |
@@ -150,7 +150,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 7 | RGBA16F | light: ブロックライト履歴 | light | light | 永続 |
 | 8 | RGBA16F | post: 鏡面の白飛び分の履歴 (rgb = 露出前の線形, a 予備)。SPECULAR_SPARKLE の時だけ composite20 が読み書きし、final がミップで読んで点像の芯と裾を作る (LENS_POINT_SPREAD_STRENGTH) | post | post | 永続 |
 | 9 | RGBA16F | surface: rgb 間接光照度, a AO。deferred11 の出力が次のフレームの GI の履歴を兼ねる | surface (deferred11) | surface, post(debug) | 永続 |
-| 10 | RGBA16F | 未使用 | - | - | なし |
+| 10 | RGBA16F | surface: GI 履歴の付属。r = 履歴の長さ (フレーム、0 = 無効), g = 視線距離 (再投影の遮蔽判定), b / a = 速い履歴の輝度の平均・分散 (変化の検出)。GI_DENOISE >= 1 の時だけ | surface (deferred11) | surface | 永続 |
 | 11 | RGBA16F | sky: 雲 (フル解像度, 時間蓄積) | sky | surface (sky の関数経由), sky | 永続 |
 | 12 | RGBA16F | sky: VL / フォグ (低解像度) rgb 内散乱, a 透過率 | sky | sky | 永続 |
 | 13 | RGBA16F | post: TAA 履歴 | post | post | 永続 |
@@ -158,12 +158,12 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 15 | RGBA16F | 速度: rg = 前フレーム UV - 今の UV, a = 1 なら有効 (エンティティ・手)。a = 0 の金属の防具の画素だけ rgb = 環境光の鏡面の重み x 1e-4 (gbuffers_entities_translucent -> composite2。双線形で読まれても速度がずれないよう小さくする) | surface (gbuffers, post の関数) | post | 毎フレーム |
 | 16 | R16F | sky: 画面空間の光芒 (低解像度 `size.buffer.colortex16` = 1/GODRAYS_RES)。composite12 -> 13 -> 14 で同じバッファをピンポンして読み書きし、composite19 が足す | sky | sky | 毎フレーム |
 | 18 | RGBA16F | 未使用 | - | - | なし |
-| 19 | RGBA16F | surface: GI 履歴の付属。r = 履歴の長さ (フレーム、0 = 無効), g = 視線距離 (再投影の遮蔽判定), b / a = 速い履歴の輝度の平均・分散 (変化の検出)。GI_DENOISE >= 1 の時だけ | surface (deferred11) | surface | 永続 |
+| 19 | RGBA16F | 未使用 | - | - | なし |
 | 20 | RGBA16F | 未使用 | - | - | なし |
 | 21 | RGBA16F | 未使用 | - | - | なし |
 
 - gbuffers では colortex0-3 を読めない (Iris の仕様)
-- 4, 8, 9, 14, 16, 18〜21 は `lib/buffers/slots.glsl` の論理名 (`TEX_*`、用途ごとの区間付き) で読む。番号を変えるときは slots.glsl と RENDERTARGETS の数字を一緒に直す (`tools/check_slots.py` が直接書きと区間の外の読み書きを調べる)
+- 4, 8〜10, 14, 16, 18, 20, 21 は `lib/buffers/slots.glsl` の論理名 (`TEX_*`、用途ごとの区間付き) で読む。番号を変えるときは slots.glsl と RENDERTARGETS の数字を一緒に直す (`tools/check_slots.py` が直接書きと区間の外の読み書きを調べる)
 - 画面相対の image の blockLightRawImg と giRawImg も、deferred の用途 (TEX_BLOCKLIGHT_RAW / TEX_GI_RAW) と composite1 -> 2 の水の用途 (TEX_WATER_SUNVIS / TEX_WATER_MIRROR) で分け合うので、読みは slots.glsl の TEX_*、書きは STORE_* で書く。deferred の側は毎フレーム、読む範囲を全部書き直してから読むので、水の値は次のフレームに残らない
 - `shadowcolor0` RGBA8: 最も太陽側の面の色 (半透明は透過色 + a 不透明度、不透明は a=1)。`shadowcolor1` RGBA16: rg 法線 (oct), b スカイライト, a 種別 (0 不透明 / 0.5 半透明 / 1 水)。RSM (surface) と色付き影 (surface) と色付き光芒 (sky) が読む
 

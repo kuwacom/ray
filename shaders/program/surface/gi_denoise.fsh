@@ -72,7 +72,7 @@
 in vec2 texcoord;
 
 #if GI_DENOISE >= 1
-/* RENDERTARGETS: 9,19 */
+/* RENDERTARGETS: 9,10 */
 #else
 /* RENDERTARGETS: 9 */
 #endif

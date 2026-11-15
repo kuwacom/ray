@@ -13,14 +13,13 @@ const int colortex6Format  = RGBA16F; // A: ブロックライト    | deferred2
 const int colortex7Format  = RGBA16F; // A: ブロックライト履歴 | deferred2 (永続)
 const int colortex8Format  = RGBA16F; // D: 鏡面の白飛び分の履歴 | composite20 (永続, SPECULAR_SPARKLE) -> final (ミップ)
 const int colortex9Format  = RGBA16F; // C: GI / AO (出力と履歴) | deferred11 (永続) -> deferred30 / composite*
-const int colortex10Format = RGBA16F; // (未使用)
+const int colortex10Format = RGBA16F; // C: GI 履歴の付属 (長さ, 視線距離, 速い履歴の輝度の平均・分散) | deferred11 (永続, GI_DENOISE >= 1)
 const int colortex11Format = RGBA16F; // B: 雲履歴            | deferred21 (永続) -> deferred30 / composite*
 const int colortex12Format = RGBA16F; // B: ボリューメトリック | composite1_a -> composite19
 const int colortex13Format = RGBA16F; // D: TAA 履歴          | composite20 (永続)
 const int colortex14Format = RGBA16F; // B: 雲 (低解像度) | deferred20 -> deferred21、水の屈折先の色 + 水の中の経路長 | composite1 -> composite2 (水の画素だけ)、D: ブルームタイル | composite23 -> composite24 -> final
 const int colortex15Format = RGBA16F; // 速度ベクトル         | gbuffers (エンティティ/手) -> composite20 / 21
 const int colortex16Format = R16F;    // B: 画面空間の光芒 (低解像度) | composite12 -> 13 -> 14 -> composite19
-const int colortex19Format = RGBA16F; // C: GI 履歴の付属 (長さ, 視線距離, 速い履歴の輝度の平均・分散) | deferred11 (永続, GI_DENOISE >= 1)
 
 const bool colortex0Clear  = true;
 const bool colortex1Clear  = true;
@@ -39,7 +38,6 @@ const bool colortex13Clear = false;
 const bool colortex14Clear = true;
 const bool colortex15Clear = true;
 const bool colortex16Clear = true;
-const bool colortex19Clear = false;
 
 const vec4 colortex0ClearColor  = vec4(0.0, 0.0, 0.0, 0.0);
 const vec4 colortex1ClearColor  = vec4(0.0, 0.0, 0.0, 0.0);

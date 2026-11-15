@@ -53,7 +53,6 @@ G_TRANSLUCENT = {
 }
 # リンク後の木には残るが、実行時に通らない読み (名前, プログラム): 理由
 KNOWN_UNREACHABLE = {
-    ("TEX_GI", "deferred10"): "gatherSurfaceLights は deferred10 で SL_GI を渡さない (lighting.glsl の呼び出し)",
 }
 
 Pos = tuple[int, int, int, str]
