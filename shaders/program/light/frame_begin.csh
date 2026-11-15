@@ -2,6 +2,7 @@
  * begin (shadow パスの前): 今フレームの光源リストとライトビンを空にする
  * エンティティ光源の蓄積表 (lib/light/entity_light.glsl) もここでクリアする
  * エンティティの三角形 (lib/light/entity_tri.glsl) のカウンタと AABB もここで空にする
+ * ビーコンの光線の区間 (FrameData、lib/sky/beacon_beam.glsl) もここで空にする
  * light モジュール (lib/light)
  */
 // このプログラムで書く SSBO (lib/buffers。ほかのプログラムでは readonly)
@@ -81,6 +82,12 @@ void main() {
     // 40960 スレッドで蓄積表 (32768 uint) を覆える
     if (i < uint(ENTITY_ACC_UINTS)) lightBins.entityAcc[i] = 0u;
     clearEntityTriangles(i);
+    // ビーコンの光線の区間は gbuffers_beaconbeam が毎フレーム登録し直す
+    if (i < uint(BEACON_BEAM_MAX)) {
+        frameData.beaconBeamKey[i] = 0u;
+        frameData.beaconBeamYMin[i] = 0x7fffffff;
+        frameData.beaconBeamYMax[i] = -0x7fffffff;
+    }
 
     if (i == 0u) {
         frameData.lightStats.x = globalLights.count;

@@ -371,8 +371,6 @@ void main() {
     materialId = MAT_BLOCK_ENTITY;
 #elif defined GBUF_HAND
     materialId = (heldBlockLightValue > 0 || heldBlockLightValue2 > 0) ? MAT_HAND_EMISSIVE : MAT_HAND;
-#elif defined GBUF_BEACON
-    materialId = MAT_BEACON_BEAM;
 #elif defined GBUF_PARTICLES
     materialId = MAT_PARTICLE;
 #elif defined GBUF_BASIC || defined GBUF_LINE

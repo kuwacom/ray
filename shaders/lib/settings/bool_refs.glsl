@@ -90,6 +90,8 @@
 #endif
 #ifdef EMISSION_GLARE
 #endif
+#ifdef EMISSION_BEACON_SCATTER
+#endif
 #ifdef WATER_WAVES
 #endif
 #ifdef WATER_GLITTER

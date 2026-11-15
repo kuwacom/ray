@@ -309,6 +309,10 @@ option.EMISSION_BLOCK_BRIGHTNESS=Light Block Brightness
 option.EMISSION_BLOCK_BRIGHTNESS.comment=How bright blocks that glow as a whole (glowstone, sea lantern, redstone lamp, jack o'lantern, froglights, shroomlight) look on screen. Lower values show more of the texture pattern. Does not change the light they cast
 option.EMISSION_BEACON_BRIGHTNESS=Beacon Brightness
 option.EMISSION_BEACON_BRIGHTNESS.comment=How bright the beacon block and its beam look on screen. The beam is always visible from far away, so a low value keeps it from standing out. Does not change the light the beacon casts
+option.EMISSION_BEACON_SCATTER=Beacon Beam Scattering
+option.EMISSION_BEACON_SCATTER.comment=Draws the beam as light scattered by the air. It gets brighter when you look down along it from above or along its length, and stronger with a glow around it in fog, haze and rain. Faint against the daytime sky, clear at night. OFF = a thin line of constant brightness. No cost when no beam is on screen
+option.EMISSION_BEACON_SCATTER_STRENGTH=Beacon Beam Glow
+option.EMISSION_BEACON_SCATTER_STRENGTH.comment=How strongly fog, haze and rain around the beam light up and glow. 0 = no glow
 option.EMISSION_CHARGED_CREEPER_BRIGHTNESS=Charged Creeper / Wither Armor Brightness
 option.EMISSION_CHARGED_CREEPER_BRIGHTNESS.comment=How brightly the electric swirl of a creeper charged by lightning and of the wither's armor glows blue-white, so it stands out at night. 0 = vanilla brightness. Does not change the light it casts
 option.CREAKING_EYE_BRIGHTNESS=Creaking Eye Brightness
