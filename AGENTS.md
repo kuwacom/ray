@@ -30,6 +30,8 @@ glslang は `RAY_GLSLANG`、PATH、`tools/glslang/bin/glslang.exe` の順に探�
 - compute の `workGroups` / `workGroupsRender` はリテラルで書く (式・マクロ不可)。`setup` は 1x1 の画面として dispatch されるので、絶対の `workGroups` を使う
 - `/* RENDERTARGETS: 0,1,2 */` の `,` の後に空白を入れない (Iris が数として読めず失敗する)
 - `iris_`・`irisMain`・`moj_import` で始まる識別子は使わない (Iris の内部用で、読み込みが失敗する)
+- ローダーの版で分けるときは、`tools/capabilities.py` の表に能力 (`CAP_*`) と機能 (`FX_*`) を足して `uv run tools/gen_capabilities.py` で生成し、本体は `FX_*` だけを見る (`//@include "/lib/settings/capabilities.glsl"`)。`MC_VERSION` / `IRIS_VERSION` / `MAX_COLOR_BUFFERS` を生成物の外に書くと validate_shaders.py が落とす
+- 古い Iris (1.7) と Oculus でも読めるように書く。新しく使う colortex は 0〜15、`bufferObject` の添字は 8 まで、image の pixel type は Iris 1.7 の列挙にあるもの。validate_shaders.py がローダーごとに検査する (colortex16 以上は今は警告)
 - カスタム image (`image.*`) は Iris の上限 16 個をすべて使っている。足すときは既存のものを分け合うか、colortex か SSBO で代える
 - 設定で決まる分岐は `#if` / `const` で書き、uniform で分岐しない (実行しない側もリンクされ、レジスタも両側の多いほうになる)
 - グローバルの `const` を uniform で初期化しない。NVIDIA は通すが仕様では誤りで、他社のドライバでは落ちる
