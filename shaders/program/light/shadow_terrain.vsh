@@ -50,6 +50,17 @@
 in vec2 mc_Entity;
 in vec4 at_midBlock;
 
+#ifdef PROGRAM_SHADOW_FALLBACK
+// shadow はジオメトリシェーダー (shadow.gsh) を通る。GS の出力と同じ名前は使えないので、入力側の名前に替える
+#define texcoord vTexcoord
+#define glcolor vColor
+#define normalPlayer vNormal
+#define skyLight vSkyLight
+#define blockId vBlockId
+#define tintTransmittance vTint
+// エンティティのボクセル化に使う、揺れ適用前の位置
+out vec3 vPlayerPos;
+#endif
 out vec2 texcoord;
 out vec4 glcolor;
 out vec3 normalPlayer;
@@ -90,6 +101,9 @@ void main() {
         float emission = rawBlockId == BLOCK_WATER_FLOWING ? float(VOXEL_WATER_FLOWING) : at_midBlock.w;
         voxelizeTerrainVertex(playerPos, at_midBlock.xyz / 64.0, blockId, emission);
     }
+#ifdef PROGRAM_SHADOW_FALLBACK
+    vPlayerPos = playerPos;
+#endif
 
     playerPos = applyWaving(playerPos, blockId, at_midBlock.y < 0.0, skyLight);
     vec3 clip = (shadowProjection * vec4(playerToShadowView(playerPos), 1.0)).xyz;

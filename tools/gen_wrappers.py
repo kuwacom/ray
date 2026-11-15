@@ -114,7 +114,7 @@ PROGRAMS: dict[str, list[str] | dict[str, Body | None]] = {
     "begin": ["csh"],
     # shadow。地形は solid / cutout / water で受け、shadow は専用のプログラムが無いジオメトリの受け皿
     # (Iris 1.8 未満は全ジオメトリが shadow に来る。新しい Iris の地形を shadow から外し、受け皿だけの処理を地形に掛けない)
-    "shadow": shared("light/shadow_terrain", "PROGRAM_SHADOW_FALLBACK"),
+    "shadow": {**shared("light/shadow_terrain", "PROGRAM_SHADOW_FALLBACK"), "gsh": ("light/shadow_fallback.gsh", ())},
     "shadow_solid": SHADOW_TERRAIN,
     "shadow_cutout": SHADOW_TERRAIN,
     "shadow_water": SHADOW_TERRAIN,
