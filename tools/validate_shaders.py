@@ -48,6 +48,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import gen_block_properties  # noqa: E402
+import gen_capabilities  # noqa: E402
 import gen_includes  # noqa: E402
 import gen_settings  # noqa: E402
 import gen_wrappers  # noqa: E402
@@ -440,6 +441,7 @@ def static_checks(options: dict[str, Option], profiles: dict[str, list[str]]) ->
     problems += gen_settings.check(SHADERS)
     problems += gen_settings.definition_problems(SHADERS)
     problems += gen_block_properties.check(SHADERS)
+    problems += gen_capabilities.check(SHADERS)
     for pname in profiles:
         for k, v in resolve_profile(pname, profiles).items():
             opt = options.get(k)
