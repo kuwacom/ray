@@ -109,6 +109,12 @@ void main() {
 
     // 画面外のエンティティ光源もここで登録する (gbuffers_entities と同じセルなら重複しない)
     injectEntityLight((vPlayerPos[0] + vPlayerPos[1] + vPlayerPos[2]) / 3.0, entityId, currentRenderedItemId, entityColor);
+    /*
+     * Iris 1.11 は影のパスのブロックエンティティを描き方 (RenderPipeline) で振り分け、shadow_block に回すのは
+     * エンドポータル・エンドゲートウェイだけ。エンダーチェスト・コンジットなどはこちらに来るので、ここでも登録する
+     * エンティティを描く間の blockEntityId は光源でない値 (0 / 1) なので、エンティティでは何もしない
+     */
+    injectBlockEntityLight((vPlayerPos[0] + vPlayerPos[1] + vPlayerPos[2]) / 3.0, blockEntityId);
     #ifdef CHARGED_CREEPER_LIGHT
         if (vSwirlLayer[0] != 0) injectSwirlLight((vPlayerPos[0] + vPlayerPos[1] + vPlayerPos[2]) / 3.0, entityId);
     #endif
