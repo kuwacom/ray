@@ -11,6 +11,7 @@
 //@include "/lib/settings.glsl"
 //@include "/lib/common/uniforms.glsl"
 //@include "/lib/ids/block_ids.glsl"
+//@include "/lib/ids/light_ids.glsl"
 
 const float WIND_SPEED = 1.0;
 const float WAVE_AMP_SHORT = 0.11;      // 草花の先端
@@ -51,7 +52,8 @@ vec3 applyWaving(vec3 playerPos, int blockId, bool isTopVertex, float skyLight) 
     // 屋内や洞窟の植物は風が届かないので弱める
     float exposure = 0.25 + 0.75 * smoothstep(0.3, 0.9, skyLight);
 #ifdef WAVING_PLANTS
-    if (blockId == BLOCK_PLANT_SHORT || blockId == BLOCK_CROPS) {
+    // 開いたアイブロッサムは光源の ID だが、閉じた花と同じに揺らす
+    if (blockId == BLOCK_PLANT_SHORT || blockId == BLOCK_CROPS || blockId == BLOCK_LIGHT_BASE + LIGHT_EYEBLOSSOM) {
         if (isTopVertex) playerPos += windOffset(worldPos) * WAVE_AMP_SHORT * exposure;
     } else if (blockId == BLOCK_PLANT_TALL_LOWER) {
         if (isTopVertex) playerPos += windOffset(worldPos) * WAVE_AMP_TALL * exposure;

@@ -1,6 +1,6 @@
 /*
  * アルベドに重ねるだけのオーバーレイ (エンチャントの光沢・クモの目・ブロックの破壊ひび)
- * colortex1 のみに書く。ブレンドは shaders.properties で a (マテリアル ID) を壊さない設定にしてある
+ * colortex1 に書く (鎧の光沢とクリーキングの目は deferred の後に描かれるので colortex4 にも加算する)。ブレンドは shaders.properties で a (マテリアル ID) を壊さない設定にしてある
  * surface モジュール (lib/surface)
  */
 //@include "/lib/common/common.glsl"

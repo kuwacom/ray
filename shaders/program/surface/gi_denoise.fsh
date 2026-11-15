@@ -59,6 +59,7 @@
 #include "/lib/common/shadow_space.glsl"
 #include "/lib/common/shadow_volume.glsl"
 #include "/lib/surface/sun_shadow.glsl"
+#include "/lib/ids/light_ids.glsl"
 #include "/lib/surface/waving.glsl"
 #include "/lib/surface/surface.glsl"
 #include "/lib/common/jitter.glsl"

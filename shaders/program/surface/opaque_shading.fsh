@@ -61,6 +61,7 @@
 #include "/lib/common/shadow_space.glsl"
 #include "/lib/common/shadow_volume.glsl"
 #include "/lib/surface/sun_shadow.glsl"
+#include "/lib/ids/light_ids.glsl"
 #include "/lib/surface/waving.glsl"
 #include "/lib/surface/surface.glsl"
 #include "/lib/sky/sh.glsl"
@@ -80,7 +81,6 @@
 #include "/lib/buffers/light_bins.glsl"
 #include "/lib/light/light_bins.glsl"
 #include "/lib/buffers/block_data.glsl"
-#include "/lib/ids/light_ids.glsl"
 #include "/lib/light/light_def.glsl"
 #include "/lib/light/light_table_data.glsl"
 #include "/lib/light/light_table.glsl"
@@ -147,12 +147,16 @@ const float EMISSION_POINT_GAIN = 1.0;
 const float EMISSION_AREA_GAIN = 1.0;
 #endif
 
+// 開いたアイブロッサムの発光は暗い夜でも白く飛びやすいので、他の光源より抑える (設定 1.0 で淡く光る程度)
+const float EYEBLOSSOM_GLOW_GAIN = 0.3;
+
 // 光源の種類ごとの見た目の明るさ (設定 EMISSION_*_BRIGHTNESS) x 倍率。種類は光源の表のフラグ。表に種類のない光源は倍率だけ
 float emissionKindGain(uint flags) {
     if ((flags & LIGHT_FLAG_KIND_TORCH) != 0u) return EMISSION_TORCH_BRIGHTNESS * EMISSION_POINT_GAIN;
     if ((flags & LIGHT_FLAG_KIND_FIRE) != 0u) return EMISSION_FIRE_BRIGHTNESS * EMISSION_POINT_GAIN;
     if ((flags & LIGHT_FLAG_KIND_LANTERN) != 0u) return EMISSION_LANTERN_BRIGHTNESS * EMISSION_POINT_GAIN;
     if ((flags & LIGHT_FLAG_KIND_BEACON) != 0u) return EMISSION_BEACON_BRIGHTNESS * EMISSION_POINT_GAIN;
+    if ((flags & LIGHT_FLAG_KIND_EYEBLOSSOM) != 0u) return EYEBLOSSOM_BRIGHTNESS * EYEBLOSSOM_GLOW_GAIN * EMISSION_POINT_GAIN;
     if ((flags & LIGHT_FLAG_OCCLUDES) != 0u) return EMISSION_BLOCK_BRIGHTNESS * EMISSION_AREA_GAIN;
     return EMISSION_POINT_GAIN;
 }

@@ -311,12 +311,16 @@ option.EMISSION_BEACON_BRIGHTNESS=Beacon Brightness
 option.EMISSION_BEACON_BRIGHTNESS.comment=How bright the beacon block and its beam look on screen. The beam is always visible from far away, so a low value keeps it from standing out. Does not change the light the beacon casts
 option.EMISSION_CHARGED_CREEPER_BRIGHTNESS=Charged Creeper / Wither Armor Brightness
 option.EMISSION_CHARGED_CREEPER_BRIGHTNESS.comment=How brightly the electric swirl of a creeper charged by lightning and of the wither's armor glows blue-white, so it stands out at night. 0 = vanilla brightness. Does not change the light it casts
+option.CREAKING_EYE_BRIGHTNESS=Creaking Eye Brightness
+option.CREAKING_EYE_BRIGHTNESS.comment=How brightly the glowing eyes of a creaking shine in eerie orange-red. 0 = no glow. Does not cast light on the surroundings
 option.GLOW_LICHEN_LIGHT=Glow Lichen Light
 option.GLOW_LICHEN_LIGHT.comment=Makes glow lichen a light source that lights its surroundings. When off, only the glowing look remains.
 option.GLOW_LICHEN_BRIGHTNESS=Glow Lichen Light Strength
 option.GLOW_LICHEN_BRIGHTNESS.comment=How strongly glow lichen lights its surroundings. Higher values light farther.
 option.FIREFLY_BUSH_BRIGHTNESS=Firefly Bush Light Strength
 option.FIREFLY_BUSH_BRIGHTNESS.comment=How strongly firefly bushes light their surroundings. Higher values light farther.
+option.EYEBLOSSOM_BRIGHTNESS=Open Eyeblossom Brightness
+option.EYEBLOSSOM_BRIGHTNESS.comment=How brightly open eyeblossoms glow pale orange at night, and how strongly they softly light their surroundings. 0 = no glow.
 option.LAVA_BRIGHTNESS=Lava Brightness
 option.LAVA_BRIGHTNESS.comment=How bright lava itself looks on screen. Higher values shift it from orange toward yellow. Does not change the light it casts. 0 = no extra brightening (darker orange)
 option.LAVA_BLOOM=Lava Bloom

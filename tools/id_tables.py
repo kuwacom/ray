@@ -54,7 +54,7 @@ def state_values(block: str, prop: str, values: list[str]) -> list[str]:
 
 
 # 発光の見た目の明るさの種類 -> light_def.glsl の LT_* (値は gen_block_properties.py の LIGHT_FLAG_KIND_*)
-KIND_FLAGS = {"torch": "LT_TORCH", "fire": "LT_FIRE", "lantern": "LT_LANTERN", "beacon": "LT_BEACON"}
+KIND_FLAGS = {"torch": "LT_TORCH", "fire": "LT_FIRE", "lantern": "LT_LANTERN", "beacon": "LT_BEACON", "eyeblossom": "LT_EYEBLOSSOM"}
 
 
 @dataclass(frozen=True)
@@ -219,6 +219,9 @@ LIGHTS: list[Light] = [
     Light(66, None, "decorative gold", f"vec3(1.00, 0.80, 0.35), {_DECOR}", label="LIGHT_DECOR_FIRST + 3", mask="gold_block"),
     Light(67, None, "decorative redstone", f"vec3(1.00, 0.15, 0.08), {_DECOR}", label="LIGHT_DECOR_FIRST + 4", mask="redstone_block"),
     Light(68, None, "decorative amethyst", f"vec3(0.75, 0.50, 1.00), {_DECOR}", label="LIGHT_DECOR_FIRST + 5", mask="amethyst_block"),
+    # 開いたアイブロッサム (夜)。ホタルの茂みと同じく floodfill の種だけで、点光源と影を持たない。閉じた花は光らない (植物のまま)
+    Light(69, "LIGHT_EYEBLOSSOM", "open eyeblossom", "vec3(1.0, 0.65, 0.35), EYEBLOSSOM_BRIGHTNESS * 0.2, 3.0, 0.3, vec3(0.5, 0.6, 0.5), 0.0, LT_FLOOD",
+          blocks=_lit("open_eyeblossom"), items=_lit("open_eyeblossom"), kind="eyeblossom"),
 
     Light(128, "LIGHT_ITEM_LAVA_BUCKET", "lava bucket", "LAVA_SRGB, 1.0, 15.0, 0.2, LT_CENTER, 0.2, LT_CAT_ITEM", items=_lit("lava_bucket")),
     Light(129, "LIGHT_ITEM_GLOWSTONE_DUST", "glowstone dust", "vec3(1.0, 0.80, 0.52), 0.7, 8.0, 0.1, LT_CENTER, 0.0, LT_CAT_ITEM", items=_lit("glowstone_dust")),
@@ -269,6 +272,8 @@ ENTITIES: list[tuple[int, str, str, tuple[str, ...], str]] = [
     (5007, "ENTITY_BEAM", "Iris の minecraft:end_crystal_beam", ("minecraft:end_crystal_beam",), ""),
     (5008, "ENTITY_WITHER", "ウィザー (防壁の電気の渦を帯電クリーパーと同じ明るさで光らせる)", ("minecraft:wither",),
      "Wither (its armor swirl glows like a charged creeper's)"),
+    (5009, "ENTITY_CREAKING", "クリーキング (目の層を不気味な橙〜赤に光らせる)", ("minecraft:creaking",),
+     "Creaking (its glowing eyes get an eerie orange-red emission)"),
 ]
 
 # 一部だけ金属のブロック・アイテム・エンティティの自動メタリック。金属の画素を選ぶ判定 (gate) を ID に載せる
