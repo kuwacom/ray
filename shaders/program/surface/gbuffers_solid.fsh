@@ -13,6 +13,8 @@
 //@include "/lib/post/post.glsl"
 #ifdef GBUF_ENTITIES
     //@include "/lib/common/exposure.glsl"
+    //@include "/lib/settings/capabilities.glsl"
+    //@include "/lib/surface/lightning.glsl"
 #endif
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
@@ -66,6 +68,8 @@
 #include "/lib/post/post.glsl"
 #ifdef GBUF_ENTITIES
     #include "/lib/common/exposure.glsl"
+    #include "/lib/settings/capabilities.glsl"
+    #include "/lib/surface/lightning.glsl"
 #endif
 // END GENERATED includes
 
@@ -302,6 +306,28 @@ void main() {
 #endif
 #ifdef GBUF_ENTITIES
     if (entityId == ENTITY_SHADOW) discard;
+#endif
+#if defined GBUF_ENTITIES && defined FX_LIGHTNING_IN_ENTITIES
+    /*
+     * gbuffers_lightning を読まないローダー (Oculus) は雷 (とドラゴンの死亡時の光線) をここで描く。頂点形式は POSITION_COLOR だけで
+     * テクスチャ・法線が無く、下の G バッファの経路では法線が NaN になって TAA で黒い染みが広がる
+     * gbuffers_lightning と同じ発光を colortex4 へ加算し、G バッファは光を受けない発光の面にする (deferred の後に描かれれば映らない。
+     * 前なら発光の柱として映る)
+     * 見分けは entityId (Iris は雷の間 lightning_bolt にする) と、法線が無いこと (ID の来ない版のため。NaN も拾う)
+     */
+    if (getEntityLightIndex(entityId) == LIGHT_ENTITY_LIGHTNING || !(dot(normalPlayer, normalPlayer) > 0.5)) {
+        GBufferData lg = gbufferDefault();
+        lg.albedo = srgbToLinear(glcolor.rgb / max(maxOf(glcolor.rgb), 1e-3));
+        lg.materialId = MAT_LIGHTNING;
+        lg.geoNormal = vec3(0.0, 1.0, 0.0);
+        lg.normal = lg.geoNormal;
+        lg.lightmap = vec2(1.0);
+        lg.emission = 1.0;
+        encodeGBuffer(lg, outAlbedo, outNormal, outMaterial);
+        outVelocity = encodeVelocity(viewPos);
+        outSwirl = vec4(lightningGlow(glcolor), 0.0);
+        return;
+    }
 #endif
 
     vec3 geoN = normalize(normalPlayer);
