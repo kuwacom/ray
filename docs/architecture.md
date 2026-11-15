@@ -109,8 +109,8 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 21 | gbuffers_water / hand_water / particles_translucent / weather / clouds | surface (weather・clouds は sky) | 半透明の前方シェーディング (clouds は CLOUDS=1 のバニラの雲。deferred の後に描かれるので前方で色を決め、colortex4 だけに書く) | アトラス, 影, flood | colortex4 (乗算済み), colortex5 | 画面 | 常時 |
 | 22 | composite.csh | surface | 反射 (SSR / ラフ / ボクセル補完) | colortex0/2/3/5, voxel | reflectionImg | local 8², 0.5 | REFLECTIONS>0 |
 | 23 | composite1_a.csh | sky | VL / 高さフォグのレイマーチ (影マップ空間 + floodfill + 雲影) | 影マップ, flood, cloudShadow | colorimg12 (左上 1/VL_RES), fogHistoryImg | local 8², 1/VL_RES | VL |
-| 24 | composite1.vsh/fsh | surface | 水面の光線を辿る部分: 屈折先の色と水の中の経路長 (画面の歩き + ボクセルの屈折、側面の水の厚み)、上向きの水面の太陽の可視率 (PCSS + 雲影)、鏡面の映り込みのフル解像度の SSR (映り込みを散らさない凪の水面だけ)。水の画素だけ書く。合成と分けるのは、光線を辿る処理と影が合成のシェーダーに入ると、合成の重い経路でレジスタの数が決まってワープが減り、水の画素の全部の処理が遅くなるため | colortex0/5, depthtex0/1, voxel, 影マップ | colortex18, colortex21, colortex20 (REFLECTIONS>0) | 画面 | 常時 |
-| 25 | composite2.vsh/fsh | surface | 半透明合成 (水中吸収・反射・太陽の鏡面・泡、ガラスの透過) | colortex0/4/5/18-21, reflectionImg | colortex0 | 画面 | 常時 |
+| 24 | composite1.vsh/fsh | surface | 水面の光線を辿る部分: 屈折先の色と水の中の経路長 (画面の歩き + ボクセルの屈折、側面の水の厚み)、上向きの水面の太陽の可視率 (PCSS + 雲影)、鏡面の映り込みのフル解像度の SSR (映り込みを散らさない凪の水面だけ)。水の画素だけ書く。合成と分けるのは、光線を辿る処理と影が合成のシェーダーに入ると、合成の重い経路でレジスタの数が決まってワープが減り、水の画素の全部の処理が遅くなるため | colortex0/5, depthtex0/1, voxel, 影マップ | colortex14, colortex21, colortex20 (REFLECTIONS>0) | 画面 | 常時 |
+| 25 | composite2.vsh/fsh | surface | 半透明合成 (水中吸収・反射・太陽の鏡面・泡、ガラスの透過) | colortex0/4/5/14/20/21, reflectionImg | colortex0 | 画面 | 常時 |
 | 26 | composite12.vsh/fsh | sky | 画面空間の光芒 1/3: 空のマスク (深度 x 雲の透過率 x 光源からの角度) をタップごとに求め、光源へ向かう最短のスパンでぼかす | depthtex2, colortex11 | colortex16 | 画面 (1/GODRAYS_RES) | GODRAYS, world0 |
 | 27 | composite13.vsh/fsh | sky | 同 2/3: 中のスパン | colortex16 | colortex16 | 同上 | 同上 |
 | 28 | composite14.vsh/fsh | sky | 同 3/3: 全長のスパン | colortex16 | colortex16 | 同上 | 同上 |
@@ -152,10 +152,10 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 11 | RGBA16F | sky: 雲 (フル解像度, 時間蓄積) | sky | surface (sky の関数経由), sky | 永続 |
 | 12 | RGBA16F | sky: VL / フォグ (低解像度) rgb 内散乱, a 透過率 | sky | sky | 永続 |
 | 13 | RGBA16F | post: TAA 履歴 | post | post | 永続 |
-| 14 | RGBA16F | sky: 雲 (低解像度、deferred20 -> 21) rgb 散乱, a 透過率。post: ブルームタイル (composite23 -> final) (と画面のフレア、LOCAL_TONEMAP > 0 の時は局所トーンマップの 1/32 タイル) | sky, post | sky, post | 毎フレーム |
+| 14 | RGBA16F | sky: 雲 (低解像度、deferred20 -> 21) rgb 散乱, a 透過率。surface: 水の屈折先の色 (rgb、吸収の前) + 水の中の経路長 (a) (composite1 -> 2。水の画素だけ書き、composite2 も水の画素だけ読む)。post: ブルームタイル (composite23 -> final) (と画面のフレア、LOCAL_TONEMAP > 0 の時は局所トーンマップの 1/32 タイル) | sky, surface, post | sky, surface, post | 毎フレーム |
 | 15 | RGBA16F | 速度: rg = 前フレーム UV - 今の UV, a = 1 なら有効 (エンティティ・手)。a = 0 の金属の防具の画素だけ rgb = 環境光の鏡面の重み x 1e-4 (gbuffers_entities_translucent -> composite2。双線形で読まれても速度がずれないよう小さくする) | surface (gbuffers, post の関数) | post | 毎フレーム |
 | 16 | R16F | sky: 画面空間の光芒 (低解像度 `size.buffer.colortex16` = 1/GODRAYS_RES)。composite12 -> 13 -> 14 で同じバッファをピンポンして読み書きし、composite19 が足す | sky | sky | 毎フレーム |
-| 18 | RGBA16F | surface: 水の屈折先の色 (rgb、吸収の前) + 水の中の経路長 (a)。水の画素だけ書き、ほかは前の値のまま | surface (composite1) | surface (composite2) | なし |
+| 18 | RGBA16F | 未使用 | - | - | なし |
 | 19 | RGBA16F | surface: GI 履歴の付属。r = 履歴の長さ (フレーム、0 = 無効), g = 視線距離 (再投影の遮蔽判定), b / a = 速い履歴の輝度の平均・分散 (変化の検出)。GI_DENOISE >= 1 の時だけ | surface (deferred11) | surface | 永続 |
 | 20 | RGBA16F | surface: 水の鏡面の映り込みのフル解像度の SSR (rgb = 当たりの色 x 画面端の重み, a = 重み、外れは 0)。水の画素のうち映り込みを散らさない凪の水面だけ、REFLECTIONS > 0 | surface (composite1) | surface (composite2) | なし |
 | 21 | RGBA16F | surface: 上向きの水面の太陽の可視率 (影の PCSS + 雲影、rgb。内散乱・泡・波頭の透過光と太陽の照り返しに使う), a = 水の屈折先の白飛び分の輝度 (屈折先の deferred30 の a から)。水の画素だけ | surface (composite1) | surface (composite2) | なし |
@@ -707,7 +707,7 @@ post モジュールが提供 (`//@include "/lib/post/post.glsl"`):
 | colortex1/2/3/15 | 読む | 読む | 書く | 読む |
 | colortex4/5 | - | colortex4 に雨を書く | 書く | - |
 | colortex6/7, blockLightRaw/Aux | 書く | 読む (6) | 読む (6, 関数経由) | 読む (debug) |
-| colortex9/18-21, giRaw, reflection | 読む (9) | 読む | 書く | 読む (debug) |
+| colortex9/20/21, colortex14 (composite1/2), giRaw, reflection | 読む (9) | 読む | 書く | 読む (debug) |
 | colortex11/12/16, colortex14 (deferred), sky LUT, cloud*, fogHistory | 読む | 書く | 読む (11, 関数経由) | 読む (debug) |
 | colortex0 | - | 空テクスチャ (gbuffers), composite19 で書く | deferred30 / composite2 で書く | composite20 以降で書く |
 | colortex8/13/14 | - | - | - | 書く |

@@ -21,7 +21,7 @@
 #define TEX_BLOOM         colortex14  // composite23 -> final
 #define TEX_GODRAYS       colortex16  // composite12 -> composite19 (size.buffer.colortex16 の低解像度)
 #define TEX_SPARKLE_HIST  colortex8   // composite20 (永続) -> final
-#define TEX_WATER_REFR    colortex18  // composite1 -> composite2
+#define TEX_WATER_REFR    colortex14  // composite1 -> composite2
 #define TEX_GI_AUX        colortex19  // deferred11 (永続)
 #define TEX_WATER_MIRROR  colortex20  // composite1 -> composite2
 #define TEX_WATER_SUNVIS  colortex21  // composite1 -> composite2

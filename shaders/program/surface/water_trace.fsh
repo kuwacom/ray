@@ -1,5 +1,5 @@
 /*
- * composite1: 水面の光線を辿る部分。屈折先の色と水の中の経路長 (colortex18)、上向きの水面の太陽の可視率と屈折先の白飛び分
+ * composite1: 水面の光線を辿る部分。屈折先の色と水の中の経路長 (colortex14。ブルームより前の空き)、上向きの水面の太陽の可視率と屈折先の白飛び分
  * (colortex21)、鏡面の映り込みのフル解像度の SSR (colortex20) を書き、半透明の合成 (composite2) が読む
  * surface モジュール (lib/surface)
  *
@@ -115,9 +115,9 @@
 // END GENERATED includes
 
 #if REFLECTIONS > 0
-/* RENDERTARGETS: 18,21,20 */
+/* RENDERTARGETS: 14,21,20 */
 #else
-/* RENDERTARGETS: 18,21 */
+/* RENDERTARGETS: 14,21 */
 #endif
 layout(location = 0) out vec4 outRefraction;
 layout(location = 1) out vec4 outSunVis;
