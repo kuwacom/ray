@@ -21,6 +21,7 @@
 //@include "/lib/common/encoding.glsl"
 //@include "/lib/common/gbuffer.glsl"
 //@include "/lib/light/light.glsl"
+//@include "/lib/buffers/slots.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -71,6 +72,7 @@
 #include "/lib/light/hand_light.glsl"
 #include "/lib/light/blocklight.glsl"
 #include "/lib/light/light.glsl"
+#include "/lib/buffers/slots.glsl"
 // END GENERATED includes
 
 layout(local_size_x = 8, local_size_y = 8) in;
@@ -126,7 +128,7 @@ void main() {
 
     float depth = texelFetch(depthtex0, src, 0).r;
     if (depth >= 1.0) {
-        imageStore(blockLightRawImg, low, vec4(0.0, 0.0, 0.0, -1.0));
+        imageStore(STORE_BLOCKLIGHT_RAW, low, vec4(0.0, 0.0, 0.0, -1.0));
         imageStore(blockLightAuxImg, low, vec4(0.0, 0.0, 0.0, encodeLightIndex(-1)));
         return;
     }
@@ -224,6 +226,6 @@ void main() {
     #endif
     }
 
-    imageStore(blockLightRawImg, low, vec4(shadowed, -viewPos.z));
+    imageStore(STORE_BLOCKLIGHT_RAW, low, vec4(shadowed, -viewPos.z));
     imageStore(blockLightAuxImg, low, vec4(unshadowed, encodeLightIndex(dominant)));
 }

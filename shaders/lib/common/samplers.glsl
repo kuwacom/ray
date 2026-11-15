@@ -30,10 +30,7 @@ uniform sampler2D colortex13; // D: TAA 履歴
 uniform sampler2D colortex14; // D: ブルームタイル
 uniform sampler2D colortex15; // 速度ベクトル
 uniform sampler2D colortex16; // B: 画面空間の光芒 (低解像度)
-uniform sampler2D colortex18; // 水の屈折先の色 + 経路長
 uniform sampler2D colortex19; // C: GI 履歴の付属 (長さ・視線距離・速い履歴)
-uniform sampler2D colortex20; // 水の鏡面の SSR
-uniform sampler2D colortex21; // 水面の太陽の可視率 + 屈折先の白飛び分
 
 uniform sampler2D depthtex0; // 半透明・手を含む深度
 uniform sampler2D depthtex1; // 半透明を含まない深度

@@ -145,7 +145,7 @@ void main() {
             ivec2 P = min(L * scale + offset, screen - 1);
             float dP = texelFetch(depthtex1, P, 0).r;
             if (dP >= 1.0 || isHandDepth(dP)) continue;
-            vec4 raw = texelFetch(giRawSampler, L, 0);
+            vec4 raw = texelFetch(TEX_GI_RAW, L, 0);
             float wDepth = bilateralDepthWeight(linearizeDepth(dP), linZ, linZ * GI_DEPTH_SIGMA + 0.05);
             float wNormal = bilateralNormalWeight(normal, readGeoNormal(P), GI_NORMAL_POWER);
             float wSpatial = exp(-float(dx * dx + dy * dy) / float(GI_FILTER_RADIUS * GI_FILTER_RADIUS + 1));
@@ -156,7 +156,7 @@ void main() {
             w2sum += w * w;
         }
     }
-    vec4 mean = wsum > 0.0 ? sum / wsum : texelFetch(giRawSampler, clamp(center, ivec2(0), lowSize - 1), 0);
+    vec4 mean = wsum > 0.0 ? sum / wsum : texelFetch(TEX_GI_RAW, clamp(center, ivec2(0), lowSize - 1), 0);
     vec4 result = mean;
 
 #if GI_DENOISE >= 1

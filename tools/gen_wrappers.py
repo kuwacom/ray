@@ -79,6 +79,7 @@ BODIES: dict[str, str] = {
     "deferred30.fsh": "surface/opaque_shading.fsh",
     "composite.csh": "surface/reflection_trace.csh",
     "composite1.fsh": "surface/water_trace.fsh",
+    "composite2_a.csh": "surface/water_barrier.csh",
     "composite2.fsh": "surface/translucent_composite.fsh",
     # post
     "composite20.fsh": "post/taa.fsh",
@@ -161,7 +162,8 @@ PROGRAMS: dict[str, list[str] | dict[str, Body | None]] = {
     # composite
     "composite": ["csh"],
     "composite1": fullscreen("fsh", "csh_a"),
-    "composite2": fullscreen("fsh"),
+    # composite2_a は composite1 の imageStore の後のバリアを Iris に出させる空の compute
+    "composite2": fullscreen("fsh", "csh_a"),
     # 画面空間の光芒の 3 パス。ラッパーは #define 名前 しか書けないので、パスはマクロの有無で分ける
     "composite12": {"vsh": FULLSCREEN_VSH, "fsh": ("sky/godrays.fsh", ("GODRAYS_PASS_0",))},
     "composite13": {"vsh": FULLSCREEN_VSH, "fsh": ("sky/godrays.fsh", ("GODRAYS_PASS_1",))},

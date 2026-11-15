@@ -63,8 +63,9 @@ layout(rgba8) uniform image2D cloudWeatherImg;         // 512x512 (prepare2)
 uniform sampler2D cloudWeatherSampler;
 
 // 画面サイズ相対 (1.0 倍で確保。低解像度で使う場合は左上の部分領域を使う)
+// blockLightRaw と giRaw は composite1 -> 2 の間だけ水の値に貸す。読み書きは lib/buffers/slots.glsl の論理名で行う
 #ifdef IMG_BLOCKLIGHT_RAW
-layout(rgba16f) uniform image2D blockLightRawImg;  // light: トレース結果 (生)
+layout(rgba16f) uniform image2D blockLightRawImg;  // light: トレース結果 (生)。composite1 -> 2 は水面の太陽の可視率
 #endif
 uniform sampler2D blockLightRawSampler;
 #ifdef IMG_BLOCKLIGHT_AUX
@@ -72,7 +73,7 @@ layout(rgba16f) uniform image2D blockLightAuxImg;  // light: 鏡面 / モーメ�
 #endif
 uniform sampler2D blockLightAuxSampler;
 #ifdef IMG_GI_RAW
-layout(rgba16f) uniform image2D giRawImg;          // surface: GI / AO の生値
+layout(rgba16f) uniform image2D giRawImg;          // surface: GI / AO の生値。composite1 -> 2 は水の鏡面の SSR
 #endif
 uniform sampler2D giRawSampler;
 #ifdef IMG_REFLECTION

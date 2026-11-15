@@ -17,6 +17,7 @@
 //@include "/lib/common/temporal.glsl"
 //@include "/lib/light/light.glsl"
 //@include "/lib/post/post.glsl"
+//@include "/lib/buffers/slots.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -74,6 +75,7 @@
 #include "/lib/common/look_presets.glsl"
 #include "/lib/post/tonemap.glsl"
 #include "/lib/post/post.glsl"
+#include "/lib/buffers/slots.glsl"
 // END GENERATED includes
 
 in vec2 texcoord;
@@ -154,7 +156,7 @@ void main() {
 #if LIGHT_DENOISE == 0
     {
         ivec2 l = lightTraceNearestLow(texel, frameCounter);
-        ratio = safeRatio(texelFetch(blockLightRawSampler, l, 0).rgb, texelFetch(blockLightAuxSampler, l, 0).rgb);
+        ratio = safeRatio(texelFetch(TEX_BLOCKLIGHT_RAW, l, 0).rgb, texelFetch(blockLightAuxSampler, l, 0).rgb);
     }
 #else
     ivec2 l0 = ivec2(floor(lp));
@@ -168,7 +170,7 @@ void main() {
     for (int x = TAP_MIN; x <= TAP_MAX; x++) {
         ivec2 l = l0 + ivec2(x, y);
         if (any(lessThan(l, ivec2(0))) || any(greaterThanEqual(l, lowSize))) continue;
-        vec4 raw = texelFetch(blockLightRawSampler, l, 0);
+        vec4 raw = texelFetch(TEX_BLOCKLIGHT_RAW, l, 0);
         if (raw.a < 0.0) continue;
         vec3 u = texelFetch(blockLightAuxSampler, l, 0).rgb;
         ivec2 src = lightTraceSourceTexel(l, frameCounter);

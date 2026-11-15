@@ -1,6 +1,7 @@
 /*
  * composite1: 水面の光線を辿る部分。屈折先の色と水の中の経路長 (colortex14。ブルームより前の空き)、上向きの水面の太陽の可視率と屈折先の白飛び分
- * (colortex21)、鏡面の映り込みのフル解像度の SSR (colortex20) を書き、半透明の合成 (composite2) が読む
+ * (STORE_WATER_SUNVIS)、鏡面の映り込みのフル解像度の SSR (STORE_WATER_MIRROR) を書き、半透明の合成 (composite2) が読む
+ * 後の 2 つは deferred だけで使う image を composite1 -> 2 の間だけ借りる (lib/buffers/slots.glsl)。colortex の枚数を 16 に収めるため
  * surface モジュール (lib/surface)
  *
  * 屈折 (WATER_REFRACTION 1 = 屈折方向に水深分進めて投影 + 深度検証, 2 = 屈折方向のレイマーチ)
@@ -13,6 +14,9 @@
  * 水の画素の全部の処理が何倍も遅くなっていた
  * 水でない画素は書かない (合成は水の画素でだけ読む)
  */
+// このプログラムで書く image (lib/buffers/images.glsl。宣言は 8 個まで)
+#define IMG_GI_RAW
+#define IMG_BLOCKLIGHT_RAW
 //@include "/lib/common/common.glsl"
 //@include "/lib/surface/surface.glsl"
 //@include "/lib/sky/sky.glsl"
@@ -25,6 +29,7 @@
 //@include "/lib/surface/water_self.glsl"
 //@include "/lib/light/entity_tri.glsl"
 //@include "/lib/light/hand_light.glsl"
+//@include "/lib/buffers/slots.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -51,6 +56,7 @@
 #include "/lib/common/frame_offset.glsl"
 #include "/lib/common/look_presets.glsl"
 #include "/lib/common/voxel_space.glsl"
+#include "/lib/buffers/images.glsl"
 #include "/lib/buffers/slots.glsl"
 #include "/lib/surface/gi.glsl"
 #include "/lib/common/noise.glsl"
@@ -68,7 +74,6 @@
 #include "/lib/surface/surface.glsl"
 #include "/lib/sky/sh.glsl"
 #include "/lib/common/phase.glsl"
-#include "/lib/buffers/images.glsl"
 #include "/lib/sky/atmosphere.glsl"
 #include "/lib/common/celestial_shape.glsl"
 #include "/lib/sky/celestial.glsl"
@@ -114,16 +119,8 @@
 #include "/lib/surface/water_self.glsl"
 // END GENERATED includes
 
-#if REFLECTIONS > 0
-/* RENDERTARGETS: 14,21,20 */
-#else
-/* RENDERTARGETS: 14,21 */
-#endif
+/* RENDERTARGETS: 14 */
 layout(location = 0) out vec4 outRefraction;
-layout(location = 1) out vec4 outSunVis;
-#if REFLECTIONS > 0
-layout(location = 2) out vec4 outMirror;
-#endif
 
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
@@ -305,7 +302,7 @@ void main() {
      * 自分の水の中の画素は gbuffers_entities_translucent が捨てるので、ここで水底の代わりに描く。色は三角形ごとの平均のアルベドを
      * 当たった点で照らしたもの (水の中の太陽の影・コースティクス・空)。体を描かない一人称では当てない
      * カメラが水の中の時は、水面の上へ屈折した視線を水面より上の体 (半透明の層が捨てた所) に当てる。全反射の画素は
-     * 反射した視線を水の中の体に当て、鏡面の映り込み (colortex20) に重ねる (画面の像に体が無く、SSR では映らない)
+     * 反射した視線を水の中の体に当て、鏡面の映り込み (STORE_WATER_MIRROR) に重ねる (画面の像に体が無く、SSR では映らない)
      */
     #if REFLECTIONS > 0
     bool selfMirror = below && !refracts;
@@ -352,7 +349,7 @@ void main() {
      */
     vec3 sunVis = vec3(0.0);
     if (!below && !side) sunVis = surfaceSunVisibility(surfPlayer, vec3(0.0, 1.0, 0.0), dither);
-    outSunVis = vec4(sunVis, behindExcess);
+    imageStore(STORE_WATER_SUNVIS, texel, vec4(sunVis, behindExcess));
 
 #if REFLECTIONS > 0
     /*
@@ -361,7 +358,7 @@ void main() {
      * 当たりの色に画面端の重みを掛けた rgb と重み a を書き、合成が半分の解像度の反射に a で重ねる
      */
     // 画素より細かい波で映り込みを散らす水面は、半分の解像度の粗い反射 (reflection_trace.csh) だけを使う (鏡との境は重みで混ぜる)
-    outMirror = vec4(0.0);
+    vec4 outMirror = vec4(0.0);
     float mirrorW = !below && !side && N.y > 0.5 ? waterLod(waterSeaState(lmT.y), dist, abs(V.y)).mirror : 1.0;
     if (mirrorW > 0.0) {
         vec3 R0 = reflect(-V, below ? N : waterReflectNormal(N, V));
@@ -376,5 +373,6 @@ void main() {
         }
     #endif
     }
+    imageStore(STORE_WATER_MIRROR, texel, outMirror);
 #endif
 }
