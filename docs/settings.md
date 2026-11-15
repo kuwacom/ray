@@ -84,6 +84,8 @@
 | GLOWING_ENTITY_LIGHTS | ON | ON / OFF |
 | CHARGED_CREEPER_LIGHT | ON | ON / OFF |
 | CHARGED_CREEPER_LIGHT_BRIGHTNESS | 1.0 | 0.25, 0.5, 0.75, 1.0, 1.5, 2.0 |
+| FIREWORK_LIGHT | ON | ON / OFF |
+| FIREWORK_LIGHT_STRENGTH | 1.0 | 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0 |
 
 ## surface (`lib/settings/surface.glsl`)
 
@@ -148,6 +150,9 @@
 | EMISSION_BEACON_SCATTER_STRENGTH | 1.0 | 0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0 |
 | EMISSION_CHARGED_CREEPER_BRIGHTNESS | 1.0 | 0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0 |
 | CREAKING_EYE_BRIGHTNESS | 1.0 | 0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0 |
+| FIREWORK_GLOW | ON | ON / OFF |
+| FIREWORK_GLOW_STRENGTH | 1.0 | 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0 |
+| FIREWORK_TWINKLE_STRENGTH | 0.3 | 0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0 |
 | LAVA_BRIGHTNESS | 2.0 | 0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0 |
 | LAVA_BLOOM | 1.0 | 0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0 |
 | LAVA_LIGHT | 1.0 | 0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0 |

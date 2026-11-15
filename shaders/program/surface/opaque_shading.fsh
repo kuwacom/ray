@@ -20,6 +20,9 @@
 //@include "/lib/sky/sky.glsl"
 //@include "/lib/light/light.glsl"
 //@include "/lib/surface/surface_lights.glsl"
+#ifdef FIREWORK_LIGHT
+    //@include "/lib/light/firework_light.glsl"
+#endif
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -101,6 +104,10 @@
 #include "/lib/light/blocklight.glsl"
 #include "/lib/light/light.glsl"
 #include "/lib/surface/surface_lights.glsl"
+#ifdef FIREWORK_LIGHT
+    #include "/lib/buffers/firework_light.glsl"
+    #include "/lib/light/firework_light.glsl"
+#endif
 // END GENERATED includes
 
 in vec2 texcoord;
@@ -342,6 +349,10 @@ void main() {
         indirectLight *= LAVA_RECEIVED_LIGHT;
     }
     vec3 ambient = skyAmbient + blockLight + indirectLight + minAmbientIrradiance() * ao;
+#ifdef FIREWORK_LIGHT
+    // 花火の爆発の光 (lib/light/firework_light.glsl)。遮蔽はスカイライトの近似なので、ほかの環境光と同じく AO を掛ける
+    if (hasFireworkLight()) ambient += evalFireworkIrradiance(playerPos, g.normal, g.lightmap.y) * ao;
+#endif
     color += evalDiffuseIrradiance(m, ambient);
 
     vec3 glow = vec3(0.0);

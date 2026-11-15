@@ -226,9 +226,10 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 | 2 | GlobalLightsBuffer (`globalLights`) | `global_lights.glsl` | 295200 | `count/blockCount/entityCount/overflow`, `cullDistance/culled` + `cullHist[64]` (間引き距離と距離の分布), `LightInstance lights[8192]` (posRadius: ボクセル空間位置 + 到達半径, colorSize: 放射 + 光源半径), `lightPower[]` (揺らぎ前の放射の輝度、8192 個)。使うのは LIGHT_MAX_COUNT 個まで | `GLOBAL_LIGHTS`: setup, begin, deferred, deferred_a |
 | 3 | LightBinsBuffer (`lightBins`) | `light_bins.glsl` | 10944512 (LIGHT_BIN_LIGHTS > 64 で 21430272) | `binCount[40960]`, `entityAcc[32768]` (エンティティ光源の蓄積表), `binLights[]` (40960 x 65 個、> 64 で x 129)。ビン = 8³ ブロック、1 ビン LIGHT_BIN_LIGHTS + 1 枠。枠のキー = 重要度 19 bit + 光源インデックス 13 bit | `LIGHT_BINS`: setup, begin, deferred_a, shadow_entities・shadow_block の gsh と gbuffers_entities・gbuffers_entities_translucent の vsh (蓄積表) |
 | 4 | EntityTriangleBuffer (`entityTris`) | `entity_tris.glsl` | 838672 | `counts[4]`, `groupBounds`, `clusterBounds` + `EntityTriangle tris[]` (16384 個) (ボクセル空間の三角形 v0/e1/e2 + アルファマスク + テクスチャ x 頂点色の平均の色) | `ENTITY_TRIS`: begin (クリア), shadow_entities・shadow_block の gsh |
-| 5-8 | - | - | - | 予備 | - |
+| 5 | FireworkLightBuffer (`fireworkLight`) | `firework_light.glsl` | 64 | `posRadius` (花火の光の player 空間の位置, 広がりの半径。0 = 光っていない), `intensity` (放射強度), `acc[]` (光る粒の固定小数点の和 8 個: 数, 重み, 位置 x 重み, 色 x 重み) | `FIREWORK_LIGHT`: begin (光を決めて acc を空にする), gbuffers_particles_translucent の vsh (acc に足す) |
+| 6-8 | - | - | - | 予備 | - |
 
-world0 の既定値で SSBO を 1 つも宣言しないのは 17 プログラム (gbuffers の 14 と composite21/23・deferred11)。frameData だけを宣言するのは 13 プログラム (prepare・prepare1/2・setup1/2・composite20/22/24/25・deferred20/21・gbuffers_lightning/skytextured)。光源モジュール (`lib/light/light.glsl`) を読むプログラムは 5 つすべてを宣言する
+world0 の既定値で SSBO を 1 つも宣言しないのは 17 プログラム (gbuffers の 14 と composite21/23・deferred11)。frameData だけを宣言するのは 13 プログラム (prepare・prepare1/2・setup1/2・composite20/22/24/25・deferred20/21・gbuffers_lightning/skytextured)。光源モジュール (`lib/light/light.glsl`) を読むプログラムは 0-4 の 5 つを宣言する。花火の光 (5) は FIREWORK_LIGHT の時だけ、begin・gbuffers_particles_translucent・deferred30・composite19 が宣言する
 
 ```glsl
 struct LightDef {
@@ -411,6 +412,12 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 - 以後はブロック光源と同じ経路 (floodfill へ注入 + ビン + トレース) なので、遮蔽も影も同じ品質で付く
 - 燃えるエンティティは Iris の `entity_flame` が別ドローで来るのでそれを光源化
 - ブロックエンティティの光源 (エンダーチェスト・コンジット・エンドゲートウェイ) は `blockEntityId` -> `getBlockLightIndex` で shadow_block.gsh から登録する
+
+### 花火 (光るパーティクル)
+
+- 判定: バニラが自己発光の粒 (花火の火花と尾・エンドロッド・トーテム・発光イカの粒など) をライトマップ最大 (空と光源とも 240) で描くことを使う。粒の ID は無いので種類は分けない
+- 見た目 (FIREWORK_GLOW、`lib/surface/particle_glow.glsl`): gbuffers_particles_translucent で照明の代わりに HDR の発光にする。四角を画面で 1.5 画素広げて明るさを面積の比で割り (遠くの粒が TAA で潰れない)、数画素の粒は丸い点で描く。遠いほど距離の平方根で明るくする。白を超えた分は composite2 が鏡面の白飛びと同じく TAA の外へ渡す。開いた瞬間の閃光 (ライトマップが周りのままの大きな粒) は 2.5 ブロックより大きい半透明の粒として見分けて柔らかく光らせる
+- 光 (FIREWORK_LIGHT、`lib/light/firework_light.glsl`): 粒の頂点 (4 頂点に 1 回) が SSBO5 に位置と色を足し、次のフレームの begin が平均の位置・色と粒の数から点光源を 1 つ決める。deferred30 が空の見える面 (スカイライトで近似、影なし) の拡散に、composite19 が霧と煙の内散乱 (手持ち光源と同じ解析積分) に足す。到達距離が 100 ブロック近くあるので光源リスト・ビンには入れない
 
 ---
 
@@ -706,6 +713,7 @@ post モジュールが提供 (`//@include "/lib/post/post.glsl"`):
 | voxelBlock / Entity / Emit | 書く | 読む | 読む | 読む (debug) |
 | floodImgA/B | 書く | 読む (関数経由) | 読む (関数経由) | 読む (debug) |
 | SSBO1 BlockData, SSBO2, SSBO3, SSBO4 | 書く | 読む | 読む | 読む |
+| SSBO5 FireworkLight | 書く (begin) | 読む (composite19) | acc に足す (gbuffers_particles_translucent)、読む (deferred30) | - |
 | SSBO0 FrameData | lightStats と handLights (手持ち光源) を書く | sun/moon/SH/skyParams[0..3] と surfaceParams[0..5] (開けた水面の海の状態、きらめきのフレームの長さ、海・湖・川を混ぜた水の性質) を書く (prepare2 が skyParams[4..7] を書く) | surfaceParams[0..5] を読む | exposure/focus/histogram/postParams と skyParams[3].z を書く |
 | shadowtex / shadowcolor | 書く (shadow パス) | 読む | 読む | - |
 | colortex1/2/3/15 | 読む | 読む | 書く | 読む |

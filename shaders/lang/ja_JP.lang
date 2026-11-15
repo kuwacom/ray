@@ -331,6 +331,16 @@ option.LAVA_BLOOM=溶岩のブルーム
 option.LAVA_BLOOM.comment=溶岩の周りの光の滲みの強さ。0 で他の物と同じブルーム
 option.LAVA_LIGHT=溶岩の照らす光
 option.LAVA_LIGHT.comment=溶岩が周りの地形を照らす光の強さ。溶岩そのものの見た目の明るさは変わらない。0 で溶岩は何も照らさない
+option.FIREWORK_GLOW=花火の輝き
+option.FIREWORK_GLOW.comment=花火の火花などの自分で光るパーティクル (エンドロッド・トーテムの粒も) を、色を保ったまま明るく光らせてブルームでにじませる。花火が開いた瞬間の閃光も光る。遠くの小さな火花も消えずに光る。OFF ではほかのパーティクルと同じく周りの光で照らす
+option.FIREWORK_GLOW_STRENGTH=花火の輝きの明るさ
+option.FIREWORK_GLOW_STRENGTH.comment=光るパーティクルの明るさ。上げるほど芯が大きく白く飛び、周りのにじみが広がる
+option.FIREWORK_TWINKLE_STRENGTH=花火の瞬き
+option.FIREWORK_TWINKLE_STRENGTH.comment=光るパーティクルの明るさの揺らぎ。火花が少しずつずれて瞬く。0 で揺らがない
+option.FIREWORK_LIGHT=花火の光
+option.FIREWORK_LIGHT.comment=花火が開いた瞬間、空の見える地面・壁と周りの空気 (霧・煙) を花火の色で照らす。影は付かない。軽い
+option.FIREWORK_LIGHT_STRENGTH=花火の光の強さ
+option.FIREWORK_LIGHT_STRENGTH.comment=花火が周りを照らす光の強さ。火花そのものの明るさは変わらない
 
 # 水と反射
 option.WATER_WAVES=水の波

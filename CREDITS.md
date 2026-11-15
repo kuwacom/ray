@@ -17,6 +17,8 @@
 | 正規直交基底 | Duff et al., "Building an Orthonormal Basis, Revisited", JCGT 2017 | lib/common/math.glsl |
 | 球面調和の放射照度 | Ramamoorthi & Hanrahan, "An Efficient Representation for Irradiance Environment Maps", SIGGRAPH 2001 | lib/sky/sh.glsl |
 | 窓付き逆二乗減衰 | Karis, "Real Shading in Unreal Engine 4", SIGGRAPH 2013 | lib/light/block_data.glsl |
+| 画素より細い物の最小の幅 (幅を画素に広げ、広げた比で明るさを割る) | Persson, "Phone-wire AA", humus.name 2011 | lib/surface/particle_glow.glsl |
+| 一様な媒質の点光源の単散乱 (逆二乗の視線積分を atan で閉じる) | Sun, Ramamoorthi, Narasimhan & Nayar, "A Practical Analytic Single Scattering Model for Real Time Rendering", SIGGRAPH 2005 | lib/light/firework_light.glsl |
 | 黒体放射の近似色 | Tanner Helland の近似式 | lib/common/color.glsl |
 | Light Propagation Volumes | Kaplanyan & Dachsbacher, I3D 2010 | lib/light/floodfill.glsl, program/light/floodfill.csh |
 | 大気散乱 LUT (透過率・多重散乱・SkyView) | Hillaire, "A Scalable and Production Ready Sky and Atmosphere Rendering Technique", EGSR 2020 | lib/sky/atmosphere.glsl, program/sky/transmittance_lut.csh, multiscatter_lut.csh, skyview_lut.csh |

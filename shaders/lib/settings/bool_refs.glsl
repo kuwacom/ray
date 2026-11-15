@@ -60,6 +60,8 @@
 #endif
 #ifdef CHARGED_CREEPER_LIGHT
 #endif
+#ifdef FIREWORK_LIGHT
+#endif
 #ifdef SHADOW_COLORED
 #endif
 #ifdef ENTITY_SHADOWS
@@ -91,6 +93,8 @@
 #ifdef EMISSION_GLARE
 #endif
 #ifdef EMISSION_BEACON_SCATTER
+#endif
+#ifdef FIREWORK_GLOW
 #endif
 #ifdef WATER_WAVES
 #endif
