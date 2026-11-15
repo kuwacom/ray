@@ -91,6 +91,7 @@ const int LIGHT_ENTITY_LIGHTNING = 204;
 const int LIGHT_ENTITY_FLAME = 205;
 const int LIGHT_ENTITY_SHULKER_BULLET = 206;
 const int LIGHT_ENTITY_TNT_MINECART = 207;
+const int LIGHT_ENTITY_SWIRL = 208;
 
 // 光源フラグ (LightDef.info.x)
 const uint LIGHT_FLAG_OCCLUDES = 1u;        // 光源ブロック自体が完全遮蔽物 (グロウストーン等)

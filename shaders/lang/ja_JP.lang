@@ -191,6 +191,10 @@ option.BURNING_ENTITY_LIGHTS=燃えるエンティティの光
 option.BURNING_ENTITY_LIGHTS.comment=燃えているエンティティが光る
 option.GLOWING_ENTITY_LIGHTS=発光エンティティの光
 option.GLOWING_ENTITY_LIGHTS.comment=ブレイズ・ヒカリイカ・マグマキューブ・エンドクリスタル・点滅中の TNT が光る
+option.CHARGED_CREEPER_LIGHT=帯電クリーパー・ウィザーの防壁の光
+option.CHARGED_CREEPER_LIGHT.comment=帯電したクリーパーとウィザーの防壁の電気の渦が出ている間、周りを青白く照らす。色付き floodfill の柔らかい光で、影は付かずほとんど重くならない
+option.CHARGED_CREEPER_LIGHT_BRIGHTNESS=帯電クリーパー・ウィザーの防壁の光の強さ
+option.CHARGED_CREEPER_LIGHT_BRIGHTNESS.comment=電気の渦が周りを照らす光の強さ。上げるほど遠くまで明るくなる。渦そのものの見た目の明るさは変わらない
 
 # 影と GI
 option.shadowMapResolution=影の解像度
@@ -306,7 +310,7 @@ option.EMISSION_BLOCK_BRIGHTNESS.comment=画面に見えるブロック全体が
 option.EMISSION_BEACON_BRIGHTNESS=ビーコンの明るさ
 option.EMISSION_BEACON_BRIGHTNESS.comment=画面に見えるビーコンのブロックとビームの明るさ。ビームは遠くからでも常に見えるので、低くすると目立ちにくい。ビーコンが周りを照らす光は変わらない
 option.EMISSION_CHARGED_CREEPER_BRIGHTNESS=帯電クリーパー・ウィザーの防壁の明るさ
-option.EMISSION_CHARGED_CREEPER_BRIGHTNESS.comment=雷で帯電したクリーパーとウィザーの防壁の電気の渦が青白く光る明るさ。夜でも目立つ。0 でバニラと同じ明るさ。周りは照らさない
+option.EMISSION_CHARGED_CREEPER_BRIGHTNESS.comment=雷で帯電したクリーパーとウィザーの防壁の電気の渦が青白く光る明るさ。夜でも目立つ。0 でバニラと同じ明るさ。周りを照らす光は変わらない
 option.GLOW_LICHEN_LIGHT=ヒカリゴケの光
 option.GLOW_LICHEN_LIGHT.comment=ヒカリゴケを光源にして周りを照らす。OFF では光る部分の見た目だけが残る
 option.GLOW_LICHEN_BRIGHTNESS=ヒカリゴケの光の強さ

@@ -465,7 +465,7 @@ def check_tables() -> None:
             raise SystemExit(f"光源 {light.index} ({light.title}): アイテム専用光源の帯なのにアイテムが無い")
         if light.entities and light.index < LIGHT_ENTITY_FIRST:
             raise SystemExit(f"光源 {light.index} ({light.title}): エンティティはエンティティ光源の帯 ({LIGHT_ENTITY_FIRST}-) に置く")
-        if light.index >= LIGHT_ENTITY_FIRST and not light.entities:
+        if light.index >= LIGHT_ENTITY_FIRST and not light.entities and not light.shader_only:
             raise SystemExit(f"光源 {light.index} ({light.title}): エンティティ光源の帯なのにエンティティが無い")
     ids: dict[int, str] = {}
     for bid, comment, _ in all_blocks():

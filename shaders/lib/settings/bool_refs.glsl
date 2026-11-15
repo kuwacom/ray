@@ -58,6 +58,8 @@
 #endif
 #ifdef GLOWING_ENTITY_LIGHTS
 #endif
+#ifdef CHARGED_CREEPER_LIGHT
+#endif
 #ifdef SHADOW_COLORED
 #endif
 #ifdef ENTITY_SHADOWS

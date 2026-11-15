@@ -50,5 +50,7 @@
 #define PROJECTILE_LIGHTS // 投擲物 (光る矢・火の玉等)
 #define BURNING_ENTITY_LIGHTS // 燃えているエンティティ
 #define GLOWING_ENTITY_LIGHTS // 発光エンティティ (ブレイズ・グロウイカ等)
+#define CHARGED_CREEPER_LIGHT // 帯電したクリーパーとウィザーの防壁の電気の渦が周りを照らす
+#define CHARGED_CREEPER_LIGHT_BRIGHTNESS 1.0 // [0.25 0.5 0.75 1.0 1.5 2.0] 電気の渦が周りを照らす光の強さ (見た目の明るさは変わらない)
 
 #endif

@@ -81,6 +81,8 @@
 | PROJECTILE_LIGHTS | ON | ON / OFF |
 | BURNING_ENTITY_LIGHTS | ON | ON / OFF |
 | GLOWING_ENTITY_LIGHTS | ON | ON / OFF |
+| CHARGED_CREEPER_LIGHT | ON | ON / OFF |
+| CHARGED_CREEPER_LIGHT_BRIGHTNESS | 1.0 | 0.25, 0.5, 0.75, 1.0, 1.5, 2.0 |
 
 ## surface (`lib/settings/surface.glsl`)
 

@@ -322,6 +322,7 @@ getLightDef(index) -> lightEmission(d, level), lightRange(d, level), lightFallof
 光源エンティティの分類フラグ (LightDef.info.x) で個別スイッチを判定する:
 `LIGHT_FLAG_CAT_ITEM` (ITEM_LIGHTS) / `CAT_PROJECTILE` (PROJECTILE_LIGHTS) / `CAT_BURNING` (BURNING_ENTITY_LIGHTS) / `CAT_GLOWING` (GLOWING_ENTITY_LIGHTS)。
 TNT・クリーパーは `LIGHT_FLAG_ENTITY_FLASH` で `entityColor.a` (点滅) が強い時だけ光る。
+208 `LIGHT_ENTITY_SWIRL` (帯電したクリーパー・ウィザーの防壁の電気の渦) はエンティティ ID を持たない (`Light.shader_only`)。ID では帯電が分からないので、shadow_entities がテクスチャ行列で渦の層を見分け、クリーパーかウィザーの三角形だけを登録する (`CHARGED_CREEPER_LIGHT`)。画面の渦の層は deferred の後に描かれ、登録に間に合わない。`LIGHT_FLAG_FLOOD_ONLY` なので floodfill の種だけになり、光源リスト (直接光の影のレイ) には入らない。
 
 ### マテリアル ID (G バッファ 8bit, `lib/ids/material_ids.glsl`)
 

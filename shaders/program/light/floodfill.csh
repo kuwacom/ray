@@ -263,7 +263,8 @@ void main() {
         LightDef d = getLightDef(int(emitKey & 255u));
         float level = float((emitKey >> 8u) & 15u);
         vec3 e = lightEmission(d, level);
-        registerLight(entityLightCentroid(cell, emitKey), lightRange(d, level), e * lightFlicker(d.params.y, uvec3(worldCell + 0x8000)), luminance(e), d.shape.w, false);
+        // floodfill だけの光源 (電気の渦) は直接光の影のレイを足さない
+        if ((d.info.x & LIGHT_FLAG_FLOOD_ONLY) == 0u) registerLight(entityLightCentroid(cell, emitKey), lightRange(d, level), e * lightFlicker(d.params.y, uvec3(worldCell + 0x8000)), luminance(e), d.shape.w, false);
         emission = max(emission, e);
     }
 

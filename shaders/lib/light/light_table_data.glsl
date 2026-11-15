@@ -101,6 +101,7 @@ LightDef lightDefStatic(int i) {
         case LIGHT_ENTITY_FLAME:          return makeLight(mix(fire, FIRE_WARM_SRGB, 0.3), 1.0, 15.0, 0.4, LT_CENTER, 0.8, LT_CAT_BURN);
         case LIGHT_ENTITY_SHULKER_BULLET: return makeLight(vec3(1.0, 0.95, 0.85), 0.6, 6.0, 0.1, LT_CENTER, 0.0, LT_CAT_PROJ);
         case LIGHT_ENTITY_TNT_MINECART:   return makeLight(vec3(1.0, 1.0, 1.0), 1.0, 10.0, 0.5, LT_CENTER, 0.0, LT_CAT_GLOW | LIGHT_FLAG_ENTITY_FLASH);
+        case LIGHT_ENTITY_SWIRL:          return makeLight(vec3(0.80, 0.90, 1.0), CHARGED_CREEPER_LIGHT_BRIGHTNESS, 10.0, 0.4, LT_CENTER, 0.0, LT_FLOOD);
     }
     LightDef none;
     none.color = vec4(0.0);

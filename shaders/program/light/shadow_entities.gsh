@@ -62,6 +62,9 @@ in vec2 vTexcoord[];
 in vec4 vColor[];
 in vec3 vPlayerPos[];
 in vec3 vNormal[];
+#if !defined PROGRAM_SHADOW_BLOCK && defined CHARGED_CREEPER_LIGHT
+    flat in int vSwirlLayer[];
+#endif
 
 out vec2 texcoord;
 out vec4 glcolor;
@@ -106,6 +109,9 @@ void main() {
 
     // 画面外のエンティティ光源もここで登録する (gbuffers_entities と同じセルなら重複しない)
     injectEntityLight((vPlayerPos[0] + vPlayerPos[1] + vPlayerPos[2]) / 3.0, entityId, currentRenderedItemId, entityColor);
+    #ifdef CHARGED_CREEPER_LIGHT
+        if (vSwirlLayer[0] != 0) injectSwirlLight((vPlayerPos[0] + vPlayerPos[1] + vPlayerPos[2]) / 3.0, entityId);
+    #endif
 #endif
 
 #if defined ENTITY_TRI_OCCLUSION && !defined PROGRAM_SHADOW_BLOCK

@@ -75,6 +75,7 @@ class Light:
     mask: str = ""                   # 面の光り方を測るブロックと状態 ("redstone_lamp:lit=true")。空なら LT_OCC の光源だけ blocks[0]
     facing: bool = False             # 前面だけが光る向きのあるブロック (かまど・ジャック・オ・ランタン)。向きごとに ID を分ける。mask は facing=north を指定する
     kind: str = ""                   # 発光の見た目の明るさを設定で分ける種類 (KIND_FLAGS のキー)。光源ブロック (LT_OCC) は種類を付けずフラグで分ける
+    shader_only: bool = False        # エンティティ光源の帯で、エンティティ ID を持たずシェーダーが直接登録するもの
 
     def make_expr(self) -> str:
         make = self.make + " | LIGHT_FLAG_FACING" if self.facing else self.make
@@ -247,6 +248,10 @@ LIGHTS: list[Light] = [
           entities=_lit("minecraft:entity_flame"), entity_note="Flames on burning entities (Iris hardcoded ID)"),
     Light(206, "LIGHT_ENTITY_SHULKER_BULLET", "shulker bullet", "vec3(1.0, 0.95, 0.85), 0.6, 6.0, 0.1, LT_CENTER, 0.0, LT_CAT_PROJ", entities=_lit("minecraft:shulker_bullet")),
     Light(207, "LIGHT_ENTITY_TNT_MINECART", "tnt minecart", "vec3(1.0, 1.0, 1.0), 1.0, 10.0, 0.5, LT_CENTER, 0.0, LT_CAT_GLOW | LIGHT_FLAG_ENTITY_FLASH", entities=_lit("minecraft:tnt_minecart")),
+    # 帯電したクリーパーとウィザーの防壁の電気の渦。ID では帯電が分からないので、渦の層を描く影パスが直接登録する
+    # 直接光 (影のレイ) にすると帯電クリーパーとウィザーの近くで 0.8-1.2 ms 重く、照らし方も強すぎたので floodfill の種だけにする
+    Light(208, "LIGHT_ENTITY_SWIRL", "energy swirl", "vec3(0.80, 0.90, 1.0), CHARGED_CREEPER_LIGHT_BRIGHTNESS, 10.0, 0.4, LT_CENTER, 0.0, LT_FLOOD",
+          shader_only=True),
 ]
 
 # 光源にならないエンティティ: (ID, 定数名, GLSL のコメント, 名前, entity.properties の上のコメント)
