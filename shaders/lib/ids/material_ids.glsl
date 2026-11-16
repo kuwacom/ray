@@ -43,5 +43,7 @@ const int MAT_BASIC = 43;
 
 bool isHandMaterial(int m) { return m >= MAT_HAND && m < MAT_HAND + 10; }
 bool isEntityMaterial(int m) { return m >= MAT_ENTITY && m < MAT_ENTITY + 10; }
+// 動くエンティティ (ブロックエンティティとビーコンの光線は動かない)
+bool isMovingEntityMaterial(int m) { return isEntityMaterial(m) && m != MAT_BLOCK_ENTITY && m != MAT_BEACON_BEAM; }
 
 #endif
