@@ -344,7 +344,8 @@ METAL_ITEMS: dict[str, list[str]] = {
 METAL_LIGHT_ITEMS: dict[str, list[str]] = {"gray": ["lava_bucket"]}
 
 # 金属のブロックのうち、同じ名前のアイテムが無いもの (大釜は中身ごとにブロックが分かれる。アイテムは cauldron)
-ITEMLESS_METAL_BLOCKS = {"water_cauldron", "lava_cauldron", "powder_snow_cauldron", "chain", "copper_wall_torch"}
+# chain は 1.21.9 で iron_chain に改名される前のアイテムの名前でもあるので、アイテムにも出す
+ITEMLESS_METAL_BLOCKS = {"water_cauldron", "lava_cauldron", "powder_snow_cauldron", "copper_wall_torch"}
 
 METAL_ENTITIES: dict[str, list[str]] = {
     "all": ["minecraft:copper_golem"],
