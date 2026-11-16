@@ -147,14 +147,27 @@ vec2 vlFarScreenVisibility(vec3 dir, float nearDist, float farDist, float dither
 }
 #endif
 
+// 光芒の洞窟の上限が 1 になるスカイライト。面の太陽 (SUN_SKYLIGHT_GATE) より広く、霧は面より目立たない
+const float VL_CAVE_GATE = 3.0 / 15.0;
+
+// 目と視線の先の面のスカイライトの大きいほうで光芒の太陽を抑える。入口の外や縦穴の底の明るい面を見ている時は残す
+float vlCaveGate(float surfaceSkyLm) {
+#if defined CAVE_LEAK_PREVENTION && defined HAS_SKYLIGHT
+    return smoothstep(0.0, VL_CAVE_GATE, max(float(eyeBrightnessSmooth.y) / 240.0, surfaceSkyLm));
+#else
+    return 1.0;
+#endif
+}
+
 /*
  * 空気中のフォグ (全ディメンション)。endDist: 地形 (空なら描画距離) までの距離
  * farVisibility: 影マップの範囲の外にある遮蔽物による太陽の見え方 (画面空間の光芒。無ければ 1)
  *   x = 範囲より遠い区間の点、y = 範囲内の点 (範囲内の点も、影マップに写らない遠い壁や山には遮られる)
  * aerial: 空中遠近を掛ける画素 (空以外)。空中遠近 (composite19) の内散乱は影を見ないので、視線上の影の分をここで引く
+ * caveGate: 影マップの範囲内の太陽の上限 (vlCaveGate)。影マップに穴があっても、空の無い所の光芒に太陽を入れない
  * 戻り値: rgb = 内散乱 (空中遠近の影の分を引いた後), a = 透過率 (灰色)
  */
-vec4 marchAirFog(vec3 dir, float endDist, float dither, vec2 farVisibility, bool aerial) {
+vec4 marchAirFog(vec3 dir, float endDist, float dither, vec2 farVisibility, float caveGate, bool aerial) {
     FogLighting fl = fogLightingSetup(dir);
     float outdoor = 1.0 - getCaveFactor();
 #ifdef CAVE_LEAK_PREVENTION
@@ -218,7 +231,7 @@ vec4 marchAirFog(vec3 dir, float endDist, float dither, vec2 farVisibility, bool
 #if defined FOG_CLOUD_SHADOWS && defined HAS_SKY
         shadow *= getCloudShadow(p);
 #endif
-        float sunVisibility = inside ? farVisibility.y : farSunVisibility;
+        float sunVisibility = inside ? farVisibility.y * caveGate : farSunVisibility;
         float skyVisibility = inside ? max(outdoor, luminance(shadow)) : outdoor;
 
         float ambientVisibility = max(skyVisibility, VL_MIN_AMBIENT_SCALE * MIN_AMBIENT / max(luminance(fl.ambient), 1e-6));

@@ -77,8 +77,10 @@ vec3 opaqueEnvSpecular(ivec2 texel, float depth) {
 
 // 面での太陽の可視率 (影 + 雲影)。PCSS は重いので 1 ピクセル 1 回にして鏡面・内散乱・泡で使い回す
 // 集める項は太陽の影だけ (空・ブロックライト・手持ち光源は泡・内散乱・鏡面が別に集める。GI・AO・接触影は水・ガラスに掛けない)
-vec3 surfaceSunVisibility(vec3 playerPos, vec3 geoNormal, float dither) {
+// skyLm: 面のスカイライト (洞窟の奥の面に太陽を当てない上限に使う)
+vec3 surfaceSunVisibility(vec3 playerPos, vec3 geoNormal, float skyLm, float dither) {
     SurfacePoint p = surfacePoint(playerPos, geoNormal);
+    p.lightmap.y = skyLm;
     p.dither = dither;
     return gatherSurfaceLights(p, SL_SUN_SHADOW_MAP, SL_BLOCK_NONE, 0u).sunVis;
 }

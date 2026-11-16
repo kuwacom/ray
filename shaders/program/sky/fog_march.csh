@@ -150,7 +150,9 @@ void main() {
 #else
             vec2 farVisibility = vec2(farSunHiddenShade(dir));
 #endif
-            raw = marchAirFog(dir, dist, dither, farVisibility, !isSky);
+            // 空の画素の G バッファは 0 なので、空は 1 (開けている) として扱う
+            float surfaceSkyLm = isSky ? 1.0 : unpack2x8(texelFetch(colortex2, texel, 0).a).y;
+            raw = marchAirFog(dir, dist, dither, farVisibility, vlCaveGate(surfaceSkyLm), !isSky);
         }
     }
 
