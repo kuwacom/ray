@@ -19,6 +19,7 @@
 //@include "/lib/surface/surface_lights.glsl"
 //@include "/lib/surface/water_self.glsl"
 //@include "/lib/surface/generated_normal.glsl"
+//@include "/lib/light/hand_pose.glsl"
 #if defined GBUF_PARTICLES_TRANSLUCENT && defined FIREWORK_GLOW
     //@include "/lib/surface/particle_glow.glsl"
 #endif
@@ -250,6 +251,17 @@ bool isTranslucentCubeItem(int itemId) {
 }
 #endif
 
+#ifdef GBUF_ENTITIES_TRANSLUCENT
+// 描いているのが自分か (current_player の ID が無い Iris では、目からの距離で見分ける。p は画素の player 空間の位置)
+bool isSelfDraw(vec3 p) {
+#ifdef FX_SELF_BY_DISTANCE
+    return isSelfEntity(entityId, p);
+#else
+    return entityId == ENTITY_CURRENT_PLAYER;
+#endif
+}
+#endif
+
 void main() {
     vec4 tex = texture(gtexture, texcoord);
     vec4 albedo = tex * glcolor;
@@ -378,7 +390,7 @@ void main() {
      * 水の中の自分は composite1 (water_trace.fsh) が屈折した視線を自分の三角形に当てて描くので、ここでは描かない (二重の像になる)
      * カメラが水の中の時は逆に、水面より上の体を水面越しに描く (ここで描くと水面の手前に貼り付き、水の中の色と霧が掛かる)
      */
-    if (entityId == ENTITY_CURRENT_PLAYER) {
+    if (isSelfDraw(playerPos)) {
         if (isEyeInWater == 0 ? waterSelfDepth(playerPos) > 0.0 : isEyeInWater == 1 && waterSelfHeight(playerPos) > 0.0) discard;
     }
 #endif
@@ -397,7 +409,7 @@ void main() {
      * 視線に沿った水の中の長さは、水面からの深さを視線の上向きの cos で割った長さ。内散乱は composite2 の深い水と同じ式で、
      * 水面の照度は空と、影を掛けない太陽 (月) の上向きの面への照度 (前方シェーディングをもう 1 回呼ぶとプログラムが 1.5 倍に膨らむ)
      */
-    if (entityId == ENTITY_CURRENT_PLAYER && isEyeInWater == 0) {
+    if (isSelfDraw(playerPos) && isEyeInWater == 0) {
         float below = waterSelfDepth(playerPos);
         if (below > 0.0) {
             vec3 T = exp(-waterExtinction() * (below / max(V.y, WATER_SELF_MIN_COS)));
