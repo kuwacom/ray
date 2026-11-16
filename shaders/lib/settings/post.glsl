@@ -6,7 +6,7 @@
 #define CAS_STRENGTH 0.5 // [0.0 0.25 0.5 0.75 1.0]
 #define DOF // 被写界深度
 #define DOF_QUALITY 0 // [0 1 2] 0=30 1=50 2=75 サンプル
-#define DOF_STRENGTH 0.5 // [0.05 0.1 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0 6.0 8.0 12.0 16.0 24.0 32.0] 絞りの決め方が 0 の時の絞り径 (0.5 = f/2.1 相当)
+#define DOF_STRENGTH 1.0 // [0.05 0.1 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0 6.0 8.0 12.0 16.0 24.0 32.0] 絞りの決め方が 0 の時の絞り径 (0.5 = f/2.1 相当)
 #define DOF_APERTURE_MODE 0 // [0 1 2] 0=ボケの量 1=レンズプリセットの開放 F 値 2=F 値を指定
 #define DOF_F_NUMBER 1.4 // [0.7 0.95 1.2 1.4 1.8 2.0 2.8 4.0 5.6 8.0 11.0 16.0 22.0 32.0] DOF_APERTURE_MODE=2 の時の F 値
 #define DOF_SENSOR 0 // [0 1 2 3 4 5] 0=フルサイズ 1=APS-C 2=中判 44x33 3=中判 6x7 4=大判 4x5 5=大判 8x10
@@ -188,7 +188,7 @@
 #define GRADE_SPLIT_BALANCE 0.0 // [-1.0 -0.75 -0.5 -0.25 0.0 0.25 0.5 0.75 1.0]
 #define PURKINJE_STRENGTH 0.3 // [0.0 0.1 0.2 0.3 0.5 0.75 1.0] 暗所の青シフト
 #define FILM_GRAIN 0.008 // [0.0 0.004 0.008 0.015 0.03 0.05 0.1]
-//#define SELECTION_OUTLINE // ブロック選択枠
+#define SELECTION_OUTLINE // ブロック選択枠
 #define DEBUG_VIEW 0 // [0 1 2 3 4 5 6 7 8 9 10 11 12]
 
 #endif
