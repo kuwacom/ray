@@ -112,10 +112,11 @@ flat in int blockId;
  * MC 1.21.11 の Iris は半透明の物 (額縁の地図などの文字の経路) を、後から描かれる不透明の物 (落ちたブロックのアイテム・防具・手など) より
  * 先に描き、その色とデータは colortex4/5 に残る。不透明の物は深度では勝つが半透明の層を消さないので、composite2 が上に重ねる
  * バニラは 1 枚の色バッファに描くので、深度テストを通った画素は先に描かれた半透明を上書きする。同じに、画素では両方を空に戻す
- * 手・ブロックエンティティ・パーティクルはブレンドなしで 0 を上書きする
+ * 手・パーティクルはブレンドなしで 0 を上書きする
  * エンティティは電気の渦の層 (帯電したクリーパー・ウィザーの防壁) を colortex4 へ加算するので、a で切り替える
  * (渦の画素は a = 0 で足し、それ以外は a = 1 で消す。shaders.properties の blend)
  * 電気の渦はバニラが半透明の物と一緒に deferred の後に描くので、G バッファへ書いても映らない
+ * ブロックエンティティも同じ a の切り替えで、消すのはブロックエンティティの描画だけ (下の main)
  */
 /* RENDERTARGETS: 1,2,3,15,4,5 */
 #else
@@ -128,12 +129,14 @@ layout(location = 3) out vec4 outVelocity;
 #ifdef CLEARS_TRANSLUCENT
 layout(location = 4) out vec4 outTranslucent;
 layout(location = 5) out vec4 outTranslucentData;
-#ifdef GBUF_ENTITIES
+#if defined GBUF_ENTITIES || defined GBUF_BLOCK
 const vec4 TRANSLUCENT_CLEAR = vec4(0.0, 0.0, 0.0, 1.0);
-// EMISSION_CHARGED_CREEPER_BRIGHTNESS が 1 増えるごとに足す、バニラの明るさの倍数
-const float CHARGED_SWIRL_GAIN = 3.0;
 #else
 const vec4 TRANSLUCENT_CLEAR = vec4(0.0);
+#endif
+#ifdef GBUF_ENTITIES
+// EMISSION_CHARGED_CREEPER_BRIGHTNESS が 1 増えるごとに足す、バニラの明るさの倍数
+const float CHARGED_SWIRL_GAIN = 3.0;
 #endif
 #endif
 
@@ -626,6 +629,10 @@ void main() {
 
 #ifdef CLEARS_TRANSLUCENT
     outTranslucent = TRANSLUCENT_CLEAR;
+#endif
+#ifdef GBUF_BLOCK
+    // 26.x はピストンで動く半透明ブロックを deferred の後にここで描く。奥の半透明を消さないよう、消すのはブロックエンティティの描画だけ
+    if (renderStage != MC_RENDER_STAGE_BLOCK_ENTITIES) outTranslucent = vec4(0.0);
 #endif
 #if defined GBUF_ENTITIES
     outVelocity = encodeVelocity(viewPos);
