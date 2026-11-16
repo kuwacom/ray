@@ -90,6 +90,7 @@ BODIES: dict[str, str] = {
     "composite23.fsh": "post/bloom_down.fsh",
     "composite24.fsh": "post/bloom_blur.fsh",
     "composite25.csh": "post/exposure_autofocus.csh",
+    "composite26.csh": "post/analog_smear.csh",
     "final.fsh": "post/final.fsh",
 }
 
@@ -177,6 +178,7 @@ PROGRAMS: dict[str, list[str] | dict[str, Body | None]] = {
     "composite23": fullscreen("fsh"),
     "composite24": fullscreen("fsh"),
     "composite25": ["csh"],
+    "composite26": ["csh"],
     "final": fullscreen("fsh"),
 }
 
@@ -248,6 +250,8 @@ DISABLED: list[Disable] = [
     Disable(("composite22",), "#ifndef DOF"),
     # 局所トーンマップもブルームの縮小タイルを読む
     Disable(("composite23", "composite24"), "#if !defined BLOOM && LOCAL_TONEMAP == 0"),
+    # properties からは internal.glsl の #undef が見えないので、アナログの効果は親の ANALOG も条件に書く
+    Disable(("composite26",), "#if !defined ANALOG || !defined ANALOG_SMEAR"),
 ]
 
 ENABLES_BEGIN = "# BEGIN GENERATED program enables (tools/gen_wrappers.py)"

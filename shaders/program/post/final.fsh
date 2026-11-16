@@ -4,6 +4,8 @@
  * 色に掛ける処理は物理的な順 (レンズ -> センサー -> 現像) に並べる
  * post モジュール
  */
+// このプログラムで読む SSBO の opt-in (宣言はアナログのスミアが有効な時だけ入る。lib/buffers/analog_smear.glsl)
+#define SSBO_ANALOG_SMEAR_USE
 //@include "/lib/common/common.glsl"
 //@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/common/exposure.glsl"
@@ -18,6 +20,7 @@
 //@include "/lib/buffers/formats.glsl"
 //@include "/lib/buffers/slots.glsl"
 //@include "/lib/surface/gi.glsl"
+//@include "/lib/post/analog.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -77,6 +80,9 @@
 #include "/lib/buffers/formats.glsl"
 #include "/lib/common/frame_offset.glsl"
 #include "/lib/surface/gi.glsl"
+#include "/lib/buffers/analog_smear.glsl"
+#include "/lib/post/analog_presets.glsl"
+#include "/lib/post/analog.glsl"
 // END GENERATED includes
 
 #ifdef SPECULAR_SPARKLE
@@ -437,6 +443,11 @@ void main() {
 #endif
 
     hdr *= inside;
+
+    // センサー: CCD の縦スミア。光学の滲みの後のセンサーの現象なので、レンズの後・露出の前に足す (筋はブルームしない。魚眼の黒い隅にも続く)
+#if defined ANALOG && defined ANALOG_SMEAR
+    hdr = applyAnalogSmear(hdr, texelL.x);
+#endif
 
     // 目 / センサー: Purkinje 効果 -> 露出
     hdr = applyPurkinje(hdr, frameData.averageLuminance, exposure);

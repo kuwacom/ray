@@ -189,6 +189,17 @@
 #define PURKINJE_STRENGTH 0.3 // [0.0 0.1 0.2 0.3 0.5 0.75 1.0] 暗所の青シフト
 #define FILM_GRAIN 0.008 // [0.0 0.004 0.008 0.015 0.03 0.05 0.1]
 #define SELECTION_OUTLINE // ブロック選択枠
+/*
+  アナログ (2000 年代の民生 CCD ビデオカメラの画)。ANALOG が総スイッチで、OFF なら追加のパスも止まり final は今と同じになる
+  プリセット (ANALOG_PRESET) が詳細の値 AP_* (lib/post/analog_presets.glsl) を決め、効果ごとの ON/OFF は常に効く
+  詳細の値 (ANALOG_C_*) は ANALOG_PRESET = 0 (カスタム) の時だけ使い、既定値はプリセット 1 の値にそろえる
+  番号は後ろに足していき、既存の番号は変えない (ユーザーの保存値を保つ)
+*/
+//#define ANALOG // アナログ領域
+#define ANALOG_PRESET 1 // [0 1 2 3 4 5 6] 0=カスタム 1=標準の MiniDV 2=安いコンパクトのビデオ 3=暗い所の自動ゲイン 4=古い Digital8 5=HDV 1080i 6=PAL の MiniDV
+#define ANALOG_SMEAR // CCD の縦スミア (明るい光の列に上下へ伸びる淡い筋)
+#define ANALOG_C_SMEAR_RATIO 0.01 // [0.0003 0.001 0.003 0.01 0.03 0.1 0.3 1.0] スミア比 (%)。列が一様に照らされた時の信号に対する筋の比
+#define ANALOG_C_SMEAR_TINT_MODE 1 // [0 1] 筋の色 0=光の色 1=白
 #define DEBUG_VIEW 0 // [0 1 2 3 4 5 6 7 8 9 10 11 12]
 
 #endif

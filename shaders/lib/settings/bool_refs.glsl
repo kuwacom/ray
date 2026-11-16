@@ -184,5 +184,9 @@
 #endif
 #ifdef SELECTION_OUTLINE
 #endif
+#ifdef ANALOG
+#endif
+#ifdef ANALOG_SMEAR
+#endif
 
 #endif // SETTINGS_BOOL_REFS_GLSL

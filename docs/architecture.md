@@ -127,7 +127,8 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 35 | composite23.vsh/fsh | post | ブルーム縮小タイル、局所トーンマップの log2 輝度のタイル | colortex0 ミップ | colortex14 | 画面 | BLOOM または LOCAL_TONEMAP > 0 |
 | 36 | composite24.vsh/fsh | post | ブルームぼかし | colortex14 | colortex14 | 画面 | BLOOM または LOCAL_TONEMAP > 0 |
 | 37 | composite25.csh | post | 自動露出 (ヒストグラム。屋外の夜の持ち上げは画面の暗い側の計測で決める) + オートフォーカス | colortex0, centerDepthSmooth | SSBO0 exposure/focus/histogram | local 16², (1,1,1) | 常時 |
-| 38 | final.vsh/fsh | post | 歪曲と魚眼の再投影・ブルーム合成・点像の芯と裾・フレア・露出・局所トーンマップ・AgX・色調整・CAS・ディザ・デバッグ表示 | colortex0/8/13/14, SSBO0 | 画面 | 画面 | 常時 |
+| 38 | composite26.csh | post | アナログの縦スミア: colortex0 (露出前の線形、DoF・MB の後) の列ごとの平均 (1 列を 1 グループで閉じて求める) | colortex0 | SSBO6 columns | local 8x32, (1024,1,1) | ANALOG かつ ANALOG_SMEAR |
+| 39 | final.vsh/fsh | post | 歪曲と魚眼の再投影・ブルーム合成・点像の芯と裾・フレア・アナログの縦スミアの加算・露出・局所トーンマップ・AgX・色調整・CAS・ディザ・デバッグ表示 | colortex0/8/13/14, SSBO0, SSBO6 (ANALOG) | 画面 | 画面 | 常時 |
 
 補足
 - shadowcomp は使わない。floodfill を deferred に置くのは、gbuffers_entities (deferred より前) が登録した画面内のエンティティ光源を同じフレームで取り込むため (voxelEmitImg は毎フレームクリアされる)
@@ -237,6 +238,7 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 - 各ブロックの最後の配列は大きさなし (`[]`) で宣言し、確保量は shaders.properties の `bufferObject.N` で決める。NVIDIA のリンクは、使っていなくても宣言された固定長の配列の要素数に比例して時間がかかり (`binLights` が 266 万要素あった時は main が空のプログラムでも vs+fs で 7-10 秒)、全プログラムに入るので読み込み全体が数倍になる
 - 大きさなしの配列の要素数は宣言の行の注記 `// 要素数: <定数>` に書き、添字の上限もその定数で見る (`.length()` は使わない)。`tools/gl_compile_check.py` が注記を読み、配列の先頭 + 要素の間隔 x 要素数が `bufferObject.N` に収まるかをプログラムごとに確かめる
 - `lib/buffers/` には設定の値を入れない (宣言を読む全プログラムで、設定の値が前処理後の本文に残ると、その設定を変えるたびにドライバのキャッシュが外れる)。設定で変わる大きさ (`GLOBAL_LIGHTS_MAX`, `LIGHT_BIN_CAPACITY` / `STRIDE` / `STRIDE_ALLOC` / `GRID`, `LIGHT_BIN_KEYS_ALLOC`) は `lib/light/light_bins.glsl` に置き、`lib/light/light.glsl` を宣言するプログラム (world0 で 23 個) だけが読む。LIGHT_BIN_LIGHTS・LIGHT_MAX_COUNT・LIGHT_CULL_MODE を変えた時に作り直すのはこの 23 個 (前は 53 個全部)。VOXEL_VOLUME は `lib/common/voxel_space.glsl` の `VOXEL_SIZE` が全プログラムに入るので、まだ全部作り直しになる
+- 例外: `analog_smear.glsl` は設定を `defined ANALOG && defined ANALOG_SMEAR` だけで見て宣言を入れるかを決める (値は本文に残さない)。ANALOG が OFF の final に SSBO 6 の宣言を入れず、本文を変えないため
 - ブロックの途中の配列 (`albedo`, `lights`, `binCount`, `entityAcc`, `groupBounds`, `clusterBounds`) は固定長のまま。合わせても 1 プログラム 0.4 秒程度で、並べ替えるとレイアウトが変わるので動かしていない
 
 | binding | 名前 (アクセサ) | ファイル | サイズ | 内容 | 書くプログラム (`SSBO_<名前>_WRITE`) |
@@ -247,7 +249,8 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 | 3 | LightBinsBuffer (`lightBins`) | `light_bins.glsl` | 10944512 (LIGHT_BIN_LIGHTS > 64 で 21430272) | `binCount[40960]`, `entityAcc[32768]` (エンティティ光源の蓄積表), `binLights[]` (40960 x 65 個、> 64 で x 129)。ビン = 8³ ブロック、1 ビン LIGHT_BIN_LIGHTS + 1 枠。枠のキー = 重要度 19 bit + 光源インデックス 13 bit | `LIGHT_BINS`: setup, begin, deferred_a, shadow_entities・shadow_block の gsh と gbuffers_entities・gbuffers_entities_translucent の vsh (蓄積表) |
 | 4 | EntityTriangleBuffer (`entityTris`) | `entity_tris.glsl` | 838672 | `counts[4]`, `groupBounds`, `clusterBounds` + `EntityTriangle tris[]` (16384 個) (ボクセル空間の三角形 v0/e1/e2 + アルファマスク + テクスチャ x 頂点色の平均の色) | `ENTITY_TRIS`: begin (クリア), shadow_entities・shadow_block の gsh |
 | 5 | FireworkLightBuffer (`fireworkLight`) | `firework_light.glsl` | 64 | `posRadius` (花火の光の player 空間の位置, 広がりの半径。0 = 光っていない), `intensity` (放射強度), `acc[]` (光る粒の固定小数点の和 8 個: 数, 重み, 位置 x 重み, 色 x 重み) | `FIREWORK_LIGHT`: begin (光を決めて acc を空にする), gbuffers_particles_translucent の vsh (acc に足す)。MC 26.1 未満の Iris は gbuffers_particles の vsh も足す (`FX_SPARKS_IN_PARTICLES`) |
-| 6-8 | - | - | - | 予備 (Iris 1.7 と Oculus の `bufferObject` の添字は 8 まで。最新の Iris は 12 まで) | - |
+| 6 | AnalogSmearBuffer (`analogSmear`) | `analog_smear.glsl` | 131072 (ANALOG かつ ANALOG_SMEAR の時だけ確保) | `vec4 columns[]` (8192 列。rgb = colortex0 の列の平均 (露出前の線形)、a 予備)。宣言は opt-in: 読むプログラム (final) は `SSBO_ANALOG_SMEAR_USE` を定義し、ANALOG と ANALOG_SMEAR の時だけブロックが入る | `ANALOG_SMEAR`: composite26 |
+| 7-8 | - | - | - | 予備 (Iris 1.7 と Oculus の `bufferObject` の添字は 8 まで。最新の Iris は 12 まで) | - |
 
 world0 の既定値で SSBO を 1 つも宣言しないのは 17 プログラム (gbuffers の 14 と composite21/23・deferred11)。frameData だけを宣言するのは 13 プログラム (prepare・prepare1/2・setup1/2・composite20/22/24/25・deferred20/21・gbuffers_lightning/skytextured)。光源モジュール (`lib/light/light.glsl`) を読むプログラムは 0-4 の 5 つを宣言する。花火の光 (5) は FIREWORK_LIGHT の時だけ、begin・gbuffers_particles_translucent・deferred30・composite19 が宣言する
 
@@ -627,7 +630,7 @@ DEBUG_VIEW の値 (0-12) と表示内容の対応は `shaders/lang/ja_JP.lang` /
 | light (ボクセル・ブロックライト) | ボクセル化、floodfill、光源リスト・ビン、光源シャドウ (DDA)、デノイズ、手持ち光源、エンティティ光源、`traceVoxelRay` (surface の GI / 反射が使う) | `lib/light/*`, `program/light/*` (setup, begin, shadow, shadow_entities / shadow_block, deferred, deferred_a, deferred1, deferred2) |
 | sky (空・大気・雲・フォグ・VL) | 大気 LUT、太陽/月の照度と空の SH、空の描画、星、雲 (体積・2D・影)、高さフォグ、VL、水中フォグ、雨 | `lib/sky/*`, `program/sky/*` (setup1, setup2, prepare, prepare1, prepare2, gbuffers_skybasic / skytextured / clouds / weather, deferred20, deferred21, composite1_a, composite12-14, composite19) |
 | surface (太陽影・GI・マテリアル・水・反射) | gbuffers (不透明/半透明/オーバーレイ)、マテリアル (labPBR・自動法線・POM・揺れ)、BRDF、太陽影、AO・GI、不透明シェーディング (deferred30)、水、反射、半透明合成 | `lib/surface/*`, `lib/common/water.glsl`, `program/surface/*` (gbuffers_* が共有する solid / translucent / overlay, gbuffers_lightning, deferred10, deferred11, deferred30, composite, composite1, composite2_a, composite2) |
-| post (ポストプロセス) | 速度ベクトルの関数、TAA、モーションブラー、DoF、ブルーム、露出、オートフォーカス、トーンマップ、色調整、CAS、レンズフレア、デバッグ表示 | `lib/post/*`, `program/post/*` (composite20-24, composite25, final) |
+| post (ポストプロセス) | 速度ベクトルの関数、TAA、モーションブラー、DoF、ブルーム、露出、オートフォーカス、トーンマップ、色調整、CAS、レンズフレア、アナログ (CCD ビデオカメラ風)、デバッグ表示 | `lib/post/*`, `program/post/*` (composite20-24, composite25, composite26, final) |
 
 - shadow パスの出力 (shadowcolor の内容) は surface (RSM・色付き影) と sky (色付き光芒) も使う。内容を変える時は「colortex」の節の定義を守り、docs/architecture.md も更新する
 - 表面の光 (light / sky の関数) は surface の `gatherSurfaceLights` が呼ぶ。deferred30・半透明・composite2・二次ヒットは light / sky の照度の関数を直接呼ばない
@@ -791,6 +794,8 @@ post モジュールが提供 (`//@include "/lib/post/post.glsl"`):
 | `GRADE_*_SAT` | `_SATURATION` の略 |
 | `VIGNETTE`、`FILM_GRAIN`、`BLOOM_FOG` | 強さで接尾辞なし |
 | 画面の名前 (`*_SCREEN`、`*_OPTIONS`) | 混在 |
+| `ANALOG_C_*` | カスタムの値を 1 枚の `ANALOG_CUSTOM` にまとめず、効果のまとまりの画面 (`ANALOG_SENSOR` など) に効果と並べて置く (数が多く、1 枚では効果との対応が分からないため) |
+| `LP_*`・`AP_*`・`AF_*` | レンズ・アナログのプリセットとアナログの記録の形式の表の定数。機能の語でなく短い接頭辞 |
 
 ### 検証
 
