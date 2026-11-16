@@ -8,6 +8,7 @@
 #define LIGHT_SHADOW_ENTITY_GLSL
 
 //@include "/lib/common/uniforms.glsl"
+//@include "/lib/settings/capabilities.glsl"
 //@include "/lib/ids/entity_ids.glsl"
 //@include "/lib/ids/id_decode.glsl"
 //@include "/lib/light/voxel.glsl"
@@ -44,7 +45,11 @@ bool shadowEntityTriangle(vec3 p0, vec3 p1, vec3 p2, vec2 uv0, vec2 uv1, vec2 uv
      * blockEntityId で見分けると雷がブロックエンティティとして遮蔽物になる
      */
     bool isBlockEntity = mixedBlockEntities && isBlockEntityDraw(blockEntityId);
+#ifdef FX_SELF_BY_DISTANCE
+    bool isPlayer = !isBlockEntity && isSelfEntity(entityId, (p0 + p1 + p2) / 3.0);
+#else
     bool isPlayer = !isBlockEntity && entityId == ENTITY_CURRENT_PLAYER;
+#endif
     int entLight = getEntityLightIndex(entityId);
     // 名札・丸影・ビーム・炎・雷は形を持たないので遮蔽物にも影にもしない
     bool ignored = entityId == ENTITY_NAME_TAG || entityId == ENTITY_SHADOW || entityId == ENTITY_BEAM

@@ -14,6 +14,7 @@
 #define LIGHT_ENTITY_LIGHT_GLSL
 
 //@include "/lib/settings.glsl"
+//@include "/lib/settings/capabilities.glsl"
 //@include "/lib/common/math.glsl"
 //@include "/lib/common/noise.glsl"
 //@include "/lib/common/voxel_space.glsl"
@@ -25,6 +26,7 @@
 //@include "/lib/ids/id_decode.glsl"
 //@include "/lib/ids/light_ids.glsl"
 //@include "/lib/light/block_data.glsl"
+//@include "/lib/light/hand_pose.glsl"
 
 const int ENTITY_ACC_PROBES = 8;       // 線形探索の上限
 const float ENTITY_ACC_SCALE = 256.0;  // セル内位置の固定小数点倍率
@@ -145,6 +147,10 @@ void injectLightAt(vec3 playerPos, int index, float level) {
 void injectEntityLight(vec3 playerPos, int entId, int itemId, vec4 entColor) {
 #ifdef ENTITY_LIGHTS
     if (entityLightsClosed()) return;
+    #ifdef FX_SELF_BY_DISTANCE
+        // resolveEntityLight の current_player と同じく、自分の手持ちは手持ち光源に任せる (ID で見分けられないので位置で)
+        if (isSelfEntity(entId, playerPos)) return;
+    #endif
     float level;
     int index = resolveEntityLight(entId, itemId, entColor, level);
     if (index == LIGHT_NONE || index == LIGHT_ENTITY_LIGHTNING) return;

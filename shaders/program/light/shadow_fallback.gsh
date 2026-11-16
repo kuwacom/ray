@@ -49,8 +49,8 @@
 #include "/lib/light/entity_tri.glsl"
 #include "/lib/buffers/frame_data.glsl"
 #include "/lib/buffers/light_bins.glsl"
-#include "/lib/light/entity_light.glsl"
 #include "/lib/light/hand_pose.glsl"
+#include "/lib/light/entity_light.glsl"
 #include "/lib/light/shadow_entity.glsl"
 // END GENERATED includes
 

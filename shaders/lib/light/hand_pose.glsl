@@ -6,6 +6,8 @@
 #define LIGHT_HAND_POSE_GLSL
 
 //@include "/lib/common/uniforms.glsl"
+//@include "/lib/settings/capabilities.glsl"
+//@include "/lib/ids/entity_ids.glsl"
 
 // 三人称の手の位置: 目からの下がり幅, 体の中心からの横幅, 前へのずれ (ブロック)
 const float HAND_THIRD_PERSON_DROP = 0.75;
@@ -39,5 +41,24 @@ bool isNearLitHand(vec3 p) {
     if (heldBlockLightValue > 0 && distance(p, getBodyHandPosition(true)) < HAND_HELD_ITEM_RADIUS) return true;
     return heldBlockLightValue2 > 0 && distance(p, getBodyHandPosition(false)) < HAND_HELD_ITEM_RADIUS;
 }
+
+#ifdef FX_SELF_BY_DISTANCE
+/*
+ * 自分の体の範囲: 目から下がった体の中心と、そこからの半径 (ブロック)。持った物の先と、泳ぐ・滑空する時の横になった体まで入る大きさ
+ * この範囲にいる他のプレイヤーも自分として扱われる
+ */
+const float SELF_BODY_CENTER_DROP = 0.8;
+const float SELF_BODY_RADIUS = 1.6;
+
+/*
+ * 描いているエンティティが自分か。p はそのエンティティ上の点 (player 空間)
+ * current_player の ID が無い Iris では自分も minecraft:player で来るので、目の近くのプレイヤーを自分とする
+ * (見分けないと、影のパスの自分の手のたいまつがエンティティの光源として手持ち光源に重なって明るくなり、自分の体も手持ち光源を遮る)
+ */
+bool isSelfEntity(int entId, vec3 p) {
+    return entId == ENTITY_CURRENT_PLAYER
+        || (entId == ENTITY_PLAYER && distance(p, getEyePlayerPos() - vec3(0.0, SELF_BODY_CENTER_DROP, 0.0)) < SELF_BODY_RADIUS);
+}
+#endif
 
 #endif

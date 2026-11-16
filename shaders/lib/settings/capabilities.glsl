@@ -24,6 +24,11 @@
 #define CAP_SPARKS_TRANSLUCENT 1
 #endif
 
+// entity.properties の minecraft:current_player で自分が見分けられる。無い環境: Iris 1.8 未満と Oculus。自分も他のプレイヤーと同じ minecraft:player で描かれる
+#if defined IRIS_VERSION && IRIS_VERSION >= 10800
+#define CAP_CURRENT_PLAYER_ID 1
+#endif
+
 // エンティティを影とボクセルに描く (遮蔽とエンティティの光源)
 #if defined ENTITY_SHADOWS || defined LIGHT_ENTITY_OCCLUSION || defined LIGHT_PLAYER_OCCLUSION || defined ENTITY_LIGHTS
 #define FX_ENTITY_VOXEL 1
@@ -47,6 +52,11 @@
 // 花火の火花の発光と花火の光を gbuffers_particles でも扱う (火花が不透明のパーティクルで来る環境)
 #if !defined CAP_SPARKS_TRANSLUCENT
 #define FX_SPARKS_IN_PARTICLES 1
+#endif
+
+// 自分を current_player の ID ではなく、プレイヤーの ID と目の位置からの距離で見分ける
+#if !defined CAP_CURRENT_PLAYER_ID
+#define FX_SELF_BY_DISTANCE 1
 #endif
 
 #endif // SETTINGS_CAPABILITIES_GLSL

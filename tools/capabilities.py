@@ -59,6 +59,10 @@ CAPS: list[Cap] = [
     Cap("CAP_SPARKS_TRANSLUCENT", "defined MC_VERSION && MC_VERSION >= 260100",
         "花火の火花が半透明のパーティクル (gbuffers_particles_translucent) で描かれる",
         "MC 26.1 より前 (火花は gbuffers_particles で描かれる)"),
+    # Iris 1.7.6 (1.20.1) のソースには無く、1.21.1 の 1.8 系にはある。その間の版は確かめていないので 1.8 で分ける
+    Cap("CAP_CURRENT_PLAYER_ID", "defined IRIS_VERSION && IRIS_VERSION >= 10800",
+        "entity.properties の minecraft:current_player で自分が見分けられる",
+        "Iris 1.8 未満と Oculus。自分も他のプレイヤーと同じ minecraft:player で描かれる"),
 ]
 
 ENTITY_VOXEL_SETTINGS = "defined ENTITY_SHADOWS || defined LIGHT_ENTITY_OCCLUSION || defined LIGHT_PLAYER_OCCLUSION || defined ENTITY_LIGHTS"
@@ -77,6 +81,8 @@ FXS: list[Fx] = [
        "雷を gbuffers_entities でも扱う (gbuffers_lightning が読まれない環境)"),
     Fx("FX_SPARKS_IN_PARTICLES", "!defined CAP_SPARKS_TRANSLUCENT",
        "花火の火花の発光と花火の光を gbuffers_particles でも扱う (火花が不透明のパーティクルで来る環境)"),
+    Fx("FX_SELF_BY_DISTANCE", "!defined CAP_CURRENT_PLAYER_ID",
+       "自分を current_player の ID ではなく、プレイヤーの ID と目の位置からの距離で見分ける"),
 ]
 
 
