@@ -8,7 +8,7 @@
  *   [0] rgb = 雲の高度での光源照度, a = +1 なら光源は太陽 / -1 なら月
  *   [1] x = 前フレームの worldTime, y = 履歴が有効な連続フレーム数 (0 = 時刻が飛んだのでリセット), zw = 予備
  *   [3] x = 目の位置の太陽の見え方 (今フレーム), y = 目の周り 3 ブロックの平均 (平滑化済み), z = 太陽が影マップの範囲より遠い地形に隠れている割合
- *       (post の composite25 が書く。ここでは触らない), w = 予備
+ *       (post の composite25 が書く。ここでは触らない), w = 一人称の手の太陽の見え方 (x を短く平滑化。lib/surface/surface_lights.glsl)
  *   [4] = (カメラの位置の雲の中の太陽の光, 雲の濃さ), [5] = (雲の中の空の光, 霧の消散係数) (prepare2 の cloud_weather.csh が書く。ここでは触らない)
  *   [6] = (雨の日の雲の向こうの空を置き換える灰色の放射輝度, 置き換える割合) (prepare2 の cloud_weather.csh が書く。反射の空が使う)
  * surfaceParams[0..2] は開けた水面の海の状態 (lib/common/water_waves.glsl の waterSeaStoreOpen)、[3] は水面のきらめきの寿命に使うフレームの長さ
@@ -110,6 +110,8 @@ const float EYE_SUN_BIAS = 0.1;
 const float EYE_SUN_SPEED = 4.0;
 // カメラがこれ以上飛んだら平滑化の履歴を捨てる (ブロック)
 const float EYE_SUN_RESET_DISTANCE = 16.0;
+// 手の日向の平滑化 (1/秒)。16 点の判定の 1/16 の段が、歩くたびに手の明るさの段にならない程度に短く
+const float HAND_SUN_SPEED = 12.0;
 
 #ifdef HAS_SKY
 // 目から光源側へ EYE_SUN_OFFSET の点の周り (光に垂直な、横 radius 縦 height の楕円) が、影マップで光に見えている割合
@@ -210,12 +212,16 @@ void main() {
     bool eyeReset = historyFrames < 1.5 || isnan(eyePrev) || isinf(eyePrev) || distance(cameraPosition, previousCameraPosition) > EYE_SUN_RESET_DISTANCE;
     float eyeSmooth = eyeReset ? eyeArea : mix(eyePrev, eyeArea, 1.0 - exp(-EYE_SUN_SPEED * clamp(frameTime, 0.0, 0.5)));
     frameData.skyParams[3].xy = vec2(eyeNow, eyeSmooth);
+    float handPrev = frameData.skyParams[3].w;
+    bool handReset = eyeReset || isnan(handPrev) || isinf(handPrev);
+    frameData.skyParams[3].w = handReset ? eyeNow : mix(handPrev, eyeNow, 1.0 - exp(-HAND_SUN_SPEED * clamp(frameTime, 0.0, 0.5)));
 #else
     frameData.sunIrradiance = vec4(0.0);
     frameData.moonIrradiance = vec4(0.0);
     frameData.skyParams[0] = vec4(0.0);
     frameData.skyParams[2] = vec4(0.0);
     frameData.skyParams[3].xy = vec2(1.0);
+    frameData.skyParams[3].w = 1.0;
     #ifdef WORLD_END
         // エンドは影マップがあるので、淡い紫の平行光で立体感を出す
         frameData.shadowLightIrradiance = vec4(END_LIGHT_IRRADIANCE, 0.0);

@@ -58,6 +58,18 @@ const uint SL_BLOCK_SPECULAR_TRACED = 1u << 9; // 鏡面の光源を 1 つずつ
 const vec2 SHADOW_FALLBACK_SKYLIGHT = vec2(0.8, 0.97);
 // GI が空の光を運ぶ時 (GI_TRACES_SKY): ボクセル体積の判定で面から浮かせる量
 const float GI_VOLUME_TEST_OFFSET = 0.1;
+/*
+ * 一人称の手の太陽の可視率。手は影マップ上で自分の体の影の中にあるので、手の位置では影を引かない
+ * スカイライトには向きが無く、軒下・壁や木の陰・縦穴でも 14〜15 になるので、目から光源側の影マップの判定 (prepare の
+ * sun_sky_light.csh) の小さいほうを使う。スカイライトは、影マップの深さの範囲より上の地形に覆われた洞窟を暗くするために残す
+ */
+float handSunVisibility(float skylightFallback) {
+#ifdef HAS_SKY
+    return min(skylightFallback, saturate(frameData.skyParams[3].w));
+#else
+    return skylightFallback;
+#endif
+}
 
 // 影を落とす天体の影の濃さ (昼 = 太陽, 夜・エンド = 月)。可視率に mix(1, 可視率, 濃さ) で掛ける
 float celestialShadowStrength() {
@@ -232,8 +244,13 @@ SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, ui
     } else if (sunMode == SL_SUN_SHADOW_MAP_FALLBACK) {
         L.celestial = getCelestialLight();
         SunShadow ss = evalSunShadow(p.playerPos, p.geoNormal, p.sss, p.dither);
-        L.sunShadow = ss;
         float fallback = smoothstep(SHADOW_FALLBACK_SKYLIGHT.x, SHADOW_FALLBACK_SKYLIGHT.y, p.lightmap.y);
+        if (p.hand) {
+            fallback = handSunVisibility(fallback);
+            // SSS の厚さ (opaque_shading.fsh) も手の位置の影マップではなく推定から決める
+            ss.fade = 0.0;
+        }
+        L.sunShadow = ss;
         L.sunFallback = fallback;
         vec3 vis = mix(vec3(fallback), ss.visibility, ss.fade);
         if ((terms & SL_POM) != 0u) vis *= p.pomShadow;
