@@ -113,7 +113,8 @@ const float LENS_SCREEN_STAR_GAIN = 0.12;
 vec3 screenStars(vec2 uv, float exposure, float fNumber) {
     if (LP_STARBURST <= 0.0) return vec3(0.0);
     const int spikes = LENS_BLADES % 2 == 0 ? LENS_BLADES : LENS_BLADES * 2;
-    const int lines = spikes / 2;
+    // 線の数は SSBO の値で決め、展開させない (理由は lib/post/lens_flare.glsl の lensGhosts)
+    int lines = min(int(frameData.postParams[4].z), LENS_SCREEN_STAR_LINES);
     // 解析的な光条と同じく、絞るほど長く強く、丸い羽根と開放付近では弱い
     float n = fNumber / LENS_F_REFERENCE;
     float len = LENS_SCREEN_STAR_LENGTH * LP_STAR_SIZE * sqrt(n);
@@ -153,7 +154,9 @@ vec3 screenFlare(vec2 uv) {
     // ゴースト: 画素 y には、光源像が y / S にある光が届く。広がりは前玉の倍率 A x 入射瞳
     // 輝度はゴーストの写像で面積が S^2 倍に広がる分だけ下がる (反射率 R / S^2)
     if (LP_SCREEN_GHOSTS > 0.0) {
-        for (int g = 0; g < LENS_SCREEN_GHOST_COUNT; g++) {
+        // 回数は SSBO の値で決め、展開させない (理由は lib/post/lens_flare.glsl の lensGhosts)
+        int ghostCount = min(int(frameData.postParams[4].w), LENS_SCREEN_GHOST_COUNT);
+        for (int g = 0; g < ghostCount; g++) {
 #ifdef LENS_GHOST_TUNED
             if (((LP_GHOST_MASK >> g) & 1) == 0) continue;
 #endif

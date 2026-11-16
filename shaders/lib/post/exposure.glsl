@@ -5,7 +5,7 @@
  * FrameData.postParams[1]: x = オートフォーカスの目標距離 (デバッグ用), y = 順応済みの暗い側の計測 EV100 (夜の持ち上げ用)
  * FrameData.postParams[2]: x = 平滑化済みのフレアの見え具合, y = 今フレーム
  * FrameData.postParams[3]: バニラの四角の見えている点の格子位置の重み付きモーメント (x, y, x^2, y^2。見え具合と同じ重みと平滑)
- * FrameData.postParams[4]: x = ゴーストのループの回数, y = ゴーストの波長のループの回数 (lib/post/lens_flare.glsl)
+ * FrameData.postParams[4]: フレアのループの回数 (lib/post/lens_flare.glsl)。x = ゴースト, y = ゴーストの波長, z = 画面の光条の線, w = 画面のゴースト
  */
 #ifndef POST_EXPOSURE_GLSL
 #define POST_EXPOSURE_GLSL

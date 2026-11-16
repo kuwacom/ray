@@ -97,6 +97,8 @@ vec2 lensSourceLocal(LensSource s, vec2 d) { return vec2(dot(d, s.ex), dot(d, ve
 
 const int LENS_GHOST_COUNT = GHOST_S.length() < LENS_GHOST_LIMIT ? GHOST_S.length() : LENS_GHOST_LIMIT;
 const int LENS_SCREEN_GHOST_COUNT = GHOST_S.length() < LENS_SCREEN_GHOST_LIMIT ? GHOST_S.length() : LENS_SCREEN_GHOST_LIMIT;
+// 画面の光条の線の数 (偶数枚なら枚数の半分、奇数枚なら枚数)
+const int LENS_SCREEN_STAR_LINES = LENS_BLADES % 2 == 0 ? LENS_BLADES / 2 : LENS_BLADES;
 
 /*
  * ゴースト (光源 1 個, 解析的)
