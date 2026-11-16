@@ -46,8 +46,6 @@ BODIES: dict[str, str] = {
     # light
     "setup.csh": "light/setup_tables.csh",
     "begin.csh": "light/frame_begin.csh",
-    "shadow.vsh": "light/shadow_terrain.vsh",
-    "shadow.fsh": "light/shadow_terrain.fsh",
     "shadow_entities.vsh": "light/shadow_entities.vsh",
     "shadow_entities.gsh": "light/shadow_entities.gsh",
     "shadow_entities.fsh": "light/shadow_entities.fsh",
@@ -83,6 +81,7 @@ BODIES: dict[str, str] = {
     "deferred30.fsh": "surface/opaque_shading.fsh",
     "composite.csh": "surface/reflection_trace.csh",
     "composite1.fsh": "surface/water_trace.fsh",
+    "composite2_a.csh": "surface/water_barrier.csh",
     "composite2.fsh": "surface/translucent_composite.fsh",
     # post
     "composite20.fsh": "post/taa.fsh",
@@ -105,6 +104,8 @@ def fullscreen(*own_stages: str) -> dict[str, Body | None]:
     return {"vsh": FULLSCREEN_VSH, **{s: None for s in own_stages}}
 
 
+SHADOW_TERRAIN: dict[str, Body | None] = {"vsh": ("light/shadow_terrain.vsh", ()), "fsh": ("light/shadow_terrain.fsh", ())}
+
 # プログラム名 -> ステージ。docs/architecture.md のパイプライン表と一致させる
 # ステージを list で書いたものは、すべて BODIES の本体でマクロなし
 PROGRAMS: dict[str, list[str] | dict[str, Body | None]] = {
@@ -114,8 +115,12 @@ PROGRAMS: dict[str, list[str] | dict[str, Body | None]] = {
     "setup2": ["csh"],
     # begin (shadow の前)
     "begin": ["csh"],
-    # shadow
-    "shadow": ["vsh", "fsh"],
+    # shadow。地形は solid / cutout / water で受け、shadow は専用のプログラムが無いジオメトリの受け皿
+    # (Iris 1.8 未満は全ジオメトリが shadow に来る。新しい Iris の地形を shadow から外し、受け皿だけの処理を地形に掛けない)
+    "shadow": {**shared("light/shadow_terrain", "PROGRAM_SHADOW_FALLBACK"), "gsh": ("light/shadow_fallback.gsh", ())},
+    "shadow_solid": SHADOW_TERRAIN,
+    "shadow_cutout": SHADOW_TERRAIN,
+    "shadow_water": SHADOW_TERRAIN,
     "shadow_entities": ["vsh", "gsh", "fsh"],
     # ブロックエンティティ用。本体は shadow_entities と共通 (light モジュール)
     "shadow_block": shared("light/shadow_entities", "PROGRAM_SHADOW_BLOCK", ("vsh", "gsh", "fsh")),
@@ -159,7 +164,8 @@ PROGRAMS: dict[str, list[str] | dict[str, Body | None]] = {
     # composite
     "composite": ["csh"],
     "composite1": fullscreen("fsh", "csh_a"),
-    "composite2": fullscreen("fsh"),
+    # composite2_a は composite1 の imageStore の後のバリアを Iris に出させる空の compute
+    "composite2": fullscreen("fsh", "csh_a"),
     # 画面空間の光芒の 3 パス。ラッパーは #define 名前 しか書けないので、パスはマクロの有無で分ける
     "composite12": {"vsh": FULLSCREEN_VSH, "fsh": ("sky/godrays.fsh", ("GODRAYS_PASS_0",))},
     "composite13": {"vsh": FULLSCREEN_VSH, "fsh": ("sky/godrays.fsh", ("GODRAYS_PASS_1",))},

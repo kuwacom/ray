@@ -38,6 +38,7 @@
 //@include "/lib/surface/surface_lights.glsl"
 //@include "/lib/sky/clouds.glsl"
 //@include "/lib/sky/sky_color.glsl"
+//@include "/lib/buffers/slots.glsl"
 
 /*
  * ボクセルのヒット面の色が画面に無い時は、ブロックの平均の色の表 (lib/ids/block_albedo.glsl) を使う
@@ -112,7 +113,7 @@ const float GI_HISTORY_EDGE = 0.002;
 vec3 giHistoryAtPlayer(vec3 playerPos) {
     vec2 uv = playerToPreviousScreen(playerPos).xy;
     if (any(lessThan(uv, vec2(GI_HISTORY_EDGE))) || any(greaterThan(uv, vec2(1.0 - GI_HISTORY_EDGE)))) return vec3(-1.0);
-    return textureLod(colortex9, uv, 0.0).rgb / max(GI_EFFECTIVE_STRENGTH * LK_GI_BOUNCE, 1e-3);
+    return textureLod(TEX_GI_HIST, uv, 0.0).rgb / max(GI_EFFECTIVE_STRENGTH * LK_GI_BOUNCE, 1e-3);
 }
 
 /*
@@ -372,7 +373,7 @@ bool voxelBorrowColor(ivec2 qt, vec3 Ehit, vec3 Eq, out vec3 color) {
 }
 
 /*
- * 当たりの点の照明 unitE (shadeSecondaryHit(hitPlayer, hitNormal, vec3(1.0), skyLm)) と、借りた色 (color) を作る
+ * 当たりの点の照明 unitE (shadeSecondaryHit(hitPlayer, hitNormal, vec3(1.0), skyLm, false)) と、借りた色 (color) を作る
  * 戻り値 true = 借りられた。false = 借りられない (呼び出し側が unitE で代わりの色を作る)
  * 照明の近似は重く、呼ぶ所ごとに本体が展開される。当たりの点と借りる点を、回数を実行時に決める 1 つのループの 1 か所で呼んで、
  * 展開を 1 つにする
@@ -384,7 +385,11 @@ bool shadeSecondaryHitBorrowing(vec3 hitPlayer, vec3 hitNormal, int hitBlock, fl
     unitE = vec3(0.0);
     color = vec3(0.0);
     for (int i = 0; i < steps; i++) {
-        vec3 E = shadeSecondaryHit(i == 0 ? hitPlayer : q, hitNormal, vec3(1.0), skyLm);
+        /*
+         * コースティクスは掛けない。水の中から見上げた全反射は水底・池の壁に当たり、集光の細い線を当たりごとに 1 点で拾うと、
+         * 半分の解像度とジッターで水面に横の線と明るい粒が並んだ (借りる時の比も、2 点の集光の比で跳ねる)
+         */
+        vec3 E = shadeSecondaryHit(i == 0 ? hitPlayer : q, hitNormal, vec3(1.0), skyLm, false);
         if (i == 0) unitE = E;
         else if (voxelBorrowColor(qt, unitE, E, color)) return true;
     }

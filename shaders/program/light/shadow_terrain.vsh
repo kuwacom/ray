@@ -1,7 +1,8 @@
 /*
- * shadow (地形: solid / cutout / 半透明): 太陽影マップ + 地形のボクセル化
+ * shadow_solid / shadow_cutout / shadow_water (地形): 太陽影マップ + 地形のボクセル化
  * light モジュール (影マップの出力内容は surface モジュールと調整)
- * shadow_entities / shadow_block が無いジオメトリもここに来るが、Iris 1.8+ ではエンティティは来ない
+ * PROGRAM_SHADOW_FALLBACK が定義されていれば shadow (専用のプログラムが無いジオメトリの受け皿)。
+ * Iris 1.8 未満は地形もエンティティも shadow に来て、新しい Iris でもリードなどが来るので、地形用の処理を isTerrain で閉じる
  */
 // このプログラムで書く image (lib/buffers/images.glsl。宣言は 8 個まで)
 #define IMG_VOXEL_BLOCK
@@ -49,6 +50,21 @@
 in vec2 mc_Entity;
 in vec4 at_midBlock;
 
+#ifdef PROGRAM_SHADOW_FALLBACK
+// shadow はジオメトリシェーダー (shadow.gsh) を通る。GS の出力と同じ名前は使えないので、入力側の名前に替える
+#define texcoord vTexcoord
+#define glcolor vColor
+#define normalPlayer vNormal
+#define skyLight vSkyLight
+#define blockId vBlockId
+#define tintTransmittance vTint
+// エンティティのボクセル化に使う、揺れ適用前の位置
+out vec3 vPlayerPos;
+#ifdef CHARGED_CREEPER_LIGHT
+    flat out int vSwirlLayer;
+    const float SWIRL_TEXTURE_MATRIX_EPS = 1e-6;
+#endif
+#endif
 out vec2 texcoord;
 out vec4 glcolor;
 out vec3 normalPlayer;
@@ -73,12 +89,31 @@ void main() {
         || renderStage == MC_RENDER_STAGE_TERRAIN_CUTOUT
         || renderStage == MC_RENDER_STAGE_TERRAIN_CUTOUT_MIPPED
         || renderStage == MC_RENDER_STAGE_TERRAIN_TRANSLUCENT;
+#ifdef PROGRAM_SHADOW_FALLBACK
+    /*
+     * エンティティの mc_Entity はブロック ID ではない (Iris は同じ場所にエンティティ ID を入れる)。at_midBlock も無い
+     * 地形以外は BLOCK_AIR にして、色付き影・水・揺れの判定に当てない
+     */
+    if (!isTerrain) {
+        blockId = BLOCK_AIR;
+        tintTransmittance = vec3(1.0);
+    }
+#endif
     if (isTerrain) {
         // ボクセルは揺れ適用前のブロック中心で書く
         // 流れる水は水として書き、発光の欄 (水は光らないので空いている) に印を残す
         float emission = rawBlockId == BLOCK_WATER_FLOWING ? float(VOXEL_WATER_FLOWING) : at_midBlock.w;
         voxelizeTerrainVertex(playerPos, at_midBlock.xyz / 64.0, blockId, emission);
     }
+#ifdef PROGRAM_SHADOW_FALLBACK
+    vPlayerPos = playerPos;
+    #ifdef CHARGED_CREEPER_LIGHT
+        // 電気の渦の層だけがテクスチャ行列で UV を流す (shadow_entities.vsh と同じ見分け方)
+        mat4 texMatOffset = gl_TextureMatrix[0] - mat4(1.0);
+        vec4 texMatDiff = abs(texMatOffset[0]) + abs(texMatOffset[1]) + abs(texMatOffset[2]) + abs(texMatOffset[3]);
+        vSwirlLayer = dot(texMatDiff, vec4(1.0)) > SWIRL_TEXTURE_MATRIX_EPS ? 1 : 0;
+    #endif
+#endif
 
     playerPos = applyWaving(playerPos, blockId, at_midBlock.y < 0.0, skyLight);
     vec3 clip = (shadowProjection * vec4(playerToShadowView(playerPos), 1.0)).xyz;

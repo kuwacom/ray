@@ -16,6 +16,8 @@
 //@include "/lib/light/floodfill.glsl"
 //@include "/lib/light/voxel.glsl"
 //@include "/lib/buffers/formats.glsl"
+//@include "/lib/buffers/slots.glsl"
+//@include "/lib/surface/gi.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -49,6 +51,8 @@
 #include "/lib/post/exposure.glsl"
 #include "/lib/post/camera.glsl"
 #include "/lib/post/grading.glsl"
+#include "/lib/buffers/images.glsl"
+#include "/lib/buffers/slots.glsl"
 #include "/lib/post/bloom.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/post/lens_optics.glsl"
@@ -65,17 +69,18 @@
 #include "/lib/ids/material_ids.glsl"
 #include "/lib/ids/id_decode.glsl"
 #include "/lib/common/voxel_space.glsl"
-#include "/lib/buffers/images.glsl"
 #include "/lib/buffers/block_data.glsl"
 #include "/lib/light/block_data.glsl"
 #include "/lib/light/voxel_read.glsl"
 #include "/lib/light/voxel.glsl"
 #include "/lib/light/floodfill.glsl"
 #include "/lib/buffers/formats.glsl"
+#include "/lib/common/frame_offset.glsl"
+#include "/lib/surface/gi.glsl"
 // END GENERATED includes
 
 #ifdef SPECULAR_SPARKLE
-const bool colortex17MipmapEnabled = true;
+const bool colortex8MipmapEnabled = true;
 #endif
 
 in vec2 texcoord;
@@ -97,7 +102,8 @@ vec3 debugView(ivec2 texel, vec3 color) {
     vec3 playerPos = screenToPlayer(vec3(texcoord, depth));
     return linearToSrgb(tonemap(sampleFloodfillVolume(playerPos - normalize(playerPos) * 0.5)));
 #elif DEBUG_VIEW == 6
-    vec4 gi = texelFetch(colortex8, texel, 0);
+    // GI/AO なしでは colortex9 が書かれないので、枠を直接読まず定数を返す口を通す
+    vec4 gi = getIndirectLight(texel);
     return linearToSrgb(tonemap(gi.rgb)) * gi.a;
 #elif DEBUG_VIEW == 7
     // 雲の散乱光に露出を掛けて見る (掛けないと夜や薄明では真っ黒になる)
@@ -299,7 +305,7 @@ void main() {
     /*
      * レンズ: 点像の芯と裾。白を超えた鏡面の点は 1 画素ほどで、実際のカメラでは回折・センサーの芯 (半径 1-2 px) と、収差と
      * 散乱の裾 (r^-2) を引いて丸い光の塊に見える。芯は双線形の 3 x 3 の読みで配る (POINT_CORE_SHARE)
-     * 白飛び分 (colortex17) のミップは箱の平均でエネルギーを保つので、4 段を同じエネルギーずつ読んで芯から裾へ配る (総量は変えない)
+     * 白飛び分 (colortex8) のミップは箱の平均でエネルギーを保つので、4 段を同じエネルギーずつ読んで芯から裾へ配る (総量は変えない)
      * DoF の前の値なので、ボケている点には重ねない (玉ボケに任せる)
      * 球面収差・ブルーム・ヘイズの mix より前に掛ける。後に掛けると、mix で縮んだ hdr から縮む前の白飛び分を引き、点の中心が地まで削られて黒く抜けた
      */
@@ -313,19 +319,19 @@ void main() {
         // 配るのは点の光の全部まで。強さで先に裾を増やし、芯は残りの分 (和が 1 を超えると中心の地まで引かれて黒く抜けた)
         float spreadAmount = min((POINT_SPREAD_BASE + POINT_SPREAD_PER_GLARE * LP_VEILING_GLARE) * focusFade, 1.0);
         float coreAmount = min(POINT_CORE_SHARE * focusFade, 1.0 - spreadAmount);
-        if (any(greaterThan(textureLod(colortex17, uvL, float(POINT_SPREAD_GATE_LEVEL)).rgb, vec3(0.0)))) {
-            vec3 spreadCore = max(textureLod(colortex17, uvL, 0.0).rgb, 0.0);
+        if (any(greaterThan(textureLod(TEX_SPARKLE_HIST, uvL, float(POINT_SPREAD_GATE_LEVEL)).rgb, vec3(0.0)))) {
+            vec3 spreadCore = max(textureLod(TEX_SPARKLE_HIST, uvL, 0.0).rgb, 0.0);
             vec3 spreadTail = vec3(0.0);
-            for (int l = 1; l <= POINT_SPREAD_LEVELS; l++) spreadTail += max(sampleBSplineMip(colortex17, uvL, l), 0.0);
+            for (int l = 1; l <= POINT_SPREAD_LEVELS; l++) spreadTail += max(sampleBSplineMip(TEX_SPARKLE_HIST, uvL, l), 0.0);
             vec3 coreBlur = vec3(0.0);
             for (int i = 0; i < 25; i++) {
                 ivec2 o = ivec2(i % 5, i / 5) - 2;
                 ivec2 a = abs(o);
                 vec2 offset = vec2(sign(o)) * vec2(POINT_CORE_TAP_X[a.x], POINT_CORE_TAP_X[a.y]);
-                coreBlur += max(textureLod(colortex17, uvL + offset * texelSize(), 0.0).rgb, 0.0) * (POINT_CORE_TAP_W[a.x] * POINT_CORE_TAP_W[a.y]);
+                coreBlur += max(textureLod(TEX_SPARKLE_HIST, uvL + offset * texelSize(), 0.0).rgb, 0.0) * (POINT_CORE_TAP_W[a.x] * POINT_CORE_TAP_W[a.y]);
             }
             /*
-             * 芯と裾へ配る分は中心から引く。colortex17 は DoF・モーションブラー・色収差の前の値なので、ボケた点や色ごとにずれた点では
+             * 芯と裾へ配る分は中心から引く。colortex8 は DoF・モーションブラー・色収差の前の値なので、ボケた点や色ごとにずれた点では
              * hdr の中心に同じだけの白飛び分が残っていない。引くのは、TAA の出した白飛び分の外の色 (colortex13) を超えて残っている分まで
              * (ピントの前後で中心だけ地まで引かれ、周りが光って中心が黒・緑・紫の 1 画素に抜けた)
              */

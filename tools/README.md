@@ -30,6 +30,7 @@ uv sync
 | `gen_includes.py` | 本体 (`shaders/program/`) の `#include` を、本体と lib の `//@include` の宣言から生成します (本体の `BEGIN GENERATED includes` と `END GENERATED includes` の間)。lib を足したり依存を変えたりしたときに実行します。`--check` で生成が最新かの確認だけもできます |
 | `gen_block_properties.py` | `shaders/block.properties`、`item.properties`、`entity.properties`、ID の定数 `shaders/lib/ids/{block,light,entity}_ids.glsl`、ブロックの平均の色の表 `block_albedo.glsl`、光源の表のデータ `shaders/lib/light/light_table_data.glsl`、光源の面の光り方 `light_mask_data.glsl` (`light_masks.json` から)。光源・エンティティ・ID の定数の表は `id_tables.py`、光源でないブロックの表はこのスクリプトの中にあります。光源の追加は `id_tables.py` の `LIGHTS` に 1 行足すだけです。表に無いブロックは `block_colors.json` の色ごとに 2000 番台の ID にまとめます。`--check` で生成物が最新かの確認だけもできます (`validate_shaders.py` も確認します) |
 | `gen_settings.py` | `shaders/lib/settings/bool_refs.glsl` (Iris がブールの設定を認識するための参照) と、`shaders/shaders.properties` の `sliders` (`BEGIN GENERATED sliders` と `END GENERATED sliders` の間。値がすべて数値で 4 個以上の設定がスライダーになり、例外は `gen_settings.py` の `NOT_SLIDER` / `FORCE_SLIDER`)、プロファイルで値の変わる設定の表 (`docs/architecture.md` の `BEGIN GENERATED settings` と `END GENERATED settings` の間)、全設定の一覧 `docs/settings.md`。設定の解析は `validate_shaders.py` と `shader_options.py` もここを使います。設定を追加・削除したときに実行します。`--check` で生成物が最新かの確認だけもできます |
+| `gen_capabilities.py` | `shaders/lib/settings/capabilities.glsl` (ローダーの能力 `CAP_*` と、本体が見る機能 `FX_*` の `#define`。使うファイルが `//@include` で宣言します) と、`shaders/shaders.properties` の `BEGIN GENERATED capabilities` と `END GENERATED capabilities` の間 (`FX_*` で決まる項目。式は展開して書きます)。表は `capabilities.py` にあり、検出は未定義のマクロでは「能力なし」になる式だけで書きます。`--check` で生成物が最新かの確認だけもできます (`validate_shaders.py` も確認します) |
 | `gen_block_colors.py <client.jar>` | `tools/block_colors.json` (ブロックごとの平均の色) と `tools/light_masks.json` (光るブロックの面ごとの光る範囲の四角と 4x4 のマス。測るブロックは `id_tables.py` の `Light.mask`)。Minecraft のクライアント jar のブロックモデルとテクスチャを読むだけで、jar は変更しません (クライアント jar のパスを引数で渡します)。バージョンを上げたときに実行し、続けて `gen_block_properties.py` を実行します。リポジトリに入るのは数値だけです |
 | `gen_blue_noise.py` | `shaders/textures/blue_noise.png` |
 | `gen_cloud_noise.py` | `shaders/textures/cloud_*.dat` |
@@ -42,15 +43,16 @@ uv sync
 
 | スクリプト | 内容 |
 |---|---|
-| `validate_shaders.py` | Iris の前処理 (include の展開、設定値の差し替え、Iris が注入するマクロ) を再現して glslang でコンパイルし、エラーを元ファイルの行番号で表示します。プロファイルの値、「高」プロファイルと既定値の一致、設定画面と lang の過不足、`*.properties` が ASCII だけか、`//@include` の宣言の漏れ・循環・ガード名と `gen_includes.py` の生成が最新か、も確認します |
+| `validate_shaders.py` | Iris の前処理 (include の展開、設定値の差し替え、Iris が注入するマクロ) を再現して glslang でコンパイルし、エラーを元ファイルの行番号で表示します。プロファイルの値、「高」プロファイルと既定値の一致、設定画面と lang の過不足、`*.properties` が ASCII だけか、`//@include` の宣言の漏れ・循環・ガード名と `gen_includes.py` の生成が最新か、も確認します。ローダー (`capabilities.py` の `ENVS`: 最新の Iris / Iris 1.8〜1.10.4 / Iris 1.7 と Oculus) ごとにマクロを変えてコンパイルし、`tools/loader_checks.py` で、そのローダーで読み込めない記述 (flag、`bufferObject` の添字、image の数と形式、`RENDERTARGETS` のカンマの後の空白)、colortex の上限を超える使用 (失敗。どのローダーでも colortex0〜15)、`MC_VERSION` / `IRIS_VERSION` / `MAX_COLOR_BUFFERS` の生成物の外での使用を調べます |
 | `include_deps.py` | `shaders/lib` と `shaders/program` の各ファイルが使う記号 (関数・const・struct・uniform・SSBO・マクロ) の定義元を、そのファイルの `//@include` の宣言から辿れるかを調べます。lib に `#include` の行がないこと、本体の `#include` が生成ブロックの中にだけあることなど、宣言の書き方も確認します。`-v` でファイルごとの不足を表示します。validate_shaders.py からも呼ばれます |
-| `gl_compile_check.py` | 同じ前処理の結果を、見えないウィンドウの OpenGL 4.6 compatibility コンテキストで手元の GPU ドライバに compile + link させます。glslang では出ないドライバ固有のエラーと、image / sampler / SSBO / shared メモリの使用数が上限を超えていないかを調べます |
+| `check_slots.py` | `shaders/lib/buffers/slots.glsl` の colortex の論理名 (時間で分け合う枠と番号を移す枠) を調べます。区間の書式と重なり、名前の付いた枠を本体が `colortexN` と直接書いていないかを見ます (validate_shaders.py からも呼ばれます)。`--intervals` では glslang で各プログラムの読み書きを調べ、区間の外で使っていないかを見ます (`--all` で代表の設定の組と全プロファイル。既定値 x 3 ディメンションは `validate_shaders.py --full` も見ます) |
+| `gl_compile_check.py` | 同じ前処理の結果を、見えないウィンドウの OpenGL 4.6 compatibility コンテキストで手元の GPU ドライバに compile + link させます。glslang では出ないドライバ固有のエラーと、image / sampler / SSBO / shared メモリの使用数が上限を超えていないかを調べます。ローダーは `--env` (`capabilities.py` の `ENVS` の名前。既定は最新) で選び、`equiv_check.py` も同じです |
 | `equiv_check.py` | 2 つのコミット (または作業ツリー) のシェーダーをドライバにリンクさせ、バイナリが同じかを比べます。リファクタで計算が変わっていないかを、ゲームを使わずに確かめます |
 | `pixdiff.py` | 2 枚の撮影の画素の差 (平均・p99・最大・4/255 を超える画素の割合・平均色の差) を出します |
 | `pass_preview.py` | 全画面の fragment パスと compute パスを手元の GPU で 1 回ずつ実行して、出力を PNG と npy に保存します。下の「パスを 1 つだけ描く」 |
 | `image_style.py` | 写真・参考画像のトーン・色・質感・構図を測って CSV と集計にし、コンタクトシートも作ります。下の「画像の画づくりを測る」 |
 
-`tools/lib/` はスクリプト共通の部品です (リポジトリの場所 `paths.py`、sRGB の変換 `color.py`、PNG と .mcmeta の書き出し `textures.py`、生成物の書き込みと `--check` `generated.py`、shaders.properties の読み取りと `#if` の評価 `properties.py`)。スクリプトを足すときは、同じ処理を書き直さずここを使ってください
+`tools/lib/` はスクリプト共通の部品です (リポジトリの場所 `paths.py`、sRGB の変換 `color.py`、PNG と .mcmeta の書き出し `textures.py`、生成物の書き込みと `--check` `generated.py`、shaders.properties の読み取りと `#if` の評価 `properties.py`、GLSL の `#if` の評価 `cpp.py`)。スクリプトを足すときは、同じ処理を書き直さずここを使ってください
 
 ### ゲーム内デバッグ
 
@@ -71,6 +73,7 @@ $env:RAY_GLSLANG = "<glslang のパス>\bin\glslang.exe"
 
 uv run tools/validate_shaders.py                    # 既定値・オーバーワールドだけ
 uv run tools/validate_shaders.py --full             # 3 ディメンションと全プロファイル
+uv run tools/validate_shaders.py --env 1.7.6 --colortex-report colortex.md   # 1 つのローダーだけ。colortex の上限を超える使用の一覧も書く
 uv run tools/gl_compile_check.py                    # 手元のドライバで compile + link
 uv run tools/gl_compile_check.py --full --limits --report
 ```

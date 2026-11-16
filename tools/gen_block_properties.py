@@ -162,7 +162,7 @@ BLOCKS: list[tuple[int, str, list[str]]] = [
     (17, "decorative: redstone", ["redstone_block"]),
     (18, "decorative: amethyst", ["amethyst_block", "budding_amethyst"]),
 
-    (100, "short plants (wave with fixed root)", ["short_grass", "fern", "dead_bush", "dandelion", "poppy", "blue_orchid", "allium",
+    (100, "short plants (wave with fixed root)", ["short_grass", "grass", "fern", "dead_bush", "dandelion", "poppy", "blue_orchid", "allium",
                                          "azure_bluet", "red_tulip", "orange_tulip", "white_tulip", "pink_tulip", "oxeye_daisy",
                                          "cornflower", "lily_of_the_valley", "wither_rose", "torchflower", "closed_eyeblossom",
                                          "pink_petals", "wildflowers", "short_dry_grass", "tall_dry_grass", "bush",

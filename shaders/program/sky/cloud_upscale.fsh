@@ -1,5 +1,5 @@
 /*
- * deferred21: 雲の時間アップスケール (colortex10 + 履歴 -> colortex11 フル解像度)
+ * deferred21: 雲の時間アップスケール (TEX_CLOUD_LOW + 履歴 -> colortex11 フル解像度)
  * - 今フレームに計算されたピクセル: 履歴と強めに混ぜる
  * - それ以外: 低解像度のバイリニア補間と弱く混ぜ、履歴は低解像度近傍の min/max でクランプしてゴーストを抑える
  * 再投影は雲までの距離 (層の入口付近) で行うので、高速移動でも雲がカメラに貼り付かない
@@ -9,6 +9,7 @@
 //@include "/lib/common/temporal.glsl"
 //@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/sky/sky.glsl"
+//@include "/lib/buffers/slots.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -46,6 +47,7 @@
 #include "/lib/sky/fog_styles.glsl"
 #include "/lib/sky/fog.glsl"
 #include "/lib/sky/sky.glsl"
+#include "/lib/buffers/slots.glsl"
 // END GENERATED includes
 
 in vec2 texcoord;
@@ -66,7 +68,7 @@ const float CLOUD_CLAMP_EXPAND = CLOUD_RES == 1 ? 1.0 : 0.5;
 const vec4 CLOUD_CLAMP_PAD = vec4(vec3(1e-4), 0.01);
 
 vec4 fetchLowRes(ivec2 q) {
-    return texelFetch(colortex10, clamp(q, ivec2(0), cloudLowResSize() - 1), 0);
+    return texelFetch(TEX_CLOUD_LOW, clamp(q, ivec2(0), cloudLowResSize() - 1), 0);
 }
 
 // 雲の再投影距離。層を通らない (雲の無い) 方向は無限遠として回転だけで戻す

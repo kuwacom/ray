@@ -4,7 +4,7 @@
  *
  * 不透明面: 環境光の鏡面 (反射バッファ or 空) x 方向アルベド x 鏡面遮蔽 を足す
  * 水面: 屈折先の色と水の中の経路長、上向きの水面の太陽の可視率、鏡面の映り込みのフル解像度の SSR は composite1 (water_trace.fsh) が
- *       colortex18-21 に書いたもの
+ *       TEX_WATER_* (lib/buffers/slots.glsl) に書いたもの
  *       屈折した経路長で Jerlov の吸収と内散乱 / 厳密フレネル (水中からは全反射とスネルの窓) / 反射 / 太陽の鏡面 / 岸の泡
  *       側面 (滝・水槽): 水の厚みと出る面での屈折は composite1 / 滝の気泡の白さと着水点の泡
  *       水中から見上げた水面より上は空気なので吸収しない (カメラと水面の間の水中フォグは sky の composite19)
@@ -25,6 +25,7 @@
 //@include "/lib/surface/water_shading.glsl"
 //@include "/lib/common/specular_sparkle.glsl"
 //@include "/lib/common/jitter.glsl"
+//@include "/lib/buffers/slots.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -52,6 +53,8 @@
 #include "/lib/common/frame_offset.glsl"
 #include "/lib/common/look_presets.glsl"
 #include "/lib/common/voxel_space.glsl"
+#include "/lib/buffers/images.glsl"
+#include "/lib/buffers/slots.glsl"
 #include "/lib/surface/gi.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/common/transforms.glsl"
@@ -69,7 +72,6 @@
 #include "/lib/surface/surface.glsl"
 #include "/lib/sky/sh.glsl"
 #include "/lib/common/phase.glsl"
-#include "/lib/buffers/images.glsl"
 #include "/lib/sky/atmosphere.glsl"
 #include "/lib/common/celestial_shape.glsl"
 #include "/lib/sky/celestial.glsl"
@@ -98,8 +100,9 @@
 #include "/lib/light/trace.glsl"
 #include "/lib/buffers/global_lights.glsl"
 #include "/lib/light/light_select.glsl"
-#include "/lib/light/entity_light.glsl"
+#include "/lib/settings/capabilities.glsl"
 #include "/lib/light/hand_pose.glsl"
+#include "/lib/light/entity_light.glsl"
 #include "/lib/light/hand_light.glsl"
 #include "/lib/light/blocklight.glsl"
 #include "/lib/light/light.glsl"
@@ -114,8 +117,10 @@
 #include "/lib/common/jitter.glsl"
 // END GENERATED includes
 
-/* RENDERTARGETS: 0 */
+/* RENDERTARGETS: 0,14 */
 layout(location = 0) out vec4 outColor;
+// r = 半透明の不透明度。composite19 のビーコンの光線が読む (colortex4 は composite2 の後に光芒が使う)
+layout(location = 1) out vec4 outTranslucentAlpha;
 
 const float GLASS_IOR = 1.5;
 const float GLASS_F0 = 0.04;
@@ -127,7 +132,8 @@ void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
     vec4 sceneIn = texelFetch(colortex0, texel, 0);
     vec3 scene = sceneIn.rgb;
-    vec4 translucent = texelFetch(colortex4, texel, 0);
+    vec4 translucent = texelFetch(TEX_TRANSLUCENT, texel, 0);
+    outTranslucentAlpha = vec4(translucent.a, 0.0, 0.0, 0.0);
     float d0 = texelFetch(depthtex0, texel, 0).r;
     float d1 = texelFetch(depthtex1, texel, 0).r;
     vec4 data = texelFetch(colortex5, texel, 0);
@@ -221,7 +227,7 @@ void main() {
             sunVis = vec3(smoothstep(0.6, 0.95, lmT.y)) * getCloudShadow(surfPlayer);
         } else if (!below) {
             // 上向きの水面の影 (PCSS) は composite1 (water_trace.fsh) が求めた可視率
-            sunVis = texelFetch(colortex21, texel, 0).rgb;
+            sunVis = texelFetch(TEX_WATER_SUNVIS, texel, 0).rgb;
         }
         vec3 sunSpecVis = sunVis * getCloudSunDiscVisibility();
 
@@ -230,10 +236,10 @@ void main() {
         float behindExcess = 0.0;
         float pathLen = WATER_SKY_PATH;
         if (F < 1.0) {
-            vec4 refr = texelFetch(colortex18, texel, 0);
+            vec4 refr = texelFetch(TEX_WATER_REFR, texel, 0);
             behind = refr.rgb;
             pathLen = refr.a;
-            behindExcess = texelFetch(colortex21, texel, 0).a;
+            behindExcess = texelFetch(TEX_WATER_SUNVIS, texel, 0).a;
         }
 
         // 吸収と内散乱 (水の上から見た時だけ。水中側は sky のフォグ)
@@ -267,7 +273,7 @@ void main() {
             refl = fallback;
         }
         // 物の映り込みのフル解像度の SSR は composite1 (water_trace.fsh) が辿った当たり (rgb = 色 x 重み, a = 重み)
-        vec4 mirror = texelFetch(colortex20, texel, 0);
+        vec4 mirror = texelFetch(TEX_WATER_MIRROR, texel, 0);
         refl = refl * (1.0 - mirror.a) + mirror.rgb;
 #else
         refl = below ? vec3(0.0) : skyReflectionFallback(R, lmT.y, 0.0);

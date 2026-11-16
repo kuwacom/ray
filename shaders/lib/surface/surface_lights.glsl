@@ -47,7 +47,7 @@ const int SL_BLOCK_HIT_FLOOD = 4;         // 2 次ヒットの floodfill だけ
 const uint SL_SUN_CONTACT = 1u << 0;
 const uint SL_POM = 1u << 2;
 const uint SL_SKY = 1u << 3;
-const uint SL_GI = 1u << 4;               // colortex8 を読み、GI が運ぶ空・地面の分を sky から引く
+const uint SL_GI = 1u << 4;               // GI の出力 (TEX_GI) を読み、GI が運ぶ空・地面の分を sky から引く
 const uint SL_HAND = 1u << 5;             // 手持ち光源の LightSample (トレース付き)
 const uint SL_HAND_FILL = 1u << 6;
 const uint SL_BLOCK_SPECULAR = 1u << 7;
@@ -120,7 +120,7 @@ struct SurfaceLights {
     vec3 sky;               // 空の SH x スカイライト。GI が運ぶ分を引いた後、AO の前
     vec3 block;             // ブロックライトの拡散照度 (AO の前)
     vec3 handFill;          // 手持ち光源の照り返し (AO の前)
-    vec4 indirect;          // colortex8 (rgb = GI, a = GTAO)
+    vec4 indirect;          // TEX_GI (rgb = GI, a = GTAO)
     float giSky;            // GI が空の光を運んでいる度合い (ボクセル RT の範囲の端で 0 へ落ちる)
     int blockSpecCount;
     LightSample blockSpec[BLOCKLIGHT_SPECULAR_LIGHTS];

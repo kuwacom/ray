@@ -1,6 +1,6 @@
 /*
- * deferred11: GI / AO のアップサンプル + デノイズ (giRawImg + colortex9 -> colortex8, colortex9)
- * 出力 colortex8: rgb = 間接光の照度, a = AO
+ * deferred11: GI / AO のアップサンプル + デノイズ (giRawImg + colortex9 -> colortex9)
+ * 出力 colortex9: rgb = 間接光の照度, a = AO。今フレームの出力と次フレームの履歴を兼ねる
  * surface モジュール (lib/surface)
  *
  * 1. 空間: 低解像度テクセルの近傍 (GI_DENOISE=2 で 5x5、それ以外 3x3) を深度・法線の差で重み付けして集める (joint bilateral)
@@ -18,6 +18,7 @@
 //@include "/lib/common/temporal.glsl"
 //@include "/lib/surface/surface.glsl"
 //@include "/lib/post/post.glsl"
+//@include "/lib/buffers/slots.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/buffers/images.glsl"
 #include "/lib/settings/look.glsl"
@@ -47,6 +48,7 @@
 #include "/lib/common/frame_offset.glsl"
 #include "/lib/common/look_presets.glsl"
 #include "/lib/common/voxel_space.glsl"
+#include "/lib/buffers/slots.glsl"
 #include "/lib/surface/gi.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/common/transforms.glsl"
@@ -71,15 +73,14 @@
 in vec2 texcoord;
 
 #if GI_DENOISE >= 1
-/* RENDERTARGETS: 8,9,19 */
+/* RENDERTARGETS: 9,10 */
 #else
-/* RENDERTARGETS: 8,9 */
+/* RENDERTARGETS: 9 */
 #endif
-layout(location = 0) out vec4 outIndirect;
-layout(location = 1) out vec4 outHistory;
+layout(location = 0) out vec4 outHistory;
 #if GI_DENOISE >= 1
 // r = 履歴の長さ (フレーム), g = 視線距離, b = 速い履歴の輝度の平均, a = その分散
-layout(location = 2) out vec4 outHistoryInfo;
+layout(location = 1) out vec4 outHistoryInfo;
 #endif
 
 #if GI_DENOISE == 2
@@ -113,8 +114,7 @@ void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
     float depth = texelFetch(depthtex1, texel, 0).r;
     if (depth >= 1.0 || isHandDepth(depth)) {
-        outIndirect = vec4(0.0, 0.0, 0.0, 1.0);
-        outHistory = outIndirect;
+        outHistory = vec4(0.0, 0.0, 0.0, 1.0);
 #if GI_DENOISE >= 1
         outHistoryInfo = vec4(0.0);
 #endif
@@ -146,7 +146,7 @@ void main() {
             ivec2 P = min(L * scale + offset, screen - 1);
             float dP = texelFetch(depthtex1, P, 0).r;
             if (dP >= 1.0 || isHandDepth(dP)) continue;
-            vec4 raw = texelFetch(giRawSampler, L, 0);
+            vec4 raw = texelFetch(TEX_GI_RAW, L, 0);
             float wDepth = bilateralDepthWeight(linearizeDepth(dP), linZ, linZ * GI_DEPTH_SIGMA + 0.05);
             float wNormal = bilateralNormalWeight(normal, readGeoNormal(P), GI_NORMAL_POWER);
             float wSpatial = exp(-float(dx * dx + dy * dy) / float(GI_FILTER_RADIUS * GI_FILTER_RADIUS + 1));
@@ -157,7 +157,7 @@ void main() {
             w2sum += w * w;
         }
     }
-    vec4 mean = wsum > 0.0 ? sum / wsum : texelFetch(giRawSampler, clamp(center, ivec2(0), lowSize - 1), 0);
+    vec4 mean = wsum > 0.0 ? sum / wsum : texelFetch(TEX_GI_RAW, clamp(center, ivec2(0), lowSize - 1), 0);
     vec4 result = mean;
 
 #if GI_DENOISE >= 1
@@ -180,10 +180,10 @@ void main() {
         for (int i = 0; i < 4; i++) {
             ivec2 o = ivec2(i & 1, i >> 1);
             ivec2 p = clamp(p0 + o, ivec2(0), screen - 1);
-            vec4 hi = texelFetch(colortex19, p, 0);
+            vec4 hi = texelFetch(TEX_GI_AUX, p, 0);
             vec2 bw = mix(1.0 - f, f, vec2(o));
             float w = bw.x * bw.y * (hi.r > 0.0 && abs(hi.g - expected) < tol ? 1.0 : 0.0);
-            history += texelFetch(colortex9, p, 0) * w;
+            history += texelFetch(TEX_GI_HIST, p, 0) * w;
             info += hi * w;
             hw += w;
         }
@@ -221,6 +221,5 @@ void main() {
     outHistoryInfo = info;
 #endif
 
-    outIndirect = result;
     outHistory = result;
 }

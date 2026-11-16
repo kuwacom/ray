@@ -1,5 +1,5 @@
 /*
- * shadow (地形) のフラグメント: 影マップの色・法線を書く
+ * shadow_solid / shadow_cutout / shadow_water (地形) と shadow (PROGRAM_SHADOW_FALLBACK) のフラグメント: 影マップの色・法線を書く
  * shadowcolor0: 最も太陽側の面の色 (半透明は透過色 + 不透明度)
  * shadowcolor1: rg = 法線 (oct), b = スカイライト, a = 種別 (0=不透明 0.5=半透明 1=水)
  * light モジュール (RSM で使う内容は surface モジュールと調整)
@@ -48,7 +48,12 @@ layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec4 outNormal;
 
 void main() {
+#ifdef PROGRAM_SHADOW_FALLBACK
+    // shadow.gsh が地形の頂点色の a を 1 にしてある。エンティティは shadow_entities.fsh と同じく頂点色の a でも抜く
+    vec4 albedo = texture(gtexture, texcoord) * glcolor;
+#else
     vec4 albedo = texture(gtexture, texcoord) * vec4(glcolor.rgb, 1.0);
+#endif
     if (albedo.a < 0.1) discard;
 
     float kind = 0.0;

@@ -19,6 +19,7 @@
 //@include "/lib/surface/surface_lights.glsl"
 //@include "/lib/surface/water_self.glsl"
 //@include "/lib/surface/generated_normal.glsl"
+//@include "/lib/light/hand_pose.glsl"
 #if defined GBUF_PARTICLES_TRANSLUCENT && defined FIREWORK_GLOW
     //@include "/lib/surface/particle_glow.glsl"
 #endif
@@ -50,6 +51,8 @@
 #include "/lib/common/frame_offset.glsl"
 #include "/lib/common/look_presets.glsl"
 #include "/lib/common/voxel_space.glsl"
+#include "/lib/buffers/images.glsl"
+#include "/lib/buffers/slots.glsl"
 #include "/lib/surface/gi.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/common/transforms.glsl"
@@ -66,7 +69,6 @@
 #include "/lib/surface/surface.glsl"
 #include "/lib/sky/sh.glsl"
 #include "/lib/common/phase.glsl"
-#include "/lib/buffers/images.glsl"
 #include "/lib/sky/atmosphere.glsl"
 #include "/lib/common/celestial_shape.glsl"
 #include "/lib/sky/celestial.glsl"
@@ -95,8 +97,9 @@
 #include "/lib/light/trace.glsl"
 #include "/lib/buffers/global_lights.glsl"
 #include "/lib/light/light_select.glsl"
-#include "/lib/light/entity_light.glsl"
+#include "/lib/settings/capabilities.glsl"
 #include "/lib/light/hand_pose.glsl"
+#include "/lib/light/entity_light.glsl"
 #include "/lib/light/hand_light.glsl"
 #include "/lib/light/blocklight.glsl"
 #include "/lib/light/light.glsl"
@@ -248,9 +251,28 @@ bool isTranslucentCubeItem(int itemId) {
 }
 #endif
 
+#ifdef GBUF_ENTITIES_TRANSLUCENT
+// 描いているのが自分か (current_player の ID が無い Iris では、目からの距離で見分ける。p は画素の player 空間の位置)
+bool isSelfDraw(vec3 p) {
+#ifdef FX_SELF_BY_DISTANCE
+    return isSelfEntity(entityId, p);
+#else
+    return entityId == ENTITY_CURRENT_PLAYER;
+#endif
+}
+#endif
+
 void main() {
     vec4 tex = texture(gtexture, texcoord);
     vec4 albedo = tex * glcolor;
+#ifdef GBUF_WATER
+    /*
+     * 流れる水の面の向きの画面微分は、透明の画素の discard より前に取る。三角形の外の補助の画素は UV がスプライトの外へ出て
+     * アトラスの透明な所を読み、discard で止まると微分が壊れる。1.20.1 (Iris 1.7.6 + Sodium 0.5) では水の面の境の画素で
+     * 面の向きが壊れ (流れを 0 にしても判定に掛からないので NaN と見られる)、静かな湖に面の境の点線の格子が出た
+     */
+    vec3 faceCross = mat3(gbufferModelViewInverse) * cross(dFdx(viewPos), dFdy(viewPos));
+#endif
 #if defined GBUF_PARTICLES_TRANSLUCENT && defined FIREWORK_GLOW
     // 光る粒 (花火の火花など) と花火の閃光は照らさず発光だけにする。小さな粒はテクスチャの代わりに丸い点で描くので、捨てる判定もその後
     vec2 glowCornerWidth = fwidth(glowCorner);
@@ -336,7 +358,8 @@ void main() {
         WaterSea sea = waterSeaState(lmcoord.y);
         WaterLod lod = waterLod(sea, length(playerPos), abs(dot(geoNormal, V)));
         // 流れる水の上面は傾いているが、頂点の法線は真上のままなので三角形の向きは画面微分から取る
-        vec3 faceNormal = normalize(cross(dFdx(playerPos), dFdy(playerPos)));
+        // 微分が取れなかった画素 (長さ 0) は幾何の法線にする (normalize(0) の NaN を流れに入れない)
+        vec3 faceNormal = dot(faceCross, faceCross) > 0.0 ? normalize(faceCross) : geoNormal;
         if (dot(faceNormal, geoNormal) < 0.0) faceNormal = -faceNormal;
         vec2 flow = waterFlowVelocity(faceNormal, geoNormal);
         if (geoNormal.y > 0.5 && dot(flow, flow) < 1e-4) worldPos = waterParallax(sea, lod, worldPos, -V);
@@ -367,7 +390,7 @@ void main() {
      * 水の中の自分は composite1 (water_trace.fsh) が屈折した視線を自分の三角形に当てて描くので、ここでは描かない (二重の像になる)
      * カメラが水の中の時は逆に、水面より上の体を水面越しに描く (ここで描くと水面の手前に貼り付き、水の中の色と霧が掛かる)
      */
-    if (entityId == ENTITY_CURRENT_PLAYER) {
+    if (isSelfDraw(playerPos)) {
         if (isEyeInWater == 0 ? waterSelfDepth(playerPos) > 0.0 : isEyeInWater == 1 && waterSelfHeight(playerPos) > 0.0) discard;
     }
 #endif
@@ -386,7 +409,7 @@ void main() {
      * 視線に沿った水の中の長さは、水面からの深さを視線の上向きの cos で割った長さ。内散乱は composite2 の深い水と同じ式で、
      * 水面の照度は空と、影を掛けない太陽 (月) の上向きの面への照度 (前方シェーディングをもう 1 回呼ぶとプログラムが 1.5 倍に膨らむ)
      */
-    if (entityId == ENTITY_CURRENT_PLAYER && isEyeInWater == 0) {
+    if (isSelfDraw(playerPos) && isEyeInWater == 0) {
         float below = waterSelfDepth(playerPos);
         if (below > 0.0) {
             vec3 T = exp(-waterExtinction() * (below / max(V.y, WATER_SELF_MIN_COS)));

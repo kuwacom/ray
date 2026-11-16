@@ -24,6 +24,7 @@
 //@include "/lib/light/light.glsl"
 //@include "/lib/surface/screen_trace.glsl"
 //@include "/lib/surface/lighting.glsl"
+//@include "/lib/buffers/slots.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -50,6 +51,8 @@
 #include "/lib/common/frame_offset.glsl"
 #include "/lib/common/look_presets.glsl"
 #include "/lib/common/voxel_space.glsl"
+#include "/lib/buffers/images.glsl"
+#include "/lib/buffers/slots.glsl"
 #include "/lib/surface/gi.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/common/transforms.glsl"
@@ -67,7 +70,6 @@
 #include "/lib/surface/surface.glsl"
 #include "/lib/sky/sh.glsl"
 #include "/lib/common/phase.glsl"
-#include "/lib/buffers/images.glsl"
 #include "/lib/sky/atmosphere.glsl"
 #include "/lib/common/celestial_shape.glsl"
 #include "/lib/sky/celestial.glsl"
@@ -96,8 +98,9 @@
 #include "/lib/light/trace.glsl"
 #include "/lib/buffers/global_lights.glsl"
 #include "/lib/light/light_select.glsl"
-#include "/lib/light/entity_light.glsl"
+#include "/lib/settings/capabilities.glsl"
 #include "/lib/light/hand_pose.glsl"
+#include "/lib/light/entity_light.glsl"
 #include "/lib/light/hand_light.glsl"
 #include "/lib/light/blocklight.glsl"
 #include "/lib/light/light.glsl"
@@ -346,7 +349,7 @@ void main() {
 
     float depth = texelFetch(depthtex1, texel, 0).r;
     if (depth >= 1.0 || isHandDepth(depth)) {
-        imageStore(giRawImg, low, vec4(0.0, 0.0, 0.0, 1.0));
+        imageStore(STORE_GI_RAW, low, vec4(0.0, 0.0, 0.0, 1.0));
         return;
     }
     vec2 uv = (vec2(texel) + 0.5) / viewSize();
@@ -383,5 +386,5 @@ void main() {
 #endif
     gi *= GI_EFFECTIVE_STRENGTH;
 
-    imageStore(giRawImg, low, vec4(max(gi, 0.0), ao));
+    imageStore(STORE_GI_RAW, low, vec4(max(gi, 0.0), ao));
 }

@@ -19,6 +19,7 @@
 //@include "/lib/post/bloom.glsl"
 //@include "/lib/post/post_constants.glsl"
 //@include "/lib/post/sampling.glsl"
+//@include "/lib/buffers/slots.glsl"
 
 // タイルの縮小 (1 / 2^n)。窓の大きさがこれで決まる (ぼかしと双三次の拡大で 3〜4 テクセル)
 const int LOCAL_TONEMAP_TILE_SHIFT = 5;
@@ -69,7 +70,7 @@ vec2 sampleLocalTonemapSource(sampler2D source, vec2 uv) {
 vec3 applyLocalTonemap(vec3 color, vec2 uv, float exposure, float pivot) {
     vec2 screen = viewSize();
     vec4 rect = vec4(localTonemapTileRectPx());
-    vec2 moments = sampleBSplineClamped4(colortex14, (rect.xy + uv * rect.zw) / screen, screen,
+    vec2 moments = sampleBSplineClamped4(TEX_BLOOM, (rect.xy + uv * rect.zw) / screen, screen,
                                          (rect.xy + 0.5) / screen, (rect.xy + rect.zw - 0.5) / screen).xy;
     float own = log2(max(luminance(color), LOCAL_TONEMAP_LUM_MIN));
     float mean = moments.x + log2(exposure);

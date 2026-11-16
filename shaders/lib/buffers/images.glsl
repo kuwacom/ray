@@ -63,8 +63,9 @@ layout(rgba8) uniform image2D cloudWeatherImg;         // 512x512 (prepare2)
 uniform sampler2D cloudWeatherSampler;
 
 // 画面サイズ相対 (1.0 倍で確保。低解像度で使う場合は左上の部分領域を使う)
+// blockLightRaw と giRaw は composite1 -> 2 の間だけ水の値に貸す。読み書きは lib/buffers/slots.glsl の論理名で行う
 #ifdef IMG_BLOCKLIGHT_RAW
-layout(rgba16f) uniform image2D blockLightRawImg;  // light: トレース結果 (生)
+layout(rgba16f) uniform image2D blockLightRawImg;  // light: トレース結果 (生)。composite1 -> 2 は水面の太陽の可視率
 #endif
 uniform sampler2D blockLightRawSampler;
 #ifdef IMG_BLOCKLIGHT_AUX
@@ -72,7 +73,7 @@ layout(rgba16f) uniform image2D blockLightAuxImg;  // light: 鏡面 / モーメ�
 #endif
 uniform sampler2D blockLightAuxSampler;
 #ifdef IMG_GI_RAW
-layout(rgba16f) uniform image2D giRawImg;          // surface: GI / AO の生値
+layout(rgba16f) uniform image2D giRawImg;          // surface: GI / AO の生値。composite1 -> 2 は水の鏡面の SSR
 #endif
 uniform sampler2D giRawSampler;
 #ifdef IMG_REFLECTION
@@ -90,23 +91,15 @@ layout(rgba16f) uniform image2D debugImg;
 uniform sampler2D debugSampler;
 
 // colortex を compute から書くための image (フォーマットは formats.glsl と一致)
+// 時間で分け合う枠 (8・10・14。lib/buffers/slots.glsl) は区間を取り違えないよう、ここに置かない (使うなら slots.glsl に区間を足してから)
 #ifdef IMG_COLORIMG0
 layout(rgba16f) uniform image2D colorimg0;
 #endif
 #ifdef IMG_COLORIMG6
 layout(rgba16f) uniform image2D colorimg6;
 #endif
-#ifdef IMG_COLORIMG8
-layout(rgba16f) uniform image2D colorimg8;
-#endif
-#ifdef IMG_COLORIMG10
-layout(rgba16f) uniform image2D colorimg10;
-#endif
 #ifdef IMG_COLORIMG12
 layout(rgba16f) uniform image2D colorimg12;
-#endif
-#ifdef IMG_COLORIMG14
-layout(rgba16f) uniform image2D colorimg14;
 #endif
 
 #endif

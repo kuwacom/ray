@@ -25,6 +25,7 @@ glslangValidator は仕様の文法しか見ないので、ドライバ固有の
     uv run tools/gl_compile_check.py --all-programs     # program.*.enabled で無効なプログラムも検査する
     uv run tools/gl_compile_check.py --time --gpu 1070  # 検査の代わりにコールドのコンパイル時間を測る
     uv run tools/gl_compile_check.py --shaders <dir>    # 別のフォルダのシェーダーを検査する
+    uv run tools/gl_compile_check.py --env 1.7.6        # ローダーを選ぶ (tools/capabilities.py の ENVS。既定 latest。能力が無くて読まれないプログラムは除く)
     uv run tools/gl_compile_check.py --asm --gpu 1070 --section gbuffers_hand_water   # NV のアセンブリの行数 (時間なし。--time を足すと時間も)
     uv run tools/gl_compile_check.py --asm --ray --gpu 1070                           # 保存した設定 (Ray.txt) で。パスも渡せる
 
@@ -278,9 +279,10 @@ def gl_string(enum: int) -> str:
 
 # shaders.properties の #if を評価して program.*.enabled = false を拾う (Iris と同じく無効なプログラムは読まれない)
 
-def effective_macros(overrides: dict[str, str | bool], options: dict[str, vs.Option]) -> dict[str, str]:
+def effective_macros(overrides: dict[str, str | bool], options: dict[str, vs.Option], env: vs.Env | None = None) -> dict[str, str]:
     """設定の実効値 -> マクロ表 (ブール設定は定義の有無, 値設定は値)"""
-    macros: dict[str, str] = {k: v for k, v in vs.IRIS_MACROS.items()}
+    # ローダーの既定は最新の Iris (capabilities.ENVS の先頭)。--env で選んだものは本文と同じ値を渡す
+    macros: dict[str, str] = {**vs.IRIS_MACROS, **(env or vs.ENVS[0]).macros}
     for name, opt in options.items():
         val = overrides.get(name, opt.default)
         if opt.kind == "bool":
@@ -289,6 +291,13 @@ def effective_macros(overrides: dict[str, str | bool], options: dict[str, vs.Opt
         else:
             macros[name] = str(val).rstrip("f") if re.fullmatch(r"-?[\d.]+f?", str(val)) else str(val)
     return macros
+
+
+def unread_programs(overrides: dict[str, str | bool], options: dict[str, vs.Option], env: vs.Env | None = None) -> set[str]:
+    """Iris が読まないプログラム (world/name)。program.*.enabled で止めたものと、ローダーに能力が無くて読まれないもの"""
+    env = env or vs.ENVS[0]
+    disabled = disabled_programs(preprocess_properties(vs.PROPERTIES, effective_macros(overrides, options, env)))
+    return disabled | {f"{w}/{p}" for w in vs.WORLDS for p in vs.loader_checks.missing_programs(env)}
 
 
 # 前処理 (glslang -E) と宣言数
@@ -879,7 +888,7 @@ def read_ray_settings(path: str) -> dict[str, str]:
 
 def time_programs(configs: list[tuple[str, dict, list[str]]], options: dict[str, vs.Option], features: list[str],
                   flt: str, sections: list[str], all_programs: bool, reps: int = 1, asm: bool = False,
-                  all_stages: bool = False) -> int:
+                  all_stages: bool = False, env: vs.Env | None = None) -> int:
     """
     --time / --asm: 有効なプログラムのコールドのコンパイル時間とアセンブリの統計を表示する。同じ本文は 1 回の実行の中で 1 回だけ測る
     reps が 2 以上なら回ごとに nonce を変えて繰り返し、時間は中央値 (リンクは全回の値も表示)。0 ならアセンブリだけ
@@ -890,7 +899,7 @@ def time_programs(configs: list[tuple[str, dict, list[str]]], options: dict[str,
     count = failed = 0
     t_all = time.perf_counter()
     for cfg_name, ov, worlds in configs:
-        disabled = disabled_programs(preprocess_properties(vs.PROPERTIES, effective_macros(ov, options)))
+        disabled = unread_programs(ov, options, env)
         for world in worlds:
             for pname, files in collect_programs(world, flt, sections).items():
                 prog_key = f"{world}/{pname.removesuffix('.csh')}"
@@ -898,7 +907,7 @@ def time_programs(configs: list[tuple[str, dict, list[str]]], options: dict[str,
                     continue
                 stages = []
                 for f in files:
-                    src, lm = vs.build_source(f, ov, options, features)
+                    src, lm = vs.build_source(f, ov, options, features, env)
                     stages.append(StageSource(f, vs.STAGE_OF_EXT[f.suffix], src, lm))
                 key = run_key(stages)
                 if key in seen:
@@ -916,7 +925,7 @@ def time_programs(configs: list[tuple[str, dict, list[str]]], options: dict[str,
                 total += comp + link
                 count += 1
                 failed += not ok
-                line = f"[{cfg_name}] {prog_key:36s} "
+                line = f"[{(env or vs.ENVS[0]).name}/{cfg_name}] {prog_key:36s} "
                 if reps:
                     line += f"{comp + link:7.2f}s (compile {comp:6.2f} link {link:6.2f}"
                     line += (" all " + " ".join(f"{x:.2f}" for x in links) if reps > 1 else "") + ")"
@@ -946,7 +955,9 @@ def main() -> int:
     ap.add_argument("--all-stages", action="store_true", help="--asm で頂点・ジオメトリも数える")
     ap.add_argument("--ray", nargs="?", const="", metavar="Ray.txt", help="既定値の代わりに保存した設定 (Ray.txt) を当てる (パス省略で $RAY_MC_DIR/shaderpacks/Ray.txt)")
     ap.add_argument("--shaders", type=Path, help="検査するシェーダーのフォルダ (既定: このリポジトリの shaders/)")
+    ap.add_argument("--env", help=f"ローダー (tools/capabilities.py の ENVS の名前。既定 {vs.ENVS[0].name})")
     args = ap.parse_args()
+    env = vs.env_named(args.env)
     level = "warning" if args.warnings else "error"
     if args.shaders:
         vs.set_shaders_dir(args.shaders)
@@ -967,6 +978,7 @@ def main() -> int:
     measuring = args.time or args.asm
     parallel = False if measuring else enable_parallel_compile(args.jobs)
     print(f"GL: {gl_string(GL.GL_VENDOR)} / {gl_string(GL.GL_RENDERER)} / {gl_string(GL.GL_VERSION)}")
+    print(f"ローダー: {env.name} {env.macros}")
     if args.limits:
         for k, v in limits.items():
             print(f"  {k:52s} {v}")
@@ -993,7 +1005,7 @@ def main() -> int:
     if measuring:
         try:
             return time_programs(configs, options, features, args.filter, sections, args.all_programs,
-                                 args.reps if args.time else 0, args.asm, args.all_stages)
+                                 args.reps if args.time else 0, args.asm, args.all_stages, env)
         finally:
             glfw.destroy_window(win)
             glfw.terminate()
@@ -1010,9 +1022,9 @@ def main() -> int:
 
     try:
         for cfg_name, ov, worlds in configs:
-            macros = effective_macros(ov, options)
+            macros = effective_macros(ov, options, env)
             prop_lines = preprocess_properties(vs.PROPERTIES, macros)
-            disabled = disabled_programs(prop_lines)
+            disabled = unread_programs(ov, options, env)
             buffer_sizes = buffer_object_sizes(prop_lines)
             for p in check_properties(prop_lines, limits):
                 if p not in seen_static:
@@ -1032,7 +1044,7 @@ def main() -> int:
                             continue
                         srcs = []
                         for i, f in enumerate(files):
-                            src, lm = vs.build_source(f, ov, options, features)
+                            src, lm = vs.build_source(f, ov, options, features, env)
                             ss = StageSource(f, vs.STAGE_OF_EXT[f.suffix], src, lm)
                             stage_jobs[(pname, i)] = ss
                             srcs.append(ss.stage + ss.source)
@@ -1081,7 +1093,7 @@ def main() -> int:
                         res.usage_problems = check_usage(prog_key, stages, res, limits, buffer_sizes)
                         cache[key] = res
                     checked += 1
-                    label = f"[{cfg_name}] {prog_key} ({'+'.join(s.stage for s in stages)})"
+                    label = f"[{env.name}/{cfg_name}] {prog_key} ({'+'.join(s.stage for s in stages)})"
                     if args.report:
                         report_rows.append((label, res.usage))
                     errors = [m for m in res.messages if "error" in m.split(":")[0] or m.startswith("link")]

@@ -10,6 +10,7 @@
 //@include "/lib/common/exposure.glsl"
 //@include "/lib/common/temporal.glsl"
 //@include "/lib/post/post_internal.glsl"
+//@include "/lib/buffers/slots.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -42,6 +43,8 @@
 #include "/lib/post/exposure.glsl"
 #include "/lib/post/camera.glsl"
 #include "/lib/post/grading.glsl"
+#include "/lib/buffers/images.glsl"
+#include "/lib/buffers/slots.glsl"
 #include "/lib/post/bloom.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/post/lens_optics.glsl"
@@ -55,7 +58,7 @@
 in vec2 texcoord;
 
 #ifdef SPECULAR_SPARKLE
-/* RENDERTARGETS: 0,13,17 */
+/* RENDERTARGETS: 0,13,8 */
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec4 outHistory;
 layout(location = 2) out vec4 outSparkle;
@@ -97,7 +100,7 @@ vec3 clipToBox(vec3 history, vec3 boxMin, vec3 boxMax) {
 /*
  * 鏡面の白飛び分の割合 (deferred30 / composite2 / composite19 が colortex0.a = 1 + 割合で渡す)
  * 白を超えた分は 1 画素ほどの HDR の点になり、トーンマップ空間の近傍の箱と低い混合率では数十フレームかけないと履歴が追いつかず、
- * ブルームに届く前に平らな灰色へ潰れる。この分は箱の統計と本体の履歴から外し、線形のまま専用の短い履歴 (colortex17) で混ぜて足す
+ * ブルームに届く前に平らな灰色へ潰れる。この分は箱の統計と本体の履歴から外し、線形のまま専用の短い履歴 (colortex8) で混ぜて足す
  * 位置は法線の反射で決まり、白より下は TAA を通すので輪郭はアンチエイリアスされる
  */
 float sparkleShare(float a) { return clamp(a - 1.0, 0.0, 1.0); }
@@ -138,7 +141,7 @@ vec3 gatherSparkle(vec2 pos, ivec2 maxTexel) {
  */
 void writeTaaOutput(vec3 result, vec3 sparkleNow, vec3 sparkleMax, vec2 prevUv, bool valid, float motionPx, float rawA, float historyDist) {
 #ifdef SPECULAR_SPARKLE
-    vec3 sparkleHist = valid ? max(sanitizeColor(textureLod(colortex17, prevUv, 0.0).rgb), 0.0) : vec3(0.0);
+    vec3 sparkleHist = valid ? max(sanitizeColor(textureLod(TEX_SPARKLE_HIST, prevUv, 0.0).rgb), 0.0) : vec3(0.0);
     sparkleHist = min(sparkleHist, max(sparkleMax, sparkleNow));
     float sa = valid ? mix(SPARKLE_HISTORY_BLEND, SPARKLE_HISTORY_BLEND_MOVING, saturate(motionPx / TAA_BLEND_MOTION_PX)) : 1.0;
     vec3 sparkle = mix(sparkleHist, sparkleNow, sa);

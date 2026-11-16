@@ -7,24 +7,18 @@ const int colortex0Format  = RGBA16F; // シーン HDR          | deferred30 -> 
 const int colortex1Format  = RGBA8;   // G: アルベド + ID    | gbuffers (不透明) -> deferred*
 const int colortex2Format  = RGBA16;  // G: 法線 + ライトマップ | gbuffers (不透明) -> deferred* / composite*
 const int colortex3Format  = RGBA16;  // G: PBR + AO          | gbuffers (不透明) -> deferred*
-const int colortex4Format  = RGBA16F; // 半透明の色 (乗算済み) | gbuffers (半透明) -> composite2
+const int colortex4Format  = RGBA16F; // 半透明の色 (乗算済み) | gbuffers (半透明) -> composite2。後に B: 画面空間の光芒 (左上 1/GODRAYS_RES、.r) | composite12 -> 13 -> 14 -> composite19
 const int colortex5Format  = RGBA16;  // 半透明のデータ       | gbuffers (半透明) -> composite*
 const int colortex6Format  = RGBA16F; // A: ブロックライト    | deferred2 -> deferred30 / composite*
 const int colortex7Format  = RGBA16F; // A: ブロックライト履歴 | deferred2 (永続)
-const int colortex8Format  = RGBA16F; // C: GI / AO           | deferred11 -> deferred30
-const int colortex9Format  = RGBA16F; // C: GI 履歴           | deferred11 (永続)
-const int colortex10Format = RGBA16F; // B: 雲 (低解像度)     | deferred20 -> deferred21
+const int colortex8Format  = RGBA16F; // D: 鏡面の白飛び分の履歴 | composite20 (永続, SPECULAR_SPARKLE) -> final (ミップ)
+const int colortex9Format  = RGBA16F; // C: GI / AO (出力と履歴) | deferred11 (永続) -> deferred30 / composite*
+const int colortex10Format = RGBA16F; // C: GI 履歴の付属 (長さ, 視線距離, 速い履歴の輝度の平均・分散) | deferred11 (永続, GI_DENOISE >= 1)
 const int colortex11Format = RGBA16F; // B: 雲履歴            | deferred21 (永続) -> deferred30 / composite*
 const int colortex12Format = RGBA16F; // B: ボリューメトリック | composite1_a -> composite19
 const int colortex13Format = RGBA16F; // D: TAA 履歴          | composite20 (永続)
-const int colortex14Format = RGBA16F; // D: ブルームタイル    | composite23 -> composite24 -> final
+const int colortex14Format = RGBA16F; // B: 雲 (低解像度) | deferred20 -> deferred21、水の屈折先の色 + 水の中の経路長 | composite1 -> composite2 (水の画素だけ)、半透明の不透明度 | composite2 -> composite19、D: ブルームタイル | composite23 -> composite24 -> final
 const int colortex15Format = RGBA16F; // 速度ベクトル         | gbuffers (エンティティ/手) -> composite20 / 21
-const int colortex16Format = R16F;    // B: 画面空間の光芒 (低解像度) | composite12 -> 13 -> 14 -> composite19
-const int colortex17Format = RGBA16F; // D: 鏡面の白飛び分の履歴 | composite20 (永続, SPECULAR_SPARKLE)
-const int colortex18Format = RGBA16F; // 水の屈折先の色 + 水の中の経路長 | composite1 -> composite2 (水の画素だけ)
-const int colortex19Format = RGBA16F; // C: GI 履歴の付属 (長さ, 視線距離, 速い履歴の輝度の平均・分散) | deferred11 (永続, GI_DENOISE >= 1)
-const int colortex20Format = RGBA16F; // 水の鏡面の SSR (当たりの色 x 重み + 重み) | composite1 -> composite2 (水の画素だけ, REFLECTIONS > 0)
-const int colortex21Format = RGBA16F; // 水面の太陽の可視率 (影 + 雲影) + 屈折先の白飛び分の輝度 | composite1 -> composite2 (水の画素だけ)
 
 const bool colortex0Clear  = true;
 const bool colortex1Clear  = true;
@@ -34,7 +28,7 @@ const bool colortex4Clear  = true;
 const bool colortex5Clear  = true;
 const bool colortex6Clear  = true;
 const bool colortex7Clear  = false;
-const bool colortex8Clear  = true;
+const bool colortex8Clear  = false;
 const bool colortex9Clear  = false;
 const bool colortex10Clear = false;
 const bool colortex11Clear = false;
@@ -42,12 +36,6 @@ const bool colortex12Clear = false;
 const bool colortex13Clear = false;
 const bool colortex14Clear = true;
 const bool colortex15Clear = true;
-const bool colortex16Clear = true;
-const bool colortex17Clear = false;
-const bool colortex18Clear = false;
-const bool colortex19Clear = false;
-const bool colortex20Clear = false;
-const bool colortex21Clear = false;
 
 const vec4 colortex0ClearColor  = vec4(0.0, 0.0, 0.0, 0.0);
 const vec4 colortex1ClearColor  = vec4(0.0, 0.0, 0.0, 0.0);
@@ -56,10 +44,8 @@ const vec4 colortex3ClearColor  = vec4(0.0, 0.0, 0.0, 0.0);
 const vec4 colortex4ClearColor  = vec4(0.0, 0.0, 0.0, 0.0);
 const vec4 colortex5ClearColor  = vec4(0.0, 0.0, 0.0, 0.0);
 const vec4 colortex6ClearColor  = vec4(0.0, 0.0, 0.0, 0.0);
-const vec4 colortex8ClearColor  = vec4(0.0, 0.0, 0.0, 1.0);
 const vec4 colortex14ClearColor = vec4(0.0, 0.0, 0.0, 0.0);
 const vec4 colortex15ClearColor = vec4(0.0, 0.0, 0.0, 0.0);
-const vec4 colortex16ClearColor = vec4(0.0, 0.0, 0.0, 0.0);
 
 const int shadowcolor0Format = RGBA8;  // 最も太陽側の面の色 (半透明は透過色, a = 不透明度)
 const int shadowcolor1Format = RGBA16; // rg = 法線 (oct), b = スカイライト, a = 種別 (0=不透明 0.5=半透明 1=水)

@@ -13,6 +13,14 @@
 //@include "/lib/post/post.glsl"
 #ifdef GBUF_ENTITIES
     //@include "/lib/common/exposure.glsl"
+    //@include "/lib/settings/capabilities.glsl"
+    //@include "/lib/surface/lightning.glsl"
+#endif
+#ifdef GBUF_PARTICLES
+    //@include "/lib/settings/capabilities.glsl"
+#endif
+#if defined GBUF_PARTICLES && defined FX_SPARKS_IN_PARTICLES && defined FIREWORK_GLOW
+    //@include "/lib/surface/particle_glow.glsl"
 #endif
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
@@ -43,6 +51,8 @@
 #include "/lib/common/frame_offset.glsl"
 #include "/lib/common/look_presets.glsl"
 #include "/lib/common/voxel_space.glsl"
+#include "/lib/buffers/images.glsl"
+#include "/lib/buffers/slots.glsl"
 #include "/lib/surface/gi.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/common/transforms.glsl"
@@ -64,6 +74,15 @@
 #include "/lib/post/post.glsl"
 #ifdef GBUF_ENTITIES
     #include "/lib/common/exposure.glsl"
+    #include "/lib/settings/capabilities.glsl"
+    #include "/lib/surface/lightning.glsl"
+#endif
+#ifdef GBUF_PARTICLES
+    #include "/lib/settings/capabilities.glsl"
+#endif
+#if defined GBUF_PARTICLES && defined FX_SPARKS_IN_PARTICLES && defined FIREWORK_GLOW
+    #include "/lib/common/exposure.glsl"
+    #include "/lib/surface/particle_glow.glsl"
 #endif
 // END GENERATED includes
 
@@ -79,6 +98,10 @@ flat in int blockId;
 #ifdef GBUF_ENTITIES
     flat in int swirlLayer;
 #endif
+#if defined GBUF_PARTICLES && defined FX_SPARKS_IN_PARTICLES && defined FIREWORK_GLOW
+    in vec2 glowCorner;
+    in float glowGain;
+#endif
 
 #ifdef GBUF_HAND
 /*
@@ -91,6 +114,13 @@ flat in int blockId;
  * 電気の渦の層 (帯電したクリーパー・ウィザーの防壁) は加算ブレンドの層なので、バニラが半透明の物と一緒に deferred の後に描く
  * G バッファへ書いても deferred が読み終わっていて映らないので、colortex4 へ加算する (shaders.properties の blend)
  * 渦でない画素は 0 を書いて何も足さない
+ */
+/* RENDERTARGETS: 1,2,3,15,4 */
+#elif defined GBUF_PARTICLES && defined FX_SPARKS_IN_PARTICLES && defined FIREWORK_GLOW
+/*
+ * 火花が不透明のパーティクルで来る環境 (FX_SPARKS_IN_PARTICLES) は、光る粒の発光を colortex4 へ書く
+ * (半透明の経路と同じく composite2 が重ね、白を超えた分を TAA の外へ渡す)。光らない粒は 0 を書いて後ろの粒の発光を隠す
+ * 加算にすると、奥から手前の順に描かれた重なる火花の分だけ足されて、玉が白く飛んだ (半透明の経路は重ねても 1 粒の明るさ)
  */
 /* RENDERTARGETS: 1,2,3,15,4 */
 #else
@@ -107,6 +137,8 @@ layout(location = 5) out vec4 outTranslucentDataClear;
 layout(location = 4) out vec4 outSwirl;
 // EMISSION_CHARGED_CREEPER_BRIGHTNESS が 1 増えるごとに足す、バニラの明るさの倍数
 const float CHARGED_SWIRL_GAIN = 3.0;
+#elif defined GBUF_PARTICLES && defined FX_SPARKS_IN_PARTICLES && defined FIREWORK_GLOW
+layout(location = 4) out vec4 outGlow;
 #endif
 
 #if PBR_FORMAT == 1 && !defined GBUF_BASIC && !defined GBUF_LINE
@@ -300,6 +332,49 @@ void main() {
 #endif
 #ifdef GBUF_ENTITIES
     if (entityId == ENTITY_SHADOW) discard;
+#endif
+#if defined GBUF_ENTITIES && defined FX_LIGHTNING_IN_ENTITIES
+    /*
+     * gbuffers_lightning を読まないローダー (Oculus) は雷 (とドラゴンの死亡時の光線) をここで描く。頂点形式は POSITION_COLOR だけで
+     * テクスチャ・法線が無く、下の G バッファの経路では法線が NaN になって TAA で黒い染みが広がる
+     * gbuffers_lightning と同じ発光を colortex4 へ加算し、G バッファは光を受けない発光の面にする (deferred の後に描かれれば映らない。
+     * 前なら発光の柱として映る)
+     * 見分けは entityId (Iris は雷の間 lightning_bolt にする) と、法線が無いこと (ID の来ない版のため。NaN も拾う)
+     */
+    if (getEntityLightIndex(entityId) == LIGHT_ENTITY_LIGHTNING || !(dot(normalPlayer, normalPlayer) > 0.5)) {
+        GBufferData lg = gbufferDefault();
+        lg.albedo = srgbToLinear(glcolor.rgb / max(maxOf(glcolor.rgb), 1e-3));
+        lg.materialId = MAT_LIGHTNING;
+        lg.geoNormal = vec3(0.0, 1.0, 0.0);
+        lg.normal = lg.geoNormal;
+        lg.lightmap = vec2(1.0);
+        lg.emission = 1.0;
+        encodeGBuffer(lg, outAlbedo, outNormal, outMaterial);
+        outVelocity = encodeVelocity(viewPos);
+        outSwirl = vec4(lightningGlow(glcolor), 0.0);
+        return;
+    }
+#endif
+#if defined GBUF_PARTICLES && defined FX_SPARKS_IN_PARTICLES && defined FIREWORK_GLOW
+    // 微分は分岐の外で取る
+    vec2 glowCornerWidth = fwidth(glowCorner);
+    if (glowGain > 0.0) {
+        vec4 glow = evalParticleGlow(texture(gtexture, texcoord), glcolor, glowCorner, glowCornerWidth, glowGain, length(viewPos));
+        /*
+         * この経路はブレンドできないので、不透明度の割合で画素を間引き、TAA で混ぜる (半透明の経路の a のブレンドの代わり)
+         * 残した画素の G バッファは光を受けない黒にして、発光は colortex4 へ書く
+         */
+        if (glow.a <= interleavedGradientNoise(gl_FragCoord.xy, frameCounter)) discard;
+        GBufferData sg = gbufferDefault();
+        sg.albedo = vec3(0.0);
+        sg.f0 = 0.0;
+        sg.materialId = MAT_PARTICLE;
+        sg.lightmap = lmcoord;
+        encodeGBuffer(sg, outAlbedo, outNormal, outMaterial);
+        outVelocity = vec4(0.0);
+        outGlow = vec4(glow.rgb, 0.0);
+        return;
+    }
 #endif
 
     vec3 geoN = normalize(normalPlayer);
@@ -564,5 +639,8 @@ void main() {
     outTranslucentDataClear = vec4(0.0);
 #else
     outVelocity = vec4(0.0);
+#endif
+#if defined GBUF_PARTICLES && defined FX_SPARKS_IN_PARTICLES && defined FIREWORK_GLOW
+    outGlow = vec4(0.0);
 #endif
 }

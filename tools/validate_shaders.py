@@ -15,6 +15,13 @@ Iris の前処理を簡易再現して glslangValidator で全プログラムを
 - ラッパー (shaders/world*) と shaders.properties の program.*.enabled の生成が最新か、止める条件の設定が存在するか (tools/gen_wrappers.py)
 - lang (en_US / ja_JP) に全設定・全画面のラベルがあるか
 - shaders.properties の screen に全設定が載っているか
+- 能力の生成物 (tools/gen_capabilities.py) が最新か、MC_VERSION / IRIS_VERSION / MAX_COLOR_BUFFERS を生成物の外で使っていないか、
+  RENDERTARGETS のカンマの後に空白が無いか
+
+ローダー (tools/capabilities.py の ENVS: latest / mid / 1.7.6) ごとに、マクロを変えてコンパイルし、次も調べる (tools/loader_checks.py)
+- iris.features.required の flag、bufferObject の添字、image の数、image と customTexture の形式の列挙
+- 前処理の後に有効なプログラムが colortex の上限以上を使っていないか (失敗にする)
+--full では、分け合う colortex の区間の外の読み書きも調べる (tools/check_slots.py --intervals の既定値 x 3 ディメンション)
 
 使い方:
     uv run tools/validate_shaders.py                    # 高速: 既定値・world0 のみ + 前回成功から変わったものだけ
@@ -23,6 +30,8 @@ Iris の前処理を簡易再現して glslangValidator で全プログラムを
     uv run tools/validate_shaders.py --filter deferred  # ファイル名に文字列を含むものだけ
     uv run tools/validate_shaders.py --no-cache         # キャッシュを使わず全部コンパイルし直す
     uv run tools/validate_shaders.py --shaders <dir>    # 別のフォルダのシェーダーを検証する
+    uv run tools/validate_shaders.py --env 1.7.6        # このローダーだけ (既定は ENVS の全部)
+    uv run tools/validate_shaders.py --colortex-report <path>   # colortex の上限を超える使用の一覧を書く
 
 キャッシュ (tools/.cache/validate.json): include を展開し設定を差し替えた後の本文のハッシュを、成功したものだけ記録する
 本文には依存ファイルと設定値がすべて入っているので、どのファイルを変えても影響するプログラムだけが再コンパイルされる
@@ -47,14 +56,18 @@ import threading
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import check_slots  # noqa: E402
 import gen_block_properties  # noqa: E402
+import gen_capabilities  # noqa: E402
 import gen_includes  # noqa: E402
 import gen_settings  # noqa: E402
 import gen_wrappers  # noqa: E402
 import include_deps  # noqa: E402
+import loader_checks  # noqa: E402
+from capabilities import ENVS, Env  # noqa: E402
 from gen_settings import CONST_RE, DEFINE_RE, Option  # noqa: E402
 from lib.paths import ROOT, SHADERS  # noqa: E402
-from lib.properties import read_properties_logical_lines, resolve_profile  # noqa: E402
+from lib.properties import disabled_programs, read_properties_logical_lines, resolve_profile  # noqa: E402
 
 
 PROPERTIES = SHADERS / "shaders.properties"
@@ -85,12 +98,11 @@ RENDER_STAGES = [
     "WORLD_BORDER", "HAND_TRANSLUCENT",
 ]
 
+# バージョンで変わるマクロ (MC_VERSION / IRIS_VERSION / MAX_COLOR_BUFFERS) は capabilities.ENVS のローダーごとに入れる
 IRIS_MACROS = {
-    "MC_VERSION": "12104",
     "MC_GL_VERSION": "460",
     "MC_GLSL_VERSION": "460",
     "IS_IRIS": "",
-    "IRIS_VERSION": "10800",
     "IRIS_TAG_SUPPORT": "2",
     "MC_OS_WINDOWS": "",
     "MC_GL_VENDOR_NVIDIA": "",
@@ -291,12 +303,25 @@ def expanded(wrapper: Path) -> tuple[tuple[str, ...], tuple[tuple[str, int], ...
     candidates = tuple(i for i, ln in enumerate(lines) if is_setting_line(ln))
     return lines, linemap, candidates
 
-def build_source(wrapper: Path, overrides: dict[str, str | bool], options: dict[str, Option], features: list[str]) -> tuple[str, list[tuple[str, int]]]:
+def env_named(name: str | None) -> Env:
+    """ローダーの名前 -> Env。None なら最新 (ENVS の先頭)"""
+    if name is None:
+        return ENVS[0]
+    for e in ENVS:
+        if e.name == name:
+            return e
+    sys.exit(f"--env {name}: 未知のローダー (候補: {', '.join(e.name for e in ENVS)})")
+
+
+def build_source(wrapper: Path, overrides: dict[str, str | bool], options: dict[str, Option], features: list[str],
+                 env: Env | None = None) -> tuple[str, list[tuple[str, int]]]:
+    # 既定値を定義時の ENVS[0] にすると、呼び出し側で選んだローダーが届かない経路が残るので呼ぶ時に決める
+    env = env or ENVS[0]
     raw, raw_map, candidates = expanded(wrapper)
     linemap = list(raw_map)
     lines = apply_overrides(list(raw), overrides, options, candidates)
     assert lines[0].startswith("#version"), f"{wrapper}: 1 行目が #version ではない"
-    inject = [f"#define {k} {v}".rstrip() for k, v in IRIS_MACROS.items()]
+    inject = [f"#define {k} {v}".rstrip() for k, v in {**IRIS_MACROS, **env.macros}.items()]
     inject += [f"#define MC_RENDER_STAGE_{s} {i}" for i, s in enumerate(RENDER_STAGES)]
     inject += [f"#define IRIS_FEATURE_{f}" for f in features]
     out = [lines[0]] + inject + lines[1:]
@@ -381,18 +406,19 @@ def find_glslang() -> str:
 
 
 def compile_one(glslang: str, tmpdir: Path, wrapper: Path, cfg_name: str, overrides, options, features,
-                cache: SuccessCache | None = None, glslang_id: str = "") -> tuple[str, list[str], str | None]:
+                cache: SuccessCache | None = None, glslang_id: str = "", env: Env | None = None) -> tuple[str, list[str], str | None]:
     """戻り値: (表示名, メッセージ, 成功時に記録するキャッシュキー。キャッシュから返した時と失敗時は None)"""
-    label = f"[{cfg_name}] {wrapper.relative_to(SHADERS).as_posix()}"
+    env = env or ENVS[0]
+    label = f"[{env.name}/{cfg_name}] {wrapper.relative_to(SHADERS).as_posix()}"
     try:
-        src, linemap = build_source(wrapper, overrides, options, features)
+        src, linemap = build_source(wrapper, overrides, options, features, env)
     except Exception as e:  # noqa: BLE001 - 前処理の失敗はそのまま報告する
         return label, [f"preprocess: {e}"], None
     stage = STAGE_OF_EXT[wrapper.suffix]
     key = SuccessCache.key(glslang_id, stage, src)
     if cache is not None and cache.get(key) is not None:
         return label, [], None
-    safe = re.sub(r"[^\w.-]", "_", f"{cfg_name}_{wrapper.parent.name}_{wrapper.stem}")
+    safe = re.sub(r"[^\w.-]", "_", f"{env.name}_{cfg_name}_{wrapper.parent.name}_{wrapper.stem}")
     tmp = tmpdir / f"{safe}.{stage}"
     tmp.write_text(src, encoding="utf-8")
     proc = subprocess.run([glslang, "-S", stage, str(tmp)], capture_output=True, text=True, encoding="utf-8", errors="replace")
@@ -408,6 +434,28 @@ def compile_one(glslang: str, tmpdir: Path, wrapper: Path, cfg_name: str, overri
         msgs.append("ERROR (glslang): " + (proc.stdout + proc.stderr).strip().splitlines()[-1] if (proc.stdout + proc.stderr).strip() else "ERROR (glslang): unknown")
     # 警告付きも記録しない (毎回表示されるように)
     return label, msgs, (key if proc.returncode == 0 and not msgs else None)
+
+
+_SCAN_STATE: dict[str, tuple[dict[str, Option], list[str]]] = {}
+
+
+def scan_one(shaders: str, wrapper: str, cfg_name: str, overrides: dict, env_name: str) -> tuple[str, loader_checks.ScanResult]:
+    """
+    ### scan_one
+    1 プログラムのローダーの検査 (loader_checks.program_scan)。前処理の評価は Python で重いので、別のプロセスで回す
+
+    @returns (表示名, 結果)
+    """
+    if Path(shaders) != SHADERS:
+        set_shaders_dir(Path(shaders))
+    if shaders not in _SCAN_STATE:
+        req, opt = parse_features()
+        _SCAN_STATE[shaders] = (parse_settings(), req + opt)
+    options, features = _SCAN_STATE[shaders]
+    env = env_named(env_name)
+    path = Path(wrapper)
+    src, linemap = build_source(path, overrides, options, features, env)
+    return f"[{env.name}/{cfg_name}]", loader_checks.program_scan(env, cfg_name, f"{path.parent.name}/{path.name}", src, linemap)
 
 
 def properties_checks() -> list[str]:
@@ -437,9 +485,13 @@ def static_checks(options: dict[str, Option], profiles: dict[str, list[str]]) ->
     problems += include_deps.Tree(SHADERS).problems()
     problems += gen_includes.check(SHADERS)
     problems += gen_wrappers.check(SHADERS)
+    problems += check_slots.check(SHADERS)
     problems += gen_settings.check(SHADERS)
     problems += gen_settings.definition_problems(SHADERS)
     problems += gen_block_properties.check(SHADERS)
+    problems += gen_capabilities.check(SHADERS)
+    problems += loader_checks.rendertargets_spacing(SHADERS)
+    problems += loader_checks.direct_loader_macros(SHADERS)
     for pname in profiles:
         for k, v in resolve_profile(pname, profiles).items():
             opt = options.get(k)
@@ -500,6 +552,56 @@ def static_checks(options: dict[str, Option], profiles: dict[str, list[str]]) ->
     return problems
 
 
+def properties_by_loader(env: Env, cfg_name: str, ov: dict, options: dict[str, Option]) -> tuple[set[str], list[str], list[loader_checks.ColortexUse]]:
+    """
+    ### properties_by_loader
+    1 つのローダーと設定の組で shaders.properties を前処理して調べる (tools/loader_checks.py)
+
+    @returns (読まれないプログラム `world0/shadow_entities` の形。properties で止めたものと、能力が無くて読まれないもの,
+              問題, 上限を超える colortex の項目)
+    """
+    macros = {**IRIS_MACROS, **env.macros, **loader_checks.settings_macros(options, ov)}
+    props = loader_checks.preprocessed_properties(SHADERS, macros)
+    skipped = disabled_programs(props) | {f"{w}/{p}" for w in WORLDS for p in loader_checks.missing_programs(env)}
+    problems = [f"[{env.name}/{cfg_name}] {p}" for p in loader_checks.properties_problems(env, props)]
+    return skipped, problems, loader_checks.properties_colortex(env, cfg_name, props)
+
+
+def colortex_rows(uses: list[loader_checks.ColortexUse]) -> list[tuple[str, int, str, str, list[str], list[str]]]:
+    """(ローダー, 番号, 種類, 場所) ごとにまとめた行 (使うプログラムと設定の組の一覧付き)"""
+    grouped: dict[tuple[str, int, str, str], tuple[set[str], set[str]]] = {}
+    for u in uses:
+        progs, cfgs = grouped.setdefault((u.env, u.index, u.kind, u.where), (set(), set()))
+        progs.add(u.program)
+        cfgs.add(u.config)
+    def order(k: tuple[str, int, str, str]):
+        file, _, line = k[3].rpartition(":")
+        return (k[0], k[1], k[2], file, int(line) if line.isdigit() else 0)
+
+    return [(*k, sorted(grouped[k][0]), sorted(grouped[k][1])) for k in sorted(grouped, key=order)]
+
+
+def write_colortex_report(path: Path, rows, envs: list[Env], configs: list[tuple[str, dict, list[str]]]) -> None:
+    out = ["# colortex の上限を超える使用", "",
+           "`uv run tools/validate_shaders.py --colortex-report <path>` が書く一覧。前処理の後に有効なプログラムだけを数える"
+           " (sampler の宣言だけの行は数えない。種類の「指定」は colortexN の Format / Clear / ClearColor / MipmapEnabled)", "",
+           "設定の組: " + ", ".join(f"{name} ({' '.join(worlds)})" for name, _, worlds in configs), ""]
+    for env in envs:
+        sel = [r for r in rows if r[0] == env.name]
+        out += [f"## {env.name} (colortex {env.colortex_count} 枚。{env.note})", ""]
+        if not sel:
+            out += ["なし", ""]
+            continue
+        out += [f"{len(sel)} 件。番号ごとの件数: " + ", ".join(f"colortex{n} {sum(1 for r in sel if r[1] == n)}" for n in sorted({r[1] for r in sel})), ""]
+        out += ["| colortex | 種類 | 場所 | プログラム | 設定 |", "|---|---|---|---|---|"]
+        for _, n, kind, where, progs, cfgs in sel:
+            shown = ", ".join(progs[:6]) + (f" ほか {len(progs) - 6}" if len(progs) > 6 else "")
+            out.append(f"| {n} | {kind} | `{where}` | {shown} | {', '.join(cfgs)} |")
+        out.append("")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(out), encoding="utf-8")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--profile", help="このプロファイルだけ検証する (DEFAULT で既定値)")
@@ -509,6 +611,8 @@ def main() -> int:
     ap.add_argument("--no-cache", action="store_true", help="前回成功したものも含めて全部コンパイルする")
     ap.add_argument("--jobs", type=int, default=os.cpu_count() or 4)
     ap.add_argument("--shaders", type=Path, help="検証するシェーダーのフォルダ (既定: このリポジトリの shaders/)")
+    ap.add_argument("--env", help="このローダーだけ検証する (カンマ区切り。tools/capabilities.py の ENVS の名前)")
+    ap.add_argument("--colortex-report", type=Path, help="colortex の上限を超える使用の一覧を Markdown で書く")
     args = ap.parse_args()
     if args.shaders:
         set_shaders_dir(args.shaders)
@@ -535,18 +639,40 @@ def main() -> int:
     else:
         configs.append(("DEFAULT", {}, ["world0"]))
 
+    envs = ENVS
+    if args.env:
+        names = args.env.split(",")
+        envs = [e for e in ENVS if e.name in names]
+        if len(envs) != len(names):
+            sys.exit(f"--env: 未知のローダー (候補: {', '.join(e.name for e in ENVS)})")
+
     jobs = []
     tmpdir = Path(tempfile.mkdtemp(prefix="ray_glsl_"))
     glslang_id = tool_version(glslang)
     cached = 0
-    # glslang はプロセスとして起動するのでスレッドから呼べば CPU コア数だけ並列に走る
-    with cf.ThreadPoolExecutor(max_workers=args.jobs) as ex:
-        for cfg_name, ov, worlds in configs:
-            for w in worlds:
-                for f in sorted((SHADERS / w).glob("*")):
-                    if f.suffix not in STAGE_OF_EXT or args.filter not in f.name:
-                        continue
-                    jobs.append(ex.submit(compile_one, glslang, tmpdir, f, cfg_name, ov, options, features, cache, glslang_id))
+    loader: dict[str, str] = {}  # 同じ文面は最初の組だけ出す (文面 -> 表示)
+    uses: list[loader_checks.ColortexUse] = []
+    scans = []
+    # glslang はプロセスとして起動するのでスレッドから呼べば CPU コア数だけ並列に走る。ローダーの検査は Python の処理なので別のプロセスで回す
+    with cf.ThreadPoolExecutor(max_workers=args.jobs) as ex, cf.ProcessPoolExecutor(max_workers=args.jobs) as px:
+        for env in envs:
+            for cfg_name, ov, worlds in configs:
+                skipped, props_problems, props_uses = properties_by_loader(env, cfg_name, ov, options)
+                for p in props_problems:
+                    loader.setdefault(p.split("] ", 1)[1], p)
+                uses += props_uses
+                for w in worlds:
+                    for f in sorted((SHADERS / w).glob("*")):
+                        if f.suffix not in STAGE_OF_EXT or args.filter not in f.name:
+                            continue
+                        jobs.append(ex.submit(compile_one, glslang, tmpdir, f, cfg_name, ov, options, features, cache, glslang_id, env))
+                        if f"{w}/{f.stem}" not in skipped:
+                            scans.append(px.submit(scan_one, str(SHADERS), str(f), cfg_name, ov, env.name))
+        for fut in cf.as_completed(scans):
+            tag, (found, msgs) = fut.result()
+            uses += found
+            for p in msgs:
+                loader.setdefault(p, f"{tag} {p}")
         failed = 0
         warned = 0
         for fut in cf.as_completed(jobs):
@@ -563,6 +689,25 @@ def main() -> int:
                     print(f"    {m}")
             elif msgs:
                 warned += 1
+        for p in loader.values():
+            print(f"[loader] {p}")
+        problems += list(loader.values())
+        rows = colortex_rows(uses)
+        # 上限が同じローダーでは同じ箇所が並ぶので、ローダーの名前をまとめて 1 行にする
+        merged: dict[tuple[int, str, str], list[str]] = {}
+        for env_name, n, kind, where, _, _ in rows:
+            merged.setdefault((n, kind, where), []).append(env_name)
+        for (n, kind, where), env_names in merged.items():
+            msg = f"colortex{n} を{kind} {where} ({', '.join(env_names)})"
+            print(f"[colortex] {msg}")
+            problems.append(msg)
+        if args.colortex_report:
+            write_colortex_report(args.colortex_report, rows, envs, configs)
+    if args.full and not args.filter:
+        # 分け合う枠の区間の外の読み書き (check_slots.py --intervals の既定値 x 3 ディメンション)。glslang を全プログラムにもう 1 回掛けるので --full だけ
+        for p in check_slots.interval_check(SHADERS, ["DEFAULT"], args.jobs, False, V=sys.modules[__name__]):
+            print(f"[slots] {p}")
+            problems.append(p)
     shutil.rmtree(tmpdir, ignore_errors=True)
     cache.save()
     print(f"\n{len(jobs)} compiled ({cached} unchanged, cached), {failed} failed, {warned} with warnings, {len(problems)} static problem(s)")
