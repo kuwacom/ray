@@ -2,7 +2,8 @@
 
 独自 Minecraft シェーダーパック Ray の設計。`shaders/` のパイプライン・バッファ・ID・モジュール構成と、各手法の選定理由を説明する。
 
-- 対象: Iris 1.8+ / Minecraft 1.21.x 〜 26.x (Java)。OptiFine 非対応 (SSBO・カスタムイメージ・compute・`currentRenderedItemId`・`shadow_entities` を前提)
+- 対象: Iris 1.7.x (Minecraft 1.20.1) 〜 Iris 1.11.x (Minecraft 26.1)、Oculus 1.8.0 (Forge 1.20.1)。OptiFine 非対応 (SSBO・カスタムイメージ・compute・`currentRenderedItemId` を前提)。Oculus はコンパイルとリンクの確認だけで、実機では読み込んでいない。1.20.1 は Iris 1.7.6 + Sodium 0.5.13 で実機確認済み
+- ローダーの差は能力 (`CAP_*`) と機能 (`FX_*`) の表 (`tools/capabilities.py`、生成物は `lib/settings/capabilities.glsl`) で吸収し、本体は `FX_*` だけを見る。新しい Iris ではどの分岐もコンパイルで外れる
 - GLSL: gbuffers / composite 系は `#version 460 compatibility`、compute は `#version 460`
 - 画質優先 + 9 段階プリセット (LOW / MEDIUM / HIGH_FASTEST / HIGH_FAST / HIGH / ULTRA / EXTREME_LITE / EXTREME_BALANCED / EXTREME, 軽い順)。素の既定値 = HIGH
 
@@ -51,7 +52,10 @@ tools/
   gen_lens_ghosts.py                        lib/post/lens_ghosts.glsl (レンズゴーストの定数表) の生成
   gen_look_lut.py, look_luts/*.json         ルックの LUT (textures/look/) の生成・.cube や PNG ストリップとの変換・確認
   validate_shaders.py                       Iris 前処理の簡易再現 + glslangValidator 検証 + 静的チェック
-  gl_compile_check.py                       同じ前処理結果を実機の GL ドライバで compile + link、上限値との比較
+  gl_compile_check.py                       同じ前処理結果を実機の GL ドライバで compile + link、上限値との比較 (--env でローダーを選ぶ)
+  capabilities.py, gen_capabilities.py      ローダーの能力 (CAP_*) と機能 (FX_*) の表・検証で使うローダー (ENVS) の一覧と、生成物 (lib/settings/capabilities.glsl、shaders.properties の生成区間) の書き出し
+  loader_checks.py                          ローダーごとに読み込めない記述と colortex の上限超えを調べる (validate_shaders.py から呼ばれる)
+  check_slots.py                            lib/buffers/slots.glsl の colortex の論理名の書式・直接書き・区間の外の使用を調べる
   pass_preview.py                           パス 1 つ (または順に複数) を実機で描いて・dispatch して画像と数値で保存する
   lib/                                      スクリプト共通の部品 (リポジトリの場所、sRGB、PNG の書き出し、生成物の書き込み・確認、shaders.properties の読み取り)
   mc.py / run_scene.py / shader_options.py  ゲーム内デバッグのクライアント・定点シーン撮影・Iris の設定の読み書き
@@ -63,8 +67,8 @@ shaders/
   textures/                                 blue_noise.png, lens_dirt.png, moon_phases.png (SUN_MOON_STYLE=2 の月の写真、満ち欠け 8 段のアトラス), cloud_*.dat, lens_starburst.dat, water_waves.dat (+ .mcmeta)
   textures/look/                            user_lut.png (ユーザーの LUT、恒等), split_tone.dat, film.dat, portra.dat, ektar.dat, vision3_500t.dat, velvia.dat, provia.dat, eterna.dat (同梱の LUT) (+ .mcmeta)
   lib/settings.glsl                         設定の入口 (lib/settings/ のファイルを宣言する)
-  lib/settings/*                            全設定の定義 (look / light / surface / sky / post のモジュールごと)、導出値 (internal)、ブールの参照 (bool_refs、gen_settings.py が生成)
-  lib/common/*   lib/buffers/*   lib/ids/*  共通基盤
+  lib/settings/*                            全設定の定義 (look / light / surface / sky / post のモジュールごと)、導出値 (internal)、ブールの参照 (bool_refs、gen_settings.py が生成)、ローダーの能力と機能 (capabilities、gen_capabilities.py が生成)
+  lib/common/*   lib/buffers/*   lib/ids/*  共通基盤 (lib/buffers/slots.glsl は時間で分け合う colortex の論理名)
   lib/light/*                               light モジュール
   lib/sky/*                                 sky モジュール
   lib/surface/*                             surface モジュール
@@ -97,7 +101,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 9 | prepare.csh | sky | 太陽・月の直達照度、空の SH (全モジュールが使う光の色) | skyView / 解析式 | SSBO0 sun/moon/shadowLight/skySH | (1,1,1) | 常時 |
 | 10 | prepare1.csh | sky | SkyView LUT | transmittance, multiScatter | skyViewImg 192x108 | local 8x4, (24,27,1) | ATMOSPHERE_MODE=1, world0 |
 | 11 | prepare2.csh | sky | 雲の天気マップ (バニラの形は柱の表) と雲影マップ、カメラの位置の雲の中の霧と雨の空の置き換え (FrameData) | - | cloudWeatherImg, cloudShadowImg 512² | local 16², (32,32,1) | CLOUDS>=2, world0 |
-| 12 | gbuffers_* (不透明) | surface (空/雲は sky) | G バッファ書き込み、TAA ジッター、エンティティ光源登録 (light の関数) | アトラス | colortex1,2,3,15 (手は colortex4,5 を 0 で上書きして先に描かれた半透明を消す。エンティティは電気の渦の層 (deferred の後に描かれる帯電したクリーパー・ウィザーの防壁。テクスチャ行列が単位行列でないことで見分ける) だけ colortex4 へ加算する) / voxelEmitImg, SSBO2 | 画面 | 常時 |
+| 12 | gbuffers_* (不透明) | surface (空/雲は sky) | G バッファ書き込み、TAA ジッター、エンティティ光源登録 (light の関数)。能力の無いローダーでは gbuffers が次も扱う: MC 26.1 未満の花火の火花 (不透明のパーティクルで来るので発光と花火の光をここで足す、`FX_SPARKS_IN_PARTICLES`)、Oculus の雷 (`FX_LIGHTNING_IN_ENTITIES`)、Iris 1.8 未満の自分の判定 (`FX_SELF_BY_DISTANCE`) | アトラス | colortex1,2,3,15 (手は colortex4,5 を 0 で上書きして先に描かれた半透明を消す。エンティティは電気の渦の層 (deferred の後に描かれる帯電したクリーパー・ウィザーの防壁。テクスチャ行列が単位行列でないことで見分ける) だけ colortex4 へ加算する) / voxelEmitImg, SSBO2 | 画面 | 常時 |
 | 13 | deferred.csh | light | floodfill 1 ステップ伝搬 + ブロック光源・エンティティ光源をグローバルリストへ | voxelBlock/Emit, flood(前) | flood(今), SSBO2 | local 8³, VOXEL_SIZE/8 | 常時 |
 | 14 | deferred_a.csh | light | 光源をワールド空間ライトビン (8³ ブロック) に重要度の降順で振り分け (LIGHT_CULL_MODE)、次フレームの間引き距離を更新 | SSBO2 | SSBO3, SSBO2 cullDistance | local 64, (LIGHT_MAX_COUNT/64,1,1) | 常時 |
 | 15 | deferred1.csh | light | LIGHT_TRACE_COUNT 光源 (上位 N-1 個 + 残りから確率的に 1 個) の DDA トレース (直接光) | SSBO3, voxel*, G バッファ | blockLightRawImg (影あり S), blockLightAuxImg (影なし U) (左上 1/RES) | local 8², workGroupsRender = 1/LIGHT_TRACE_RES | LIGHT_SHADOWS |
@@ -129,7 +133,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 - shadowcomp は使わない。floodfill を deferred に置くのは、gbuffers_entities (deferred より前) が登録した画面内のエンティティ光源を同じフレームで取り込むため (voxelEmitImg は毎フレームクリアされる)
 - Iris は同じパスの compute (composite1_a) を fragment (composite1) の前に走らせる。VL の有効条件は `program.<world>/composite1_a.enabled` で、composite1 の fragment (水の光線を辿る処理) は止まらない
 - ネザー・エンドは大気 LUT と雲のパスを外す (shaders.properties)。shadow パスはボクセル化のため全ディメンションで回す
-- `particles.ordering = mixed`: 不透明パーティクルは G バッファ (gbuffers_particles)、半透明は前方 (gbuffers_particles_translucent)
+- `particles.ordering = mixed`: 不透明パーティクルは G バッファ (gbuffers_particles)、半透明は前方 (gbuffers_particles_translucent)。MC 26.1 未満の Iris は花火の火花を不透明側に回すので、発光と花火の光の登録は gbuffers_particles でも行う (`FX_SPARKS_IN_PARTICLES`、不透明の粒は画素を間引き TAA で均す。頂点色が真っ白の粒は炎・溶岩の粒と区別できず光らない)
 - DH (Distant Horizons) は未対応 (dh_* プログラムなし)。DH の水 (dh_water) を足す時の入口は `lib/common/water_lod.glsl` の `waterLod`: DH の深度から求めた距離と視線の cos を渡し (1 画素の角度は dhProjection も同じ画角なので `waterPixelAngle()` のまま)、返った `WaterLod` で `getWaterNormal` と合成 (composite2) の粗さ・フレネル・鏡の重みを決める。描画距離の先も遠い層 (`farAmp`) が残るので鏡にはならない。遠景を軽くする段 (層を読まない・視差なし・鏡の SSR を辿らない) とその移り変わりも、waterLod に足して決める。層 0-4 を読まない段でも遠い層 (`WaterLod.farAmp`) は残す (止めると鏡に戻る。読むのは遠い層の 2 本、移り変わりで 3 本だけ)。波頭・泡・WATER_GLITTER のむらの高さの読みは `heights` を 0 にすると止まる
 
 ---
@@ -158,7 +162,24 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 15 | RGBA16F | 速度: rg = 前フレーム UV - 今の UV, a = 1 なら有効 (エンティティ・手)。a = 0 の金属の防具の画素だけ rgb = 環境光の鏡面の重み x 1e-4 (gbuffers_entities_translucent -> composite2。双線形で読まれても速度がずれないよう小さくする) | surface (gbuffers, post の関数) | post | 毎フレーム |
 
 - gbuffers では colortex0-3 を読めない (Iris の仕様)
-- 4, 8〜10, 14 は `lib/buffers/slots.glsl` の論理名 (`TEX_*`、用途ごとの区間付き) で読む。番号を変えるときは slots.glsl と RENDERTARGETS の数字を一緒に直す (`tools/check_slots.py` が直接書きと区間の外の読み書きを調べる。区間は validate_shaders.py --full でも見る)。Iris 1.10.4 以前と Oculus は 16 枚までなので colortex16 以上は使わない (validate_shaders.py がローダーごとに落とす)
+- 4, 8〜10, 14 は `lib/buffers/slots.glsl` の論理名 (`TEX_*`、用途ごとの区間付き) で読む。番号を変えるときは slots.glsl と RENDERTARGETS の数字を一緒に直す (`tools/check_slots.py` が直接書きと区間の外の読み書きを調べる。区間は validate_shaders.py --full でも見る)。Iris 1.10.4 以前と Oculus は 16 枚までなので colortex16 以上は使わない (validate_shaders.py がローダーごとに落とす。最新の Iris は 32 枚)
+`slots.glsl` の論理名 (正本は slots.glsl。区間は Iris のプログラム名で、永続は前フレームの値を読む)
+
+| 名前 | 枠 | 区間 |
+|---|---|---|
+| TEX_TRANSLUCENT | colortex4 | gbuffers -> composite2 |
+| TEX_GODRAYS | colortex4 | composite12 -> composite19 (左上 1/GODRAYS_RES、`scale.composite12`〜`14`) |
+| TEX_GI / TEX_GI_HIST | colortex9 | deferred11 (永続) -> composite2 / final (TEX_GI は今フレームの出力で、次フレームの履歴 TEX_GI_HIST と同じ値) |
+| TEX_GI_AUX | colortex10 | deferred11 (永続) |
+| TEX_SPARKLE_HIST | colortex8 | composite20 (永続) -> final |
+| TEX_CLOUD_LOW | colortex14 | deferred20 -> deferred21 |
+| TEX_WATER_REFR | colortex14 | composite1 -> composite2 |
+| TEX_TRANSLUCENT_ALPHA | colortex14 | composite2 -> composite19 |
+| TEX_BLOOM | colortex14 | composite23 -> final |
+| TEX_GI_RAW / STORE_GI_RAW | giRawImg | deferred10 -> deferred11 |
+| TEX_BLOCKLIGHT_RAW / STORE_BLOCKLIGHT_RAW | blockLightRawImg | deferred1 -> deferred2 |
+| TEX_WATER_MIRROR / STORE_WATER_MIRROR | giRawImg | composite1 -> composite2 |
+| TEX_WATER_SUNVIS / STORE_WATER_SUNVIS | blockLightRawImg | composite1 -> composite2 |
 - 画面相対の image の blockLightRawImg と giRawImg も、deferred の用途 (TEX_BLOCKLIGHT_RAW / TEX_GI_RAW) と composite1 -> 2 の水の用途 (TEX_WATER_SUNVIS / TEX_WATER_MIRROR) で分け合うので、読みは slots.glsl の TEX_*、書きは STORE_* で書く。deferred の側は毎フレーム、読む範囲を全部書き直してから読むので、水の値は次のフレームに残らない
 - `shadowcolor0` RGBA8: 最も太陽側の面の色 (半透明は透過色 + a 不透明度、不透明は a=1)。`shadowcolor1` RGBA16: rg 法線 (oct), b スカイライト, a 種別 (0 不透明 / 0.5 半透明 / 1 水)。RSM (surface) と色付き影 (surface) と色付き光芒 (sky) が読む
 
@@ -225,8 +246,8 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 | 2 | GlobalLightsBuffer (`globalLights`) | `global_lights.glsl` | 295200 | `count/blockCount/entityCount/overflow`, `cullDistance/culled` + `cullHist[64]` (間引き距離と距離の分布), `LightInstance lights[8192]` (posRadius: ボクセル空間位置 + 到達半径, colorSize: 放射 + 光源半径), `lightPower[]` (揺らぎ前の放射の輝度、8192 個)。使うのは LIGHT_MAX_COUNT 個まで | `GLOBAL_LIGHTS`: setup, begin, deferred, deferred_a |
 | 3 | LightBinsBuffer (`lightBins`) | `light_bins.glsl` | 10944512 (LIGHT_BIN_LIGHTS > 64 で 21430272) | `binCount[40960]`, `entityAcc[32768]` (エンティティ光源の蓄積表), `binLights[]` (40960 x 65 個、> 64 で x 129)。ビン = 8³ ブロック、1 ビン LIGHT_BIN_LIGHTS + 1 枠。枠のキー = 重要度 19 bit + 光源インデックス 13 bit | `LIGHT_BINS`: setup, begin, deferred_a, shadow_entities・shadow_block の gsh と gbuffers_entities・gbuffers_entities_translucent の vsh (蓄積表) |
 | 4 | EntityTriangleBuffer (`entityTris`) | `entity_tris.glsl` | 838672 | `counts[4]`, `groupBounds`, `clusterBounds` + `EntityTriangle tris[]` (16384 個) (ボクセル空間の三角形 v0/e1/e2 + アルファマスク + テクスチャ x 頂点色の平均の色) | `ENTITY_TRIS`: begin (クリア), shadow_entities・shadow_block の gsh |
-| 5 | FireworkLightBuffer (`fireworkLight`) | `firework_light.glsl` | 64 | `posRadius` (花火の光の player 空間の位置, 広がりの半径。0 = 光っていない), `intensity` (放射強度), `acc[]` (光る粒の固定小数点の和 8 個: 数, 重み, 位置 x 重み, 色 x 重み) | `FIREWORK_LIGHT`: begin (光を決めて acc を空にする), gbuffers_particles_translucent の vsh (acc に足す) |
-| 6-8 | - | - | - | 予備 | - |
+| 5 | FireworkLightBuffer (`fireworkLight`) | `firework_light.glsl` | 64 | `posRadius` (花火の光の player 空間の位置, 広がりの半径。0 = 光っていない), `intensity` (放射強度), `acc[]` (光る粒の固定小数点の和 8 個: 数, 重み, 位置 x 重み, 色 x 重み) | `FIREWORK_LIGHT`: begin (光を決めて acc を空にする), gbuffers_particles_translucent の vsh (acc に足す)。MC 26.1 未満の Iris は gbuffers_particles の vsh も足す (`FX_SPARKS_IN_PARTICLES`) |
+| 6-8 | - | - | - | 予備 (Iris 1.7 と Oculus の `bufferObject` の添字は 8 まで。最新の Iris は 12 まで) | - |
 
 world0 の既定値で SSBO を 1 つも宣言しないのは 17 プログラム (gbuffers の 14 と composite21/23・deferred11)。frameData だけを宣言するのは 13 プログラム (prepare・prepare1/2・setup1/2・composite20/22/24/25・deferred20/21・gbuffers_lightning/skytextured)。光源モジュール (`lib/light/light.glsl`) を読むプログラムは 0-4 の 5 つを宣言する。花火の光 (5) は FIREWORK_LIGHT の時だけ、begin・gbuffers_particles_translucent・deferred30・composite19 が宣言する
 
@@ -310,7 +331,7 @@ getLightDef(index) -> lightEmission(d, level), lightRange(d, level), lightFallof
 
 | ID | エンティティ | 用途 |
 |---|---|---|
-| 5001 | minecraft:current_player (Iris 固定) | 手持ち光源の二重発光防止、自分専用の遮蔽ビット |
+| 5001 | minecraft:current_player (Iris 固定。Iris 1.8 未満と Oculus には無く、自分も 5002 の player で来る。`FX_SELF_BY_DISTANCE` が、player の ID と目の位置からの距離で自分を見分ける) | 手持ち光源の二重発光防止、自分専用の遮蔽ビット |
 | 5002 | player | 他プレイヤー |
 | 5003 | item | ドロップアイテム (光源化) |
 | 5004 | item_frame, glow_item_frame | 中身を光源化しない |
@@ -343,7 +364,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | 解像度 | 地形: 1 ブロック = 1 セル (部分形状は形状テーブルの AABB で精度を補う, Shrimple 方式)。エンティティ: 1 セルを 2x2x2 サブセル (0.5 ブロック) のビットマスクで表す |
 | 地形の更新 | shadow パスの頂点シェーダーで、`at_midBlock` からブロック中心を求めて `imageStore` (Photon / Shrimple 方式)。毎フレーム全量 (voxel イメージは毎フレームクリア)。`shadow.culling = reversed` + `voxelDistance` (= 水平半径) でカメラ周辺をカリングさせない |
 | エンティティ | Iris 1.8 の `shadow_entities` / `shadow_block` のジオメトリシェーダーで三角形をサブセル間隔でサンプルし `imageAtomicOr` (閉じた箱は表面を埋めれば十分)。地形には GS を使わないので重くならない (shadow_entities の無い Iris では shadow.gsh で同じ処理をし、地形も GS を通る)。RV の「ラスタライザ流用」より単純で、エンティティ限定なのでコストが小さい |
-| 自分 | `minecraft:current_player` は別ビット (8-15) にも書く。一人称の手持ち光源のレイは自分を無視し、設置光源のレイは自分で遮る |
+| 自分 | `minecraft:current_player` は別ビット (8-15) にも書く。一人称の手持ち光源のレイは自分を無視し、設置光源のレイは自分で遮る。current_player が無い Iris 1.8 未満と Oculus では、player のうち、目の 0.8 ブロック下 (`SELF_BODY_CENTER_DROP`) から 1.6 ブロック以内 (`SELF_BODY_RADIUS`) のものを自分とする (近くの他のプレイヤーも自分に数える) |
 | 揺れ | ボクセルは揺れ適用前の位置で書く (影マップは揺れ適用後) |
 | 発光 | 地形の発光は voxelBlockImg の ID + 発光レベル。エンティティ光源は voxelEmitImg (atomicMax で重複排除) |
 | ON/OFF | プレイヤー: LIGHT_PLAYER_OCCLUSION、他エンティティ・ブロックエンティティ: LIGHT_ENTITY_OCCLUSION。shadowEntities / shadowBlockEntities は shaders.properties で必要な時だけ ON |
@@ -719,7 +740,7 @@ post モジュールが提供 (`//@include "/lib/post/post.glsl"`):
 | colortex1/2/3/15 | 読む | 読む | 書く | 読む |
 | colortex4/5 | - | colortex4 に雨を書く | 書く | - |
 | colortex6/7, blockLightRaw/Aux | 書く | 読む (6) | 読む (6, 関数経由) | 読む (debug) |
-| colortex9, colortex14 (composite1-19), giRaw, blockLightRaw (composite1/2), reflection | 読む (9) | 読む | 書く | 読む (debug) |
+| colortex9/10, colortex14 (composite1-19), giRaw, blockLightRaw (composite1/2), reflection | 読む (9) | 読む | 書く | 読む (debug) |
 | colortex11/12, colortex4 (composite12-19), colortex14 (deferred), sky LUT, cloud*, fogHistory | 読む | 書く | 読む (11, 関数経由) | 読む (debug) |
 | colortex0 | - | 空テクスチャ (gbuffers), composite19 で書く | deferred30 / composite2 で書く | composite20 以降で書く |
 | colortex8/13/14 | - | - | - | 書く |
@@ -782,10 +803,15 @@ uv run tools/gl_compile_check.py             # 実機ドライバで compile + l
 uv run tools/gl_compile_check.py --full      # 同上を既定値 x 3 ディメンション + 全プロファイル
 # キャッシュ (tools/.cache/) を無視するのは --no-cache
 uv run tools/gen_wrappers.py --check         # プログラム本体とラッパー、program.*.enabled の生成の対応
+uv run tools/gen_capabilities.py --check     # ローダーの能力と機能の生成物が最新か
+uv run tools/validate_shaders.py --env 1.7.6 # ローダーを 1 つだけ (latest / mid / 1.7.6。指定しないと 3 つとも検証する)
+uv run tools/gl_compile_check.py --env 1.7.6 # 同じ本文を実機のドライバで (既定は latest)
+uv run tools/check_slots.py --intervals --all # colortex の論理名の区間の外の読み書き (validate_shaders.py --full は既定値 x 3 ディメンションを見る)
 ```
 
 validate_shaders.py は include 展開・設定差し替え・Iris マクロ注入をしてからコンパイルし、エラーを元ファイルの行番号で表示する。
-静的チェック: プロファイルの値の妥当性、HIGH = 既定値、screen と lang の網羅、workGroups のリテラル性、`*.properties` が ASCII だけか、block/item の状態値にカンマ区切りが無いか、ラッパーと `program.*.enabled` の生成が最新か。
+静的チェック: プロファイルの値の妥当性、HIGH = 既定値、screen と lang の網羅、workGroups のリテラル性、`*.properties` が ASCII だけか、block/item の状態値にカンマ区切りが無いか、ラッパーと `program.*.enabled` の生成が最新か、能力と機能の生成物 (`gen_capabilities.py`) が最新か。
+ローダーごとの検査: `tools/capabilities.py` の `ENVS` (latest = Iris 1.10.5 以降 / mid = Iris 1.8〜1.10.4 / 1.7.6 = Iris 1.7.x と Oculus) ごとにマクロを変えてコンパイルし、`tools/loader_checks.py` が、そのローダーで読み込めない記述 (flag、`bufferObject` の添字 (latest 12、mid と 1.7.6 は 8)、image の数と pixel type・format、`RENDERTARGETS` のカンマの後の空白)、colortex の上限を超える使用 (mid と 1.7.6 は 16 枚、latest は 32 枚。実際はどのローダーでも colortex0〜15 だけを使い、16 以上は失敗)、`MC_VERSION` / `IRIS_VERSION` / `MAX_COLOR_BUFFERS` の生成物の外での使用を調べる。
 
 gl_compile_check.py は同じ前処理結果を不可視ウィンドウの OpenGL 4.6 compatibility コンテキストで実際にコンパイル・リンクする (glfw + PyOpenGL)。
 glslang が通しても実ドライバで落ちるもの (NVIDIA の image uniform 8 個制限 `C7624`、予約語 `packed` 等) を検出し、info log を元ファイルの行番号で表示する。
@@ -803,6 +829,12 @@ shaders.properties の `#if` を評価して `program.*.enabled = false` のプ�
 - 影・GI・反射: 水の後ろのガラスが手前に見える。半透明越しの環境反射は空のみ。RSM に可視性はない。F82 は未実装。自動法線は地形とエンティティと手持ち (植物は対象外)
 - ポスト: TAAU は見送り (Iris では gbuffers の解像度を下げられない)
 - エンティティのボクセル化は `shadow_entities` / `shadow_block` (Iris 1.8 未満と Oculus では shadow.gsh) で行う。影パスの距離 (`entityShadowDistanceMul`) とフラスタムの外のエンティティは遮蔽物にならない
+- 古い Iris (1.7.x、MC 26.1 未満、Oculus) の違い。新しい Iris ではどれもコンパイルで外れる。Oculus はコンパイルとリンクの確認だけで、実機では読み込んでいない
+  - 影のパスにエンティティが来る (専用の影のパスが無い、Iris 1.8 未満と Oculus): 地形も shadow.gsh を通る (`FX_SHADOW_NON_TERRAIN`)。重さは測っていない
+  - 花火の火花が不透明の粒で来る (MC 26.1 未満): 画素の間引きと TAA で光らせる (`FX_SPARKS_IN_PARTICLES`)。頂点色が真っ白の花火 (コマンドで成分 1.0 の色にしたもの) は炎・溶岩の粒と区別できず光らない。染料の白の花火は光る
+  - 自分の判定 (current_player が無い、Iris 1.8 未満と Oculus): 目の位置からの距離で見分け (`FX_SELF_BY_DISTANCE`)、1.6 ブロック以内の他のプレイヤーも自分に数える
+  - 雷 (gbuffers_lightning が読まれない Oculus): gbuffers_entities で光らせる (`FX_LIGHTNING_IN_ENTITIES`)
+- `bufferObject` の添字は Iris 1.7 と Oculus で 8 まで、colortex は Iris 1.10.4 以前と Oculus で 16 枚まで、image の pixel type は Iris 1.7 の列挙にあるものだけ。足すときは `tools/capabilities.py` の `ENVS` の上限に収める
 - 階段は向き・上下・外角を ID に持ち、ハーフ + 段の箱 2 個で遮る。内角 (段が 3/4) は箱 2 個に収まらないので同じ向きの直線で近似する (1/8 ブロック小さい)
 - `minecraft:light` (ライトブロック) の実際のレベルは `at_midBlock.w` が 0 で来る可能性があり、その場合は既定 15 になる (未対処)
 - MOD ブロックは未登録 = 完全な固体扱い。光る MOD ブロックはタグ (`%c:...`) か個別登録が必要

@@ -75,8 +75,13 @@ uv run tools/validate_shaders.py                    # 既定値・オーバー�
 uv run tools/validate_shaders.py --full             # 3 ディメンションと全プロファイル
 uv run tools/validate_shaders.py --env 1.7.6 --colortex-report colortex.md   # 1 つのローダーだけ。colortex の上限を超える使用の一覧も書く
 uv run tools/gl_compile_check.py                    # 手元のドライバで compile + link
+uv run tools/gl_compile_check.py --env 1.7.6        # 古い Iris と Oculus 向けの本文で compile + link
 uv run tools/gl_compile_check.py --full --limits --report
+uv run tools/gen_capabilities.py --check            # 能力と機能の生成物が最新か
+uv run tools/check_slots.py --intervals --all       # colortex の論理名の区間の外の使用
 ```
+
+ローダーは `capabilities.py` の `ENVS` の名前で選びます。`latest` は Iris 1.10.5 以降 (colortex 32 枚)、`mid` は Iris 1.8〜1.10.4、`1.7.6` は Iris 1.7.x と Oculus です。`validate_shaders.py` は `--env` を省くと 3 つとも検証し、`gl_compile_check.py` と `equiv_check.py` は省くと `latest` だけです
 
 どちらも前回成功したプログラムは前処理後の内容が変わっていなければ飛ばします。結果は `tools/.cache/` に保存され、`--no-cache` で全部やり直します
 
@@ -88,6 +93,7 @@ uv run tools/gl_compile_check.py --full --limits --report
 | `--no-cache` | キャッシュを使わずに全部検証します |
 | `--jobs N` | 並列数 (既定は CPU 数。ドライバのコンパイルスレッドは既定 4 で、重いプログラムのリンクを同時に多く走らせると 1 本ずつが極端に遅くなるため) |
 | `--shaders DIR` | このリポジトリの `shaders/` の代わりに DIR を検証します |
+| `--env NAME` | ローダーを指定します (`validate_shaders.py` はカンマ区切りで複数、`gl_compile_check.py` は 1 つ) |
 
 `gl_compile_check.py` だけにあるオプション
 

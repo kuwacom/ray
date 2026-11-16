@@ -18,6 +18,10 @@ Python は uv で管理している (`pyproject.toml`, `uv.lock`)。最初に `u
 uv run tools/validate_shaders.py          # glslang でコンパイル + 静的チェック (既定値・world0)
 uv run tools/validate_shaders.py --full   # 設定やプロファイルを変えたとき
 uv run tools/gl_compile_check.py          # 実機のドライバで compile + link
+uv run tools/validate_shaders.py --env 1.7.6   # ローダーを 1 つだけ (latest / mid / 1.7.6。既定は 3 つとも)
+uv run tools/gl_compile_check.py --env 1.7.6   # 同じローダーの本文を実機のドライバで (既定は latest)
+uv run tools/gen_capabilities.py --check  # 能力と機能の生成物が最新か (validate_shaders.py も見る)
+uv run tools/check_slots.py --intervals --all  # colortex の論理名の区間の外の使用
 ```
 
 glslang は `RAY_GLSLANG`、PATH、`tools/glslang/bin/glslang.exe` の順に探す

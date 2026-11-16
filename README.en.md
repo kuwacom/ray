@@ -3,8 +3,8 @@
 English | [日本語](README.md)
 
 ![Version](https://img.shields.io/badge/version-v0.1.0--alpha-orange)
-![Iris](https://img.shields.io/badge/Iris-1.8%2B-5b6ee1)
-![Minecraft](https://img.shields.io/badge/Minecraft-1.21.x%20%E2%80%93%2026.x-62b47a)
+![Iris](https://img.shields.io/badge/Iris-1.7%2B-5b6ee1)
+![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1%20%E2%80%93%2026.x-62b47a)
 ![License](https://img.shields.io/badge/license-Ray%20Shader%20License%201.0-lightgrey)
 ![Downloads](https://img.shields.io/github/downloads/kuwacom/ray/total)
 ![Views](https://hits.sh/github.com/kuwacom/ray.svg?label=views)
@@ -46,17 +46,35 @@ Ghost color and shape, distortion, vignetting, bokeh shape, and chromatic aberra
 
 | Item | Requirement |
 |---|---|
-| Minecraft | Java Edition 1.21.x - 26.x |
-| Shader loader | Iris 1.8 or later (with Sodium) |
+| Minecraft | Java Edition 1.20.1 - 26.x |
+| Shader loader | Iris 1.7 or later (with Sodium). See "Supported Versions" below for the versions |
 | OpenGL | 4.6 (the shaders are GLSL 4.60 and use compute shaders / SSBOs / custom images) |
 | OS | Developed and tested on Windows only. macOS does not work because compute shaders are not available there |
 | GPU | The required performance has not been measured yet |
 
 > [!IMPORTANT]
-> Ray does not work with OptiFine. It relies on features that only Iris has, such as SSBOs, custom images, and `shadow_entities`
+> Ray does not work with OptiFine. It relies on features that only Iris has, such as SSBOs, custom images, and compute shaders
 
 > [!NOTE]
 > Distant Horizons is not supported yet (the pack has no `dh_*` programs). If you keep DH installed, Iris treats Ray as a pack without DH shaders, but the look of the LOD area is not guaranteed
+
+### Supported Versions
+
+One zip supports the following loaders
+
+| Loader | Minecraft | Status |
+|---|---|---|
+| Iris 1.7.x | 1.20.1 | Checked in the game with Iris 1.7.6 + Sodium 0.5.13 |
+| Iris 1.8 - 1.10 | 1.21.x | Compile validation only |
+| Iris 1.11.x | 26.1 | Checked in the game (26.1.2) |
+| Oculus 1.8.0 (Forge) | 1.20.1 | Only compile and link have been checked. It has not been loaded in the game |
+
+Older Iris versions differ from newer ones in the following ways (newer Iris versions do not show them)
+
+- Firework sparks: Iris before Minecraft 26.1 draws the sparks as opaque particles, so pixels are thinned out and smoothed by TAA. A firework whose color was set to pure white with a command does not glow
+- Entity shadows and voxelization: there is no dedicated shadow pass (Iris before 1.8, and Oculus), so the terrain also goes through the same geometry shader. On 1.20.1 this added 1.6-2 ms in a scene looking down over a forest
+- Detecting yourself: `current_player` does not exist (Iris before 1.8, and Oculus), so you are identified by the distance from the position of your eyes. Other players within 1.6 blocks of your body are also treated as you
+- Lightning: Oculus lights lightning through another path (`gbuffers_entities`)
 
 ## Installation
 
@@ -326,6 +344,8 @@ uv sync                                   # First time only. Installs Python 3.1
 uv run tools/validate_shaders.py          # Reproduces the Iris preprocessor and compiles with glslang (defaults, Overworld)
 uv run tools/validate_shaders.py --full   # Defaults in all 3 dimensions, all profiles in the Overworld
 uv run tools/gl_compile_check.py          # compile + link with your local GPU driver
+uv run tools/validate_shaders.py --env 1.7.6   # One loader only (latest / mid / 1.7.6). Without it, all 3 are validated
+uv run tools/gl_compile_check.py --env 1.7.6   # compile + link the source for older Iris and Oculus (default: latest)
 ```
 
 ### Automated Debug Loop with AI Agents

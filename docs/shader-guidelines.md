@@ -2,7 +2,7 @@
 
 Ray のシェーダーを書くときに、読み込み (Iris の前処理とドライバのコンパイル・リンク) が速く、描画も速く、NVIDIA 以外でも動く形を選ぶための判断材料をまとめる。リポジトリの決まりは [AGENTS.md](../AGENTS.md)、設計と命名・検証は [architecture.md](architecture.md) の「規約・単位・検証」にあり、ここでは繰り返さない
 
-- Iris の動きは Iris 1.11.4 (Minecraft 26.1.2) のソースで確かめたもの。Iris を更新したら、include の展開・設定の検出・資源の上限が変わっていないか見直す
+- Iris の動きは Iris 1.11.4 (Minecraft 26.1.2) のソースで確かめたもの。Iris を更新したら、include の展開・設定の検出・資源の上限が変わっていないか見直す。古い Iris (1.7〜1.10) と Oculus で違う所は `tools/capabilities.py` の表と `validate_shaders.py` のローダー別の検査 (`--env`) で見る
 - 時間の数値は GTX 1070 (ドライバ 581.57、Windows) での例。描画の時間は 1920x1080 の RGBA16F に全画面で描いて測った。桁と傾向の目安で、GPU が変われば変わる。リンクの時間は同じ条件で 2〜5 倍揺れた
 - 確かめていないことは指針にしていない
 
@@ -104,8 +104,8 @@ Ray のシェーダーを書くときに、読み込み (Iris の前処理とド
 | sampler (1 プログラム) | GL の `GL_MAX_TEXTURE_IMAGE_UNITS` = 32 (NVIDIA、Mesa)。gbuffers と shadow は Iris が 3 ユニットを使うので 29 | composite2 が 24 | `gl_compile_check.py --gpu 1070 --report` |
 | image (1 ステージ、1 プログラム) | 8 (NVIDIA。GL の最小保証も 8) | opt-in で 8 以下に抑える ([architecture.md](architecture.md) の「image の宣言は opt-in」) | 同上 |
 | カスタム image (`image.*`) | 16 (Iris) | 16 (空きなし) | `shaders.properties` |
-| colortex | 32 (Iris。1.10.5 から) | 22 (0〜21。16 は `size.buffer` の低解像度) | `lib/buffers/formats.glsl` |
-| SSBO (`bufferObject.N`) | 番号 0〜12 (Iris)、1 ステージ 16 ブロック (NVIDIA) | 0〜4 | `shaders.properties`、`lib/buffers/` |
+| colortex | 32 (Iris 1.10.5 から)。Iris 1.10.4 以前と Oculus は 16 | 16 (0〜15。時間で分け合う枠は `lib/buffers/slots.glsl`) | `lib/buffers/formats.glsl`、`validate_shaders.py` (colortex16 以上は失敗) |
+| SSBO (`bufferObject.N`) | 番号 0〜12 (最新の Iris)。Iris 1.7 と Oculus は 0〜8。1 ステージ 16 ブロック (NVIDIA) | 0〜5 | `shaders.properties`、`lib/buffers/`、`validate_shaders.py` |
 | UBO の大きさ | 64 KB (NVIDIA)。GL の最小保証は 16 KB | 使っていない | - |
 | compute のスレッド (1 グループ) | 1024 (NVIDIA) | - | `gl_compile_check.py` が検査する |
 | shared memory (1 グループ) | 48 KB (NVIDIA)。32 KB の GPU もある | - | 同上 |

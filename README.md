@@ -3,8 +3,8 @@
 [English](README.en.md) | 日本語
 
 ![Version](https://img.shields.io/badge/version-v0.1.0--alpha-orange)
-![Iris](https://img.shields.io/badge/Iris-1.8%2B-5b6ee1)
-![Minecraft](https://img.shields.io/badge/Minecraft-1.21.x%20%E2%80%93%2026.x-62b47a)
+![Iris](https://img.shields.io/badge/Iris-1.7%2B-5b6ee1)
+![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1%20%E2%80%93%2026.x-62b47a)
 ![License](https://img.shields.io/badge/license-Ray%20Shader%20License%201.0-lightgrey)
 ![Downloads](https://img.shields.io/github/downloads/kuwacom/ray/total)
 ![Views](https://hits.sh/github.com/kuwacom/ray.svg?label=views)
@@ -46,17 +46,33 @@ Helios 44-2 や Sonnar のようなオールドレンズから、Hologon や Fle
 
 | 項目 | 要件 |
 |---|---|
-| Minecraft | Java Edition 1.21.x - 26.x |
-| シェーダーローダー | Iris 1.8 以降 (Sodium と併用) |
+| Minecraft | Java Edition 1.20.1 - 26.x |
+| シェーダーローダー | Iris 1.7 以降 (Sodium と併用) |
 | OpenGL | 4.6 (シェーダーは GLSL 4.60 で、compute shader / SSBO / カスタムイメージを使います) |
 | OS | 開発と動作確認は Windows のみです。macOS は compute shader が使えないため動きません |
 | GPU | 必要な性能はまだ測れていません |
 
 > [!IMPORTANT]
-> OptiFine では動きません。SSBO・カスタムイメージ・`shadow_entities` など Iris にしかない機能を前提にしています
+> OptiFine では動きません。SSBO・カスタムイメージ・compute shader など Iris にしかない機能を前提にしています
 
 > [!NOTE]
 > 現状はまだ Distant Horizons には対応していません (`dh_*` プログラムを持っていません)。入れたままでも Iris は DH 用のシェーダーがないパックとして扱いますが、LOD 部分の見た目は保証できません
+
+### 対応バージョン
+
+| ローダー | Minecraft | 状態 |
+|---|---|---|
+| Iris 1.7.x | 1.20.1 | Iris 1.7.6 + Sodium 0.5.13 で実機で確認しています |
+| Iris 1.8 - 1.10 | 1.21.x | コンパイルの検証だけです |
+| Iris 1.11.x | 26.1 | 実機で確認しています (26.1.2) |
+| Oculus 1.8.0 (Forge) | 1.20.1 | コンパイルとリンクの確認だけで、実機では読み込んでいません |
+
+古い Iris では、新しい Iris と次の点が違います (新しい Iris では出ません)
+
+- 花火の火花: Minecraft 26.1 より前の Iris は火花を不透明の粒として描くので、画素を間引いて TAA で均します。コマンドで色を真っ白にした花火は光りません
+- エンティティの影とボクセル化: 専用のシェーダーパスが無い (Iris 1.8 未満と Oculus) ので、地形も同じジオメトリシェーダーを通ります
+- 自分の判定: `current_player` が無い (Iris 1.8 未満と Oculus) ので、目の位置からの距離で見分けます。自分の体から 1.6 ブロック以内にいる他のプレイヤーも自分として扱います
+- 雷: Oculus は雷を別の経路 (`gbuffers_entities`) で光らせます
 
 ## 導入
 
@@ -326,6 +342,8 @@ uv sync                                   # 初回だけ。.venv/ に Python 3.1
 uv run tools/validate_shaders.py          # Iris の前処理を再現して glslang でコンパイル (既定値・オーバーワールド)
 uv run tools/validate_shaders.py --full   # 既定値を 3 ディメンションで、全プロファイルをオーバーワールドで
 uv run tools/gl_compile_check.py          # 手元の GPU ドライバで compile + link
+uv run tools/validate_shaders.py --env 1.7.6   # ローダーを 1 つだけ (latest / mid / 1.7.6)。指定しないと 3 つとも検証します
+uv run tools/gl_compile_check.py --env 1.7.6   # 古い Iris と Oculus 向けの本文で compile + link (既定は latest)
 ```
 
 ### AI エージェントによる自動デバッグループ
