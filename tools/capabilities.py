@@ -54,6 +54,11 @@ CAPS: list[Cap] = [
     Cap("CAP_LIGHTNING_PROGRAM", "defined IRIS_VERSION",
         "gbuffers_lightning のプログラムが読まれる",
         "Oculus (雷は gbuffers_entities で描かれる)"),
+    # MC 26.1 より前の Iris (と Iris 由来の Oculus) は、花火の火花の粒を不透明のパーティクル (gbuffers_particles) に回す
+    # (Iris の MixinFireworkSparkParticle。26.1 の版で粒子の段の分け方ごと無くなった)
+    Cap("CAP_SPARKS_TRANSLUCENT", "defined MC_VERSION && MC_VERSION >= 260100",
+        "花火の火花が半透明のパーティクル (gbuffers_particles_translucent) で描かれる",
+        "MC 26.1 より前 (火花は gbuffers_particles で描かれる)"),
 ]
 
 ENTITY_VOXEL_SETTINGS = "defined ENTITY_SHADOWS || defined LIGHT_ENTITY_OCCLUSION || defined LIGHT_PLAYER_OCCLUSION || defined ENTITY_LIGHTS"
@@ -70,6 +75,8 @@ FXS: list[Fx] = [
        "shadow のプログラムに地形以外 (プレイヤー・エンティティ・ブロックエンティティ) が来る。地形用の処理を地形だけに閉じる"),
     Fx("FX_LIGHTNING_IN_ENTITIES", "!defined CAP_LIGHTNING_PROGRAM",
        "雷を gbuffers_entities でも扱う (gbuffers_lightning が読まれない環境)"),
+    Fx("FX_SPARKS_IN_PARTICLES", "!defined CAP_SPARKS_TRANSLUCENT",
+       "花火の火花の発光と花火の光を gbuffers_particles でも扱う (火花が不透明のパーティクルで来る環境)"),
 ]
 
 
@@ -118,7 +125,8 @@ class Env:
 
 
 ENVS: list[Env] = [
-    Env("latest", {"MC_VERSION": "12104", "IRIS_VERSION": "11100", "MAX_COLOR_BUFFERS": "32"}, 32, 12,
+    # MC_VERSION は 26.1.2 (Iris の書式は 大 + 中 2 桁 + 小 2 桁 で 260102)。1.21.x の Iris 1.10 は火花を不透明で描くので mid と同じ側
+    Env("latest", {"MC_VERSION": "260102", "IRIS_VERSION": "11100", "MAX_COLOR_BUFFERS": "32"}, 32, 12,
         features=FEATURES_1_7 | {"CAN_DISABLE_WEATHER", "FADE_VARIABLE", "TEXTURE_FILTERING"},
         pixel_types=PIXEL_TYPES_1_7 | {"UNSIGNED_INT_10F_11F_11F_REV"},
         note="Iris 1.10.5 以降 (colortex 32 枚、bufferObject 0-12 は 1.21.11 / 26.x)"),

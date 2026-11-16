@@ -8,6 +8,11 @@
     // 蓄積表に書く SSBO_LIGHT_BINS_WRITE は lib/buffers/light_bins.glsl が定義する
     #define IMG_VOXEL_EMIT
 #endif
+#ifdef GBUF_PARTICLES
+    // 火花が不透明のパーティクルで来る環境 (FX_SPARKS_IN_PARTICLES) は、ここでも花火の光に溜める (gbuffers_translucent.vsh と同じ)
+    // FX_* は include の後で決まるので書き込みの指定は先に置く。花火の光の SSBO を取り込まない時は何も変わらない
+    #define SSBO_FIREWORK_LIGHT_WRITE
+#endif
 //@include "/lib/common/common.glsl"
 //@include "/lib/common/constants.glsl"
 //@include "/lib/common/jitter.glsl"
@@ -15,6 +20,15 @@
 //@include "/lib/surface/surface.glsl"
 #ifdef GBUF_ENTITIES
     //@include "/lib/light/light.glsl"
+#endif
+#ifdef GBUF_PARTICLES
+    //@include "/lib/settings/capabilities.glsl"
+#endif
+#if defined GBUF_PARTICLES && defined FX_SPARKS_IN_PARTICLES && (defined FIREWORK_GLOW || defined FIREWORK_LIGHT)
+    //@include "/lib/surface/particle_glow.glsl"
+#endif
+#if defined GBUF_PARTICLES && defined FX_SPARKS_IN_PARTICLES && defined FIREWORK_LIGHT
+    //@include "/lib/light/firework_light.glsl"
 #endif
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
@@ -84,6 +98,18 @@
     #include "/lib/light/blocklight.glsl"
     #include "/lib/light/light.glsl"
 #endif
+#ifdef GBUF_PARTICLES
+    #include "/lib/settings/capabilities.glsl"
+#endif
+#if defined GBUF_PARTICLES && defined FX_SPARKS_IN_PARTICLES && (defined FIREWORK_GLOW || defined FIREWORK_LIGHT)
+    #include "/lib/common/exposure.glsl"
+    #include "/lib/surface/particle_glow.glsl"
+#endif
+#if defined GBUF_PARTICLES && defined FX_SPARKS_IN_PARTICLES && defined FIREWORK_LIGHT
+    #include "/lib/common/phase.glsl"
+    #include "/lib/buffers/firework_light.glsl"
+    #include "/lib/light/firework_light.glsl"
+#endif
 // END GENERATED includes
 
 #ifdef GBUF_TERRAIN
@@ -108,6 +134,11 @@ out vec2 tileHalf;
 flat out int blockId;
 #ifdef GBUF_ENTITIES
     flat out int swirlLayer;
+#endif
+#if defined GBUF_PARTICLES && defined FX_SPARKS_IN_PARTICLES && defined FIREWORK_GLOW
+// 光る粒の四角の角 (-1..1) と瞬きの倍率 (0 = 光らない粒)。lib/surface/particle_glow.glsl
+out vec2 glowCorner;
+out float glowGain;
 #endif
 
 const float MID_UV_FIXED_SCALE = 32768.0;
@@ -150,6 +181,21 @@ void main() {
     vec3 playerPos = viewToPlayer(viewPos);
     playerPos = applyWaving(playerPos, blockId, at_midBlock.y < 0.0, lmcoord.y);
     viewPos = playerToView(playerPos);
+#endif
+#if defined GBUF_PARTICLES && defined FX_SPARKS_IN_PARTICLES && defined FIREWORK_GLOW
+    glowCorner = particleCorner(gl_VertexID);
+    glowGain = 0.0;
+#endif
+#if defined GBUF_PARTICLES && defined FX_SPARKS_IN_PARTICLES && (defined FIREWORK_GLOW || defined FIREWORK_LIGHT)
+    if (isOpaqueSpark(gl_MultiTexCoord1.xy, gl_Color.rgb)) {
+    #ifdef FIREWORK_LIGHT
+        if ((gl_VertexID & 3) == 0) fireworkAccAdd(viewToPlayer(viewPos), srgbToLinear(gl_Color.rgb), gl_Color.a);
+    #endif
+    #ifdef FIREWORK_GLOW
+        viewPos = expandParticleCorner(viewPos, glowCorner);
+        glowGain = max(particleTwinkle(viewToPlayer(viewPos) + cameraPosition), 1e-3);
+    #endif
+    }
 #endif
 
 #ifdef GBUF_ENTITIES

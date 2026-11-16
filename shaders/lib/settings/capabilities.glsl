@@ -19,6 +19,11 @@
 #define CAP_LIGHTNING_PROGRAM 1
 #endif
 
+// 花火の火花が半透明のパーティクル (gbuffers_particles_translucent) で描かれる。無い環境: MC 26.1 より前 (火花は gbuffers_particles で描かれる)
+#if defined MC_VERSION && MC_VERSION >= 260100
+#define CAP_SPARKS_TRANSLUCENT 1
+#endif
+
 // エンティティを影とボクセルに描く (遮蔽とエンティティの光源)
 #if defined ENTITY_SHADOWS || defined LIGHT_ENTITY_OCCLUSION || defined LIGHT_PLAYER_OCCLUSION || defined ENTITY_LIGHTS
 #define FX_ENTITY_VOXEL 1
@@ -37,6 +42,11 @@
 // 雷を gbuffers_entities でも扱う (gbuffers_lightning が読まれない環境)
 #if !defined CAP_LIGHTNING_PROGRAM
 #define FX_LIGHTNING_IN_ENTITIES 1
+#endif
+
+// 花火の火花の発光と花火の光を gbuffers_particles でも扱う (火花が不透明のパーティクルで来る環境)
+#if !defined CAP_SPARKS_TRANSLUCENT
+#define FX_SPARKS_IN_PARTICLES 1
 #endif
 
 #endif // SETTINGS_CAPABILITIES_GLSL

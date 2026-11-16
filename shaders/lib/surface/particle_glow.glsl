@@ -51,6 +51,13 @@ const float FIREWORK_FLASH_FALLOFF = 4.0;
 
 bool isGlowingParticle(vec2 rawLightmap) { return min(rawLightmap.x, rawLightmap.y) > PARTICLE_FULLBRIGHT_LIGHTMAP; }
 
+/*
+ * 不透明のパーティクルで来る火花 (FX_SPARKS_IN_PARTICLES) の見分け。不透明の粒には、空の下でライトマップが最大になる炎と溶岩の粒もある
+ * それらの頂点色は白 (1.0) で、花火の色 (染料ごとの色と消える時の色) の成分は最大 0xF0 (0.94) なので、色で除く
+ */
+const float SPARK_COLOR_MAX = 0.95;
+bool isOpaqueSpark(vec2 rawLightmap, vec3 color) { return isGlowingParticle(rawLightmap) && maxOf(color) < SPARK_COLOR_MAX; }
+
 // 四角の頂点の角 (-1..1)。バニラの粒は 4 頂点ずつ 右下・右上・左上・左下 の順に並ぶ
 vec2 particleCorner(int vertexId) {
     const vec2 CORNERS[4] = vec2[4](vec2(1.0, -1.0), vec2(1.0, 1.0), vec2(-1.0, 1.0), vec2(-1.0, -1.0));
