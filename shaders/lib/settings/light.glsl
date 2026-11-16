@@ -4,7 +4,7 @@
 // ブロックライト / ボクセル (light モジュール)
 #define VOXEL_VOLUME 2 // [0 1 2 3] 0=128x64x128 1=192x96x192 2=256x128x256 3=384x128x384
 #define FLOODFILL // 色付き floodfill (間接光のベース)
-#define FLOODFILL_STRENGTH 0.35 // [0.0 0.1 0.2 0.25 0.3 0.35 0.4 0.5 0.6 0.8 1.0 1.25 1.5 2.0] 光源シャドウ ON 時の間接光の強さ
+#define FLOODFILL_STRENGTH 0.25 // [0.0 0.1 0.2 0.25 0.3 0.35 0.4 0.5 0.6 0.8 1.0 1.25 1.5 2.0] 光源シャドウ ON 時の間接光の強さ
 #define BLOCKLIGHT_BOUNCE 0.5 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 1.0 1.25 1.5 2.0 3.0 4.0] floodfill の壁の照り返しの濃さ (壁の色が光に混ざる) 0=なし
 #define BLOCKLIGHT_BRIGHTNESS 1.0 // [0.1 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0 4.0 5.0 6.0 8.0]
 #define BLOCKLIGHT_WARMTH 0.6 // [0.0 0.25 0.4 0.5 0.6 0.7 0.75 1.0] 0=中性 1=バニラ寄りの暖色
