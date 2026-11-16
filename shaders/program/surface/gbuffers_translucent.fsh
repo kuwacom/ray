@@ -252,6 +252,14 @@ bool isTranslucentCubeItem(int itemId) {
 void main() {
     vec4 tex = texture(gtexture, texcoord);
     vec4 albedo = tex * glcolor;
+#ifdef GBUF_WATER
+    /*
+     * 流れる水の面の向きの画面微分は、透明の画素の discard より前に取る。三角形の外の補助の画素は UV がスプライトの外へ出て
+     * アトラスの透明な所を読み、discard で止まると微分が壊れる。1.20.1 (Iris 1.7.6 + Sodium 0.5) では水の面の境の画素で
+     * 面の向きが壊れ (流れを 0 にしても判定に掛からないので NaN と見られる)、静かな湖に面の境の点線の格子が出た
+     */
+    vec3 faceCross = mat3(gbufferModelViewInverse) * cross(dFdx(viewPos), dFdy(viewPos));
+#endif
 #if defined GBUF_PARTICLES_TRANSLUCENT && defined FIREWORK_GLOW
     // 光る粒 (花火の火花など) と花火の閃光は照らさず発光だけにする。小さな粒はテクスチャの代わりに丸い点で描くので、捨てる判定もその後
     vec2 glowCornerWidth = fwidth(glowCorner);
@@ -337,7 +345,8 @@ void main() {
         WaterSea sea = waterSeaState(lmcoord.y);
         WaterLod lod = waterLod(sea, length(playerPos), abs(dot(geoNormal, V)));
         // 流れる水の上面は傾いているが、頂点の法線は真上のままなので三角形の向きは画面微分から取る
-        vec3 faceNormal = normalize(cross(dFdx(playerPos), dFdy(playerPos)));
+        // 微分が取れなかった画素 (長さ 0) は幾何の法線にする (normalize(0) の NaN を流れに入れない)
+        vec3 faceNormal = dot(faceCross, faceCross) > 0.0 ? normalize(faceCross) : geoNormal;
         if (dot(faceNormal, geoNormal) < 0.0) faceNormal = -faceNormal;
         vec2 flow = waterFlowVelocity(faceNormal, geoNormal);
         if (geoNormal.y > 0.5 && dot(flow, flow) < 1e-4) worldPos = waterParallax(sea, lod, worldPos, -V);
