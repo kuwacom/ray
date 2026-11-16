@@ -118,8 +118,9 @@ flat in int blockId;
 /* RENDERTARGETS: 1,2,3,15,4 */
 #elif defined GBUF_PARTICLES && defined FX_SPARKS_IN_PARTICLES && defined FIREWORK_GLOW
 /*
- * 火花が不透明のパーティクルで来る環境 (FX_SPARKS_IN_PARTICLES) は、光る粒の発光を colortex4 へ加算する
- * (半透明の経路と同じく composite2 が重ね、白を超えた分を TAA の外へ渡す)。光らない粒は 0 を書いて何も足さない
+ * 火花が不透明のパーティクルで来る環境 (FX_SPARKS_IN_PARTICLES) は、光る粒の発光を colortex4 へ書く
+ * (半透明の経路と同じく composite2 が重ね、白を超えた分を TAA の外へ渡す)。光らない粒は 0 を書いて後ろの粒の発光を隠す
+ * 加算にすると、奥から手前の順に描かれた重なる火花の分だけ足されて、玉が白く飛んだ (半透明の経路は重ねても 1 粒の明るさ)
  */
 /* RENDERTARGETS: 1,2,3,15,4 */
 #else
@@ -361,7 +362,7 @@ void main() {
         vec4 glow = evalParticleGlow(texture(gtexture, texcoord), glcolor, glowCorner, glowCornerWidth, glowGain, length(viewPos));
         /*
          * この経路はブレンドできないので、不透明度の割合で画素を間引き、TAA で混ぜる (半透明の経路の a のブレンドの代わり)
-         * 残した画素の G バッファは光を受けない黒にして、発光は colortex4 へ足す
+         * 残した画素の G バッファは光を受けない黒にして、発光は colortex4 へ書く
          */
         if (glow.a <= interleavedGradientNoise(gl_FragCoord.xy, frameCounter)) discard;
         GBufferData sg = gbufferDefault();
