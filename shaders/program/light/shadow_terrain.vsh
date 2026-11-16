@@ -102,8 +102,11 @@ void main() {
     if (isTerrain) {
         // ボクセルは揺れ適用前のブロック中心で書く
         // 流れる水は水として書き、発光の欄 (水は光らないので空いている) に印を残す
+        // 水に浸った光源のセルの水 (Iris は流体の頂点に本体のブロックの発光を入れる) は書かない。水は不透明の後に描かれ、光源の ID を上書きしてしまう
+        // at_midBlock が来ない環境 (Sodium なし) では発光が 0 なので、従来どおり水を書く
+        bool waterloggedLight = blockId == BLOCK_WATER && at_midBlock.w > 0.5;
         float emission = rawBlockId == BLOCK_WATER_FLOWING ? float(VOXEL_WATER_FLOWING) : at_midBlock.w;
-        voxelizeTerrainVertex(playerPos, at_midBlock.xyz / 64.0, blockId, emission);
+        if (!waterloggedLight) voxelizeTerrainVertex(playerPos, at_midBlock.xyz / 64.0, blockId, emission);
     }
 #ifdef PROGRAM_SHADOW_FALLBACK
     vPlayerPos = playerPos;
