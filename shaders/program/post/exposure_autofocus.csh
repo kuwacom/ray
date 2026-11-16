@@ -477,6 +477,8 @@ void main() {
     float visSpeed = visNow < visPrev ? LENS_VIS_HIDE_SPEED : LENS_VIS_SPEED;
     float visBlend = 1.0 - exp(-visSpeed * dt);
     frameData.postParams[2].xy = vec2(mix(visPrev, visNow, visBlend), visNow);
+    // final のゴーストのループの回数 (lib/post/lens_flare.glsl の lensGhosts)
+    frameData.postParams[4].xy = vec2(LENS_GHOST_COUNT, LENS_SPECTRAL_SAMPLES);
     #if SUN_MOON_STYLE == 0
     // 見えている部分の位置と広がり。見え具合と同じ重みと平滑で持つので、final が割れば同じ時刻の重心と分散になる
     vec4 momentsNow = vec4(sharedMoments[0], sharedMoments[1], sharedMoments[2], sharedMoments[3]) * visScale;

@@ -125,8 +125,14 @@ vec3 lensGhosts(vec2 yTan, vec2 lightTan, float fNumber, float pxTan, LensSource
     float sourceExtent = 0.5 * src.radius;
 #endif
 
+    // ループの回数は composite25 が書いた値 (SSBO) で決め、コンパイラに全展開させない。AMD のコンパイラは定数の回数だと
+    // 全展開して final の機械語が設定によって 2〜4 倍になる。設定で決まる分岐を #if / const にする規則は、使わない側のリンクとレジスタの話で、
+    // ここは同じ処理の回数を実行時にするだけで分岐ではない (値は定数と同じで出力は変わらない)
+    int ghostCount = min(int(frameData.postParams[4].x), LENS_GHOST_COUNT);
+    int spectralCount = min(int(frameData.postParams[4].y), LENS_SPECTRAL_SAMPLES);
+
     vec3 sum = vec3(0.0);
-    for (int g = 0; g < LENS_GHOST_COUNT; g++) {
+    for (int g = 0; g < ghostCount; g++) {
 #ifdef LENS_GHOST_TUNED
         if (((LP_GHOST_MASK >> g) & 1) == 0) continue;
 #endif
@@ -158,7 +164,7 @@ vec3 lensGhosts(vec2 yTan, vec2 lightTan, float fNumber, float pxTan, LensSource
         float rimSource = lensSourceSupport(src, h0 / max(length(h0), 1e-6));
         float stopSource = lensSourceSupport(src, st0 / max(length(st0), 1e-6));
 
-        for (int k = 0; k < LENS_SPECTRAL_SAMPLES; k++) {
+        for (int k = 0; k < spectralCount; k++) {
             float l = lensWavelength(k, LENS_SPECTRAL_SAMPLES);
             float sl = ghostLagrange(GHOST_S[g], l);
             float al = ghostScaleClamp(ghostLagrange(GHOST_A[g], l));
