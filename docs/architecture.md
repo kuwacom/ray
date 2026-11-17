@@ -128,7 +128,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 36 | composite24.vsh/fsh | post | ブルームぼかし | colortex14 | colortex14 | 画面 | BLOOM または LOCAL_TONEMAP > 0 |
 | 37 | composite25.csh | post | 自動露出 (ヒストグラム。屋外の夜の持ち上げは画面の暗い側の計測で決める) + オートフォーカス | colortex0, centerDepthSmooth | SSBO0 exposure/focus/histogram | local 16², (1,1,1) | 常時 |
 | 38 | composite26.csh | post | アナログの縦スミア: colortex0 (露出前の線形、DoF・MB の後) の列ごとの平均 (1 列を 1 グループで閉じて求める) | colortex0 | SSBO6 columns | local 8x32, (1024,1,1) | ANALOG かつ ANALOG_SMEAR |
-| 39 | composite27.vsh/fsh | post | アナログの現像: final の本体 (`post/final.fsh` + `FINAL_DEVELOP_PASS`) の現像まで (縦スミアの加算を含む) を表示値で書く。グレイン・デバッグ表示・ディザはしない | colortex0/8/13/14, SSBO0, SSBO6 | colortex0 (表示値) | 画面 | ANALOG |
+| 39 | composite27.vsh/fsh | post | アナログの現像: final の本体 (`post/final.fsh` + `FINAL_DEVELOP_PASS`) の現像まで (ブルーミング (縦のタップで colortex0 を読む) と縦スミアの加算、ニーが ON ならトーンマップの代わりのニーを含む) を表示値で書く。グレイン・デバッグ表示・ディザはしない | colortex0/8/13/14, SSBO0, SSBO6 | colortex0 (表示値) | 画面 | ANALOG |
 | 40 | final.vsh/fsh | post | 歪曲と魚眼の再投影・ブルーム合成・点像の芯と裾・フレア・露出・局所トーンマップ・AgX・色調整・CAS・ディザ・デバッグ表示。ANALOG の時は記録の段 (インターレース (速度で 1 フィールド前の位置を読む) -> センサーのノイズ (ショット・暗部・FPN・ホットピクセル、タップごと、自動ゲインは適用 EV から) -> 解像 -> 輪郭強調 -> ブロックとモスキート (8x8 の仮想の画素、区画の平均はミップ) -> 色差の間引きと色ノイズ。ドロップアウトで隠したブロックは速度で 1 フレーム前の位置を読む。colortex0 のミップ) -> グレイン (センサーのノイズが OFF の時だけ) -> デバッグ表示 -> ディザだけ (本体は composite27) | colortex0/8/13/14/15, depthtex0, SSBO0 | 画面 | 画面 | 常時 |
 
 補足

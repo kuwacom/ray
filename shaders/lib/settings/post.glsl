@@ -203,9 +203,15 @@
 #define ANALOG_C_SMEAR_SHUTTER_STOPS 1 // [0 1 2 3 4] 明るい場面でシャッターが速くなる幅 (段)。暗い場面から晴天までの間で筋が 2^段 倍まで強まる。0 = 露出に連動しない
 #define ANALOG_C_SMEAR_LIGHT_THRESHOLD 8.0 // [2.0 4.0 8.0 16.0 32.0 64.0] 灯りの筋が出始める明るさ (露出の後の白の倍数)
 #define ANALOG_C_SMEAR_LIGHT_GAIN 200.0 // [0.0 5.0 10.0 20.0 50.0 100.0 200.0 500.0] 灯りの明るさがしきい値を超えた分に掛ける倍率。0 = 灯りの筋なし
+#define ANALOG_BLOOMING // CCD のブルーミング (飽和した明るい点から上下へあふれる白)
+#define ANALOG_C_BLOOMING_LENGTH 0 // [0 2 4 8 16] あふれの届く長さ (仮想の走査線)。0 = 掛けない
+#define ANALOG_C_BLOOMING_THRESHOLD 1.0 // [0.5 0.75 1.0 1.5 2.0 4.0] あふれ始める明るさ。1 = 記録の上限 (ニーが ON ならニーで収まる上限、OFF なら白)
 #define ANALOG_RESOLUTION // 形式の画素数と走査線まで解像を落とす
 #define ANALOG_C_RESOLUTION_H 1.0 // [0.5 0.75 1.0 1.25 1.5 2.0] 横の甘さ (1 = 形式の画素数、大きいほど甘い)
 #define ANALOG_C_RESOLUTION_V 1.0 // [0.5 0.75 1.0 1.25 1.5 2.0] 縦の甘さ (1 = 走査線とケル係数)
+#define ANALOG_KNEE // ビデオのニーと白飛び (トーンマップの代わりに掛かる)
+#define ANALOG_C_KNEE_POINT 0.8 // [0.7 0.75 0.8 0.85 0.9 0.95 1.0] ニーの始まり (表示値)。低いほど明部が早く寝る
+#define ANALOG_C_KNEE_RANGE 2.0 // [1.0 1.5 2.0 2.5 3.0] ニーで記録の上限 (109 %) に収める明部の幅 (段)
 #define ANALOG_SHARPEN // カメラの輪郭強調 (縁の白と黒のハロー)
 #define ANALOG_C_SHARPEN_STRENGTH 1.0 // [0.0 0.5 1.0 1.5 2.0 3.0 4.0]
 #define ANALOG_C_SHARPEN_RADIUS 1.0 // [0.5 1.0 1.5 2.0 3.0] ハローの幅 (仮想の画素)

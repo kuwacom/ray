@@ -21,6 +21,75 @@
 //@include "/lib/common/noise.glsl"
 //@include "/lib/common/math.glsl"
 
+#ifdef ANALOG
+// Rec.709 の OETF とその逆 (ニーと、記録の段で表示値の近似の線形と行き来する所で使う。ニーが無い時も同じ式で近似)
+vec3 analogOetf709(vec3 l) {
+    return mix(4.5 * l, 1.099 * pow(max(l, 0.0), vec3(0.45)) - 0.099, step(0.018, l));
+}
+
+vec3 analogOetf709Inverse(vec3 v) {
+    return mix(v / 4.5, pow(max((v + 0.099) / 1.099, 0.0), vec3(1.0 / 0.45)), step(0.081, v));
+}
+#endif
+
+#if defined ANALOG && defined ANALOG_KNEE
+/*
+ * ### applyAnalogKnee
+ * ビデオのニーと白飛び (トーンマップの代わり)。チャンネルごとに Rec.709 の OETF を掛け、ニーの始まりより上を、
+ * AP_KNEE_RANGE 段分の明部が記録の上限 (109 %) に収まる傾きへ寝かせる。上限を超えた所は切れる。
+ * チャンネルごとに切れるので、明るい色は切れたチャンネルから白へ抜けて色相がずれる (ビデオらしい白飛び)
+ *
+ * @param l - 露出とグレーディングの後のシーンの線形
+ * @returns 表示値 (709 の値をそのまま出す。sRGB へは変換しない。PC で DV を見た時の扱い)
+ */
+vec3 applyAnalogKnee(vec3 l) {
+    vec3 v = analogOetf709(l);
+    float top = analogOetf709(vec3(exp2(AP_KNEE_RANGE))).x;
+    float slope = (ANALOG_KNEE_CLIP - AP_KNEE_POINT) / (top - AP_KNEE_POINT);
+    v = mix(v, AP_KNEE_POINT + (v - AP_KNEE_POINT) * slope, step(AP_KNEE_POINT, v));
+#if ANALOG_KNEE_SUPERWHITE_MODE == 1
+    // (b) 記録の 109 % を表示の 1.0 に写す (明部は 2 段分見えるが、100 % の白が 1 / 1.09 に下がる)
+    v /= ANALOG_KNEE_CLIP;
+#endif
+    // (a) は 109 % まで記録し、表示では 100 % で切る
+    return min(v, 1.0);
+}
+#endif
+
+#if defined ANALOG && defined ANALOG_BLOOMING
+/*
+ * ### applyAnalogBlooming
+ * CCD のブルーミング。飽和容量を超えた電荷が同じ列の上下の画素へあふれ、明るい点の上下が白くつぶれる。
+ * 縦だけにして、等方のブルームと点像の裾に重ねない。上下の ANALOG_BLOOMING_TAPS 点ずつを AP_BLOOMING_LENGTH 本の
+ * 仮想の走査線に広げて読み、あふれた分を三角の重みで配る (重みの和は両側で 1。あふれた電荷の総量を輝度で保つ)
+ *
+ * @param hdr - 露出前の線形の色
+ * @param uv - シーン (colortex0) を読む位置
+ * @param exposure - 露出の倍率
+ * @returns あふれを足した色
+ */
+vec3 applyAnalogBlooming(vec3 hdr, vec2 uv, float exposure) {
+    // 記録の上限に当たる露出の後の明るさ (ニーがあれば、ニーで収まる明部の上限)
+#ifdef ANALOG_KNEE
+    float saturation = AP_BLOOMING_THRESHOLD * exp2(AP_KNEE_RANGE);
+#else
+    float saturation = AP_BLOOMING_THRESHOLD;
+#endif
+    float spacing = float(AP_BLOOMING_LENGTH) / float(ANALOG_BLOOMING_TAPS) / float(AF_LINES);
+    vec3 overflow = vec3(0.0);
+    for (int i = 1; i <= ANALOG_BLOOMING_TAPS; i++) {
+        vec2 offset = vec2(0.0, spacing * float(i));
+        vec3 up = max(textureLod(colortex0, uv + offset, 0.0).rgb * exposure - saturation, 0.0);
+        vec3 down = max(textureLod(colortex0, uv - offset, 0.0).rgb * exposure - saturation, 0.0);
+        // 三角の重み: 近いタップほど重く、和は片側で 1/2
+        float w = (1.0 - (float(i) - 0.5) / float(ANALOG_BLOOMING_TAPS)) / float(ANALOG_BLOOMING_TAPS);
+        overflow += w * (up + down);
+    }
+    // 色フィルターは列の中で隣どうし違う色なので、あふれた電荷はどの色の画素にも入る (あふれは白い)。露出の前の単位へ戻す
+    return hdr + vec3(luminance(overflow)) / exposure;
+}
+#endif
+
 #if defined ANALOG && defined ANALOG_SMEAR && defined SSBO_ANALOG_SMEAR_USE
 /*
  * ### applyAnalogSmear
@@ -167,15 +236,6 @@ uint analogFieldOf(vec2 uv) {
 #ifdef ANALOG_NOISE
 // 自動ゲイン (暗い場面で上がる)。applyAnalogRecord が画素ごとに 1 回だけ求める
 float analogGain = 1.0;
-
-// Rec.709 の OETF とその逆 (表示値の近似の線形と行き来する。ニーが無い時も同じ式で近似)
-vec3 analogOetf709(vec3 l) {
-    return mix(4.5 * l, 1.099 * pow(max(l, 0.0), vec3(0.45)) - 0.099, step(0.018, l));
-}
-
-vec3 analogOetf709Inverse(vec3 v) {
-    return mix(v / 4.5, pow(max((v + 0.099) / 1.099, 0.0), vec3(1.0 / 0.45)), step(0.081, v));
-}
 
 /*
  * センサーのノイズ: 表示値を線形へ戻し、仮想の画素ごとの乱数で揺らして戻す

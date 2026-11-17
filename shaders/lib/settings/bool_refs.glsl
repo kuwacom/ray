@@ -188,7 +188,11 @@
 #endif
 #ifdef ANALOG_SMEAR
 #endif
+#ifdef ANALOG_BLOOMING
+#endif
 #ifdef ANALOG_RESOLUTION
+#endif
+#ifdef ANALOG_KNEE
 #endif
 #ifdef ANALOG_SHARPEN
 #endif

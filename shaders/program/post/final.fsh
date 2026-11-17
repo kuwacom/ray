@@ -478,6 +478,13 @@ void main() {
 
     hdr *= inside;
 
+    // センサー: CCD のブルーミング (飽和した画素から上下へあふれる白)。長さ 0 のプリセットではコードを入れない
+#if defined ANALOG && defined ANALOG_BLOOMING
+    #if AP_BLOOMING_LENGTH > 0
+    hdr = applyAnalogBlooming(hdr, uvL, exposure);
+    #endif
+#endif
+
     // センサー: CCD の縦スミア。光学の滲みの後のセンサーの現象なので、レンズの後・露出の前に足す (筋はブルームしない。魚眼の黒い隅にも続く)
 #if defined ANALOG && defined ANALOG_SMEAR
     hdr = applyAnalogSmear(hdr, texelL.x);
@@ -518,8 +525,13 @@ void main() {
      */
     color *= 1.0 + LAVA_BRIGHTNESS * lava;
     lava = max(lava, lavaGlowShare);
+#if defined ANALOG && defined ANALOG_KNEE
+    // ビデオのニーがトーンマップの代わり (TONEMAP の選択と溶岩のトーンマップは使わない)。709 の値をそのまま表示値にする
+    color = applyAnalogKnee(color);
+#else
     color = lava > 0.0 ? mix(tonemap(color), tonemapEmissive(color), lava) : tonemap(color);
     color = linearToSrgb(color);
+#endif
     // 表示値のグレード (リフト・ガンマ・ゲイン -> カーブ -> スプリットトーン) は、フィルムの LUT の下 (前) に置く
 #ifdef GRADING
     color = gradeDisplay(color);

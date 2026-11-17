@@ -70,6 +70,8 @@ const int noiseTextureResolution = 256;
     #undef ANALOG_BLOCK
     #undef ANALOG_MOSQUITO
     #undef ANALOG_DROPOUT
+    #undef ANALOG_KNEE
+    #undef ANALOG_BLOOMING
 #endif
 
 // ANALOG_NOISE はセンサーのノイズ 3 種の総スイッチ
