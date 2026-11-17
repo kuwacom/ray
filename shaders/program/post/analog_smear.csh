@@ -57,12 +57,13 @@
 // END GENERATED includes
 
 // グループは 8 列 x 32 行のスレッド。1024 グループで 8192 列 (ANALOG_SMEAR_COLUMNS_ALLOC) を覆う
-const int SMEAR_GROUP_COLUMNS = 8;
-const int SMEAR_GROUP_ROWS = 32;
+// layout はリテラルしか書けないので、値を変える時は下の 2 つと一緒に直す
+const int ANALOG_SMEAR_GROUP_COLUMNS = 8;
+const int ANALOG_SMEAR_GROUP_ROWS = 32;
 layout(local_size_x = 8, local_size_y = 32) in;
 const ivec3 workGroups = ivec3(1024, 1, 1);
 
-shared vec3 sharedColumnSum[SMEAR_GROUP_ROWS][SMEAR_GROUP_COLUMNS];
+shared vec3 sharedColumnSum[ANALOG_SMEAR_GROUP_ROWS][ANALOG_SMEAR_GROUP_COLUMNS];
 
 void main() {
 #if defined ANALOG && defined ANALOG_SMEAR
@@ -76,7 +77,7 @@ void main() {
     vec3 sum = vec3(0.0);
     float exposure = getExposure();
     if (inside) {
-        for (int y = ly; y < size.y; y += SMEAR_GROUP_ROWS) {
+        for (int y = ly; y < size.y; y += ANALOG_SMEAR_GROUP_ROWS) {
             // NaN / Inf の 1 画素が列の平均を汚さないように入口で止める
             vec3 c = sanitizeColor(texelFetch(colortex0, ivec2(x, y), 0).rgb);
             // 灯りの倍率は機材の値に、機材によらず効く強さを掛けたもの
@@ -92,7 +93,7 @@ void main() {
     }
     sharedColumnSum[ly][lx] = sum;
     barrier();
-    for (int s = SMEAR_GROUP_ROWS / 2; s > 0; s /= 2) {
+    for (int s = ANALOG_SMEAR_GROUP_ROWS / 2; s > 0; s /= 2) {
         if (ly < s) sharedColumnSum[ly][lx] += sharedColumnSum[ly + s][lx];
         barrier();
     }

@@ -1222,9 +1222,9 @@ option.ANALOG_C_RESOLUTION_V.comment=Custom camera only. 1 = the scan lines (the
 screen.ANALOG_NOISE=Noise
 screen.ANALOG_NOISE.comment=Image sensor noise. It grows in darker scenes as the auto gain rises. Needs Analog
 option.ANALOG_NOISE=Sensor Noise
-option.ANALOG_NOISE.comment=Switches the shot, dark and color noise together. Film grain is not applied while this is on. Needs Analog
+option.ANALOG_NOISE.comment=Switches the shot, dark, color, fixed pattern and hot pixel noise together. Film grain is not applied while this is on. Needs Analog
 option.ANALOG_NOISE_STRENGTH=Noise Strength
-option.ANALOG_NOISE_STRENGTH.comment=Applies with every camera. Multiplier for all three kinds of noise. 0 removes the noise (and its cost)
+option.ANALOG_NOISE_STRENGTH.comment=Applies with every camera. Multiplier for all five kinds of noise. 0 removes the noise (and its cost)
 option.ANALOG_C_AGC_MAX=Auto Gain Limit
 option.ANALOG_C_AGC_MAX.comment=Custom camera only. How far (in stops) the camera raises its sensitivity in dark scenes. Higher gives more noise in the dark
 option.ANALOG_C_AGC_EV=Auto Gain Start

@@ -217,8 +217,8 @@
 #define ANALOG_C_SHARPEN_STRENGTH 1.0 // [0.0 0.5 1.0 1.5 2.0 3.0 4.0]
 #define ANALOG_C_SHARPEN_RADIUS 1.0 // [0.5 1.0 1.5 2.0 3.0] ハローの幅 (仮想の画素)
 #define ANALOG_C_SHARPEN_CORING 1.0 // [0.0 0.5 1.0 2.0 4.0] 細かい揺らぎを強調しないしきい値の倍率
-#define ANALOG_NOISE // センサーのノイズ (ショット・暗部・色) の総スイッチ。ON の間はフィルムグレインを掛けない
-#define ANALOG_NOISE_STRENGTH 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0] ノイズ全部の強さ (機材によらず効く)
+#define ANALOG_NOISE // センサーのノイズ (ショット・暗部・色・固定パターン・ホットピクセル) の総スイッチ。ON の間はフィルムグレインを掛けない
+#define ANALOG_NOISE_STRENGTH 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0] ノイズ 5 種すべての強さ (機材によらず効く)
 #define ANALOG_C_AGC_MAX 2 // [0 1 2 3 4] 暗い場面で自動ゲインが上げる上限 (段)
 #define ANALOG_C_AGC_EV -1.0 // [-4.0 -3.0 -2.0 -1.0 0.0 1.0 2.0] ゲインが上がり始める適用 EV
 #define ANALOG_SHOT_NOISE // ショットノイズ (光の粒の揺らぎ。明るさの平方根で増える)

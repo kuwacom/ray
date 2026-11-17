@@ -74,7 +74,7 @@ const int noiseTextureResolution = 256;
     #undef ANALOG_BLOOMING
 #endif
 
-// ANALOG_NOISE はセンサーのノイズ 3 種の総スイッチ
+// ANALOG_NOISE はセンサーのノイズ 5 種 (ショット・暗部・色・固定パターン・ホットピクセル) の総スイッチ
 #ifndef ANALOG_NOISE
     #undef ANALOG_SHOT_NOISE
     #undef ANALOG_DARK_NOISE

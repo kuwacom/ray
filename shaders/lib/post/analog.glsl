@@ -20,15 +20,18 @@
 //@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/common/noise.glsl"
 //@include "/lib/common/math.glsl"
+//@include "/lib/post/sampling.glsl"
 
 #ifdef ANALOG
 // Rec.709 の OETF とその逆 (ニーと、記録の段で表示値の近似の線形と行き来する所で使う。ニーが無い時も同じ式で近似)
 vec3 analogOetf709(vec3 l) {
-    return mix(4.5 * l, 1.099 * pow(max(l, 0.0), vec3(0.45)) - 0.099, step(0.018, l));
+    vec3 curve = ANALOG_REC709_SCALE * pow(max(l, 0.0), vec3(ANALOG_REC709_EXPONENT)) - (ANALOG_REC709_SCALE - 1.0);
+    return mix(ANALOG_REC709_SLOPE * l, curve, step(ANALOG_REC709_BREAK, l));
 }
 
 vec3 analogOetf709Inverse(vec3 v) {
-    return mix(v / 4.5, pow(max((v + 0.099) / 1.099, 0.0), vec3(1.0 / 0.45)), step(0.081, v));
+    vec3 curve = pow(max((v + (ANALOG_REC709_SCALE - 1.0)) / ANALOG_REC709_SCALE, 0.0), vec3(1.0 / ANALOG_REC709_EXPONENT));
+    return mix(v / ANALOG_REC709_SLOPE, curve, step(ANALOG_REC709_SLOPE * ANALOG_REC709_BREAK, v));
 }
 #endif
 
@@ -79,8 +82,9 @@ vec3 applyAnalogBlooming(vec3 hdr, vec2 uv, float exposure) {
     vec3 overflow = vec3(0.0);
     for (int i = 1; i <= ANALOG_BLOOMING_TAPS; i++) {
         vec2 offset = vec2(0.0, spacing * float(i));
-        vec3 up = max(textureLod(colortex0, uv + offset, 0.0).rgb * exposure - saturation, 0.0);
-        vec3 down = max(textureLod(colortex0, uv - offset, 0.0).rgb * exposure - saturation, 0.0);
+        // 中心の画素 (fetchScene) と同じく NaN / Inf を止める (1 画素の Inf が上下へ広がらないように)
+        vec3 up = max(sanitizeColor(textureLod(colortex0, uv + offset, 0.0).rgb) * exposure - saturation, 0.0);
+        vec3 down = max(sanitizeColor(textureLod(colortex0, uv - offset, 0.0).rgb) * exposure - saturation, 0.0);
         // 三角の重み: 近いタップほど重く、和は片側で 1/2
         float w = (1.0 - (float(i) - 0.5) / float(ANALOG_BLOOMING_TAPS)) / float(ANALOG_BLOOMING_TAPS);
         overflow += w * (up + down);
@@ -282,7 +286,8 @@ vec3 applyAnalogSensorNoise(vec3 v, vec2 uv) {
 // 色ノイズ: 色差の標本 (k = 色差の格子の位置) ごとの斑点。暗部 (1 - Y') ^ 偏り で強い。実機では間引きの前に乗るので標本ごとに足す
 vec2 analogChromaNoise(vec2 k, float luma, uint f) {
     if (AP_CHROMA_NOISE_STRENGTH <= 0.0) return vec2(0.0);
-    float shadow = pow(saturate(1.0 - luma), AP_CHROMA_NOISE_SHADOW);
+    // 偏り 0 は暗部に寄せない (白い画素の pow(0, 0) は未定義)
+    float shadow = AP_CHROMA_NOISE_SHADOW > 0.0 ? pow(saturate(1.0 - luma), AP_CHROMA_NOISE_SHADOW) : 1.0;
     return ANALOG_NOISE_STRENGTH * AP_CHROMA_NOISE_STRENGTH * ANALOG_CHROMA_NOISE_SCALE * analogGain * shadow
          * analogRandom(k / AP_CHROMA_NOISE_SIZE, f, ANALOG_SEED_CHROMA).xy;
 }

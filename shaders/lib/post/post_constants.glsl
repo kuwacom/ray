@@ -477,9 +477,15 @@ const float ANALOG_BLOCK_DEADZONE = 0.015;
 const float ANALOG_MOSQUITO_GAIN = 0.5;
 // 1 回のドロップアウトが続くフィールドの数 (見た目の調整値。1 フィールドでは視点を回していても見えない)
 const uint ANALOG_DROPOUT_FIELDS = 4u;
+// Rec.709 の OETF の係数 (V = 4.5 L (L < 0.018)、1.099 L^0.45 - 0.099)
+const float ANALOG_REC709_SLOPE = 4.5;
+const float ANALOG_REC709_SCALE = 1.099;
+const float ANALOG_REC709_EXPONENT = 0.45;
+const float ANALOG_REC709_BREAK = 0.018;
 // ビデオの記録の上限 (109 %。ニーは AP_KNEE_RANGE 段分の明部をここまでに収める)
 const float ANALOG_KNEE_CLIP = 1.09;
 // 109 % の表示の扱い 0 = 109 % まで記録して表示は 100 % で切る (PC で DV を見た時の扱い) 1 = 109 % を表示の 1.0 に写す
+// #351 で 0 に決まった。1 は比べる撮影を撮り直す時のために残す (定数の #if で外れ、0 の本文には入らない)
 #define ANALOG_KNEE_SUPERWHITE_MODE 0
 // ブルーミングの片側のタップの数 (見た目の調整値。長さ 16 でも 4 本おきに読む)
 const int ANALOG_BLOOMING_TAPS = 4;
