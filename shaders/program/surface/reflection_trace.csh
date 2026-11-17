@@ -118,6 +118,18 @@ const vec2 workGroupsRender = vec2(0.5, 0.5);
 
 // SSR の当たりの判定と定数 (SSR_MAX_DISTANCE など) は composite2 の鏡面のフル解像度の SSR と共有するため lib/surface/reflection.glsl に置く
 const float VOXEL_REFLECTION_DISTANCE = 64.0;
+/*
+ * 体積の端まで辿る鏡面の反射の向きの上向きの sin の上限。64 ブロック先で反射面より 32 ブロック以上高い物だけを映す急な向きは、
+ * 湖の向こうの山の映り込みにほとんど出ないので 64 で止める (下を向くと画面の大半の水面がこの向き)
+ */
+const float VOXEL_FAR_MAX_SLOPE = 0.5;
+
+// 反射の向きの消失点が画面の内側 (SSR を端で薄める幅より内) にあるか
+bool reflectDirOnScreen(vec3 R) {
+    vec4 c = gbufferProjection * vec4(playerToViewDir(R), 0.0);
+    if (c.w <= 0.0) return false;
+    return screenEdgeFade(c.xy / c.w * 0.5 + 0.5) >= 1.0;
+}
 const float REFLECTION_ALPHA_MIN = 0.12;     // 最も粗い面の時間蓄積の新しい値の割合
 /*
  * 映り込みを散らした水面の時間蓄積の新しい値の割合。散らしは粗さが小さくても空と物の境で明暗の差が大きく、粗さに応じた割合
@@ -214,7 +226,8 @@ void main() {
 
     if (s.perceptualRoughness < SSR_ROUGHNESS_LIMIT || waterRough) {
         // 鏡面 (水・ガラス) と水面は遠くの島や岸も映るよう描画距離まで辿る
-        float maxDist = s.perceptualRoughness < MIRROR_ROUGHNESS || waterRough ? mirrorTraceDistance() : SSR_MAX_DISTANCE;
+        bool mirror = s.perceptualRoughness < MIRROR_ROUGHNESS || waterRough;
+        float maxDist = mirror ? mirrorTraceDistance() : SSR_MAX_DISTANCE;
         vec4 hit = traceReflectionHit(s.viewPos, playerPos, Ng, R, dist, maxDist, !s.translucent, waterTop, noise.z);
         bool found = hit.w > 0.5;
         float edge = hit.z;
@@ -222,8 +235,14 @@ void main() {
         // 画面端で SSR を薄める先は空ではなくボクセルのレイにする。空へ溶かすと洞窟 (スカイライト 0) では
         // 画面の端ほど反射が黒く抜け、屋外でも端に映る地形が空の色に化けていた
         if (edge < 1.0) {
+            /*
+             * 鏡面で反射の向きが画面の外を指す時は体積の端まで辿る。64 ブロックで止めると、湖の向こうの山が画面の上へ外れた所
+             * (下を向いた時の手前の水面) で空に化けて映り込みが消えた。向きが画面の中なら遠くは SSR が描画距離まで拾っている
+             * 遠くを粗い刻みで探すと、山の頂きを薄くかすめる光線が刻みの間を抜け、映り込みが粒になった
+             */
+            float voxelDist = mirror && R.y < VOXEL_FAR_MAX_SLOPE && !reflectDirOnScreen(R) ? mirrorTraceDistance() : VOXEL_REFLECTION_DISTANCE;
             // voxelRayOrigin は幾何法線の主軸で固体セルから押し出す前提 (テクスチャ法線だと横の床セルへ押し出すことがある)
-            vec4 v = traceVoxelRadiance(voxelRayOrigin(playerPos, Ng), R, VOXEL_REFLECTION_DISTANCE, s.skyLm, true);
+            vec4 v = traceVoxelRadiance(voxelRayOrigin(playerPos, Ng), R, voxelDist, s.skyLm, true);
             if (v.a > 0.5) radiance = v.rgb;
             found = found || v.a > 0.5;
         }

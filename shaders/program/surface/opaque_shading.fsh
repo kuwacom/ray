@@ -295,7 +295,7 @@ void main() {
         float thickness = mix(1.0 - L.sunFallback, L.sunShadow.thickness, L.sunShadow.fade);
         vec3 transmit = exp(-thickness * SSS_DENSITY / max(m.sss, 0.05) * (1.15 - m.albedo));
         LightSample through = L.celestial;
-        through.irradiance *= transmit * L.cloudShadow * pomShadow;
+        through.irradiance *= transmit * L.cloudShadow * pomShadow * sunSkylightGate(g.lightmap.y);
         color += evalTranslucency(m, g.normal, V, through) * SSS_STRENGTH;
     }
 #endif

@@ -7,6 +7,8 @@
  *   上位 (LIGHT_TRACE_COUNT - 1) 個は確定でトレース、残り全部からリザーバサンプリングで 1 個を
  *   重みに比例して選び 1/確率 倍でトレースする (選ばれなかった光源も影付きで不偏に寄与する)
  *   LIGHT_TRACE_COUNT = 1 の時は上位 1 個だけをトレースし、残りはその可視率で近似する
+ *   動くエンティティの着色点はくじを引かず、残りで一番明るい 1 個を決まった光源としてトレースする
+ *   (くじの光源がフレームごとに変わると、動く体の上で色の斑点になる)
  *
  * 出力 (左上 viewSize / LIGHT_TRACE_RES)
  *   blockLightRawImg: rgb = 影あり照度 S (幾何法線), a = 視線方向の距離 (デノイズの深度判定用, 空は -1)
@@ -160,6 +162,11 @@ void main() {
         int restIdx = -1;
         float restW = 0.0;
         vec3 restE = vec3(0.0);
+    #ifdef STOCHASTIC_SLOT
+        int nextIdx = -1;
+        float nextW = 0.0;
+        vec3 nextE = vec3(0.0);
+    #endif
         uint seed = pcgHash(uint(low.x) | (uint(low.y) << 16u)) ^ pcgHash(uint(frameCounter));
 
         for (uint k = 0u; k < n; k++) {
@@ -190,6 +197,13 @@ void main() {
                 restW = cw;
                 restE = ce;
             }
+    #ifdef STOCHASTIC_SLOT
+            if (cw > nextW) {
+                nextIdx = ci;
+                nextW = cw;
+                nextE = ce;
+            }
+    #endif
         }
 
         uint flags = blockLightTraceFlags();
@@ -217,12 +231,27 @@ void main() {
     #endif
         }
     #ifdef STOCHASTIC_SLOT
-        if (restIdx >= 0) {
-            vec3 e = restE * (restSum / restW);
+        int pickIdx = restIdx;
+        vec3 pickE = restIdx >= 0 ? restE * (restSum / restW) : vec3(0.0);
+        // 動くエンティティは自分の速度を持たず、デノイズの履歴が体の別の場所の値になる。くじの光源が
+        // フレームごとに変わると色の比が振れたまま混ざって斑点になるので、くじの代わりに残りで一番明るい
+        // 光源を決まった 1 本としてトレースする。それ以外は、トレースした光源の可視率 (照度の輝度で重み付け)
+        // で近似する (最大光源だけの可視率だと、その影の中が他の光源にも照らされず黒く硬い縞になる)
+        bool moving = isMovingEntityMaterial(material);
+        if (moving) {
+            pickIdx = nextIdx;
+            pickE = nextE;
+        }
+        if (pickIdx >= 0) {
             vec2 xi = fract(bn.xy + r2Sequence(DET_COUNT));
             float dither = fract(bn.w + 0.5);
-            shadowed += e * traceBlockLight(restIdx, fromVoxel, playerPos, geoNormal, flags, skipStart, xi, dither, false);
-            unshadowed += e;
+            shadowed += pickE * traceBlockLight(pickIdx, fromVoxel, playerPos, geoNormal, flags, skipStart, xi, dither, false);
+            unshadowed += pickE;
+        }
+        if (moving) {
+            vec3 farE = max(restTotal - pickE, vec3(0.0));
+            shadowed += farE * (luminance(shadowed) / max(luminance(unshadowed), EPS));
+            unshadowed += farE;
         }
     #endif
     }

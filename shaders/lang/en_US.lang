@@ -696,6 +696,7 @@ option.FOG_CLOUD_SHADOWS=Cloud Shadowed Light Shafts
 option.VL_FAR=Distant Light Shafts
 option.VL_FAR.comment=Light shafts beyond the shadow distance, traced in screen space from hills, trees and buildings. Only matters when the render distance is longer than the shadow distance. Slightly heavier
 option.CAVE_LEAK_PREVENTION=Cave Light Leak Prevention
+option.CAVE_LEAK_PREVENTION.comment=Keeps sunlight and light shafts out of places with no skylight, such as caves, even when the shadow map has a gap above them. Also dims far fog in caves. Can darken the far end of side tunnels and deep sea floors
 option.GODRAYS=Screen-Space God Rays
 option.GODRAYS.comment=Streaks of light from the sky around the sun or moon through gaps in trees, hills and buildings, drawn radially on screen. Stronger in thicker fog. Slightly heavier
 option.GODRAYS_STRENGTH=Screen-Space God Ray Strength

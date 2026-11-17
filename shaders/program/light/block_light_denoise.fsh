@@ -103,6 +103,9 @@ const float NORMAL_POWER = 16.0;
 // 履歴の分散クリップの幅 (標準偏差の倍数) と最低限の幅
 const float CLIP_GAMMA = 1.5;
 const float CLIP_MIN_WIDTH = 0.05;
+// エンティティは自分の速度を持たず、再投影した履歴が体の別の場所の値になる。履歴を弱く、狭く混ぜる
+const float ENTITY_TEMPORAL_ALPHA = 0.35;
+const float ENTITY_CLIP_GAMMA = 1.0;
 // 履歴の深度の許容 (再投影の遮蔽判定)
 const float HISTORY_DEPTH_REL = 0.05;
 const float HISTORY_DEPTH_ABS = 0.1;
@@ -139,7 +142,8 @@ void main() {
     // 離れた所の広がりの分は光源の影を掛ける full に入れる (同じ形態係数なので 1 回で求める)
     vec3 boxSpread;
     vec3 box = sumBinBoxIrradiance(voxelPos, geoNormal, true, boxSpread);
-    vec3 full = sumBinLightsUnshadowed(voxelPos, normal, geoNormal, true, false, isUpNormalPlant(readMaterialId(texel), geoNormal)) + boxSpread;
+    int material = readMaterialId(texel);
+    vec3 full = sumBinLightsUnshadowed(voxelPos, normal, geoNormal, true, false, isUpNormalPlant(material, geoNormal)) + boxSpread;
     if (maxOf(full) <= 0.0) {
         outBlockLight = vec4(box, 1.0);
         outHistory = vec4(1.0, 1.0, 1.0, viewDist);
@@ -226,9 +230,10 @@ void main() {
         }
         if (hw > HISTORY_MIN_WEIGHT) {
             hist /= hw;
-            vec3 width = max(sigma * CLIP_GAMMA, vec3(CLIP_MIN_WIDTH));
+            bool entity = isMovingEntityMaterial(material);
+            vec3 width = max(sigma * (entity ? ENTITY_CLIP_GAMMA : CLIP_GAMMA), vec3(CLIP_MIN_WIDTH));
             hist = clamp(hist, mean - width, mean + width);
-            ratio = mix(hist, ratio, TEMPORAL_ALPHA);
+            ratio = mix(hist, ratio, entity ? ENTITY_TEMPORAL_ALPHA : TEMPORAL_ALPHA);
         }
     }
 #endif

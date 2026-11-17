@@ -59,9 +59,11 @@ const float GI_HIT_FLOOD_SCALE = FLOODFILL_STRENGTH;
 const float GI_HIT_FLOOD_SCALE = 1.0;
 #endif
 
-vec3 secondaryHitDirect(vec3 playerPos, vec3 normal) {
+vec3 secondaryHitDirect(vec3 playerPos, vec3 normal, float skyLm) {
     // 省く項: 手持ち光源と直接光 (secondaryHitBlockLight が別に返す)、GI と AO と鏡面 (拡散の放射輝度だけ)
-    SurfaceLights L = gatherSurfaceLights(surfacePoint(playerPos, normal), SL_SUN_VOLUME, SL_BLOCK_HIT_FLOOD, 0u);
+    SurfacePoint p = surfacePoint(playerPos, normal);
+    p.lightmap.y = skyLm;
+    SurfaceLights L = gatherSurfaceLights(p, SL_SUN_VOLUME, SL_BLOCK_HIT_FLOOD, 0u);
     return L.sun.irradiance + L.block * GI_HIT_FLOOD_SCALE;
 }
 
@@ -95,7 +97,7 @@ vec3 shadeSecondaryHit(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm) { 
  */
 vec3 shadeSecondaryHitGi(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm, vec3 prevIndirect) {
     vec3 sky = secondaryHitSky(playerPos, normal, skyLm);
-    vec3 E = secondaryHitDirect(playerPos, normal);
+    vec3 E = secondaryHitDirect(playerPos, normal, skyLm);
     if (prevIndirect.x >= 0.0) {
 #ifdef GI_TRACES_SKY
         E += mix(sky, prevIndirect + sky * (1.0 - LOOK_GI_SKY_OCCLUSION), GI_MULTI_BOUNCE);

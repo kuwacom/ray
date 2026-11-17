@@ -349,7 +349,7 @@ void main() {
      * 側面と水中から見た面は合成が近似で決める
      */
     vec3 sunVis = vec3(0.0);
-    if (!below && !side) sunVis = surfaceSunVisibility(surfPlayer, vec3(0.0, 1.0, 0.0), dither);
+    if (!below && !side) sunVis = surfaceSunVisibility(surfPlayer, vec3(0.0, 1.0, 0.0), lmT.y, dither);
     imageStore(STORE_WATER_SUNVIS, texel, vec4(sunVis, behindExcess));
 
 #if REFLECTIONS > 0

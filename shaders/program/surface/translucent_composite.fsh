@@ -387,7 +387,7 @@ void main() {
         vec3 R = reflect(-V, N);
         vec3 refl = reflectionAt(texel, dist, R, lmT.y, roughness, vec3(0.0));
         if (roughness < MIRROR_ROUGHNESS) refl = mirrorReflection(refl, surfView, surfPlayer, N, R, dist, false, false, dither);
-        vec3 glassSunVis = surfaceSunVisibility(surfPlayer, N, dither) * getCloudSunDiscVisibility();
+        vec3 glassSunVis = surfaceSunVisibility(surfPlayer, N, lmT.y, dither) * getCloudSunDiscVisibility();
         float glassAlpha = max(roughness * roughness, MIN_ROUGHNESS);
         // 前方で照らした拡散 (translucent.rgb) は鏡面で反射する F の分を除く (太陽の鏡面を足すので、その分だけ明るくならないように)
         vec3 spec = refl * F + sunSpecular(N, V, GLASS_F0, glassAlpha, glassSunVis) + localLightSpecular(lights, N, V, GLASS_F0, glassAlpha, false);

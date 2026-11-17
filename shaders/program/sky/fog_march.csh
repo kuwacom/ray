@@ -150,7 +150,11 @@ void main() {
 #else
             vec2 farVisibility = vec2(farSunHiddenShade(dir));
 #endif
-            raw = marchAirFog(dir, dist, dither, farVisibility, !isSky);
+            // 空の画素の G バッファは 0 なので、空は 1 (開けている) として扱う
+            // ガラスや水の向こうが空の画素も不透明の面が無く 0 のままなので、半透明を含まない深度でも空を見る
+            bool opaqueSky = isSky || texelFetch(depthtex1, texel, 0).r >= 1.0;
+            float surfaceSkyLm = opaqueSky ? 1.0 : unpack2x8(texelFetch(colortex2, texel, 0).a).y;
+            raw = marchAirFog(dir, dist, dither, farVisibility, vlCaveGate(surfaceSkyLm), !isSky);
         }
     }
 

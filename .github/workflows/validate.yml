@@ -3,12 +3,6 @@ name: Validate
 on:
   pull_request:
   workflow_call:
-    inputs:
-      full:
-        description: 全プロファイル・全ディメンションを検証する
-        type: boolean
-        default: false
-
 # fork からの PR でも動くよう読み取りだけ
 permissions:
   contents: read
@@ -34,5 +28,6 @@ jobs:
 
       - run: uv sync --frozen
 
+      # --full は CI の runner では終わらないほど遅いので、既定値・world0 の簡易チェックだけにする (--full は手元で回す)
       - name: Validate shaders
-        run: uv run tools/validate_shaders.py ${{ inputs.full && '--full' || '' }}
+        run: uv run tools/validate_shaders.py

@@ -103,26 +103,22 @@ flat in int blockId;
     in float glowGain;
 #endif
 
-#ifdef GBUF_HAND
+#if defined GBUF_HAND || defined GBUF_ENTITIES || defined GBUF_BLOCK || defined GBUF_PARTICLES
+#define CLEARS_TRANSLUCENT
+#endif
+
+#ifdef CLEARS_TRANSLUCENT
 /*
- * MC 1.21.11 の Iris は半透明のエンティティ (額縁の地図などの文字の経路) を手より先に描き、colortex4/5 に残る
- * 手は深度では勝つが半透明の層を消さないので、composite2 が手の上に重ねる。手の画素では両方を空に戻す
+ * MC 1.21.11 の Iris は半透明の物 (額縁の地図などの文字の経路) を、後から描かれる不透明の物 (落ちたブロックのアイテム・防具・手など) より
+ * 先に描き、その色とデータは colortex4/5 に残る。不透明の物は深度では勝つが半透明の層を消さないので、composite2 が上に重ねる
+ * バニラは 1 枚の色バッファに描くので、深度テストを通った画素は先に描かれた半透明を上書きする。同じに、画素では両方を空に戻す
+ * 手・パーティクルはブレンドなしで 0 を上書きする
+ * エンティティは電気の渦の層 (帯電したクリーパー・ウィザーの防壁) を colortex4 へ加算するので、a で切り替える
+ * (渦の画素は a = 0 で足し、それ以外は a = 1 で消す。shaders.properties の blend)
+ * 電気の渦はバニラが半透明の物と一緒に deferred の後に描くので、G バッファへ書いても映らない
+ * ブロックエンティティも同じ a の切り替えで、消すのはブロックエンティティの描画だけ (下の main)
  */
 /* RENDERTARGETS: 1,2,3,15,4,5 */
-#elif defined GBUF_ENTITIES
-/*
- * 電気の渦の層 (帯電したクリーパー・ウィザーの防壁) は加算ブレンドの層なので、バニラが半透明の物と一緒に deferred の後に描く
- * G バッファへ書いても deferred が読み終わっていて映らないので、colortex4 へ加算する (shaders.properties の blend)
- * 渦でない画素は 0 を書いて何も足さない
- */
-/* RENDERTARGETS: 1,2,3,15,4 */
-#elif defined GBUF_PARTICLES && defined FX_SPARKS_IN_PARTICLES && defined FIREWORK_GLOW
-/*
- * 火花が不透明のパーティクルで来る環境 (FX_SPARKS_IN_PARTICLES) は、光る粒の発光を colortex4 へ書く
- * (半透明の経路と同じく composite2 が重ね、白を超えた分を TAA の外へ渡す)。光らない粒は 0 を書いて後ろの粒の発光を隠す
- * 加算にすると、奥から手前の順に描かれた重なる火花の分だけ足されて、玉が白く飛んだ (半透明の経路は重ねても 1 粒の明るさ)
- */
-/* RENDERTARGETS: 1,2,3,15,4 */
 #else
 /* RENDERTARGETS: 1,2,3,15 */
 #endif
@@ -130,15 +126,18 @@ layout(location = 0) out vec4 outAlbedo;
 layout(location = 1) out vec4 outNormal;
 layout(location = 2) out vec4 outMaterial;
 layout(location = 3) out vec4 outVelocity;
-#ifdef GBUF_HAND
-layout(location = 4) out vec4 outTranslucentClear;
-layout(location = 5) out vec4 outTranslucentDataClear;
-#elif defined GBUF_ENTITIES
-layout(location = 4) out vec4 outSwirl;
+#ifdef CLEARS_TRANSLUCENT
+layout(location = 4) out vec4 outTranslucent;
+layout(location = 5) out vec4 outTranslucentData;
+#if defined GBUF_ENTITIES || defined GBUF_BLOCK
+const vec4 TRANSLUCENT_CLEAR = vec4(0.0, 0.0, 0.0, 1.0);
+#else
+const vec4 TRANSLUCENT_CLEAR = vec4(0.0);
+#endif
+#ifdef GBUF_ENTITIES
 // EMISSION_CHARGED_CREEPER_BRIGHTNESS が 1 増えるごとに足す、バニラの明るさの倍数
 const float CHARGED_SWIRL_GAIN = 3.0;
-#elif defined GBUF_PARTICLES && defined FX_SPARKS_IN_PARTICLES && defined FIREWORK_GLOW
-layout(location = 4) out vec4 outGlow;
+#endif
 #endif
 
 #if PBR_FORMAT == 1 && !defined GBUF_BASIC && !defined GBUF_LINE
@@ -351,7 +350,9 @@ void main() {
         lg.emission = 1.0;
         encodeGBuffer(lg, outAlbedo, outNormal, outMaterial);
         outVelocity = encodeVelocity(viewPos);
-        outSwirl = vec4(lightningGlow(glcolor), 0.0);
+        // a = 0 で足すだけにして、先に描かれた半透明を消さない
+        outTranslucent = vec4(lightningGlow(glcolor), 0.0);
+        outTranslucentData = vec4(0.0);
         return;
     }
 #endif
@@ -363,6 +364,8 @@ void main() {
         /*
          * この経路はブレンドできないので、不透明度の割合で画素を間引き、TAA で混ぜる (半透明の経路の a のブレンドの代わり)
          * 残した画素の G バッファは光を受けない黒にして、発光は colortex4 へ書く
+         * (半透明の経路と同じく composite2 が重ね、白を超えた分を TAA の外へ渡す。光らない粒は 0 を書いて後ろの粒の発光を隠す)
+         * 加算にすると、奥から手前の順に描かれた重なる火花の分だけ足されて、玉が白く飛んだ (半透明の経路は重ねても 1 粒の明るさ)
          */
         if (glow.a <= interleavedGradientNoise(gl_FragCoord.xy, frameCounter)) discard;
         GBufferData sg = gbufferDefault();
@@ -372,7 +375,8 @@ void main() {
         sg.lightmap = lmcoord;
         encodeGBuffer(sg, outAlbedo, outNormal, outMaterial);
         outVelocity = vec4(0.0);
-        outGlow = vec4(glow.rgb, 0.0);
+        outTranslucent = vec4(glow.rgb, 0.0);
+        outTranslucentData = vec4(0.0);
         return;
     }
 #endif
@@ -623,24 +627,29 @@ void main() {
     encodeGBuffer(g, outAlbedo, outNormal, outMaterial);
     outMaterial.a = encodeSurfaceExtra(pomShadow, puddle);
 
+#ifdef CLEARS_TRANSLUCENT
+    outTranslucent = TRANSLUCENT_CLEAR;
+#endif
+#ifdef GBUF_BLOCK
+    // 26.x はピストンで動く半透明ブロックを deferred の後にここで描く。奥の半透明を消さないよう、消すのはブロックエンティティの描画だけ
+    if (renderStage != MC_RENDER_STAGE_BLOCK_ENTITIES) outTranslucent = vec4(0.0);
+#endif
 #if defined GBUF_ENTITIES
     outVelocity = encodeVelocity(viewPos);
     // バニラの渦は光を受けない加算 (テクスチャ x 頂点色) なので、光源ブロックの発光と同じ明るさの単位で足す
-    outSwirl = vec4(0.0);
     if (swirlLayer != 0) {
         // 帯電したクリーパーとウィザーの防壁は夜でも一目で分かるように、バニラの明るさより強く光らせる
         bool strongSwirl = getEntityLightIndex(entityId) == LIGHT_ENTITY_CREEPER || entityId == ENTITY_WITHER;
         float swirlGain = strongSwirl ? 1.0 + EMISSION_CHARGED_CREEPER_BRIGHTNESS * CHARGED_SWIRL_GAIN : 1.0;
-        outSwirl.rgb = srgbToLinear(albedoDry) * (swirlGain * getVisibleEmissionLuminance() * EMISSION_STRENGTH);
+        outTranslucent = vec4(srgbToLinear(albedoDry) * (swirlGain * getVisibleEmissionLuminance() * EMISSION_STRENGTH), 0.0);
     }
 #elif defined GBUF_HAND
     outVelocity = encodeHandVelocity();
-    outTranslucentClear = vec4(0.0);
-    outTranslucentDataClear = vec4(0.0);
 #else
     outVelocity = vec4(0.0);
 #endif
-#if defined GBUF_PARTICLES && defined FX_SPARKS_IN_PARTICLES && defined FIREWORK_GLOW
-    outGlow = vec4(0.0);
+#ifdef CLEARS_TRANSLUCENT
+    // colortex5 のブレンドは自分の a で先に描かれた分を残す量を決める (a = 0 の渦の画素では残す)
+    outTranslucentData = vec4(0.0, 0.0, 0.0, outTranslucent.a);
 #endif
 }
