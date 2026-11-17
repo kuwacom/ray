@@ -63,6 +63,9 @@ const int noiseTextureResolution = 256;
 #ifndef ANALOG
     #undef ANALOG_SMEAR
     #undef ANALOG_CHROMA
+    #undef ANALOG_RESOLUTION
+    #undef ANALOG_SHARPEN
+    #undef ANALOG_INTERLACE
 #endif
 
 // 三角形方式のエンティティ遮蔽 (lib/light/entity_tri.glsl)。遮蔽が両方 OFF なら三角形も書かない

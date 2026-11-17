@@ -429,4 +429,20 @@ const float LENS_VIS_OFFSCREEN = 0.25;
 const float LENS_VIS_EYE_FADE = 0.05;
 // フィルムグレインの振幅 (sRGB) は設定 FILM_GRAIN。既定はデジカメのセンサーノイズ程度の微弱な値
 
+// アナログ (ANALOG OFF の本文に残さない)
+#ifdef ANALOG
+// インターレースのフィールドのずれを、フレームの長さで割る時の下限 (秒)。止まった直後の極端に短いフレームで割り過ぎない
+const float ANALOG_FRAME_TIME_MIN = 0.001;
+// 1 フィールドのずれの上限 (出力の px)。視点の瞬間移動で読む位置が大きく飛ばない。見た目の調整値
+const float ANALOG_INTERLACE_MAX_PX = 24.0;
+// 解像のガウスの幅 (仮想の画素 / 走査線)。形式の 1 画素の開口に近い見た目の調整値。縦はケル係数で広げる
+const float ANALOG_SOFT_SIGMA_X = 0.5;
+const float ANALOG_SOFT_SIGMA_Y = 0.5;
+// インターレースの縦の実効の解像 (ケル係数)
+const float ANALOG_KELL = 0.7;
+// 輪郭強調の強さ 1 の時の倍率と、強調しない細かい揺らぎ (コアリング) の幅 (表示値の Y')。見た目の調整値
+const float ANALOG_SHARPEN_GAIN = 0.8;
+const float ANALOG_SHARPEN_CORING = 0.01;
+#endif
+
 #endif

@@ -202,6 +202,16 @@
 #define ANALOG_C_SMEAR_TINT_MODE 1 // [0 1] 筋の色 0=光の色 1=白
 #define ANALOG_C_SMEAR_LIGHT_THRESHOLD 8.0 // [2.0 4.0 8.0 16.0 32.0 64.0] 灯りの筋が出始める明るさ (露出の後の白の倍数)
 #define ANALOG_C_SMEAR_LIGHT_GAIN 200.0 // [0.0 5.0 10.0 20.0 50.0 100.0 200.0 500.0] 灯りの明るさがしきい値を超えた分に掛ける倍率。0 = 灯りの筋なし
+#define ANALOG_RESOLUTION // 形式の画素数と走査線まで解像を落とす
+#define ANALOG_C_RESOLUTION_H 1.0 // [0.5 0.75 1.0 1.25 1.5 2.0] 横の甘さ (1 = 形式の画素数、大きいほど甘い)
+#define ANALOG_C_RESOLUTION_V 1.0 // [0.5 0.75 1.0 1.25 1.5 2.0] 縦の甘さ (1 = 走査線とケル係数)
+#define ANALOG_SHARPEN // カメラの輪郭強調 (縁の白と黒のハロー)
+#define ANALOG_C_SHARPEN_STRENGTH 1.0 // [0.0 0.5 1.0 1.5 2.0 3.0 4.0]
+#define ANALOG_C_SHARPEN_RADIUS 1.0 // [0.5 1.0 1.5 2.0 3.0] ハローの幅 (仮想の画素)
+#define ANALOG_C_SHARPEN_CORING 1.0 // [0.0 0.5 1.0 2.0 4.0] 細かい揺らぎを強調しないしきい値の倍率
+#define ANALOG_INTERLACE // インターレース (視点を動かした時の櫛状のズレ)
+#define ANALOG_INTERLACE_MODE 0 // [0 1] 見せ方 0=織り込み (PC で見た DV) 1=フィールド表示 (テレビ。細かい横縞がちらつく)
+#define ANALOG_C_INTERLACE_STRENGTH 1.0 // [0.0 0.5 1.0 1.5 2.0 3.0] 1 = 1 フィールド分の時間差
 #define ANALOG_C_FORMAT_MODE 0 // [0 1 2] 記録の形式 0=NTSC DV 1=PAL DV 2=HDV 1080i
 #define ANALOG_CHROMA // 色差の間引き (形式で 4:1:1 か 4:2:0)
 #define ANALOG_C_CHROMA_STRENGTH 1.0 // [0.0 0.25 0.5 0.75 1.0] 1 = 形式どおり。下げると元の色と混ぜる

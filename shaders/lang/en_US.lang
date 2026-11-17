@@ -1202,6 +1202,22 @@ option.ANALOG_C_SMEAR_LIGHT_THRESHOLD=Light Smear Threshold
 option.ANALOG_C_SMEAR_LIGHT_THRESHOLD.comment=Custom camera only. Only the part of a torch or other light brighter than this (times white after exposure) makes a streak. Raise it to keep streaks to clustered lights and lights seen up close
 option.ANALOG_C_SMEAR_LIGHT_GAIN=Light Smear Strength
 option.ANALOG_C_SMEAR_LIGHT_GAIN.comment=Custom camera only. Multiplier for the part of a light above the threshold (in-game lights are dimmer than real ones, so a large factor is needed for a streak). 0 turns light streaks off. Does not affect the sun's streak
+option.ANALOG_RESOLUTION=Resolution
+option.ANALOG_RESOLUTION.comment=Lowers detail to the recording format's pixel count (720 wide for DV) and scan lines for a softer image. Applies to brightness only. Costs 8 reads per pixel. Needs Analog
+option.ANALOG_C_RESOLUTION_H=Horizontal Softness
+option.ANALOG_C_RESOLUTION_H.comment=Custom camera only. 1 = the format's pixel count. Higher is softer horizontally
+option.ANALOG_C_RESOLUTION_V=Vertical Softness
+option.ANALOG_C_RESOLUTION_V.comment=Custom camera only. 1 = the scan lines (the detail interlaced video actually shows). Higher is softer vertically
+screen.ANALOG_PROCESS=Processing
+screen.ANALOG_PROCESS.comment=In-camera image processing. Needs Analog
+option.ANALOG_SHARPEN=Edge Enhancement
+option.ANALOG_SHARPEN.comment=The camcorder's detail enhancement: edges get a white rim on the bright side and a dark rim on the dark side (halo). Applies to brightness only and leaves fine fluctuations alone. Costs 1 read per pixel. Needs Analog
+option.ANALOG_C_SHARPEN_STRENGTH=Edge Enhancement Strength
+option.ANALOG_C_SHARPEN_STRENGTH.comment=Custom camera only. Higher gives darker, brighter halos
+option.ANALOG_C_SHARPEN_RADIUS=Halo Width
+option.ANALOG_C_SHARPEN_RADIUS.comment=Custom camera only. Width of the rim in format pixels
+option.ANALOG_C_SHARPEN_CORING=Coring
+option.ANALOG_C_SHARPEN_CORING.comment=Custom camera only. Brightness differences smaller than this are not enhanced. Raise it to keep grain and fine patterns from being sharpened
 screen.ANALOG_RECORD=Recording
 screen.ANALOG_RECORD.comment=Effects of the tape recording format. Needs Analog
 option.ANALOG_C_FORMAT_MODE=Recording Format
@@ -1217,6 +1233,14 @@ option.ANALOG_C_CHROMA_UPSAMPLE_MODE=Color Reconstruction
 option.ANALOG_C_CHROMA_UPSAMPLE_MODE.comment=Custom camera only. How the coarse color is spread back to pixels. Interpolate: smooth bleeding. Nearest: blocky steps at color edges
 value.ANALOG_C_CHROMA_UPSAMPLE_MODE.0=Interpolate
 value.ANALOG_C_CHROMA_UPSAMPLE_MODE.1=Nearest
+option.ANALOG_INTERLACE=Interlacing
+option.ANALOG_INTERLACE.comment=Captures each picture in two passes (even and odd scan lines 1/60 s apart). Moving the view makes moving parts split into a comb. Nothing shows while the view is still, and moving objects (mobs, water) do not comb. Costs 2 reads per pixel. Needs Analog
+option.ANALOG_INTERLACE_MODE=Interlace Display
+option.ANALOG_INTERLACE_MODE.comment=Applies with every camera. Weave: both fields side by side in one frame like DV viewed on a PC, combing when moving. Field: one field every 1/60 s like on a TV, with flickering fine horizontal lines
+value.ANALOG_INTERLACE_MODE.0=Weave
+value.ANALOG_INTERLACE_MODE.1=Field
+option.ANALOG_C_INTERLACE_STRENGTH=Comb Width
+option.ANALOG_C_INTERLACE_STRENGTH.comment=Custom camera only. 1 = the time between fields (1/60 s, 1/50 s for PAL). Higher gives a wider comb
 
 # Debug
 option.DEBUG_VIEW=Debug View

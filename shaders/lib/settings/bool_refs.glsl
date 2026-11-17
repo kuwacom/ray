@@ -188,6 +188,12 @@
 #endif
 #ifdef ANALOG_SMEAR
 #endif
+#ifdef ANALOG_RESOLUTION
+#endif
+#ifdef ANALOG_SHARPEN
+#endif
+#ifdef ANALOG_INTERLACE
+#endif
 #ifdef ANALOG_CHROMA
 #endif
 

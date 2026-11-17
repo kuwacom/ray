@@ -1202,6 +1202,22 @@ option.ANALOG_C_SMEAR_LIGHT_THRESHOLD=灯りの筋のしきい値
 option.ANALOG_C_SMEAR_LIGHT_THRESHOLD.comment=機材が「カスタム」の時だけ。たいまつなどの灯りの明るさ (露出の後の白の何倍か) がこれを超えた分だけが筋になる。上げると、灯りが重なった所や近くで大きく写った灯りだけに筋が出る
 option.ANALOG_C_SMEAR_LIGHT_GAIN=灯りの筋の強さ
 option.ANALOG_C_SMEAR_LIGHT_GAIN.comment=機材が「カスタム」の時だけ。灯りの明るさがしきい値を超えた分に掛ける倍率 (ゲームの灯りは実物より暗いので、筋にするには大きな倍率が要る)。0 で灯りの筋なし。太陽の筋には効かない
+option.ANALOG_RESOLUTION=解像
+option.ANALOG_RESOLUTION.comment=記録の形式の画素数 (DV は横 720) と走査線まで細かさを落とし、甘い画にする。明るさ (輝度) だけに掛かる。重さは 1 画素あたり 8 回の読み。「アナログ」が必要
+option.ANALOG_C_RESOLUTION_H=横の甘さ
+option.ANALOG_C_RESOLUTION_H.comment=機材が「カスタム」の時だけ。1 = 形式の画素数。大きいほど横に甘い
+option.ANALOG_C_RESOLUTION_V=縦の甘さ
+option.ANALOG_C_RESOLUTION_V.comment=機材が「カスタム」の時だけ。1 = 走査線 (インターレースで実際に見える細かさ)。大きいほど縦に甘い
+screen.ANALOG_PROCESS=画作り
+screen.ANALOG_PROCESS.comment=カメラの中の画の処理。「アナログ」が必要
+option.ANALOG_SHARPEN=輪郭強調
+option.ANALOG_SHARPEN.comment=ビデオカメラの輪郭強調。縁の明るい側が白く、暗い側が黒く縁取られる (ハロー)。明るさだけに掛かり、細かい揺らぎは強調しない。重さは 1 画素あたり 1 回の読み。「アナログ」が必要
+option.ANALOG_C_SHARPEN_STRENGTH=輪郭強調の強さ
+option.ANALOG_C_SHARPEN_STRENGTH.comment=機材が「カスタム」の時だけ。上げるほどハローが濃い
+option.ANALOG_C_SHARPEN_RADIUS=ハローの幅
+option.ANALOG_C_SHARPEN_RADIUS.comment=機材が「カスタム」の時だけ。形式の画素の数で数えた縁取りの幅
+option.ANALOG_C_SHARPEN_CORING=コアリング
+option.ANALOG_C_SHARPEN_CORING.comment=機材が「カスタム」の時だけ。これより小さい明るさの差は強調しない。上げると、ざらつきや細かい模様が強調されにくい
 screen.ANALOG_RECORD=記録
 screen.ANALOG_RECORD.comment=ビデオテープへの記録の形式で起きる現象。「アナログ」が必要
 option.ANALOG_C_FORMAT_MODE=記録の形式
@@ -1217,6 +1233,14 @@ option.ANALOG_C_CHROMA_UPSAMPLE_MODE=色の戻し方
 option.ANALOG_C_CHROMA_UPSAMPLE_MODE.comment=機材が「カスタム」の時だけ。粗く記録した色を画素へ戻す方法。補間: 色がなめらかににじむ。最近傍: 色の境目が階段状のブロックになる
 value.ANALOG_C_CHROMA_UPSAMPLE_MODE.0=補間
 value.ANALOG_C_CHROMA_UPSAMPLE_MODE.1=最近傍
+option.ANALOG_INTERLACE=インターレース
+option.ANALOG_INTERLACE.comment=1 枚の画を 2 回に分けて (偶数と奇数の走査線を 1/60 秒ずらして) 撮る。視点を動かすと、動いた所が櫛のようにずれる。視点が止まっていれば出ない。物の動き (モブ・水など) では出ない。重さは 1 画素あたり 2 回の読み。「アナログ」が必要
+option.ANALOG_INTERLACE_MODE=インターレースの見せ方
+option.ANALOG_INTERLACE_MODE.comment=機材によらず効く。織り込み: パソコンで見た DV のように 2 つの走査線を 1 枚に並べ、動くと櫛になる。フィールド表示: テレビで見たように 1/60 秒ごとに片方の走査線だけを出し、細かい横縞がちらつく
+value.ANALOG_INTERLACE_MODE.0=織り込み
+value.ANALOG_INTERLACE_MODE.1=フィールド表示
+option.ANALOG_C_INTERLACE_STRENGTH=櫛の幅
+option.ANALOG_C_INTERLACE_STRENGTH.comment=機材が「カスタム」の時だけ。1 = 1 フィールド分 (1/60 秒、PAL は 1/50 秒) の時間差。上げると櫛が広い
 
 # デバッグ
 option.DEBUG_VIEW=デバッグ表示

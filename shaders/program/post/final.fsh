@@ -96,8 +96,8 @@
 #if defined SPECULAR_SPARKLE && !(defined ANALOG && !defined FINAL_DEVELOP_PASS)
 const bool colortex8MipmapEnabled = true;
 #endif
-// アナログの final の色差の標本の箱をタップとミップの段で覆う
-#if defined ANALOG && defined ANALOG_CHROMA && !defined FINAL_DEVELOP_PASS
+// アナログの final の色差・解像・輪郭強調のタップをミップの段で太らせる
+#if defined ANALOG && (defined ANALOG_CHROMA || defined ANALOG_RESOLUTION || defined ANALOG_SHARPEN) && !defined FINAL_DEVELOP_PASS
 const bool colortex0MipmapEnabled = true;
 #endif
 
@@ -259,8 +259,8 @@ const float OUTPUT_LEVELS = 255.0;  // 8bit 出力の最大値
 // アナログの記録の段。colortex0 は composite27 (現像) が書いた表示値
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
-#ifdef ANALOG_CHROMA
-    vec3 color = applyAnalogChroma(texcoord, texel);
+#ifdef ANALOG_RECORD_STAGE
+    vec3 color = applyAnalogRecord(texcoord);
 #else
     vec3 color = texelFetch(colortex0, texel, 0).rgb;
 #endif
