@@ -46,6 +46,7 @@ import concurrent.futures as cf
 import functools
 import hashlib
 import json
+import multiprocessing
 import os
 import re
 import shutil
@@ -654,7 +655,9 @@ def main() -> int:
     uses: list[loader_checks.ColortexUse] = []
     scans = []
     # glslang はプロセスとして起動するのでスレッドから呼べば CPU コア数だけ並列に走る。ローダーの検査は Python の処理なので別のプロセスで回す
-    with cf.ThreadPoolExecutor(max_workers=args.jobs) as ex, cf.ProcessPoolExecutor(max_workers=args.jobs) as px:
+    # Linux の既定の fork は、コンパイルのスレッドが _EXPAND_LOCK を持った瞬間の状態を複製し、子が expanded() で永久に待つので spawn にそろえる
+    spawn = multiprocessing.get_context("spawn")
+    with cf.ThreadPoolExecutor(max_workers=args.jobs) as ex, cf.ProcessPoolExecutor(max_workers=args.jobs, mp_context=spawn) as px:
         for env in envs:
             for cfg_name, ov, worlds in configs:
                 skipped, props_problems, props_uses = properties_by_loader(env, cfg_name, ov, options)
