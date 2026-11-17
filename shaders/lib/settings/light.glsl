@@ -8,9 +8,11 @@
 #define BLOCKLIGHT_BOUNCE 0.5 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 1.0 1.25 1.5 2.0 3.0 4.0] floodfill の壁の照り返しの濃さ (壁の色が光に混ざる) 0=なし
 #define BLOCKLIGHT_BRIGHTNESS 1.0 // [0.1 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0 4.0 5.0 6.0 8.0]
 #define BLOCKLIGHT_WARMTH 0.6 // [0.0 0.25 0.4 0.5 0.6 0.7 0.75 1.0] 0=中性 1=バニラ寄りの暖色
-#define LIGHT_FALLOFF_MODE 0 // [0 1] 光源の届く距離の決め方 0=光源レベルに比例 1=光の量 (明るさ x レベル) の平方根 (暗い光源も遠くまで緩やかに暗くなる)
-#define LIGHT_RANGE 15.0 // [12.0 15.0 18.0 20.0 24.0] LIGHT_FALLOFF_MODE 1 で、明るさ 1・レベル 15 の光源が届く距離 (ブロック)。届く距離の上限も兼ねる
-#define LIGHT_RANGE_MIN 8.0 // [4.0 6.0 8.0 10.0 12.0] LIGHT_FALLOFF_MODE 1 で、暗い光源が届く距離の下限 (ブロック)
+#define LIGHT_FALLOFF_MODE 1 // [0 1] 光源の届く距離の決め方 0=光源レベルに比例 (窓で切る) 1=光の量 (明るさ x レベル) の平方根 (届く距離での減衰を引いて端で 0 にする)
+#define LIGHT_RANGE_MAJOR_MAX 20.0 // [12.0 15.0 18.0 20.0 24.0 28.0 32.0] LIGHT_FALLOFF_MODE 1 で、主要な光源 (たいまつ・ランタン・光源ブロック) の明るさ 1・レベル 15 の時に届く距離 (ブロック)。上限も兼ねる
+#define LIGHT_RANGE_MAJOR_MIN 12.0 // [4.0 5.0 6.0 7.0 8.0 10.0 12.0 14.0 16.0 20.0 24.0 32.0] LIGHT_FALLOFF_MODE 1 で、主要な光源が届く距離の下限 (ブロック)
+#define LIGHT_RANGE_MINOR_MAX 15.0 // [12.0 15.0 18.0 20.0 24.0 28.0 32.0] LIGHT_FALLOFF_MODE 1 で、弱い・群生する光源 (鉱石・アメジスト・マグマ・ヒカリゴケ・溶岩など) の明るさ 1・レベル 15 の時に届く距離 (ブロック)。上限も兼ねる
+#define LIGHT_RANGE_MINOR_MIN 12.0 // [4.0 5.0 6.0 7.0 8.0 10.0 12.0 14.0 16.0 20.0 24.0 32.0] LIGHT_FALLOFF_MODE 1 で、弱い・群生する光源が届く距離の下限 (ブロック)
 #define LIGHT_FLICKER // 炎系光源の揺らぎ
 #define DECORATIVE_BLOCK_LIGHTS 2 // [0 1 2] 光らない鉱物ブロック (ラピス・エメラルド・ダイヤ・金・レッドストーン・アメジスト) 0=そのまま 1=発光のみ 2=光源
 #define DECOR_LAPIS // ラピスラズリブロックを発光させる (DECORATIVE_BLOCK_LIGHTS が 1 以上の時)

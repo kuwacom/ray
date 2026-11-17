@@ -43,12 +43,29 @@ vec3 dyeSrgb(int i) {
     return dyes[clamp(i, 0, 15)];
 }
 
+/*
+ * 届く距離の種類 (tools/id_tables.py の LIGHTS の reach)。弱い・群生する光源は LT_MINOR を立て、LIGHT_RANGE_MINOR_* を使う
+ * LIGHT_FALLOFF_MODE 0 では種類を使わないので 0 にし、表とそれを読むコードを方式 0 の前と同じにする
+ */
+#if LIGHT_FALLOFF_MODE == 1
+const uint LT_MINOR = LIGHT_FLAG_RANGE_MINOR;
+#else
+const uint LT_MINOR = 0u;
+#endif
+
 LightDef makeLight(vec3 srgb, float brightness, float level, float sourceSize, vec3 center, float flicker, uint flags) {
     LightDef d;
     vec3 c = srgbToLinear(srgb);
     d.color = vec4(c / max(maxOf(c), EPS), brightness);
     d.shape = vec4(center, sourceSize);
+#if LIGHT_FALLOFF_MODE == 1
+    // 種類ごとの届く距離 (x = 明るさ 1・レベル 15 の時、w = 下限) を表に入れ、lightRange で種類を分けずに済ませる
+    bool minor = (flags & LIGHT_FLAG_RANGE_MINOR) != 0u;
+    d.params = vec4(minor ? LIGHT_RANGE_MINOR_MAX : LIGHT_RANGE_MAJOR_MAX, flicker, level,
+                    minor ? LIGHT_RANGE_MINOR_MIN : LIGHT_RANGE_MAJOR_MIN);
+#else
     d.params = vec4(LIGHT_RANGE_MAX, flicker, level, 0.0);
+#endif
     d.info = uvec4(flags, 0u, 0u, 0u);
     return d;
 }

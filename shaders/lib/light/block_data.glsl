@@ -43,16 +43,17 @@ vec3 lightEmission(LightDef d, float level) {
 
 #if LIGHT_FALLOFF_MODE == 1
 /*
- * 到達半径 (ブロック)。光の量 (明るさ x レベル) の平方根に比例させ、LIGHT_RANGE_MIN から LIGHT_RANGE の間に収める
+ * 到達半径 (ブロック)。光の量 (明るさ x レベル) の平方根に比例させ、光源の種類ごとの下限 (d.params.w) と上限 (d.params.x) に収める
  * 減衰は遠くで逆二乗なので、決まった照度まで届く距離は光の量の平方根に比例する。レベルに比例させると
  * 暗い光源ほど窓関数で早く切れ (レベル 3 のマグマブロックは 3 ブロック)、まだ見える明るさのうちに光が消えた
- * 下限は、窓関数で 0 へ落ちる所を暗い光源の近くに置かないため。半径は減衰の窓と光源ビンの範囲だけに効き、近くの明るさは変わらない
+ * 下限は、減衰が 0 へ落ちる所を暗い光源の近くに置かないため。半径は減衰と光源ビンの範囲だけに効き、近くの明るさはほぼ変わらない
  * レベルに比例する半径より短くはしない (明るさを控えめにしたシーランタン (0.75) がレベル 15 のまま届くように)
+ * 下限が上限より大きい設定では下限を優先する (clamp は lo > hi で未定義)
  */
 float lightRange(LightDef d, float level) {
     float relLevel = level / LIGHT_LEVEL_MAX;
     float flux = d.color.a * relLevel;
-    return clamp(LIGHT_RANGE * max(relLevel, sqrt(max(flux, 0.0))), LIGHT_RANGE_MIN, LIGHT_RANGE);
+    return max(min(d.params.x * max(relLevel, sqrt(max(flux, 0.0))), d.params.x), d.params.w);
 }
 #else
 // 到達半径 (ブロック)。レベルに比例
@@ -70,6 +71,21 @@ const float LIGHT_FALLOFF_QUADRATIC = 0.035;
 // 1 ブロックの距離で素の逆二乗 (0.5) と同じ照度になるように掛ける正規化 (1 + a + b) / 2
 const float LIGHT_FALLOFF_NORM = (1.0 + LIGHT_FALLOFF_LINEAR + LIGHT_FALLOFF_QUADRATIC) * 0.5;
 
+#if LIGHT_FALLOFF_MODE == 1
+/*
+ * 距離減衰。1 次 + 2 次の減衰から、到達半径での減衰の値を距離 / 半径 の重みで引き、半径でちょうど 0 にする (引き算の窓)
+ * 窓関数を掛ける形 (Karis 2013) は半径の 3/4 から急に落ち、暗い光源の光だまりの縁が円く見えた。引き算は遠くほど
+ * 一定の割合で減らすので、端の数ブロックも 1 ブロックあたりの落ち方が手前と同じ調子のまま 0 に着く
+ * 重みを付けずに引くと、遠くの値 (たいまつの 19 ブロックで 1 ブロックの 1/15) が近くからも引かれて 1-4 ブロックが 11-14 % 暗くなるので、
+ * 距離に比例させて近くではほとんど引かない (同じ所で -1.5 %)
+ */
+float lightFalloff(float dist, float range) {
+    float r = max(range, EPS);
+    float atRange = 1.0 / (1.0 + r * (LIGHT_FALLOFF_LINEAR + LIGHT_FALLOFF_QUADRATIC * r));
+    float v = 1.0 / (1.0 + dist * (LIGHT_FALLOFF_LINEAR + LIGHT_FALLOFF_QUADRATIC * dist)) - atRange * (dist / r);
+    return max(v, 0.0) * LIGHT_FALLOFF_NORM;
+}
+#else
 /*
  * 距離減衰。1 次 + 2 次の減衰に、到達半径で滑らかに 0 へ落とす窓関数を掛ける
  * (Karis 2013 の窓。半径外の光源を打ち切ってもポップしない)
@@ -78,6 +94,7 @@ float lightFalloff(float dist, float range) {
     float x = saturate(1.0 - pow4(dist / max(range, EPS)));
     return x * x * LIGHT_FALLOFF_NORM / (1.0 + dist * (LIGHT_FALLOFF_LINEAR + LIGHT_FALLOFF_QUADRATIC * dist));
 }
+#endif
 
 /*
  * 光源の面からの近距離の放射 (lightFalloff に足す係数)

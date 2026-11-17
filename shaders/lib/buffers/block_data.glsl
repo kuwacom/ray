@@ -23,7 +23,7 @@ const int LIGHT_MASK_TABLE_SIZE = LIGHT_MASK_LIGHTS * LIGHT_MASK_FACE_CLASSES;
 struct LightDef {
     vec4 color;   // rgb = 線形色 (最大成分 1), a = 明るさ倍率
     vec4 shape;   // xyz = ブロック内の発光中心 [0,1], w = 光源半径 (ブロック, 半影用)
-    vec4 params;  // x = 光源レベル 15 時の到達半径 (ブロック), y = フリッカー量 [0,1], z = 既定の光源レベル (0-15), w = 予備
+    vec4 params;  // x = 光源レベル 15 時の到達半径 (ブロック), y = フリッカー量 [0,1], z = 既定の光源レベル (0-15), w = 到達半径の下限 (LIGHT_FALLOFF_MODE 1。0 では 0)
     uvec4 info;   // x = フラグ (LIGHT_FLAG_*), y = 遮蔽形状 ID (SHAPE_*), zw = 予備
 };
 
