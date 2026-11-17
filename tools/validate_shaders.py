@@ -11,7 +11,7 @@ Iris の前処理を簡易再現して glslangValidator で全プログラムを
 あわせて静的チェックも行う
 - //@include の宣言の漏れ (使う記号の定義元を宣言しているか)、宣言の循環・書き方、lib のガード名 (tools/include_deps.py)
 - 本体の #include の生成ブロックが最新か (tools/gen_includes.py)
-- プロファイルが参照する設定が lib/settings/ に存在するか
+- プロファイルと検証用の組 (VALIDATION_SETS) が参照する設定が lib/settings/ に存在し、値が値リストにあるか
 - ラッパー (shaders/world*) と shaders.properties の program.*.enabled の生成が最新か、止める条件の設定が存在するか (tools/gen_wrappers.py)
 - lang (en_US / ja_JP) に全設定・全画面のラベルがあるか
 - shaders.properties の screen に全設定が載っているか
@@ -25,8 +25,8 @@ Iris の前処理を簡易再現して glslangValidator で全プログラムを
 
 使い方:
     uv run tools/validate_shaders.py                    # 高速: 既定値・world0 のみ + 前回成功から変わったものだけ
-    uv run tools/validate_shaders.py --full             # 既定値 + 全プロファイル (world0) + 既定値 (world-1, world1)
-    uv run tools/validate_shaders.py --profile HIGH     # 指定プロファイルのみ
+    uv run tools/validate_shaders.py --full             # 既定値 + 全プロファイルと検証用の組 (world0) + 既定値 (world-1, world1)
+    uv run tools/validate_shaders.py --profile HIGH     # 指定プロファイルのみ (検証用の組の名前 ANALOG_P1 なども指定できる)
     uv run tools/validate_shaders.py --filter deferred  # ファイル名に文字列を含むものだけ
     uv run tools/validate_shaders.py --no-cache         # キャッシュを使わず全部コンパイルし直す
     uv run tools/validate_shaders.py --shaders <dir>    # 別のフォルダのシェーダーを検証する
@@ -73,6 +73,19 @@ from lib.properties import disabled_programs, read_properties_logical_lines, res
 PROPERTIES = SHADERS / "shaders.properties"
 LANG_FILES = [SHADERS / "lang" / "en_US.lang", SHADERS / "lang" / "ja_JP.lang"]
 WORLDS = ["world0", "world-1", "world1"]
+
+# 検証用の設定の組。プロファイル (profile.*) に載せない機能 (ANALOG など) を ON にした本文を --full で検証する。
+# 利用者の画面には出ない。値は Iris と同じく文字列 (bool は "true" / "false")
+VALIDATION_SETS: dict[str, dict[str, str]] = {
+    "ANALOG_P1": {"ANALOG": "true"},
+    # ブルーミングと、ニーを外してトーンマップに戻る経路
+    "ANALOG_P4_NO_KNEE": {"ANALOG": "true", "ANALOG_PRESET": "4", "ANALOG_KNEE": "false"},
+    # カスタムの端の値と、プリセットに無い選択 (HDV・フィールド表示・光の色の筋・最近傍の色差)
+    "ANALOG_CUSTOM": {"ANALOG": "true", "ANALOG_PRESET": "0", "ANALOG_C_FORMAT_MODE": "2", "ANALOG_INTERLACE_MODE": "1",
+                      "ANALOG_C_SMEAR_TINT_MODE": "0", "ANALOG_C_CHROMA_UPSAMPLE_MODE": "1", "ANALOG_C_KNEE_POINT": "1.0",
+                      "ANALOG_C_KNEE_RANGE": "1.0", "ANALOG_C_BLOOMING_LENGTH": "16", "ANALOG_C_DROPOUT_RATE": "60.0",
+                      "ANALOG_C_FPN_STRENGTH": "2.0", "ANALOG_C_HOT_PIXELS_DENSITY": "0.003", "ANALOG_C_AGC_MAX": "4"},
+}
 
 STAGE_OF_EXT = {".vsh": "vert", ".fsh": "frag", ".gsh": "geom", ".csh": "comp", ".tcs": "tesc", ".tes": "tese"}
 
@@ -492,14 +505,16 @@ def static_checks(options: dict[str, Option], profiles: dict[str, list[str]]) ->
     problems += gen_capabilities.check(SHADERS)
     problems += loader_checks.rendertargets_spacing(SHADERS)
     problems += loader_checks.direct_loader_macros(SHADERS)
-    for pname in profiles:
-        for k, v in resolve_profile(pname, profiles).items():
+    sets = [(f"profile.{p}", resolve_profile(p, profiles)) for p in profiles]
+    sets += [(f"検証用の組 {n}", ov) for n, ov in VALIDATION_SETS.items()]
+    for label, ov in sets:
+        for k, v in ov.items():
             opt = options.get(k)
             if opt is None:
-                problems.append(f"profile.{pname}: 未定義の設定 {k}")
+                problems.append(f"{label}: 未定義の設定 {k}")
             # Iris は値を文字列で値リストと比べる
             elif opt.kind != "bool" and opt.values and v not in opt.values:
-                problems.append(f"profile.{pname}: {k}={v} が値リストにない")
+                problems.append(f"{label}: {k}={v} が値リストにない")
     # 素の既定値は HIGH と一致させる方針 (docs/architecture.md)
     if "HIGH" in profiles:
         for k, v in resolve_profile("HIGH", profiles).items():
@@ -604,9 +619,9 @@ def write_colortex_report(path: Path, rows, envs: list[Env], configs: list[tuple
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--profile", help="このプロファイルだけ検証する (DEFAULT で既定値)")
+    ap.add_argument("--profile", help="このプロファイルか検証用の組だけ検証する (DEFAULT で既定値)")
     ap.add_argument("--filter", default="", help="ファイル名にこの文字列を含むものだけ")
-    ap.add_argument("--full", action="store_true", help="既定値 x 3 ディメンション + 全プロファイル")
+    ap.add_argument("--full", action="store_true", help="既定値 x 3 ディメンション + 全プロファイルと検証用の組")
     ap.add_argument("--quick", action="store_true", help="既定値 x world0 のみ (既定の動作。互換のため残す)")
     ap.add_argument("--no-cache", action="store_true", help="前回成功したものも含めて全部コンパイルする")
     ap.add_argument("--jobs", type=int, default=os.cpu_count() or 4)
@@ -630,12 +645,17 @@ def main() -> int:
 
     configs: list[tuple[str, dict, list[str]]] = []
     if args.profile:
-        ov = {} if args.profile == "DEFAULT" else resolve_profile(args.profile, profiles)
+        if args.profile in VALIDATION_SETS:
+            ov = VALIDATION_SETS[args.profile]
+        else:
+            ov = {} if args.profile == "DEFAULT" else resolve_profile(args.profile, profiles)
         configs.append((args.profile, ov, ["world0"]))
     elif args.full:
         configs.append(("DEFAULT", {}, WORLDS))
         for p in profiles:
             configs.append((p, resolve_profile(p, profiles), ["world0"]))
+        for n, ov in VALIDATION_SETS.items():
+            configs.append((n, ov, ["world0"]))
     else:
         configs.append(("DEFAULT", {}, ["world0"]))
 

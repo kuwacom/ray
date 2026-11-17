@@ -72,7 +72,7 @@ uv sync
 $env:RAY_GLSLANG = "<glslang のパス>\bin\glslang.exe"
 
 uv run tools/validate_shaders.py                    # 既定値・オーバーワールドだけ
-uv run tools/validate_shaders.py --full             # 3 ディメンションと全プロファイル
+uv run tools/validate_shaders.py --full             # 3 ディメンションと全プロファイル、検証用の組 (アナログ ON など)
 uv run tools/validate_shaders.py --env 1.7.6 --colortex-report colortex.md   # 1 つのローダーだけ。colortex の上限を超える使用の一覧も書く
 uv run tools/gl_compile_check.py                    # 手元のドライバで compile + link
 uv run tools/gl_compile_check.py --env 1.7.6        # 古い Iris と Oculus 向けの本文で compile + link
@@ -87,8 +87,8 @@ uv run tools/check_slots.py --intervals --all       # colortex の論理名の�
 
 | オプション | 内容 |
 |---|---|
-| `--full` | 既定値を 3 ディメンションで、全プロファイルをオーバーワールドで検証します |
-| `--profile NAME` | 1 つのプロファイルだけ検証します (`DEFAULT` で既定値) |
+| `--full` | 既定値を 3 ディメンションで、全プロファイルと検証用の組をオーバーワールドで検証します。検証用の組 (`validate_shaders.py` の `VALIDATION_SETS`) は、プロファイルに載せない機能 (アナログ) を ON にした設定で、利用者の画面には出ません |
+| `--profile NAME` | 1 つのプロファイルか検証用の組だけ検証します (`DEFAULT` で既定値) |
 | `--filter TEXT` | 名前に TEXT を含むものだけ検証します |
 | `--no-cache` | キャッシュを使わずに全部検証します |
 | `--jobs N` | 並列数 (既定は CPU 数。ドライバのコンパイルスレッドは既定 4 で、重いプログラムのリンクを同時に多く走らせると 1 本ずつが極端に遅くなるため) |
