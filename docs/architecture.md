@@ -128,7 +128,8 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 36 | composite24.vsh/fsh | post | ブルームぼかし | colortex14 | colortex14 | 画面 | BLOOM または LOCAL_TONEMAP > 0 |
 | 37 | composite25.csh | post | 自動露出 (ヒストグラム。屋外の夜の持ち上げは画面の暗い側の計測で決める) + オートフォーカス | colortex0, centerDepthSmooth | SSBO0 exposure/focus/histogram | local 16², (1,1,1) | 常時 |
 | 38 | composite26.csh | post | アナログの縦スミア: colortex0 (露出前の線形、DoF・MB の後) の列ごとの平均 (1 列を 1 グループで閉じて求める) | colortex0 | SSBO6 columns | local 8x32, (1024,1,1) | ANALOG かつ ANALOG_SMEAR |
-| 39 | final.vsh/fsh | post | 歪曲と魚眼の再投影・ブルーム合成・点像の芯と裾・フレア・アナログの縦スミアの加算・露出・局所トーンマップ・AgX・色調整・CAS・ディザ・デバッグ表示 | colortex0/8/13/14, SSBO0, SSBO6 (ANALOG) | 画面 | 画面 | 常時 |
+| 39 | composite27.vsh/fsh | post | アナログの現像: final の本体 (`post/final.fsh` + `FINAL_DEVELOP_PASS`) の現像まで (縦スミアの加算を含む) を表示値で書く。グレイン・デバッグ表示・ディザはしない | colortex0/8/13/14, SSBO0, SSBO6 | colortex0 (表示値) | 画面 | ANALOG |
+| 40 | final.vsh/fsh | post | 歪曲と魚眼の再投影・ブルーム合成・点像の芯と裾・フレア・露出・局所トーンマップ・AgX・色調整・CAS・ディザ・デバッグ表示。ANALOG の時は記録の段 (色差の間引き。colortex0 のミップ) -> グレイン -> デバッグ表示 -> ディザだけ (本体は composite27) | colortex0/8/13/14, SSBO0 | 画面 | 画面 | 常時 |
 
 補足
 - shadowcomp は使わない。floodfill を deferred に置くのは、gbuffers_entities (deferred より前) が登録した画面内のエンティティ光源を同じフレームで取り込むため (voxelEmitImg は毎フレームクリアされる)
@@ -145,7 +146,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 
 | buf | フォーマット | 内容 | 書く | 読む | クリア |
 |---|---|---|---|---|---|
-| 0 | RGBA16F | シーン HDR。空テクスチャ (skybasic/skytextured) -> deferred30 -> composite* -> final | sky(空), surface, sky, post | 全 | 毎フレーム |
+| 0 | RGBA16F | シーン HDR。空テクスチャ (skybasic/skytextured) -> deferred30 -> composite* -> final。ANALOG の時は composite27 が表示値 (0-1) で書き、final がミップで読む | sky(空), surface, sky, post | 全 | 毎フレーム |
 | 1 | RGBA8 | G: rgb アルベド (sRGB エンコード), a マテリアル ID | surface (gbuffers) | 全 | 毎フレーム |
 | 2 | RGBA16 | G: rg テクスチャ法線 (oct), b 幾何法線 (oct 8+8), a ライトマップ (8+8) | surface | 全 | 毎フレーム |
 | 3 | RGBA16 | G: r smoothness+f0, g sss+emission, b ao+wetness, a 予備 | surface | 全 | 毎フレーム |
@@ -249,7 +250,7 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 | 3 | LightBinsBuffer (`lightBins`) | `light_bins.glsl` | 10944512 (LIGHT_BIN_LIGHTS > 64 で 21430272) | `binCount[40960]`, `entityAcc[32768]` (エンティティ光源の蓄積表), `binLights[]` (40960 x 65 個、> 64 で x 129)。ビン = 8³ ブロック、1 ビン LIGHT_BIN_LIGHTS + 1 枠。枠のキー = 重要度 19 bit + 光源インデックス 13 bit | `LIGHT_BINS`: setup, begin, deferred_a, shadow_entities・shadow_block の gsh と gbuffers_entities・gbuffers_entities_translucent の vsh (蓄積表) |
 | 4 | EntityTriangleBuffer (`entityTris`) | `entity_tris.glsl` | 838672 | `counts[4]`, `groupBounds`, `clusterBounds` + `EntityTriangle tris[]` (16384 個) (ボクセル空間の三角形 v0/e1/e2 + アルファマスク + テクスチャ x 頂点色の平均の色) | `ENTITY_TRIS`: begin (クリア), shadow_entities・shadow_block の gsh |
 | 5 | FireworkLightBuffer (`fireworkLight`) | `firework_light.glsl` | 64 | `posRadius` (花火の光の player 空間の位置, 広がりの半径。0 = 光っていない), `intensity` (放射強度), `acc[]` (光る粒の固定小数点の和 8 個: 数, 重み, 位置 x 重み, 色 x 重み) | `FIREWORK_LIGHT`: begin (光を決めて acc を空にする), gbuffers_particles_translucent の vsh (acc に足す)。MC 26.1 未満の Iris は gbuffers_particles の vsh も足す (`FX_SPARKS_IN_PARTICLES`) |
-| 6 | AnalogSmearBuffer (`analogSmear`) | `analog_smear.glsl` | 131072 (ANALOG かつ ANALOG_SMEAR の時だけ確保) | `vec4 columns[]` (8192 列。rgb = colortex0 の列の平均 (露出前の線形)、a 予備)。宣言は opt-in: 読むプログラム (final) は `SSBO_ANALOG_SMEAR_USE` を定義し、ANALOG と ANALOG_SMEAR の時だけブロックが入る | `ANALOG_SMEAR`: composite26 |
+| 6 | AnalogSmearBuffer (`analogSmear`) | `analog_smear.glsl` | 131072 (ANALOG かつ ANALOG_SMEAR の時だけ確保) | `vec4 columns[]` (8192 列。rgb = colortex0 の列の平均 (露出前の線形)、a 予備)。宣言は opt-in: 読むプログラム (composite27 の現像) は `SSBO_ANALOG_SMEAR_USE` を定義し、ANALOG と ANALOG_SMEAR の時だけブロックが入る | `ANALOG_SMEAR`: composite26 |
 | 7-8 | - | - | - | 予備 (Iris 1.7 と Oculus の `bufferObject` の添字は 8 まで。最新の Iris は 12 まで) | - |
 
 world0 の既定値で SSBO を 1 つも宣言しないのは 17 プログラム (gbuffers の 14 と composite21/23・deferred11)。frameData だけを宣言するのは 13 プログラム (prepare・prepare1/2・setup1/2・composite20/22/24/25・deferred20/21・gbuffers_lightning/skytextured)。光源モジュール (`lib/light/light.glsl`) を読むプログラムは 0-4 の 5 つを宣言する。花火の光 (5) は FIREWORK_LIGHT の時だけ、begin・gbuffers_particles_translucent・deferred30・composite19 が宣言する
@@ -630,7 +631,7 @@ DEBUG_VIEW の値 (0-12) と表示内容の対応は `shaders/lang/ja_JP.lang` /
 | light (ボクセル・ブロックライト) | ボクセル化、floodfill、光源リスト・ビン、光源シャドウ (DDA)、デノイズ、手持ち光源、エンティティ光源、`traceVoxelRay` (surface の GI / 反射が使う) | `lib/light/*`, `program/light/*` (setup, begin, shadow, shadow_entities / shadow_block, deferred, deferred_a, deferred1, deferred2) |
 | sky (空・大気・雲・フォグ・VL) | 大気 LUT、太陽/月の照度と空の SH、空の描画、星、雲 (体積・2D・影)、高さフォグ、VL、水中フォグ、雨 | `lib/sky/*`, `program/sky/*` (setup1, setup2, prepare, prepare1, prepare2, gbuffers_skybasic / skytextured / clouds / weather, deferred20, deferred21, composite1_a, composite12-14, composite19) |
 | surface (太陽影・GI・マテリアル・水・反射) | gbuffers (不透明/半透明/オーバーレイ)、マテリアル (labPBR・自動法線・POM・揺れ)、BRDF、太陽影、AO・GI、不透明シェーディング (deferred30)、水、反射、半透明合成 | `lib/surface/*`, `lib/common/water.glsl`, `program/surface/*` (gbuffers_* が共有する solid / translucent / overlay, gbuffers_lightning, deferred10, deferred11, deferred30, composite, composite1, composite2_a, composite2) |
-| post (ポストプロセス) | 速度ベクトルの関数、TAA、モーションブラー、DoF、ブルーム、露出、オートフォーカス、トーンマップ、色調整、CAS、レンズフレア、アナログ (CCD ビデオカメラ風)、デバッグ表示 | `lib/post/*`, `program/post/*` (composite20-24, composite25, composite26, final) |
+| post (ポストプロセス) | 速度ベクトルの関数、TAA、モーションブラー、DoF、ブルーム、露出、オートフォーカス、トーンマップ、色調整、CAS、レンズフレア、アナログ (CCD ビデオカメラ風)、デバッグ表示 | `lib/post/*`, `program/post/*` (composite20-24, composite25, composite26, composite27, final) |
 
 - shadow パスの出力 (shadowcolor の内容) は surface (RSM・色付き影) と sky (色付き光芒) も使う。内容を変える時は「colortex」の節の定義を守り、docs/architecture.md も更新する
 - 表面の光 (light / sky の関数) は surface の `gatherSurfaceLights` が呼ぶ。deferred30・半透明・composite2・二次ヒットは light / sky の照度の関数を直接呼ばない

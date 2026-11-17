@@ -179,6 +179,8 @@ PROGRAMS: dict[str, list[str] | dict[str, Body | None]] = {
     "composite24": fullscreen("fsh"),
     "composite25": ["csh"],
     "composite26": ["csh"],
+    # アナログの現像: final の本体の現像までを表示値で colortex0 に書く (final は表示値の近傍を読む記録の段になる)
+    "composite27": {"vsh": FULLSCREEN_VSH, "fsh": ("post/final.fsh", ("FINAL_DEVELOP_PASS",))},
     "final": fullscreen("fsh"),
 }
 
@@ -252,6 +254,7 @@ DISABLED: list[Disable] = [
     Disable(("composite23", "composite24"), "#if !defined BLOOM && LOCAL_TONEMAP == 0"),
     # properties からは internal.glsl の #undef が見えないので、アナログの効果は親の ANALOG も条件に書く
     Disable(("composite26",), "#if !defined ANALOG || !defined ANALOG_SMEAR"),
+    Disable(("composite27",), "#ifndef ANALOG"),
 ]
 
 ENABLES_BEGIN = "# BEGIN GENERATED program enables (tools/gen_wrappers.py)"

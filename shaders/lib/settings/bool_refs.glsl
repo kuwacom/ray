@@ -188,5 +188,7 @@
 #endif
 #ifdef ANALOG_SMEAR
 #endif
+#ifdef ANALOG_CHROMA
+#endif
 
 #endif // SETTINGS_BOOL_REFS_GLSL

@@ -62,6 +62,7 @@ const int noiseTextureResolution = 256;
 // ANALOG はアナログの段の総スイッチ。外れていれば効果ごとのスイッチも全部無効にする
 #ifndef ANALOG
     #undef ANALOG_SMEAR
+    #undef ANALOG_CHROMA
 #endif
 
 // 三角形方式のエンティティ遮蔽 (lib/light/entity_tri.glsl)。遮蔽が両方 OFF なら三角形も書かない

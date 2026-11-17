@@ -4,8 +4,14 @@
  * 色に掛ける処理は物理的な順 (レンズ -> センサー -> 現像) に並べる
  * post モジュール
  */
-// このプログラムで読む SSBO の opt-in (宣言はアナログのスミアが有効な時だけ入る。lib/buffers/analog_smear.glsl)
+/*
+ * アナログ (ANALOG) の時は、この本体の現像までを composite27 (FINAL_DEVELOP_PASS) で表示値として colortex0 に書き、
+ * final は表示値の近傍を読む記録の段 (色差の間引き) -> グレイン -> デバッグ表示 -> ディザだけを行う
+ */
+// このプログラムで読む SSBO の opt-in (宣言はアナログのスミアが有効な時だけ入る。lib/buffers/analog_smear.glsl)。スミアを足すのは現像の側
+#ifdef FINAL_DEVELOP_PASS
 #define SSBO_ANALOG_SMEAR_USE
+#endif
 //@include "/lib/common/common.glsl"
 //@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/common/exposure.glsl"
@@ -82,11 +88,17 @@
 #include "/lib/surface/gi.glsl"
 #include "/lib/buffers/analog_smear.glsl"
 #include "/lib/post/analog_presets.glsl"
+#include "/lib/post/analog_formats.glsl"
 #include "/lib/post/analog.glsl"
 // END GENERATED includes
 
-#ifdef SPECULAR_SPARKLE
+// アナログの final は colortex8 を読まない (読むのは現像の composite27) ので、毎フレームの余分なミップを作らない
+#if defined SPECULAR_SPARKLE && !(defined ANALOG && !defined FINAL_DEVELOP_PASS)
 const bool colortex8MipmapEnabled = true;
+#endif
+// アナログの final の色差の標本の箱をタップとミップの段で覆う
+#if defined ANALOG && defined ANALOG_CHROMA && !defined FINAL_DEVELOP_PASS
+const bool colortex0MipmapEnabled = true;
 #endif
 
 in vec2 texcoord;
@@ -243,6 +255,23 @@ float lavaToneMask(ivec2 texel) {
 
 const float OUTPUT_LEVELS = 255.0;  // 8bit 出力の最大値
 
+#if defined ANALOG && !defined FINAL_DEVELOP_PASS
+// アナログの記録の段。colortex0 は composite27 (現像) が書いた表示値
+void main() {
+    ivec2 texel = ivec2(gl_FragCoord.xy);
+#ifdef ANALOG_CHROMA
+    vec3 color = applyAnalogChroma(texcoord, texel);
+#else
+    vec3 color = texelFetch(colortex0, texel, 0).rgb;
+#endif
+    color = applyGrain(saturate(color), gl_FragCoord.xy);
+
+    color = debugView(texel, color);
+    // 8bit 出力のバンディング対策
+    color += (interleavedGradientNoise(gl_FragCoord.xy, frameCounter) - 0.5) / OUTPUT_LEVELS;
+    outColor = vec4(color, 1.0);
+}
+#else
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
     vec2 uv = texcoord;
@@ -496,10 +525,16 @@ void main() {
     // CDL はグレーディング用の表示値 (sRGB エンコード後) に掛ける。ASC の想定する扱いに近く、効き方が直感的
     // 既定値では恒等変換 (プリプロセッサで浮動小数の比較ができないので常に掛ける)
     color = saturate(applyCdl(color, vec3(CDL_SLOPE), vec3(CDL_OFFSET), vec3(CDL_POWER), CDL_SATURATION));
+#ifdef FINAL_DEVELOP_PASS
+    // 現像 (composite27) はここまで。グレイン・デバッグ表示・ディザは final の記録の段の後で掛ける
+    outColor = vec4(color, 1.0);
+#else
     color = applyGrain(color, gl_FragCoord.xy);
 
     color = debugView(texel, color);
     // 8bit 出力のバンディング対策
     color += (interleavedGradientNoise(gl_FragCoord.xy, frameCounter) - 0.5) / OUTPUT_LEVELS;
     outColor = vec4(color, 1.0);
+#endif
 }
+#endif
