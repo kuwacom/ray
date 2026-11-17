@@ -41,8 +41,21 @@ vec3 lightEmission(LightDef d, float level) {
     return d.color.rgb * d.color.a * (level / LIGHT_LEVEL_MAX) * BLOCKLIGHT_ILLUMINANCE * BLOCKLIGHT_BRIGHTNESS;
 }
 
+#if LIGHT_FALLOFF_MODE == 1
+/*
+ * 到達半径 (ブロック)。光の量 (明るさ x レベル) の平方根に比例させ、LIGHT_RANGE_MIN から LIGHT_RANGE の間に収める
+ * 減衰は遠くで逆二乗なので、決まった照度まで届く距離は光の量の平方根に比例する。レベルに比例させると
+ * 暗い光源ほど窓関数で早く切れ (レベル 3 のマグマブロックは 3 ブロック)、まだ見える明るさのうちに光が消えた
+ * 下限は、窓関数で 0 へ落ちる所を暗い光源の近くに置かないため。半径は減衰の窓と光源ビンの範囲だけに効き、近くの明るさは変わらない
+ */
+float lightRange(LightDef d, float level) {
+    float flux = d.color.a * level / LIGHT_LEVEL_MAX;
+    return clamp(LIGHT_RANGE * sqrt(max(flux, 0.0)), LIGHT_RANGE_MIN, LIGHT_RANGE);
+}
+#else
 // 到達半径 (ブロック)。レベルに比例
 float lightRange(LightDef d, float level) { return d.params.x * level / LIGHT_LEVEL_MAX; }
+#endif
 
 /*
  * 距離減衰の 1 次・2 次の係数 (1 / (1 + a d + b d^2))

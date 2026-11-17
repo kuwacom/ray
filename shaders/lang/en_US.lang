@@ -100,6 +100,14 @@ option.BLOCKLIGHT_BOUNCE.comment=How much block light bounces off walls and pick
 option.BLOCKLIGHT_BRIGHTNESS=Block Light Brightness
 option.BLOCKLIGHT_WARMTH=Block Light Warmth
 option.BLOCKLIGHT_WARMTH.comment=0 = neutral white fire light, 1 = warm orange like vanilla.
+option.LIGHT_FALLOFF_MODE=Light Reach
+option.LIGHT_FALLOFF_MODE.comment=How far the light of each light source reaches. Level: proportional to the light level, so low level sources (magma blocks, amethyst, candles) cut off after a few blocks. Light Amount: proportional to the square root of brightness x level, so dim sources also fade out smoothly over distance. Brightness close to the source is the same in both. Light Amount lights a larger area per source and is slightly heavier in scenes with many dim sources.
+value.LIGHT_FALLOFF_MODE.0=Level
+value.LIGHT_FALLOFF_MODE.1=Light Amount
+option.LIGHT_RANGE=Light Reach Max
+option.LIGHT_RANGE.comment=With Light Reach set to Light Amount, how far bright sources such as torches and glowstone reach (blocks). Larger lights more distant floors and walls but costs more.
+option.LIGHT_RANGE_MIN=Light Reach Min
+option.LIGHT_RANGE_MIN.comment=With Light Reach set to Light Amount, the shortest reach of dim sources (blocks). Larger lets dim light fade out more gradually but costs more in scenes with many dim sources (glow lichen caves).
 option.LIGHT_FLICKER=Light Flicker
 option.LIGHT_FLICKER.comment=Subtle flicker on fire based lights.
 option.DECORATIVE_BLOCK_LIGHTS=Mineral Block Glow

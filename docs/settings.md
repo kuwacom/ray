@@ -39,6 +39,9 @@
 | BLOCKLIGHT_BOUNCE | 0.5 | 0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0 |
 | BLOCKLIGHT_BRIGHTNESS | 1.0 | 0.1, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0 |
 | BLOCKLIGHT_WARMTH | 0.6 | 0.0, 0.25, 0.4, 0.5, 0.6, 0.7, 0.75, 1.0 |
+| LIGHT_FALLOFF_MODE | 0 | 0, 1 |
+| LIGHT_RANGE | 15.0 | 12.0, 15.0, 18.0, 20.0, 24.0 |
+| LIGHT_RANGE_MIN | 8.0 | 4.0, 6.0, 8.0, 10.0, 12.0 |
 | LIGHT_FLICKER | ON | ON / OFF |
 | DECORATIVE_BLOCK_LIGHTS | 2 | 0, 1, 2 |
 | DECOR_LAPIS | ON | ON / OFF |
