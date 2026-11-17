@@ -4,6 +4,9 @@
  * - 1 列を 1 グループの中で閉じて求めるので、atomic もクリアも要らない。読みは画面を 1 回
  * - 縦を 1 グループにするので、倍率の丸めを確かめていない workGroupsRender でなく絶対の workGroups を使う
  * - ANALOG と ANALOG_SMEAR の時だけ走る (それ以外は program.*.enabled で止まる)
+ * - 灯り: 空でない画素の、露出の後の明るさがしきい値を超えた分だけを倍率で増やしてから足す。Ray の発光は実物の灯りより桁で暗く、
+ *   そのままでは筋にならないため。しきい値があるので遠い灯り 1 つでは出ず、重なった灯りや近くで大きく写る灯りだけが筋になる。
+ *   空 (太陽) は増やさないので、太陽の筋は変わらない
  * post モジュール (lib/post)
  */
 // このプログラムで書く SSBO (lib/buffers。ほかのプログラムでは readonly)
@@ -13,6 +16,10 @@
 //@include "/lib/common/transforms.glsl"
 //@include "/lib/buffers/analog_smear.glsl"
 //@include "/lib/post/sampling.glsl"
+//@include "/lib/common/exposure.glsl"
+//@include "/lib/common/color.glsl"
+//@include "/lib/post/lens_optics.glsl"
+//@include "/lib/post/analog_presets.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -32,6 +39,21 @@
 #include "/lib/common/transforms.glsl"
 #include "/lib/buffers/analog_smear.glsl"
 #include "/lib/post/sampling.glsl"
+#include "/lib/buffers/frame_data.glsl"
+#include "/lib/common/exposure.glsl"
+#include "/lib/common/color.glsl"
+#include "/lib/common/jitter.glsl"
+#include "/lib/common/noise.glsl"
+#include "/lib/common/look_presets.glsl"
+#include "/lib/post/post_constants.glsl"
+#include "/lib/buffers/images.glsl"
+#include "/lib/buffers/slots.glsl"
+#include "/lib/post/bloom.glsl"
+#include "/lib/post/lens_presets.glsl"
+#include "/lib/post/camera.glsl"
+#include "/lib/post/velocity.glsl"
+#include "/lib/post/lens_optics.glsl"
+#include "/lib/post/analog_presets.glsl"
 // END GENERATED includes
 
 // グループは 8 列 x 32 行のスレッド。1024 グループで 8192 列 (ANALOG_SMEAR_COLUMNS_ALLOC) を覆う
@@ -52,10 +74,18 @@ void main() {
     bool inside = x < size.x;
 
     vec3 sum = vec3(0.0);
+    float exposure = getExposure();
     if (inside) {
         for (int y = ly; y < size.y; y += SMEAR_GROUP_ROWS) {
             // NaN / Inf の 1 画素が列の平均を汚さないように入口で止める
-            sum += sanitizeColor(texelFetch(colortex0, ivec2(x, y), 0).rgb);
+            vec3 c = sanitizeColor(texelFetch(colortex0, ivec2(x, y), 0).rgb);
+            if (AP_SMEAR_LIGHT_GAIN > 0.0) {
+                // 深度は半透明を含まない depthtex1 で見る (ガラスや水の向こうの太陽を灯りとして増やさない)
+                float depth = texelFetch(depthtex1, postSourceTexel((vec2(x, y) + 0.5) / vec2(size)), 0).r;
+                float l = luminance(c) * exposure;
+                if (depth < 1.0 && l > AP_SMEAR_LIGHT_THRESHOLD) c *= 1.0 + AP_SMEAR_LIGHT_GAIN * (l - AP_SMEAR_LIGHT_THRESHOLD) / l;
+            }
+            sum += c;
         }
     }
     sharedColumnSum[ly][lx] = sum;

@@ -200,6 +200,8 @@
 #define ANALOG_SMEAR // CCD の縦スミア (明るい光の列に上下へ伸びる淡い筋)
 #define ANALOG_C_SMEAR_RATIO 0.1 // [0.0003 0.001 0.003 0.01 0.03 0.1 0.3 1.0] スミア比 (%)。列が一様に照らされた時の信号に対する筋の比
 #define ANALOG_C_SMEAR_TINT_MODE 1 // [0 1] 筋の色 0=光の色 1=白
+#define ANALOG_C_SMEAR_LIGHT_THRESHOLD 8.0 // [2.0 4.0 8.0 16.0 32.0 64.0] 灯りの筋が出始める明るさ (露出の後の白の倍数)
+#define ANALOG_C_SMEAR_LIGHT_GAIN 200.0 // [0.0 5.0 10.0 20.0 50.0 100.0 200.0 500.0] 灯りの明るさがしきい値を超えた分に掛ける倍率。0 = 灯りの筋なし
 #define ANALOG_C_FORMAT_MODE 0 // [0 1 2] 記録の形式 0=NTSC DV 1=PAL DV 2=HDV 1080i
 #define ANALOG_CHROMA // 色差の間引き (形式で 4:1:1 か 4:2:0)
 #define ANALOG_C_CHROMA_STRENGTH 1.0 // [0.0 0.25 0.5 0.75 1.0] 1 = 形式どおり。下げると元の色と混ぜる
