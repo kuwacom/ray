@@ -495,6 +495,6 @@
 | ANALOG | OFF | ON / OFF |
 | ANALOG_PRESET | 1 | 0, 1, 2, 3, 4, 5, 6 |
 | ANALOG_SMEAR | ON | ON / OFF |
-| ANALOG_C_SMEAR_RATIO | 0.01 | 0.0003, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0 |
+| ANALOG_C_SMEAR_RATIO | 0.1 | 0.0003, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0 |
 | ANALOG_C_SMEAR_TINT_MODE | 1 | 0, 1 |
 | DEBUG_VIEW | 0 | 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 |
