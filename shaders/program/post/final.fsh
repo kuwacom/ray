@@ -264,7 +264,12 @@ void main() {
 #else
     vec3 color = texelFetch(colortex0, texel, 0).rgb;
 #endif
+#ifdef ANALOG_NOISE
+    // センサーのノイズが粒を出すので、フィルムグレインは重ねない
+    color = saturate(color);
+#else
     color = applyGrain(saturate(color), gl_FragCoord.xy);
+#endif
 
     color = debugView(texel, color);
     // 8bit 出力のバンディング対策

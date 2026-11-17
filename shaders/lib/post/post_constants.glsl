@@ -443,6 +443,24 @@ const float ANALOG_KELL = 0.7;
 // 輪郭強調の強さ 1 の時の倍率と、強調しない細かい揺らぎ (コアリング) の幅 (表示値の Y')。見た目の調整値
 const float ANALOG_SHARPEN_GAIN = 0.8;
 const float ANALOG_SHARPEN_CORING = 0.01;
+/*
+ * スミアの露出連動: 暗い場面 (適用 EV が DARK 以下、シャッター 1/60 秒) を倍率 1 とし、晴天 (DAY 以上) で 2^AP_SMEAR_SHUTTER_STOPS 倍まで強める
+ * Ray の適用 EV は補正を緩める曲線 (EXPOSURE_CURVE) を通るので、晴天でも上限 EXPOSURE_MAX_EV に届かない
+ * (26.1.2 の実測で晴天 0.35〜0.5、夕日 0、洞窟 -1.2、夜の村 -2.6)。上限から測ると一度も効かないので実測の値で置く
+ */
+const float ANALOG_SMEAR_SHUTTER_EV_DARK = -2.0;
+const float ANALOG_SMEAR_SHUTTER_EV_DAY = 0.0;
+// センサーのノイズの強さ 1 の時の線形の振幅 (表示値を Rec.709 の逆で線形へ戻した単位)。見た目の調整値
+// 解像の 3x3 がノイズも平均するので、その後で 26.1.2 の夜の村の暗部の輝度のノイズがプリセット 1 で約 2/255 になるようにした
+const float ANALOG_SHOT_NOISE_SCALE = 0.08;
+const float ANALOG_DARK_NOISE_SCALE = 0.0066;
+const float ANALOG_CHROMA_NOISE_SCALE = 0.021;
+// 乱数の種類ごとの salt (hash3 の第 3 成分 = フィールドの番号 x ANALOG_SEED_COUNT + salt。種類どうしが同じ入力を共有しない)
+const uint ANALOG_SEED_COUNT = 10u;
+const uint ANALOG_SEED_SHOT_Y = 0u;
+const uint ANALOG_SEED_SHOT_RGB = 1u;
+const uint ANALOG_SEED_DARK = 2u;
+const uint ANALOG_SEED_CHROMA = 3u;
 #endif
 
 #endif

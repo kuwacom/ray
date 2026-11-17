@@ -66,6 +66,14 @@ const int noiseTextureResolution = 256;
     #undef ANALOG_RESOLUTION
     #undef ANALOG_SHARPEN
     #undef ANALOG_INTERLACE
+    #undef ANALOG_NOISE
+#endif
+
+// ANALOG_NOISE はセンサーのノイズ 3 種の総スイッチ
+#ifndef ANALOG_NOISE
+    #undef ANALOG_SHOT_NOISE
+    #undef ANALOG_DARK_NOISE
+    #undef ANALOG_CHROMA_NOISE
 #endif
 
 // 三角形方式のエンティティ遮蔽 (lib/light/entity_tri.glsl)。遮蔽が両方 OFF なら三角形も書かない

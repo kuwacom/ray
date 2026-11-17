@@ -17,6 +17,9 @@
 //@include "/lib/post/lens_presets.glsl"
 //@include "/lib/post/velocity.glsl"
 //@include "/lib/post/lens_optics.glsl"
+//@include "/lib/buffers/frame_data.glsl"
+//@include "/lib/common/noise.glsl"
+//@include "/lib/common/math.glsl"
 
 #if defined ANALOG && defined ANALOG_SMEAR && defined SSBO_ANALOG_SMEAR_USE
 /*
@@ -37,12 +40,17 @@ vec3 applyAnalogSmear(vec3 hdr, int column) {
     // 漏れた電荷は列のどの色の画素の読み出しにも同じだけ足されるので、筋は白い (列の平均の輝度)
     vec3 streak = vec3(luminance(mean));
 #endif
+#if AP_SMEAR_SHUTTER_STOPS > 0
+    // 露出連動: 比は 1 / 蓄積時間に比例する。明るい場面ほどシャッターが速く、暗い場面 (1/60 秒) より 2^段 倍まで強い
+    float bright = saturate((frameData.postParams[0].w - ANALOG_SMEAR_SHUTTER_EV_DARK) / (ANALOG_SMEAR_SHUTTER_EV_DAY - ANALOG_SMEAR_SHUTTER_EV_DARK));
+    streak *= exp2(float(AP_SMEAR_SHUTTER_STOPS) * bright);
+#endif
     // AP_SMEAR_RATIO は % なので比に直す
     return hdr + streak * (AP_SMEAR_RATIO / 100.0);
 }
 #endif
 
-#if defined ANALOG && (defined ANALOG_CHROMA || defined ANALOG_RESOLUTION || defined ANALOG_SHARPEN || defined ANALOG_INTERLACE)
+#if defined ANALOG && (defined ANALOG_CHROMA || defined ANALOG_RESOLUTION || defined ANALOG_SHARPEN || defined ANALOG_INTERLACE || defined ANALOG_NOISE)
 #define ANALOG_RECORD_STAGE 1
 
 // Y'CbCr の係数 (Kr, Kg, Kb)。SD の DV は BT.601、HDV は BT.709
@@ -121,25 +129,106 @@ vec2 analogFieldMotion(vec2 uv) {
 }
 #endif
 
+#if defined ANALOG_NOISE && (defined ANALOG_SHOT_NOISE || defined ANALOG_DARK_NOISE)
+// ショットか暗部のノイズがある時だけ、タップごとに線形へ戻して揺らす (無ければ往復の計算を入れない)
+#define ANALOG_SENSOR_NOISE 1
+#endif
+
+#ifdef ANALOG_NOISE
+// 自動ゲイン (暗い場面で上がる) とフィールドの番号。applyAnalogRecord が画素ごとに 1 回だけ求める
+float analogGain = 1.0;
+uint analogField = 0u;
+
+// Rec.709 の OETF とその逆 (表示値の近似の線形と行き来する。ニーが無い時も同じ式で近似)
+vec3 analogOetf709(vec3 l) {
+    return mix(4.5 * l, 1.099 * pow(max(l, 0.0), vec3(0.45)) - 0.099, step(0.018, l));
+}
+
+vec3 analogOetf709Inverse(vec3 v) {
+    return mix(v / 4.5, pow(max((v + 0.099) / 1.099, 0.0), vec3(1.0 / 0.45)), step(0.081, v));
+}
+
+// 種類ごとの一様乱数 (各成分 -0.5〜0.5)。種類 (salt) が違えば q・t が何でも hash3 の入力が重ならず、互いに独立になる
+vec3 analogRandom(vec2 q, uint t, uint salt) {
+    return hash3(uvec3(uvec2(ivec2(floor(q))), t * ANALOG_SEED_COUNT + salt)) - 0.5;
+}
+
+// このタップの走査線のフィールドの番号 (織り込みでは古いフィールドの線は 1 つ前)
+uint analogFieldOf(vec2 uv) {
+#if defined ANALOG_INTERLACE && ANALOG_INTERLACE_MODE == 0
+    int parity = int(floor((1.0 - uv.y) * float(AF_LINES))) & 1;
+    return parity == AF_OLDER_FIELD ? analogField - 1u : analogField;
+#else
+    return analogField;
+#endif
+}
+
+/*
+ * センサーのショットノイズと暗部ノイズ: 表示値を線形へ戻し、仮想の画素ごとの乱数で揺らして戻す
+ * ショットは光の粒の数の揺らぎで σ ∝ sqrt(ゲイン x 明るさ)、暗部は読み出しと暗電流の揺らぎで σ ∝ ゲイン (明るさによらない)。
+ * Rec.709 の傾きは暗部ほど大きいので、同じ揺らぎでも暗部ほど目立つ
+ */
+#ifdef ANALOG_SENSOR_NOISE
+vec3 applyAnalogSensorNoise(vec3 v, vec2 uv) {
+    vec2 q = uv * vec2(AF_SAMPLES, AF_LINES);
+    uint f = analogFieldOf(uv);
+    vec3 l = analogOetf709Inverse(saturate(v));
+    vec3 dl = vec3(0.0);
+#ifdef ANALOG_SHOT_NOISE
+    if (AP_SHOT_NOISE_STRENGTH > 0.0) {
+        vec3 r = mix(vec3(analogRandom(q, f, ANALOG_SEED_SHOT_Y).x), analogRandom(q, f, ANALOG_SEED_SHOT_RGB), AP_SHOT_NOISE_CHROMA);
+        dl += AP_SHOT_NOISE_STRENGTH * ANALOG_SHOT_NOISE_SCALE * sqrt(analogGain * l) * r;
+    }
+#endif
+#ifdef ANALOG_DARK_NOISE
+    if (AP_DARK_NOISE_STRENGTH > 0.0) {
+        dl += AP_DARK_NOISE_STRENGTH * ANALOG_DARK_NOISE_SCALE * analogGain * analogRandom(q / AP_DARK_NOISE_SIZE, f, ANALOG_SEED_DARK).x;
+    }
+#endif
+    return analogOetf709(max(l + ANALOG_NOISE_STRENGTH * dl, 0.0));
+}
+#endif
+
+#ifdef ANALOG_CHROMA_NOISE
+// 色ノイズ: 色差の標本 (k = 色差の格子の位置) ごとの斑点。暗部 (1 - Y') ^ 偏り で強い。実機では間引きの前に乗るので標本ごとに足す
+vec2 analogChromaNoise(vec2 k, float luma, uint f) {
+    if (AP_CHROMA_NOISE_STRENGTH <= 0.0) return vec2(0.0);
+    float shadow = pow(saturate(1.0 - luma), AP_CHROMA_NOISE_SHADOW);
+    return ANALOG_NOISE_STRENGTH * AP_CHROMA_NOISE_STRENGTH * ANALOG_CHROMA_NOISE_SCALE * analogGain * shadow
+         * analogRandom(k / AP_CHROMA_NOISE_SIZE, f, ANALOG_SEED_CHROMA).xy;
+}
+#endif
+#endif
+
 /*
  * 表示値 (composite27 の出力) を記録の段の位置 uv で読む。インターレースは読む位置の走査線ごとに選ぶ:
  * 織り込みは古いフィールドの走査線を 1 フィールド前の位置で読み (動いた所の櫛)、フィールド表示は今のフィールドでない走査線を上下の線から補う
+ * センサーのノイズはタップの位置の仮想の画素で引く (解像と輪郭強調のタップごとに同じ式で掛かり、ぼけと強調を受ける)
  */
 vec3 analogFetch(vec2 uv, float lod) {
+    vec2 at = uv;
+    vec3 c;
 #ifdef ANALOG_INTERLACE
     int parity = int(floor((1.0 - uv.y) * float(AF_LINES))) & 1;
     #if ANALOG_INTERLACE_MODE == 0
     if (parity == AF_OLDER_FIELD) uv -= analogFieldShift;
+    c = textureLod(colortex0, uv, lod).rgb;
     #else
     if (parity != analogFieldPhase) {
         vec2 line = vec2(0.0, 1.0 / float(AF_LINES));
-        return 0.5 * (textureLod(colortex0, uv + line, lod).rgb + textureLod(colortex0, uv - line, lod).rgb);
+        c = 0.5 * (textureLod(colortex0, uv + line, lod).rgb + textureLod(colortex0, uv - line, lod).rgb);
+    } else {
+        c = textureLod(colortex0, uv, lod).rgb;
     }
     #endif
+#else
+    c = textureLod(colortex0, uv, lod).rgb;
 #endif
-    return textureLod(colortex0, uv, lod).rgb;
+#ifdef ANALOG_SENSOR_NOISE
+    if (ANALOG_NOISE_STRENGTH > 0.0) c = applyAnalogSensorNoise(c, at);
+#endif
+    return c;
 }
-
 #ifdef ANALOG_RESOLUTION
 /*
  * 解像: 出力の uv を中心に、仮想の画素の間隔で並べた 3x3 のタップの輝度のガウスの平均
@@ -177,7 +266,11 @@ vec2 analogChromaSample(vec2 center, float lod) {
         float dx = (float(i) + 0.5) / float(ANALOG_CHROMA_TAPS) * float(AF_CHROMA_X) - 0.5 * float(AF_CHROMA_X);
         sum += analogFetch(vec2(center.x + dx, center.y) / grid, lod);
     }
-    return analogRgbToYcc(sum / float(ANALOG_CHROMA_TAPS)).yz;
+    vec3 ycc = analogRgbToYcc(sum / float(ANALOG_CHROMA_TAPS));
+#if defined ANALOG_NOISE && defined ANALOG_CHROMA_NOISE
+    if (ANALOG_NOISE_STRENGTH > 0.0) ycc.yz += analogChromaNoise(floor(center / vec2(AF_CHROMA_X, AF_CHROMA_Y)), ycc.x, analogFieldOf(center / grid));
+#endif
+    return ycc.yz;
 }
 
 /*
@@ -241,6 +334,14 @@ vec3 applyAnalogRecord(vec2 uv) {
     analogFieldPhase = int(floor(frameTimeCounter * AF_FIELD_RATE)) & 1;
     #endif
 #endif
+#ifdef ANALOG_NOISE
+    if (ANALOG_NOISE_STRENGTH > 0.0) {
+        // 自動ゲイン: 適用 EV が AP_AGC_EV より暗い分だけ、AP_AGC_MAX 段まで上げる
+        analogGain = exp2(clamp(AP_AGC_EV - frameData.postParams[0].w, 0.0, float(AP_AGC_MAX)));
+        // 乱数はフィールドの速さで切り替える (高いフレームレートでも 1 秒にフィールドの数だけ変わる)
+        analogField = uint(floor(frameTimeCounter * AF_FIELD_RATE)) + 1u;
+    }
+#endif
     vec3 ycc = analogRgbToYcc(analogFetch(uv, 0.0));
 #ifdef ANALOG_RESOLUTION
     float luma = analogSoftLuma(uv, ycc.x);
@@ -260,6 +361,9 @@ vec3 applyAnalogRecord(vec2 uv) {
     ycc.x = luma;
 #ifdef ANALOG_CHROMA
     ycc.yz = mix(ycc.yz, analogSubsampledChroma(uv), AP_CHROMA_STRENGTH);
+#elif defined ANALOG_NOISE && defined ANALOG_CHROMA_NOISE
+    // 色差を間引かない時は、仮想の画素ごとに色ノイズを足す
+    if (ANALOG_NOISE_STRENGTH > 0.0) ycc.yz += analogChromaNoise(floor(uv * vec2(AF_SAMPLES, AF_LINES)), ycc.x, analogFieldOf(uv));
 #endif
     return analogYccToRgb(ycc);
 }

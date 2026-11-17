@@ -192,6 +192,14 @@
 #endif
 #ifdef ANALOG_SHARPEN
 #endif
+#ifdef ANALOG_NOISE
+#endif
+#ifdef ANALOG_SHOT_NOISE
+#endif
+#ifdef ANALOG_DARK_NOISE
+#endif
+#ifdef ANALOG_CHROMA_NOISE
+#endif
 #ifdef ANALOG_INTERLACE
 #endif
 #ifdef ANALOG_CHROMA
