@@ -198,6 +198,7 @@
 //#define ANALOG // アナログ領域
 #define ANALOG_PRESET 1 // [0 1 2 3 4 5 6] 0=カスタム 1=標準の MiniDV 2=安いコンパクトのビデオ 3=暗い所の自動ゲイン 4=古い Digital8 5=HDV 1080i 6=PAL の MiniDV
 #define ANALOG_SMEAR // CCD の縦スミア (明るい光の列に上下へ伸びる淡い筋)
+#define ANALOG_SMEAR_LIGHT_STRENGTH 1.0 // [0.0 0.5 1.0 1.5 2.0 3.0 5.0] 灯りの筋の強さ (機材によらず効く)。機材の灯りの倍率に掛ける。0 = 灯りの筋なし
 #define ANALOG_C_SMEAR_RATIO 0.1 // [0.0003 0.001 0.003 0.01 0.03 0.1 0.3 1.0] スミア比 (%)。列が一様に照らされた時の信号に対する筋の比
 #define ANALOG_C_SMEAR_TINT_MODE 1 // [0 1] 筋の色 0=光の色 1=白
 #define ANALOG_C_SMEAR_SHUTTER_STOPS 1 // [0 1 2 3 4] 明るい場面でシャッターが速くなる幅 (段)。暗い場面から晴天までの間で筋が 2^段 倍まで強まる。0 = 露出に連動しない
@@ -246,7 +247,7 @@
 #define ANALOG_C_MOSQUITO_STRENGTH 1.0 // [0.0 0.25 0.5 1.0 1.5 2.0 3.0] 0 = 掛けない
 #define ANALOG_C_MOSQUITO_EDGE 0.05 // [0.0 0.02 0.05 0.1 0.2] 斑点が出始める縁の強さ (表示値の段差)
 #define ANALOG_DROPOUT // テープのドロップアウト (散ったブロックが一瞬 1 フレーム前の像になる。視点が動いている時だけ見える)
-#define ANALOG_C_DROPOUT_RATE 0.0 // [0.0 1.0 2.0 5.0 10.0 20.0 30.0 60.0] 1 分あたりの回数。0 = 掛けない
+#define ANALOG_C_DROPOUT_RATE 1.0 // [0.0 1.0 2.0 5.0 10.0 20.0 30.0 60.0] 1 分あたりの回数。0 = 掛けない
 #define ANALOG_C_DROPOUT_AMOUNT 0.1 // [0.02 0.05 0.1 0.2 0.5] 1 回で隠されるブロックの割合
 #define ANALOG_C_FORMAT_MODE 0 // [0 1 2] 記録の形式 0=NTSC DV 1=PAL DV 2=HDV 1080i
 #define ANALOG_CHROMA // 色差の間引き (形式で 4:1:1 か 4:2:0)

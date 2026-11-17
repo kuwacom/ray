@@ -79,11 +79,13 @@ void main() {
         for (int y = ly; y < size.y; y += SMEAR_GROUP_ROWS) {
             // NaN / Inf の 1 画素が列の平均を汚さないように入口で止める
             vec3 c = sanitizeColor(texelFetch(colortex0, ivec2(x, y), 0).rgb);
-            if (AP_SMEAR_LIGHT_GAIN > 0.0) {
+            // 灯りの倍率は機材の値に、機材によらず効く強さを掛けたもの
+            const float lightGain = AP_SMEAR_LIGHT_GAIN * ANALOG_SMEAR_LIGHT_STRENGTH;
+            if (lightGain > 0.0) {
                 // 深度は半透明を含まない depthtex1 で見る (ガラスや水の向こうの太陽を灯りとして増やさない)
                 float depth = texelFetch(depthtex1, postSourceTexel((vec2(x, y) + 0.5) / vec2(size)), 0).r;
                 float l = luminance(c) * exposure;
-                if (depth < 1.0 && l > AP_SMEAR_LIGHT_THRESHOLD) c *= 1.0 + AP_SMEAR_LIGHT_GAIN * (l - AP_SMEAR_LIGHT_THRESHOLD) / l;
+                if (depth < 1.0 && l > AP_SMEAR_LIGHT_THRESHOLD) c *= 1.0 + lightGain * (l - AP_SMEAR_LIGHT_THRESHOLD) / l;
             }
             sum += c;
         }
