@@ -50,7 +50,7 @@ vec3 applyAnalogSmear(vec3 hdr, int column) {
 }
 #endif
 
-#if defined ANALOG && (defined ANALOG_CHROMA || defined ANALOG_RESOLUTION || defined ANALOG_SHARPEN || defined ANALOG_INTERLACE || defined ANALOG_NOISE)
+#if defined ANALOG && (defined ANALOG_CHROMA || defined ANALOG_RESOLUTION || defined ANALOG_SHARPEN || defined ANALOG_INTERLACE || defined ANALOG_NOISE || defined ANALOG_BLOCK || defined ANALOG_MOSQUITO || defined ANALOG_DROPOUT)
 #define ANALOG_RECORD_STAGE 1
 
 // Y'CbCr の係数 (Kr, Kg, Kb)。SD の DV は BT.601、HDV は BT.709
@@ -91,6 +91,13 @@ vec2 analogFieldShift = vec2(0.0);
 // フィールド表示で今出しているフィールドの走査線の偶奇 (上から数えて 0 = 上のフィールド)
 int analogFieldPhase = 0;
 #endif
+#endif
+
+#if (defined ANALOG_INTERLACE && ANALOG_INTERLACE_MODE == 0) || defined ANALOG_BLOCK || defined ANALOG_DROPOUT
+// 視点の動き (速度) を読む効果: 織り込みのインターレース、ブロックの動き、ドロップアウト
+#define ANALOG_NEEDS_MOTION 1
+// 1 フィールド分の視点の動き (強さを掛ける前)。applyAnalogRecord が中心の画素で 1 回だけ求める
+vec2 analogMotion = vec2(0.0);
 
 // final の colortex0 (出力の座標) の位置 uv に写っている元画像の位置 (深度・速度を読む位置)。歪曲を現像で掛ける時も含む
 bool analogLensRemapped() {
@@ -129,26 +136,19 @@ vec2 analogFieldMotion(vec2 uv) {
 }
 #endif
 
-#if defined ANALOG_NOISE && (defined ANALOG_SHOT_NOISE || defined ANALOG_DARK_NOISE)
-// ショットか暗部のノイズがある時だけ、タップごとに線形へ戻して揺らす (無ければ往復の計算を入れない)
+#if defined ANALOG_NOISE && (defined ANALOG_SHOT_NOISE || defined ANALOG_DARK_NOISE || defined ANALOG_FPN || defined ANALOG_HOT_PIXELS)
+// センサーのノイズがある時だけ、タップごとに線形へ戻して揺らす (無ければ往復の計算を入れない)
 #define ANALOG_SENSOR_NOISE 1
 #endif
 
-#ifdef ANALOG_NOISE
-// 自動ゲイン (暗い場面で上がる) とフィールドの番号。applyAnalogRecord が画素ごとに 1 回だけ求める
-float analogGain = 1.0;
-uint analogField = 0u;
-
-// Rec.709 の OETF とその逆 (表示値の近似の線形と行き来する。ニーが無い時も同じ式で近似)
-vec3 analogOetf709(vec3 l) {
-    return mix(4.5 * l, 1.099 * pow(max(l, 0.0), vec3(0.45)) - 0.099, step(0.018, l));
-}
-
-vec3 analogOetf709Inverse(vec3 v) {
-    return mix(v / 4.5, pow(max((v + 0.099) / 1.099, 0.0), vec3(1.0 / 0.45)), step(0.081, v));
-}
+#if defined ANALOG_NOISE || defined ANALOG_MOSQUITO || defined ANALOG_DROPOUT
+// フィールドの番号と乱数を使う効果
+#define ANALOG_NEEDS_RANDOM 1
+// フィールドの番号 (1 から数える。古いフィールドの 1 つ前が 0 になる)。applyAnalogRecord が画素ごとに 1 回だけ求める
+uint analogField = 1u;
 
 // 種類ごとの一様乱数 (各成分 -0.5〜0.5)。種類 (salt) が違えば q・t が何でも hash3 の入力が重ならず、互いに独立になる
+// 時間で変わる種類は t = フィールドの番号 (1 以上)、画面に固定の種類は t = 0
 vec3 analogRandom(vec2 q, uint t, uint salt) {
     return hash3(uvec3(uvec2(ivec2(floor(q))), t * ANALOG_SEED_COUNT + salt)) - 0.5;
 }
@@ -162,10 +162,25 @@ uint analogFieldOf(vec2 uv) {
     return analogField;
 #endif
 }
+#endif
+
+#ifdef ANALOG_NOISE
+// 自動ゲイン (暗い場面で上がる)。applyAnalogRecord が画素ごとに 1 回だけ求める
+float analogGain = 1.0;
+
+// Rec.709 の OETF とその逆 (表示値の近似の線形と行き来する。ニーが無い時も同じ式で近似)
+vec3 analogOetf709(vec3 l) {
+    return mix(4.5 * l, 1.099 * pow(max(l, 0.0), vec3(0.45)) - 0.099, step(0.018, l));
+}
+
+vec3 analogOetf709Inverse(vec3 v) {
+    return mix(v / 4.5, pow(max((v + 0.099) / 1.099, 0.0), vec3(1.0 / 0.45)), step(0.081, v));
+}
 
 /*
- * センサーのショットノイズと暗部ノイズ: 表示値を線形へ戻し、仮想の画素ごとの乱数で揺らして戻す
+ * センサーのノイズ: 表示値を線形へ戻し、仮想の画素ごとの乱数で揺らして戻す
  * ショットは光の粒の数の揺らぎで σ ∝ sqrt(ゲイン x 明るさ)、暗部は読み出しと暗電流の揺らぎで σ ∝ ゲイン (明るさによらない)。
+ * FPN (画素と列のむら) とホットピクセル (常に電荷の多い欠陥) は素子の画素に付いているので画面に固定 (t = 0) で、ゲインで増える。
  * Rec.709 の傾きは暗部ほど大きいので、同じ揺らぎでも暗部ほど目立つ
  */
 #ifdef ANALOG_SENSOR_NOISE
@@ -185,6 +200,20 @@ vec3 applyAnalogSensorNoise(vec3 v, vec2 uv) {
         dl += AP_DARK_NOISE_STRENGTH * ANALOG_DARK_NOISE_SCALE * analogGain * analogRandom(q / AP_DARK_NOISE_SIZE, f, ANALOG_SEED_DARK).x;
     }
 #endif
+#ifdef ANALOG_FPN
+    if (AP_FPN_STRENGTH > 0.0) {
+        // 列の乱数は縦の位置を 0 に固定する (垂直転送のむら = 縦縞)
+        float pixel = analogRandom(q, 0u, ANALOG_SEED_FPN_PIXEL).x;
+        float column = analogRandom(vec2(q.x, 0.0), 0u, ANALOG_SEED_FPN_COLUMN).x;
+        dl += AP_FPN_STRENGTH * ANALOG_FPN_SCALE * analogGain * mix(pixel, column, AP_FPN_COLUMN);
+    }
+#endif
+#ifdef ANALOG_HOT_PIXELS
+    if (AP_HOT_PIXELS_DENSITY > 0.0) {
+        bool hot = analogRandom(q, 0u, ANALOG_SEED_HOT).x + 0.5 < AP_HOT_PIXELS_DENSITY;
+        dl += hot ? AP_HOT_PIXELS_BRIGHTNESS * ANALOG_HOT_PIXELS_SCALE * analogGain : 0.0;
+    }
+#endif
     return analogOetf709(max(l + ANALOG_NOISE_STRENGTH * dl, 0.0));
 }
 #endif
@@ -200,35 +229,104 @@ vec2 analogChromaNoise(vec2 k, float luma, uint f) {
 #endif
 #endif
 
+#ifdef ANALOG_DROPOUT
+/*
+ * テープのドロップアウト: ANALOG_DROPOUT_FIELDS フィールドごとの窓で、起きたかを画面で 1 つ引き、起きた窓では
+ * 8x8 の仮想のブロックを AP_DROPOUT_AMOUNT の割合で散らして隠す (DV は誤り隠蔽で前のフレームの同じ画素に差し替える)
+ * 前フレームは持たず、速度で 1 フレーム (2 フィールド) 前の位置を読む。視点が止まっていれば今の像と同じになる
+ */
+bool analogDropoutHit = false;
+uint analogDropoutWindow = 0u;
+
+bool analogDropoutHidden(vec2 uv) {
+    if (!analogDropoutHit) return false;
+    vec2 block = floor(uv * vec2(AF_SAMPLES, AF_LINES) / ANALOG_BLOCK_SIZE);
+    return analogRandom(block, analogDropoutWindow, ANALOG_SEED_DROPOUT_BLOCK).x + 0.5 < AP_DROPOUT_AMOUNT;
+}
+#endif
+
 /*
  * 表示値 (composite27 の出力) を記録の段の位置 uv で読む。インターレースは読む位置の走査線ごとに選ぶ:
  * 織り込みは古いフィールドの走査線を 1 フィールド前の位置で読み (動いた所の櫛)、フィールド表示は今のフィールドでない走査線を上下の線から補う
+ * ドロップアウトで隠したブロックは 1 フレーム前の位置で読む
  * センサーのノイズはタップの位置の仮想の画素で引く (解像と輪郭強調のタップごとに同じ式で掛かり、ぼけと強調を受ける)
  */
 vec3 analogFetch(vec2 uv, float lod) {
     vec2 at = uv;
     vec3 c;
+#ifdef ANALOG_DROPOUT
+    if (AP_DROPOUT_RATE > 0.0 && analogDropoutHidden(at)) {
+        c = textureLod(colortex0, uv - 2.0 * analogMotion, lod).rgb;
+    } else
+#endif
+    {
 #ifdef ANALOG_INTERLACE
-    int parity = int(floor((1.0 - uv.y) * float(AF_LINES))) & 1;
+        int parity = int(floor((1.0 - uv.y) * float(AF_LINES))) & 1;
     #if ANALOG_INTERLACE_MODE == 0
-    if (parity == AF_OLDER_FIELD) uv -= analogFieldShift;
-    c = textureLod(colortex0, uv, lod).rgb;
-    #else
-    if (parity != analogFieldPhase) {
-        vec2 line = vec2(0.0, 1.0 / float(AF_LINES));
-        c = 0.5 * (textureLod(colortex0, uv + line, lod).rgb + textureLod(colortex0, uv - line, lod).rgb);
-    } else {
+        if (parity == AF_OLDER_FIELD) uv -= analogFieldShift;
         c = textureLod(colortex0, uv, lod).rgb;
-    }
+    #else
+        if (parity != analogFieldPhase) {
+            vec2 line = vec2(0.0, 1.0 / float(AF_LINES));
+            c = 0.5 * (textureLod(colortex0, uv + line, lod).rgb + textureLod(colortex0, uv - line, lod).rgb);
+        } else {
+            c = textureLod(colortex0, uv, lod).rgb;
+        }
     #endif
 #else
-    c = textureLod(colortex0, uv, lod).rgb;
+        c = textureLod(colortex0, uv, lod).rgb;
 #endif
+    }
 #ifdef ANALOG_SENSOR_NOISE
     if (ANALOG_NOISE_STRENGTH > 0.0) c = applyAnalogSensorNoise(c, at);
 #endif
     return c;
 }
+
+#if defined ANALOG_BLOCK || defined ANALOG_MOSQUITO
+/*
+ * DV のブロック (8x8 の DCT の量子化) とモスキートノイズの近似。輝度だけ
+ * ブロックの 4 つの 4x4 の区画の平均をミップで読み、DC と 1 次の 2 係数の平面 y_q で近似する。
+ * 平面から外れた細部 r は、デッドゾーンより小さい分を捨てる (小さな係数を 0 に丸める量子化。ノイズも減る)。動いた所はデッドゾーンが広い。
+ * 区画の段差が大きい (縁がある) ブロックには、量子化の誤差が縁の周りに散ったちらつく斑点を足す。格子は画面に固定
+ */
+float applyAnalogBlock(float luma, vec2 uv) {
+    vec2 p = uv * vec2(AF_SAMPLES, AF_LINES);
+    vec2 corner = floor(p / ANALOG_BLOCK_SIZE) * ANALOG_BLOCK_SIZE;
+    vec2 grid = 1.0 / vec2(AF_SAMPLES, AF_LINES);
+    // 区画 (半分の大きさ) の箱に合うミップの段
+    float lod = log2(max(0.5 * ANALOG_BLOCK_SIZE * viewWidth / float(AF_SAMPLES), 1.0));
+    float q = 0.25 * ANALOG_BLOCK_SIZE;
+    float m00 = dot(textureLod(colortex0, (corner + vec2(q, q)) * grid, lod).rgb, ANALOG_LUMA_WEIGHTS);
+    float m10 = dot(textureLod(colortex0, (corner + vec2(3.0 * q, q)) * grid, lod).rgb, ANALOG_LUMA_WEIGHTS);
+    float m01 = dot(textureLod(colortex0, (corner + vec2(q, 3.0 * q)) * grid, lod).rgb, ANALOG_LUMA_WEIGHTS);
+    float m11 = dot(textureLod(colortex0, (corner + vec2(3.0 * q, 3.0 * q)) * grid, lod).rgb, ANALOG_LUMA_WEIGHTS);
+    float dc = 0.25 * (m00 + m10 + m01 + m11);
+#ifdef ANALOG_BLOCK
+    if (AP_BLOCK_STRENGTH > 0.0) {
+        // 区画の中心の間隔は 2q (仮想の画素) なので、差を 2 区画分で割って 1 画素あたりの傾きにする
+        float gx = ((m10 + m11) - (m00 + m01)) / (2.0 * 2.0 * q);
+        float gy = ((m01 + m11) - (m00 + m10)) / (2.0 * 2.0 * q);
+        vec2 o = p - (corner + 0.5 * ANALOG_BLOCK_SIZE);
+        float plane = dc + gx * o.x + gy * o.y;
+        float r = luma - plane;
+        // 1 フィールドでブロック 1 つ分動けば 1
+        float moving = clamp(length(analogMotion * vec2(AF_SAMPLES, AF_LINES)) / ANALOG_BLOCK_SIZE, 0.0, 1.0);
+        float deadzone = AP_BLOCK_STRENGTH * ANALOG_BLOCK_DEADZONE * (1.0 + AP_BLOCK_MOTION * moving);
+        luma = plane + sign(r) * max(abs(r) - deadzone, 0.0);
+    }
+#endif
+#ifdef ANALOG_MOSQUITO
+    if (AP_MOSQUITO_STRENGTH > 0.0) {
+        float edge = max(max(abs(m00 - dc), abs(m10 - dc)), max(abs(m01 - dc), abs(m11 - dc)));
+        luma += AP_MOSQUITO_STRENGTH * ANALOG_MOSQUITO_GAIN * max(edge - AP_MOSQUITO_EDGE, 0.0)
+              * analogRandom(p, analogFieldOf(uv), ANALOG_SEED_MOSQUITO).x;
+    }
+#endif
+    return luma;
+}
+#endif
+
 #ifdef ANALOG_RESOLUTION
 /*
  * 解像: 出力の uv を中心に、仮想の画素の間隔で並べた 3x3 のタップの輝度のガウスの平均
@@ -327,19 +425,30 @@ vec2 analogSubsampledChroma(vec2 uv) {
  * @returns 記録の段を掛けた表示値 (0-1 に収める前。輪郭強調のはみ出しは切らない)
  */
 vec3 applyAnalogRecord(vec2 uv) {
+#ifdef ANALOG_NEEDS_MOTION
+    analogMotion = analogFieldMotion(uv);
+#endif
 #ifdef ANALOG_INTERLACE
     #if ANALOG_INTERLACE_MODE == 0
-    analogFieldShift = AP_INTERLACE_STRENGTH * analogFieldMotion(uv);
+    analogFieldShift = AP_INTERLACE_STRENGTH * analogMotion;
     #else
     analogFieldPhase = int(floor(frameTimeCounter * AF_FIELD_RATE)) & 1;
     #endif
 #endif
+#ifdef ANALOG_NEEDS_RANDOM
+    // 乱数はフィールドの速さで切り替える (高いフレームレートでも 1 秒にフィールドの数だけ変わる)
+    analogField = uint(floor(frameTimeCounter * AF_FIELD_RATE)) + 1u;
+#endif
 #ifdef ANALOG_NOISE
-    if (ANALOG_NOISE_STRENGTH > 0.0) {
-        // 自動ゲイン: 適用 EV が AP_AGC_EV より暗い分だけ、AP_AGC_MAX 段まで上げる
-        analogGain = exp2(clamp(AP_AGC_EV - frameData.postParams[0].w, 0.0, float(AP_AGC_MAX)));
-        // 乱数はフィールドの速さで切り替える (高いフレームレートでも 1 秒にフィールドの数だけ変わる)
-        analogField = uint(floor(frameTimeCounter * AF_FIELD_RATE)) + 1u;
+    // 自動ゲイン: 適用 EV が AP_AGC_EV より暗い分だけ、AP_AGC_MAX 段まで上げる
+    if (ANALOG_NOISE_STRENGTH > 0.0) analogGain = exp2(clamp(AP_AGC_EV - frameData.postParams[0].w, 0.0, float(AP_AGC_MAX)));
+#endif
+#ifdef ANALOG_DROPOUT
+    if (AP_DROPOUT_RATE > 0.0) {
+        // 1 分あたりの回数 -> 窓ごとの確率 (1 分の窓の数は 60 x フィールドの速さ / 窓のフィールドの数)
+        analogDropoutWindow = analogField / ANALOG_DROPOUT_FIELDS;
+        float chance = min(AP_DROPOUT_RATE * float(ANALOG_DROPOUT_FIELDS) / (60.0 * AF_FIELD_RATE), 1.0);
+        analogDropoutHit = analogRandom(vec2(0.0), analogDropoutWindow, ANALOG_SEED_DROPOUT_EVENT).x + 0.5 < chance;
     }
 #endif
     vec3 ycc = analogRgbToYcc(analogFetch(uv, 0.0));
@@ -357,6 +466,9 @@ vec3 applyAnalogRecord(vec2 uv) {
         float cored = sign(detail) * max(abs(detail) - AP_SHARPEN_CORING * ANALOG_SHARPEN_CORING, 0.0);
         luma += AP_SHARPEN_STRENGTH * ANALOG_SHARPEN_GAIN * cored;
     }
+#endif
+#if defined ANALOG_BLOCK || defined ANALOG_MOSQUITO
+    luma = applyAnalogBlock(luma, uv);
 #endif
     ycc.x = luma;
 #ifdef ANALOG_CHROMA

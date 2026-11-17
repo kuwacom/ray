@@ -224,9 +224,24 @@
 #define ANALOG_C_CHROMA_NOISE_STRENGTH 1.0 // [0.0 0.25 0.5 1.0 1.5 2.0 3.0]
 #define ANALOG_C_CHROMA_NOISE_SHADOW 2.0 // [0.0 1.0 2.0 3.0 4.0] 暗部への偏り (指数。0 = 明るさによらない)
 #define ANALOG_C_CHROMA_NOISE_SIZE 1.0 // [1.0 1.5 2.0 3.0] 斑点の大きさ (色差の標本)
+#define ANALOG_FPN // 固定パターンノイズ (画素ごとのむらと縦縞。画面に固定)
+#define ANALOG_C_FPN_STRENGTH 0.0 // [0.0 0.25 0.5 1.0 2.0] 0 = 掛けない
+#define ANALOG_C_FPN_COLUMN 0.5 // [0.0 0.25 0.5 0.75 1.0] 縦縞の割合 0=画素ごとだけ 1=縦縞だけ
+#define ANALOG_HOT_PIXELS // ホットピクセル (暗い場面で光る白点。画面に固定)
+#define ANALOG_C_HOT_PIXELS_DENSITY 0.0 // [0.0 0.0001 0.0003 0.001 0.003] 白点の画素の割合。0 = 掛けない
+#define ANALOG_C_HOT_PIXELS_BRIGHTNESS 1.0 // [0.25 0.5 1.0 2.0 4.0]
 #define ANALOG_INTERLACE // インターレース (視点を動かした時の櫛状のズレ)
 #define ANALOG_INTERLACE_MODE 0 // [0 1] 見せ方 0=織り込み (PC で見た DV) 1=フィールド表示 (テレビ。細かい横縞がちらつく)
 #define ANALOG_C_INTERLACE_STRENGTH 1.0 // [0.0 0.5 1.0 1.5 2.0 3.0] 1 = 1 フィールド分の時間差
+#define ANALOG_BLOCK // DV のブロックノイズ (8x8 の境目の段差と細部の消え。格子は画面に固定)
+#define ANALOG_C_BLOCK_STRENGTH 1.0 // [0.0 0.25 0.5 1.0 1.5 2.0 3.0] 細部を捨てる量。0 = 掛けない
+#define ANALOG_C_BLOCK_MOTION 1.0 // [0.0 0.5 1.0 2.0 4.0] 動いた所で細部がさらに消える量
+#define ANALOG_MOSQUITO // モスキートノイズ (縁の周りでちらつく細かい斑点)
+#define ANALOG_C_MOSQUITO_STRENGTH 1.0 // [0.0 0.25 0.5 1.0 1.5 2.0 3.0] 0 = 掛けない
+#define ANALOG_C_MOSQUITO_EDGE 0.05 // [0.0 0.02 0.05 0.1 0.2] 斑点が出始める縁の強さ (表示値の段差)
+#define ANALOG_DROPOUT // テープのドロップアウト (散ったブロックが一瞬 1 フレーム前の像になる。視点が動いている時だけ見える)
+#define ANALOG_C_DROPOUT_RATE 0.0 // [0.0 1.0 2.0 5.0 10.0 20.0 30.0 60.0] 1 分あたりの回数。0 = 掛けない
+#define ANALOG_C_DROPOUT_AMOUNT 0.1 // [0.02 0.05 0.1 0.2 0.5] 1 回で隠されるブロックの割合
 #define ANALOG_C_FORMAT_MODE 0 // [0 1 2] 記録の形式 0=NTSC DV 1=PAL DV 2=HDV 1080i
 #define ANALOG_CHROMA // 色差の間引き (形式で 4:1:1 か 4:2:0)
 #define ANALOG_C_CHROMA_STRENGTH 1.0 // [0.0 0.25 0.5 0.75 1.0] 1 = 形式どおり。下げると元の色と混ぜる

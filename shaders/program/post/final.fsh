@@ -96,8 +96,8 @@
 #if defined SPECULAR_SPARKLE && !(defined ANALOG && !defined FINAL_DEVELOP_PASS)
 const bool colortex8MipmapEnabled = true;
 #endif
-// アナログの final の色差・解像・輪郭強調のタップをミップの段で太らせる
-#if defined ANALOG && (defined ANALOG_CHROMA || defined ANALOG_RESOLUTION || defined ANALOG_SHARPEN) && !defined FINAL_DEVELOP_PASS
+// アナログの final の色差・解像・輪郭強調のタップと、ブロックの区画をミップの段で読む
+#if defined ANALOG && (defined ANALOG_CHROMA || defined ANALOG_RESOLUTION || defined ANALOG_SHARPEN || defined ANALOG_BLOCK || defined ANALOG_MOSQUITO) && !defined FINAL_DEVELOP_PASS
 const bool colortex0MipmapEnabled = true;
 #endif
 

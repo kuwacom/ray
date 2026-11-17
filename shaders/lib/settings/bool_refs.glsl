@@ -200,7 +200,17 @@
 #endif
 #ifdef ANALOG_CHROMA_NOISE
 #endif
+#ifdef ANALOG_FPN
+#endif
+#ifdef ANALOG_HOT_PIXELS
+#endif
 #ifdef ANALOG_INTERLACE
+#endif
+#ifdef ANALOG_BLOCK
+#endif
+#ifdef ANALOG_MOSQUITO
+#endif
+#ifdef ANALOG_DROPOUT
 #endif
 #ifdef ANALOG_CHROMA
 #endif

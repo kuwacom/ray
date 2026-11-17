@@ -461,6 +461,22 @@ const uint ANALOG_SEED_SHOT_Y = 0u;
 const uint ANALOG_SEED_SHOT_RGB = 1u;
 const uint ANALOG_SEED_DARK = 2u;
 const uint ANALOG_SEED_CHROMA = 3u;
+const uint ANALOG_SEED_FPN_PIXEL = 4u;
+const uint ANALOG_SEED_FPN_COLUMN = 5u;
+const uint ANALOG_SEED_HOT = 6u;
+const uint ANALOG_SEED_MOSQUITO = 7u;
+const uint ANALOG_SEED_DROPOUT_EVENT = 8u;
+const uint ANALOG_SEED_DROPOUT_BLOCK = 9u;
+// 固定パターンノイズとホットピクセルの強さ 1 の時の線形の振幅。ゲインで増え、暗い場面でだけ見える大きさにした見た目の調整値
+const float ANALOG_FPN_SCALE = 0.004;
+const float ANALOG_HOT_PIXELS_SCALE = 0.03;
+// DV の DCT のブロックの大きさ (仮想の輝度の画素)
+const float ANALOG_BLOCK_SIZE = 8.0;
+// ブロックの強さ 1 の時に捨てる細部の幅 (表示値の Y')。モスキートの強さ 1 の時の倍率。見た目の調整値
+const float ANALOG_BLOCK_DEADZONE = 0.015;
+const float ANALOG_MOSQUITO_GAIN = 0.5;
+// 1 回のドロップアウトが続くフィールドの数 (見た目の調整値。1 フィールドでは視点を回していても見えない)
+const uint ANALOG_DROPOUT_FIELDS = 4u;
 #endif
 
 #endif
