@@ -300,11 +300,12 @@ vec2 analogChromaNoise(vec2 k, float luma, uint f) {
  * 8x8 の仮想のブロックを AP_DROPOUT_AMOUNT の割合で散らして隠す (DV は誤り隠蔽で前のフレームの同じ画素に差し替える)
  * 前フレームは持たず、速度で 1 フレーム (2 フィールド) 前の位置を読む。視点が止まっていれば今の像と同じになる
  */
+// この画素のブロックが隠されたか。applyAnalogRecord が出力の画素の中心で 1 回だけ求め、全部のタップで同じに使う
+// (タップごとに引くと、起きていない間も全部のタップに乱数の判定が入る)
 bool analogDropoutHit = false;
 uint analogDropoutWindow = 0u;
 
 bool analogDropoutHidden(vec2 uv) {
-    if (!analogDropoutHit) return false;
     vec2 block = floor(uv * vec2(AF_SAMPLES, AF_LINES) / ANALOG_BLOCK_SIZE);
     return analogRandom(block, analogDropoutWindow, ANALOG_SEED_DROPOUT_BLOCK).x + 0.5 < AP_DROPOUT_AMOUNT;
 }
@@ -320,7 +321,7 @@ vec3 analogFetch(vec2 uv, float lod) {
     vec2 at = uv;
     vec3 c;
 #ifdef ANALOG_DROPOUT
-    if (AP_DROPOUT_RATE > 0.0 && analogDropoutHidden(at)) {
+    if (AP_DROPOUT_RATE > 0.0 && analogDropoutHit) {
         c = textureLod(colortex0, uv - 2.0 * analogMotion, lod).rgb;
     } else
 #endif
@@ -513,7 +514,8 @@ vec3 applyAnalogRecord(vec2 uv) {
         // 1 分あたりの回数 -> 窓ごとの確率 (1 分の窓の数は 60 x フィールドの速さ / 窓のフィールドの数)
         analogDropoutWindow = analogField / ANALOG_DROPOUT_FIELDS;
         float chance = min(AP_DROPOUT_RATE * float(ANALOG_DROPOUT_FIELDS) / (60.0 * AF_FIELD_RATE), 1.0);
-        analogDropoutHit = analogRandom(vec2(0.0), analogDropoutWindow, ANALOG_SEED_DROPOUT_EVENT).x + 0.5 < chance;
+        analogDropoutHit = analogRandom(vec2(0.0), analogDropoutWindow, ANALOG_SEED_DROPOUT_EVENT).x + 0.5 < chance
+                        && analogDropoutHidden(uv);
     }
 #endif
     vec3 ycc = analogRgbToYcc(analogFetch(uv, 0.0));
