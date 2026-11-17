@@ -73,17 +73,21 @@ const float LIGHT_FALLOFF_NORM = (1.0 + LIGHT_FALLOFF_LINEAR + LIGHT_FALLOFF_QUA
 
 #if LIGHT_FALLOFF_MODE == 1
 /*
- * 距離減衰。1 次 + 2 次の減衰から、到達半径での減衰の値を距離 / 半径 の重みで引き、半径でちょうど 0 にする (引き算の窓)
- * 窓関数を掛ける形 (Karis 2013) は半径の 3/4 から急に落ち、暗い光源の光だまりの縁が円く見えた。引き算は遠くほど
- * 一定の割合で減らすので、端の数ブロックも 1 ブロックあたりの落ち方が手前と同じ調子のまま 0 に着く
+ * 距離減衰。1 次 + 2 次の減衰 g から、到達半径での値 g(R) を (距離 / 半径)^2 の重みで引き、半径でちょうど 0 にする (引き算の窓)
+ * 窓関数を掛ける形 (Karis 2013) は半径の 3/4 から急に落ち、暗い光源の光だまりの縁が円く見えた。引き算は端に近いほど
+ * 減衰の値そのものに比べて小さな量を引くので、端の数ブロックも 1 ブロックあたりの落ち方が手前の調子から少しずつ強まって 0 に着く
  * 重みを付けずに引くと、遠くの値 (たいまつの 19 ブロックで 1 ブロックの 1/15) が近くからも引かれて 1-4 ブロックが 11-14 % 暗くなるので、
- * 距離に比例させて近くではほとんど引かない (同じ所で -1.5 %)
+ * 距離の 2 乗に比例させて近くではほとんど引かない
+ * 引いた値を 2 乗して g で割る ((g - 引く量)^2 / g) のは、0 に着く所の傾きも 0 にするため。そのまま (1 乗) では端で
+ * 直線的に 0 に落ちて、半径の短い光源 (下限 7) で最後の 1 ブロックの落ちが急だった (26.1.2 の床の測定で 1 ブロックの落ち方の変わりが
+ * アメジスト x1.82 -> x1.36、ヒカリゴケ x1.86 -> x1.47)
  */
 float lightFalloff(float dist, float range) {
     float r = max(range, EPS);
     float atRange = 1.0 / (1.0 + r * (LIGHT_FALLOFF_LINEAR + LIGHT_FALLOFF_QUADRATIC * r));
-    float v = 1.0 / (1.0 + dist * (LIGHT_FALLOFF_LINEAR + LIGHT_FALLOFF_QUADRATIC * dist)) - atRange * (dist / r);
-    return max(v, 0.0) * LIGHT_FALLOFF_NORM;
+    float g = 1.0 / (1.0 + dist * (LIGHT_FALLOFF_LINEAR + LIGHT_FALLOFF_QUADRATIC * dist));
+    float v = max(g - atRange * (dist / r) * (dist / r), 0.0);
+    return v * v / g * LIGHT_FALLOFF_NORM;
 }
 #else
 /*
