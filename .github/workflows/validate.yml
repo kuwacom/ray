@@ -28,6 +28,8 @@ jobs:
 
       - run: uv sync --frozen
 
-      # --full は CI の runner では終わらないほど遅いので、既定値・world0 の簡易チェックだけにする (--full は手元で回す)
+      # 既定値・world0 の簡易チェックだけにする (--full は手元で回す。4 コアで約 6 分)
+      # 4 コアで約 30 秒。止まったときに数時間待たないよう打ち切る
       - name: Validate shaders
+        timeout-minutes: 5
         run: uv run tools/validate_shaders.py
