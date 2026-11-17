@@ -516,8 +516,8 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 |---|---|---|---|---|---|---|---|---|---|---|
 | VOXEL_VOLUME | 2 | **0** | **1** | 2 | 2 | 2 | 2 | 2 | **3** | **3** |
 | FLOODFILL | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
-| LIGHT_RANGE_MAJOR_MIN | 12.0 | **7.0** | **7.0** | **7.0** | **7.0** | 12.0 | 12.0 | 12.0 | 12.0 | 12.0 |
-| LIGHT_RANGE_MINOR_MIN | 12.0 | **7.0** | **7.0** | **7.0** | **7.0** | 12.0 | 12.0 | 12.0 | 12.0 | 12.0 |
+| LIGHT_RANGE_MAJOR_MIN | 12.0 | **7.0** | **7.0** | **7.0** | 12.0 | 12.0 | 12.0 | 12.0 | 12.0 | 12.0 |
+| LIGHT_RANGE_MINOR_MIN | 12.0 | **7.0** | **7.0** | **7.0** | 12.0 | 12.0 | 12.0 | 12.0 | 12.0 | 12.0 |
 | LIGHT_SHADOWS | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
 | LIGHT_TRACE_COUNT | 4 | **1** | **2** | **2** | 4 | 4 | **8** | **8** | **16** | **16** |
 | LIGHT_TRACE_RES | 2 | **4** | 2 | **4** | **4** | 2 | **1** | 2 | 2 | **1** |
