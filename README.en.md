@@ -75,6 +75,7 @@ Older Iris versions differ from newer ones in the following ways (newer Iris ver
 - Entity shadows and voxelization: there is no dedicated shadow pass (Iris before 1.8, and Oculus), so the terrain also goes through the same geometry shader. On 1.20.1 this added 1.6-2 ms in a scene looking down over a forest
 - Detecting yourself: `current_player` does not exist (Iris before 1.8, and Oculus), so you are identified by the distance from the position of your eyes. Other players within 1.6 blocks of your body are also treated as you
 - Lightning: Oculus lights lightning through another path (`gbuffers_entities`)
+- Analog: not checked in the game on Iris 1.7 and Oculus (only compile and link have been checked)
 
 ## Installation
 
@@ -112,6 +113,7 @@ If you use a clone of the repository, put the folder that directly contains `sha
 | Materials | labPBR, normal maps, normals generated from textures, POM, subsurface scattering, rain puddles |
 | Water and reflections | Waves and parallax, refraction (screen space / ray traced), caustics, SSR and rough reflections, voxel fill-in for reflections, underwater light shafts and the glow around light sources (turquoise in shallow water, deep blue in deep water) |
 | Camera | 6 tone maps including AgX (default), an HDR mode (local tone mapping that darkens bright areas and brightens dark ones, like a phone's HDR photo), histogram-based auto exposure (adapts at different speeds when getting brighter and when getting darker), MIP-Bokeh depth of field and autofocus, TAA, motion blur, bloom, lens flare, color grading (shadows / midtones / highlights, lift / gamma / gain, per-hue adjustments, tone curve, split toning, ASC CDL), a blue shift in the dark, film grain |
+| Analog | Makes the image look like a 2000s CCD camcorder (MiniDV, Digital8, HDV): vertical smear and blooming, the video knee and clipping (in place of the tone map), DV chroma subsampling, interlacing, soft resolution and edge enhancement, sensor noise that grows in the dark, DV block and mosquito noise, and tape dropouts. Pick one of 6 camera presets and turn each effect off as you like. Turn it on in the Analog screen of the settings (off by default). It adds 2 passes when on |
 
 The techniques and sources for each feature are in [docs/architecture.md](docs/architecture.md) (in Japanese) and [CREDITS.md](CREDITS.md) (in Japanese)
 

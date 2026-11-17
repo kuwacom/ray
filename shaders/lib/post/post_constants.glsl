@@ -429,4 +429,66 @@ const float LENS_VIS_OFFSCREEN = 0.25;
 const float LENS_VIS_EYE_FADE = 0.05;
 // フィルムグレインの振幅 (sRGB) は設定 FILM_GRAIN。既定はデジカメのセンサーノイズ程度の微弱な値
 
+// アナログ (ANALOG OFF の本文に残さない)
+#ifdef ANALOG
+// インターレースのフィールドのずれを、フレームの長さで割る時の下限 (秒)。止まった直後の極端に短いフレームで割り過ぎない
+const float ANALOG_FRAME_TIME_MIN = 0.001;
+// 1 フィールドのずれの上限 (出力の px)。視点の瞬間移動で読む位置が大きく飛ばない。見た目の調整値
+const float ANALOG_INTERLACE_MAX_PX = 24.0;
+// 解像のガウスの幅 (仮想の画素 / 走査線)。形式の 1 画素の開口に近い見た目の調整値。縦はケル係数で広げる
+const float ANALOG_SOFT_SIGMA_X = 0.5;
+const float ANALOG_SOFT_SIGMA_Y = 0.5;
+// インターレースの縦の実効の解像 (ケル係数)
+const float ANALOG_KELL = 0.7;
+// 輪郭強調の強さ 1 の時の倍率と、強調しない細かい揺らぎ (コアリング) の幅 (表示値の Y')。見た目の調整値
+const float ANALOG_SHARPEN_GAIN = 0.8;
+const float ANALOG_SHARPEN_CORING = 0.01;
+/*
+ * スミアの露出連動: 暗い場面 (適用 EV が DARK 以下、シャッター 1/60 秒) を倍率 1 とし、晴天 (DAY 以上) で 2^AP_SMEAR_SHUTTER_STOPS 倍まで強める
+ * Ray の適用 EV は補正を緩める曲線 (EXPOSURE_CURVE) を通るので、晴天でも上限 EXPOSURE_MAX_EV に届かない
+ * (26.1.2 の実測で晴天 0.35〜0.5、夕日 0、洞窟 -1.2、夜の村 -2.6)。上限から測ると一度も効かないので実測の値で置く
+ */
+const float ANALOG_SMEAR_SHUTTER_EV_DARK = -2.0;
+const float ANALOG_SMEAR_SHUTTER_EV_DAY = 0.0;
+// センサーのノイズの強さ 1 の時の線形の振幅 (表示値を Rec.709 の逆で線形へ戻した単位)。見た目の調整値
+// 解像の 3x3 がノイズも平均するので、その後で 26.1.2 の夜の村の暗部の輝度のノイズがプリセット 1 で約 2/255 になるようにした
+const float ANALOG_SHOT_NOISE_SCALE = 0.08;
+const float ANALOG_DARK_NOISE_SCALE = 0.0066;
+const float ANALOG_CHROMA_NOISE_SCALE = 0.021;
+// 乱数の種類ごとの salt (hash3 の第 3 成分 = フィールドの番号 x ANALOG_SEED_COUNT + salt。種類どうしが同じ入力を共有しない)
+const uint ANALOG_SEED_COUNT = 10u;
+const uint ANALOG_SEED_SHOT_Y = 0u;
+const uint ANALOG_SEED_SHOT_RGB = 1u;
+const uint ANALOG_SEED_DARK = 2u;
+const uint ANALOG_SEED_CHROMA = 3u;
+const uint ANALOG_SEED_FPN_PIXEL = 4u;
+const uint ANALOG_SEED_FPN_COLUMN = 5u;
+const uint ANALOG_SEED_HOT = 6u;
+const uint ANALOG_SEED_MOSQUITO = 7u;
+const uint ANALOG_SEED_DROPOUT_EVENT = 8u;
+const uint ANALOG_SEED_DROPOUT_BLOCK = 9u;
+// 固定パターンノイズとホットピクセルの強さ 1 の時の線形の振幅。ゲインで増え、暗い場面でだけ見える大きさにした見た目の調整値
+const float ANALOG_FPN_SCALE = 0.004;
+const float ANALOG_HOT_PIXELS_SCALE = 0.03;
+// DV の DCT のブロックの大きさ (仮想の輝度の画素)
+const float ANALOG_BLOCK_SIZE = 8.0;
+// ブロックの強さ 1 の時に捨てる細部の幅 (表示値の Y')。モスキートの強さ 1 の時の倍率。見た目の調整値
+const float ANALOG_BLOCK_DEADZONE = 0.015;
+const float ANALOG_MOSQUITO_GAIN = 0.5;
+// 1 回のドロップアウトが続くフィールドの数 (見た目の調整値。1 フィールドでは視点を回していても見えない)
+const uint ANALOG_DROPOUT_FIELDS = 4u;
+// Rec.709 の OETF の係数 (V = 4.5 L (L < 0.018)、1.099 L^0.45 - 0.099)
+const float ANALOG_REC709_SLOPE = 4.5;
+const float ANALOG_REC709_SCALE = 1.099;
+const float ANALOG_REC709_EXPONENT = 0.45;
+const float ANALOG_REC709_BREAK = 0.018;
+// ビデオの記録の上限 (109 %。ニーは AP_KNEE_RANGE 段分の明部をここまでに収める)
+const float ANALOG_KNEE_CLIP = 1.09;
+// 109 % の表示の扱い 0 = 109 % まで記録して表示は 100 % で切る (PC で DV を見た時の扱い) 1 = 109 % を表示の 1.0 に写す
+// #351 で 0 に決まった。1 は比べる撮影を撮り直す時のために残す (定数の #if で外れ、0 の本文には入らない)
+#define ANALOG_KNEE_SUPERWHITE_MODE 0
+// ブルーミングの片側のタップの数 (見た目の調整値。長さ 16 でも 4 本おきに読む)
+const int ANALOG_BLOOMING_TAPS = 4;
+#endif
+
 #endif

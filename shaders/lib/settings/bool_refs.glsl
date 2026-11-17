@@ -184,5 +184,39 @@
 #endif
 #ifdef SELECTION_OUTLINE
 #endif
+#ifdef ANALOG
+#endif
+#ifdef ANALOG_SMEAR
+#endif
+#ifdef ANALOG_BLOOMING
+#endif
+#ifdef ANALOG_RESOLUTION
+#endif
+#ifdef ANALOG_KNEE
+#endif
+#ifdef ANALOG_SHARPEN
+#endif
+#ifdef ANALOG_NOISE
+#endif
+#ifdef ANALOG_SHOT_NOISE
+#endif
+#ifdef ANALOG_DARK_NOISE
+#endif
+#ifdef ANALOG_CHROMA_NOISE
+#endif
+#ifdef ANALOG_FPN
+#endif
+#ifdef ANALOG_HOT_PIXELS
+#endif
+#ifdef ANALOG_INTERLACE
+#endif
+#ifdef ANALOG_BLOCK
+#endif
+#ifdef ANALOG_MOSQUITO
+#endif
+#ifdef ANALOG_DROPOUT
+#endif
+#ifdef ANALOG_CHROMA
+#endif
 
 #endif // SETTINGS_BOOL_REFS_GLSL

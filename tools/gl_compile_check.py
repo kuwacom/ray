@@ -1019,6 +1019,8 @@ def main() -> int:
     static_problems: list[str] = []
     seen_static: set[str] = set()
     report_rows: list[tuple[str, dict[str, int]]] = []
+    # どれかの設定で shaders.properties が確保した binding (設定で確保を外す SSBO は、確保の無い設定では宣言するプログラムも無い)
+    allocated_bindings: set[int] = set()
 
     try:
         for cfg_name, ov, worlds in configs:
@@ -1026,6 +1028,7 @@ def main() -> int:
             prop_lines = preprocess_properties(vs.PROPERTIES, macros)
             disabled = unread_programs(ov, options, env)
             buffer_sizes = buffer_object_sizes(prop_lines)
+            allocated_bindings |= buffer_sizes.keys()
             for p in check_properties(prop_lines, limits):
                 if p not in seen_static:
                     seen_static.add(p)
@@ -1123,7 +1126,7 @@ def main() -> int:
     # 全プログラムをリンクした時だけ、大きさなしの配列の検査が抜けていないか見る (キャッシュや絞り込みで省いたプログラムは見ていない)
     if glslang and not args.filter and not sections and persisted == 0 and checked:
         for binding, const in sorted(ssbo_tail_counts().items()):
-            if binding not in TAIL_CHECKED:
+            if binding in allocated_bindings and binding not in TAIL_CHECKED:
                 static_problems.append(f"SSBO binding {binding}: 要素数 {const} を定義したプログラムが無く、確保量と比べられなかった")
 
     if args.report:

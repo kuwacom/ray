@@ -64,6 +64,18 @@
 | 単調な 3 次補間 (トーンカーブ) | Fritsch & Carlson, "Monotone Piecewise Cubic Interpolation", SIAM J. Numer. Anal. 1980 / Fritsch & Butland 1984 | lib/post/color_grade.glsl |
 | 水の法線の 3 次 B スプラインを双線形 4 回で引く | Sigg & Hadwiger, "Fast Third-Order Texture Filtering", GPU Gems 2, 2005 | lib/common/water_waves.glsl |
 | 水面のきらめきの鏡面点の密度と曲率 | Longuet-Higgins, "Reflection and refraction at a random moving surface", J. Opt. Soc. Am. 1960 | lib/common/water_glitter.glsl |
+| CCD の縦スミア (スミア比 = 転送時間 / 蓄積時間、蓄積時間に反比例する露出連動) | Stanford EE392B Lecture 3 (A. El Gamal) | lib/post/analog.glsl, program/post/analog_smear.csh |
+| 上下に伸びる淡い白い縦スミアと暗い被写体の白点、素子の世代でスミアが違う向き | Sony SSC-CD47P 取扱説明書 (Typical CCD Phenomena)、Sony SSC-DC54AP データシート | lib/post/analog.glsl, analog_presets.glsl |
+| CCD スミアを独立の効果にする発想 | BadCamera (rosarydigital) の発想のみ (コードは不使用) | lib/post/analog.glsl |
+| DV の色差の間引き (4:1:1 / 4:2:0)・標本の位置と、形式の数値 | Adam Wilt, "DV FAQ (technical)"、AviSynth+ documentation の Sampling、Wikipedia の DV / HDV / Chroma subsampling の項 | lib/post/analog.glsl, analog_formats.glsl |
+| Y'CbCr の係数と Rec.709 の OETF | ITU-R BT.601 / BT.709、Telestream, "A Guide to Standard and High-Definition Digital Video Measurements" | lib/post/analog.glsl |
+| インターレースの櫛・フィールドの順とケル係数 | Wikipedia の Interlaced video / Kell factor の項、dvmp.co.uk, "Digital Video and Field Order" | lib/post/analog.glsl, analog_formats.glsl, post_constants.glsl |
+| ビデオカメラの輪郭強調とコアリング、ニーの点 | The Broadcast Bridge, "Creating Video Looks Using Camcorder Image Adjustments"、Sony EXST_EN09 | lib/post/analog.glsl |
+| ビデオのニーとホワイトクリップ 109 % | Sony のカメラ機能活用集 (KNEE)・CSTGB05-0 | lib/post/analog.glsl |
+| センサーのノイズ (ショットノイズ・暗電流と読み出し・固定パターンノイズ・ホットピクセル)、色ノイズの暗部への偏り | Teledyne, "Dark Current" / "Camera Test Protocol"、Wikipedia の Fixed-pattern noise / Defective pixel の項、Kodak KAI-16050 データシート (縦縞の向き)、AV Artifact Atlas の Chrominance Noise | lib/post/analog.glsl |
+| DV の 8x8 のブロック・モスキートノイズ・動いた所のブロック | Adam Wilt, "DV FAQ" / "DV Pix - Image Artifacts"、AV Artifact Atlas の Mosquito Noise | lib/post/analog.glsl |
+| テープのドロップアウトの隠し方とブロックの散らばり | Bristol Theatre Collection, "Preserving video from MiniDV tapes"、dvinfo.net, "Consumer Digital Video Recording and Data Formats" | lib/post/analog.glsl |
+| CCD のブルーミング (飽和容量を超えた電荷が隣の画素へあふれる) | Evident Scientific, "CCD Blooming"、Oxford Instruments, "CCD Blooming and Anti Blooming"、Adimec, "Blooming suppression and Smear rejection with CCD machine vision cameras" | lib/post/analog.glsl |
 
 ## レンズの処方の出典
 

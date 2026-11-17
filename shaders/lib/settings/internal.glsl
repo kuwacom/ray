@@ -3,6 +3,7 @@
 
 //@include "/lib/settings/light.glsl"
 //@include "/lib/settings/surface.glsl"
+//@include "/lib/settings/post.glsl"
 
 // Iris の定数 (設定画面には出さない)
 const float ambientOcclusionLevel = 1.0;
@@ -56,6 +57,30 @@ const int noiseTextureResolution = 256;
 #ifndef HAND_LIGHT
     #undef HAND_LIGHT_RAYS
     #undef HAND_LIGHT_SS_SHADOWS
+#endif
+
+// ANALOG はアナログの段の総スイッチ。外れていれば効果ごとのスイッチも全部無効にする
+#ifndef ANALOG
+    #undef ANALOG_SMEAR
+    #undef ANALOG_CHROMA
+    #undef ANALOG_RESOLUTION
+    #undef ANALOG_SHARPEN
+    #undef ANALOG_INTERLACE
+    #undef ANALOG_NOISE
+    #undef ANALOG_BLOCK
+    #undef ANALOG_MOSQUITO
+    #undef ANALOG_DROPOUT
+    #undef ANALOG_KNEE
+    #undef ANALOG_BLOOMING
+#endif
+
+// ANALOG_NOISE はセンサーのノイズ 5 種 (ショット・暗部・色・固定パターン・ホットピクセル) の総スイッチ
+#ifndef ANALOG_NOISE
+    #undef ANALOG_SHOT_NOISE
+    #undef ANALOG_DARK_NOISE
+    #undef ANALOG_CHROMA_NOISE
+    #undef ANALOG_FPN
+    #undef ANALOG_HOT_PIXELS
 #endif
 
 // 三角形方式のエンティティ遮蔽 (lib/light/entity_tri.glsl)。遮蔽が両方 OFF なら三角形も書かない

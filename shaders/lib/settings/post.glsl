@@ -189,6 +189,70 @@
 #define PURKINJE_STRENGTH 0.3 // [0.0 0.1 0.2 0.3 0.5 0.75 1.0] 暗所の青シフト
 #define FILM_GRAIN 0.008 // [0.0 0.004 0.008 0.015 0.03 0.05 0.1]
 #define SELECTION_OUTLINE // ブロック選択枠
+/*
+  アナログ (2000 年代の民生 CCD ビデオカメラの画)。ANALOG が総スイッチで、OFF なら追加のパスも止まり final は今と同じになる
+  プリセット (ANALOG_PRESET) が詳細の値 AP_* (lib/post/analog_presets.glsl) を決め、効果ごとの ON/OFF は常に効く
+  詳細の値 (ANALOG_C_*) は ANALOG_PRESET = 0 (カスタム) の時だけ使い、既定値はプリセット 1 の値にそろえる
+  番号は後ろに足していき、既存の番号は変えない (ユーザーの保存値を保つ)
+*/
+//#define ANALOG // アナログ領域
+#define ANALOG_PRESET 1 // [0 1 2 3 4 5 6] 0=カスタム 1=標準の MiniDV 2=安いコンパクトのビデオ 3=暗い所の自動ゲイン 4=古い Digital8 5=HDV 1080i 6=PAL の MiniDV
+#define ANALOG_SMEAR // CCD の縦スミア (明るい光の列に上下へ伸びる淡い筋)
+#define ANALOG_SMEAR_LIGHT_STRENGTH 1.0 // [0.0 0.5 1.0 1.5 2.0 3.0 5.0] 灯りの筋の強さ (機材によらず効く)。機材の灯りの倍率に掛ける。0 = 灯りの筋なし
+#define ANALOG_C_SMEAR_RATIO 0.1 // [0.0003 0.001 0.003 0.01 0.03 0.1 0.3 1.0] スミア比 (%)。列が一様に照らされた時の信号に対する筋の比
+#define ANALOG_C_SMEAR_TINT_MODE 1 // [0 1] 筋の色 0=光の色 1=白
+#define ANALOG_C_SMEAR_SHUTTER_STOPS 1 // [0 1 2 3 4] 明るい場面でシャッターが速くなる幅 (段)。暗い場面から晴天までの間で筋が 2^段 倍まで強まる。0 = 露出に連動しない
+#define ANALOG_C_SMEAR_LIGHT_THRESHOLD 8.0 // [2.0 4.0 8.0 16.0 32.0 64.0] 灯りの筋が出始める明るさ (露出の後の白の倍数)
+#define ANALOG_C_SMEAR_LIGHT_GAIN 200.0 // [0.0 5.0 10.0 20.0 50.0 100.0 200.0 500.0] 灯りの明るさがしきい値を超えた分に掛ける倍率。0 = 灯りの筋なし
+#define ANALOG_BLOOMING // CCD のブルーミング (飽和した明るい点から上下へあふれる白)
+#define ANALOG_C_BLOOMING_LENGTH 0 // [0 2 4 8 16] あふれの届く長さ (仮想の走査線)。0 = 掛けない
+#define ANALOG_C_BLOOMING_THRESHOLD 1.0 // [0.5 0.75 1.0 1.5 2.0 4.0] あふれ始める明るさ。1 = 記録の上限 (ニーが ON ならニーで収まる上限、OFF なら白)
+#define ANALOG_RESOLUTION // 形式の画素数と走査線まで解像を落とす
+#define ANALOG_C_RESOLUTION_H 1.0 // [0.5 0.75 1.0 1.25 1.5 2.0] 横の甘さ (1 = 形式の画素数、大きいほど甘い)
+#define ANALOG_C_RESOLUTION_V 1.0 // [0.5 0.75 1.0 1.25 1.5 2.0] 縦の甘さ (1 = 走査線とケル係数)
+#define ANALOG_KNEE // ビデオのニーと白飛び (トーンマップの代わりに掛かる)
+#define ANALOG_C_KNEE_POINT 0.8 // [0.7 0.75 0.8 0.85 0.9 0.95 1.0] ニーの始まり (表示値)。低いほど明部が早く寝る
+#define ANALOG_C_KNEE_RANGE 2.0 // [1.0 1.5 2.0 2.5 3.0] ニーで記録の上限 (109 %) に収める明部の幅 (段)
+#define ANALOG_SHARPEN // カメラの輪郭強調 (縁の白と黒のハロー)
+#define ANALOG_C_SHARPEN_STRENGTH 1.0 // [0.0 0.5 1.0 1.5 2.0 3.0 4.0]
+#define ANALOG_C_SHARPEN_RADIUS 1.0 // [0.5 1.0 1.5 2.0 3.0] ハローの幅 (仮想の画素)
+#define ANALOG_C_SHARPEN_CORING 1.0 // [0.0 0.5 1.0 2.0 4.0] 細かい揺らぎを強調しないしきい値の倍率
+#define ANALOG_NOISE // センサーのノイズ (ショット・暗部・色・固定パターン・ホットピクセル) の総スイッチ。ON の間はフィルムグレインを掛けない
+#define ANALOG_NOISE_STRENGTH 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0] ノイズ 5 種すべての強さ (機材によらず効く)
+#define ANALOG_C_AGC_MAX 2 // [0 1 2 3 4] 暗い場面で自動ゲインが上げる上限 (段)
+#define ANALOG_C_AGC_EV -1.0 // [-4.0 -3.0 -2.0 -1.0 0.0 1.0 2.0] ゲインが上がり始める適用 EV
+#define ANALOG_SHOT_NOISE // ショットノイズ (光の粒の揺らぎ。明るさの平方根で増える)
+#define ANALOG_C_SHOT_NOISE_STRENGTH 1.0 // [0.0 0.25 0.5 1.0 1.5 2.0 3.0]
+#define ANALOG_C_SHOT_NOISE_CHROMA 0.5 // [0.0 0.25 0.5 0.75 1.0] 粒の色の混ざり 0=輝度だけ 1=RGB ごと
+#define ANALOG_DARK_NOISE // 暗部ノイズ (読み出しと暗電流の揺らぎを自動ゲインが増幅)
+#define ANALOG_C_DARK_NOISE_STRENGTH 1.0 // [0.0 0.25 0.5 1.0 1.5 2.0 3.0]
+#define ANALOG_C_DARK_NOISE_SIZE 1.0 // [1.0 1.5 2.0 3.0] 粒の大きさ (仮想の画素)
+#define ANALOG_CHROMA_NOISE // 色ノイズ (色差に乗る斑点。4:1:1 では横長)
+#define ANALOG_C_CHROMA_NOISE_STRENGTH 1.0 // [0.0 0.25 0.5 1.0 1.5 2.0 3.0]
+#define ANALOG_C_CHROMA_NOISE_SHADOW 2.0 // [0.0 1.0 2.0 3.0 4.0] 暗部への偏り (指数。0 = 明るさによらない)
+#define ANALOG_C_CHROMA_NOISE_SIZE 1.0 // [1.0 1.5 2.0 3.0] 斑点の大きさ (色差の標本)
+#define ANALOG_FPN // 固定パターンノイズ (画素ごとのむらと縦縞。画面に固定)
+#define ANALOG_C_FPN_STRENGTH 0.0 // [0.0 0.25 0.5 1.0 2.0] 0 = 掛けない
+#define ANALOG_C_FPN_COLUMN 0.5 // [0.0 0.25 0.5 0.75 1.0] 縦縞の割合 0=画素ごとだけ 1=縦縞だけ
+#define ANALOG_HOT_PIXELS // ホットピクセル (暗い場面で光る白点。画面に固定)
+#define ANALOG_C_HOT_PIXELS_DENSITY 0.0 // [0.0 0.0001 0.0003 0.001 0.003] 白点の画素の割合。0 = 掛けない
+#define ANALOG_C_HOT_PIXELS_BRIGHTNESS 1.0 // [0.25 0.5 1.0 2.0 4.0]
+#define ANALOG_INTERLACE // インターレース (視点を動かした時の櫛状のズレ)
+#define ANALOG_INTERLACE_MODE 0 // [0 1] 見せ方 0=織り込み (PC で見た DV) 1=フィールド表示 (テレビ。細かい横縞がちらつく)
+#define ANALOG_C_INTERLACE_STRENGTH 1.0 // [0.0 0.5 1.0 1.5 2.0 3.0] 1 = 1 フィールド分の時間差
+#define ANALOG_BLOCK // DV のブロックノイズ (8x8 の境目の段差と細部の消え。格子は画面に固定)
+#define ANALOG_C_BLOCK_STRENGTH 1.0 // [0.0 0.25 0.5 1.0 1.5 2.0 3.0] 細部を捨てる量。0 = 掛けない
+#define ANALOG_C_BLOCK_MOTION 1.0 // [0.0 0.5 1.0 2.0 4.0] 動いた所で細部がさらに消える量
+#define ANALOG_MOSQUITO // モスキートノイズ (縁の周りでちらつく細かい斑点)
+#define ANALOG_C_MOSQUITO_STRENGTH 1.0 // [0.0 0.25 0.5 1.0 1.5 2.0 3.0] 0 = 掛けない
+#define ANALOG_C_MOSQUITO_EDGE 0.05 // [0.0 0.02 0.05 0.1 0.2] 斑点が出始める縁の強さ (表示値の段差)
+#define ANALOG_DROPOUT // テープのドロップアウト (散ったブロックが一瞬 1 フレーム前の像になる。視点が動いている時だけ見える)
+#define ANALOG_C_DROPOUT_RATE 1.0 // [0.0 1.0 2.0 5.0 10.0 20.0 30.0 60.0] 1 分あたりの回数。0 = 掛けない
+#define ANALOG_C_DROPOUT_AMOUNT 0.1 // [0.02 0.05 0.1 0.2 0.5] 1 回で隠されるブロックの割合
+#define ANALOG_C_FORMAT_MODE 0 // [0 1 2] 記録の形式 0=NTSC DV 1=PAL DV 2=HDV 1080i
+#define ANALOG_CHROMA // 色差の間引き (形式で 4:1:1 か 4:2:0)
+#define ANALOG_C_CHROMA_STRENGTH 1.0 // [0.0 0.25 0.5 0.75 1.0] 1 = 形式どおり。下げると元の色と混ぜる
+#define ANALOG_C_CHROMA_UPSAMPLE_MODE 0 // [0 1] 間引いた色の戻し方 0=補間 1=最近傍
 #define DEBUG_VIEW 0 // [0 1 2 3 4 5 6 7 8 9 10 11 12]
 
 #endif

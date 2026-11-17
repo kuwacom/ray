@@ -127,7 +127,9 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 35 | composite23.vsh/fsh | post | ブルーム縮小タイル、局所トーンマップの log2 輝度のタイル | colortex0 ミップ | colortex14 | 画面 | BLOOM または LOCAL_TONEMAP > 0 |
 | 36 | composite24.vsh/fsh | post | ブルームぼかし | colortex14 | colortex14 | 画面 | BLOOM または LOCAL_TONEMAP > 0 |
 | 37 | composite25.csh | post | 自動露出 (ヒストグラム。屋外の夜の持ち上げは画面の暗い側の計測で決める) + オートフォーカス | colortex0, centerDepthSmooth | SSBO0 exposure/focus/histogram | local 16², (1,1,1) | 常時 |
-| 38 | final.vsh/fsh | post | 歪曲と魚眼の再投影・ブルーム合成・点像の芯と裾・フレア・露出・局所トーンマップ・AgX・色調整・CAS・ディザ・デバッグ表示 | colortex0/8/13/14, SSBO0 | 画面 | 画面 | 常時 |
+| 38 | composite26.csh | post | アナログの縦スミア: colortex0 (露出前の線形、DoF・MB の後) の列ごとの平均 (1 列を 1 グループで閉じて求める) | colortex0 | SSBO6 columns | local 8x32, (1024,1,1) | ANALOG かつ ANALOG_SMEAR |
+| 39 | composite27.vsh/fsh | post | アナログの現像: final の本体 (`post/final.fsh` + `FINAL_DEVELOP_PASS`) の現像まで (ブルーミング (縦のタップで colortex0 を読む) と縦スミアの加算、ニーが ON ならトーンマップの代わりのニーを含む) を表示値で書く。グレイン・デバッグ表示・ディザはしない | colortex0/8/13/14, SSBO0, SSBO6 | colortex0 (表示値) | 画面 | ANALOG |
+| 40 | final.vsh/fsh | post | 歪曲と魚眼の再投影・ブルーム合成・点像の芯と裾・フレア・露出・局所トーンマップ・AgX・色調整・CAS・ディザ・デバッグ表示。ANALOG の時は記録の段 (インターレース (速度で 1 フィールド前の位置を読む) -> センサーのノイズ (ショット・暗部・FPN・ホットピクセル、タップごと、自動ゲインは適用 EV から) -> 解像 -> 輪郭強調 -> ブロックとモスキート (8x8 の仮想の画素、区画の平均はミップ) -> 色差の間引きと色ノイズ。ドロップアウトで隠したブロックは速度で 1 フレーム前の位置を読む。colortex0 のミップ) -> グレイン (センサーのノイズが OFF の時だけ) -> デバッグ表示 -> ディザだけ (本体は composite27) | colortex0/8/13/14/15, depthtex0, SSBO0 | 画面 | 画面 | 常時 |
 
 補足
 - shadowcomp は使わない。floodfill を deferred に置くのは、gbuffers_entities (deferred より前) が登録した画面内のエンティティ光源を同じフレームで取り込むため (voxelEmitImg は毎フレームクリアされる)
@@ -144,7 +146,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 
 | buf | フォーマット | 内容 | 書く | 読む | クリア |
 |---|---|---|---|---|---|
-| 0 | RGBA16F | シーン HDR。空テクスチャ (skybasic/skytextured) -> deferred30 -> composite* -> final | sky(空), surface, sky, post | 全 | 毎フレーム |
+| 0 | RGBA16F | シーン HDR。空テクスチャ (skybasic/skytextured) -> deferred30 -> composite* -> final。ANALOG の時は composite27 が表示値 (0-1) で書き、final がミップで読む | sky(空), surface, sky, post | 全 | 毎フレーム |
 | 1 | RGBA8 | G: rgb アルベド (sRGB エンコード), a マテリアル ID | surface (gbuffers) | 全 | 毎フレーム |
 | 2 | RGBA16 | G: rg テクスチャ法線 (oct), b 幾何法線 (oct 8+8), a ライトマップ (8+8) | surface | 全 | 毎フレーム |
 | 3 | RGBA16 | G: r smoothness+f0, g sss+emission, b ao+wetness, a 予備 | surface | 全 | 毎フレーム |
@@ -237,6 +239,7 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 - 各ブロックの最後の配列は大きさなし (`[]`) で宣言し、確保量は shaders.properties の `bufferObject.N` で決める。NVIDIA のリンクは、使っていなくても宣言された固定長の配列の要素数に比例して時間がかかり (`binLights` が 266 万要素あった時は main が空のプログラムでも vs+fs で 7-10 秒)、全プログラムに入るので読み込み全体が数倍になる
 - 大きさなしの配列の要素数は宣言の行の注記 `// 要素数: <定数>` に書き、添字の上限もその定数で見る (`.length()` は使わない)。`tools/gl_compile_check.py` が注記を読み、配列の先頭 + 要素の間隔 x 要素数が `bufferObject.N` に収まるかをプログラムごとに確かめる
 - `lib/buffers/` には設定の値を入れない (宣言を読む全プログラムで、設定の値が前処理後の本文に残ると、その設定を変えるたびにドライバのキャッシュが外れる)。設定で変わる大きさ (`GLOBAL_LIGHTS_MAX`, `LIGHT_BIN_CAPACITY` / `STRIDE` / `STRIDE_ALLOC` / `GRID`, `LIGHT_BIN_KEYS_ALLOC`) は `lib/light/light_bins.glsl` に置き、`lib/light/light.glsl` を宣言するプログラム (world0 で 23 個) だけが読む。LIGHT_BIN_LIGHTS・LIGHT_MAX_COUNT・LIGHT_CULL_MODE を変えた時に作り直すのはこの 23 個 (前は 53 個全部)。VOXEL_VOLUME は `lib/common/voxel_space.glsl` の `VOXEL_SIZE` が全プログラムに入るので、まだ全部作り直しになる
+- 例外: `analog_smear.glsl` は設定を `defined ANALOG && defined ANALOG_SMEAR` だけで見て宣言を入れるかを決める (値は本文に残さない)。ANALOG が OFF の final に SSBO 6 の宣言を入れず、本文を変えないため
 - ブロックの途中の配列 (`albedo`, `lights`, `binCount`, `entityAcc`, `groupBounds`, `clusterBounds`) は固定長のまま。合わせても 1 プログラム 0.4 秒程度で、並べ替えるとレイアウトが変わるので動かしていない
 
 | binding | 名前 (アクセサ) | ファイル | サイズ | 内容 | 書くプログラム (`SSBO_<名前>_WRITE`) |
@@ -247,7 +250,8 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 | 3 | LightBinsBuffer (`lightBins`) | `light_bins.glsl` | 10944512 (LIGHT_BIN_LIGHTS > 64 で 21430272) | `binCount[40960]`, `entityAcc[32768]` (エンティティ光源の蓄積表), `binLights[]` (40960 x 65 個、> 64 で x 129)。ビン = 8³ ブロック、1 ビン LIGHT_BIN_LIGHTS + 1 枠。枠のキー = 重要度 19 bit + 光源インデックス 13 bit | `LIGHT_BINS`: setup, begin, deferred_a, shadow_entities・shadow_block の gsh と gbuffers_entities・gbuffers_entities_translucent の vsh (蓄積表) |
 | 4 | EntityTriangleBuffer (`entityTris`) | `entity_tris.glsl` | 838672 | `counts[4]`, `groupBounds`, `clusterBounds` + `EntityTriangle tris[]` (16384 個) (ボクセル空間の三角形 v0/e1/e2 + アルファマスク + テクスチャ x 頂点色の平均の色) | `ENTITY_TRIS`: begin (クリア), shadow_entities・shadow_block の gsh |
 | 5 | FireworkLightBuffer (`fireworkLight`) | `firework_light.glsl` | 64 | `posRadius` (花火の光の player 空間の位置, 広がりの半径。0 = 光っていない), `intensity` (放射強度), `acc[]` (光る粒の固定小数点の和 8 個: 数, 重み, 位置 x 重み, 色 x 重み) | `FIREWORK_LIGHT`: begin (光を決めて acc を空にする), gbuffers_particles_translucent の vsh (acc に足す)。MC 26.1 未満の Iris は gbuffers_particles の vsh も足す (`FX_SPARKS_IN_PARTICLES`) |
-| 6-8 | - | - | - | 予備 (Iris 1.7 と Oculus の `bufferObject` の添字は 8 まで。最新の Iris は 12 まで) | - |
+| 6 | AnalogSmearBuffer (`analogSmear`) | `analog_smear.glsl` | 131072 (ANALOG かつ ANALOG_SMEAR の時だけ確保) | `vec4 columns[]` (8192 列。rgb = colortex0 の列の平均 (露出前の線形。空でない画素は露出の後の明るさがしきい値を超えた分を灯りの倍率で増やしてから足す)、a 予備)。宣言は opt-in: 読むプログラム (composite27 の現像) は `SSBO_ANALOG_SMEAR_USE` を定義し、ANALOG と ANALOG_SMEAR の時だけブロックが入る | `ANALOG_SMEAR`: composite26 |
+| 7-8 | - | - | - | 予備 (Iris 1.7 と Oculus の `bufferObject` の添字は 8 まで。最新の Iris は 12 まで) | - |
 
 world0 の既定値で SSBO を 1 つも宣言しないのは 17 プログラム (gbuffers の 14 と composite21/23・deferred11)。frameData だけを宣言するのは 13 プログラム (prepare・prepare1/2・setup1/2・composite20/22/24/25・deferred20/21・gbuffers_lightning/skytextured)。光源モジュール (`lib/light/light.glsl`) を読むプログラムは 0-4 の 5 つを宣言する。花火の光 (5) は FIREWORK_LIGHT の時だけ、begin・gbuffers_particles_translucent・deferred30・composite19 が宣言する
 
@@ -469,6 +473,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | 雲の形のプリセット | CLOUD_STYLE 0 はカスタム (CLOUD_S_*)、1 は Ray (既定)、2 Bliss 風、3 バニラの形、4 現実に忠実、5 綿あめ、6 入道雲、7 まばらな晴天積雲、8 層積雲の曇り。`lib/sky/cloud_styles.glsl` の `#if` で基準値 CS_* (晴天の層ごとの雲量、低層の大きさ・背丈・対流・雲種・晴れ間・こぶ・浸食・雲底・断片雲・もや・縁・濃さ・芯、こぶの陰・銀の縁・powder・日光・多重散乱・空の光・雲底の暗さ) を差し替え、既存の CLOUD_* の設定は CS_* に掛ける。雲量・濃さ・光の値は雨天度で Ray の値へ戻り、雨は全天の雨雲へ移る (雨雲・雷雨はバニラの形を除いてどのスタイルもほぼ同じ。大きさ・こぶなど形の定数は雨雲にも効く)。バニラの形は雨雲へ作り替えず、板の形のまま、雨の強さ (`cloudRainAmount`) に応じて模様の外のマスをマスごとのハッシュの順に埋め、空をほとんど覆う (マクロ CLOUD_RAIN_KEEPS_SHAPE、`VANILLA_CLOUD_RAIN_COVER` 0.95。雷雨も雨と同じ)。この雨天度は、雲の光 (曇天の色・拡散・直達光の減衰) と濃さの倍率、雲の向こうの空を雨雲の層の灰色にする置き換え (雲の隙間から青空や太陽が見えない。カメラが雲の層の上端より上にいる間は掛けず、空の曇天も外して普通の空にする (`cloudRainBelowDeck`)。水面などの反射の空も同じ灰色にそろえ、太陽の円盤の鏡像は隠す。空中遠近で雲の上に戻す色も同じ灰色にして、描く距離の端で天井が向こうの空へ継ぎ目なく溶ける)、雲影マップ全域の太陽の遮りに効かせる。視線の濃さを上げたスタイルは、光源・真上方向の光学的深さを芯の実測の消散係数で頭打ちにする (CLOUD_STYLE_LIGHT_SIGMA_RATIO)。バニラの形 (CLOUD_STYLE=3 と、カスタムの形がバニラの形のとき。マクロ CLOUD_VANILLA_SHAPE) は、バニラの雲のテクスチャ (clouds.png。リソースパックのものに従う) を customTexture の vanillaCloudTex で読み、Iris の `cloudHeight` (下面の高さ) と `cloudTime` (流れ) でバニラと同じ高さ・模様・流れの向きで、バニラの 12 ブロックの 2 倍 (`VANILLA_CLOUD_CELL_SCALE`、24 ブロック) の格子に置く、板の体積雲 (`lib/sky/cloud_vanilla.glsl`、マーチは `cloudMarchVanilla`)。雲は模様のマスごとの同じ厚みの柱 (板雲) で、面はすべて軸に平行 (曲面・形のノイズを持たず、辺と角だけ `VANILLA_CLOUD_CORNER_RADIUS` (3 ブロック) で丸める。0 で四角いまま)。厚みは `CLOUD_VANILLA_THICKNESS` (既定 16 ブロック。格子を大きくしても絶対値のまま) でどのマスも同じ。柱の表 (`cloudWeatherImg`) は prepare2 が毎フレーム作る (マスの有無と空の区画の印。雨の埋まり方も入る)。表に出ている面 (隣のマスが雲でない側面・頭・底) から 2 ブロック (底は 1.8 ブロック) だけ密度を下げて縁を透かし (形は変えない。柔らかさは画素の大きさの 1.5 倍より細かくせず、側面は遠くほど画素の 4.5 倍まで広げる)、視線の消散は `VANILLA_CLOUD_OPACITY` 倍にする。マーチは表の 4x4 マスの区画が空なら区画の箱を、空のマスや頭より上ならマスの箱を DDA で飛ばし、柱の近くだけ細かく歩く。光源方向は光の向きへ表のマスを 1 つずつ渡り、柱の頭より下を通る長さを `VANILLA_CLOUD_LIGHT_REACH` ブロックまで足し (直方体なので長さは厳密。点で読むと影の境目がぎざぎざになる)、真上は柱の頭までの長さの解析値。日向の光には柱の頭の近くだけ緩いむら (`VANILLA_CLOUD_TOP_MOTTLE`) をかけ、上から見た上面に柔らかい明暗を付ける。カメラが柱の縁に近づく間 (縁の外 4 ブロックから) と中にいるときは、視線の消散を `skyParams[7].z` の倍率へ弱める (面から内側へ `VANILLA_CLOUD_INSIDE_DEPTH` (3 ブロック) 入るまでに 0。中の見通しは雲の中の霧が決めるので、縁で壁の消散が白く閉じない。どの段でも同じ)。陰と内散乱の濃さは既定の濃さで頭打ちにする (濃さを上げても底が暗くならない)。底は空の光の青みを抜いた灰白色にして (`VANILLA_CLOUD_SKY_SATURATION`・`VANILLA_CLOUD_BASE_SHADE`)、底は一様な厚みの板の底。雨雲の層の中 (`cloudRainBelowDeck` が 1) では板と雲の中の霧の光を曇天の暗さへ寄せ (`VANILLA_CLOUD_RAIN_SUN` `VANILLA_CLOUD_RAIN_AMBIENT`)、底の暗さを無くして (`VANILLA_CLOUD_RAIN_BASE`。層の中から見下ろす底が霧や地形より暗い影にならないように)、柱の明るさには雲の向こうの曇天の灰色の一定の割合を下限にし (`VANILLA_CLOUD_RAIN_FLOOR` 0.9。雨で空を覆う板が、隙間の曇天の灰色と同じ明るさになる。雷雨も雨と同じ曇天の暗さにする)、散乱の向きを横から見た値へ寄せ (`VANILLA_CLOUD_RAIN_DIFFUSE`)、雲の上に戻す空の色は太陽の暈の無い空の光にして (`VANILLA_CLOUD_RAIN_SKY`。暈が雲の上だけ茶色く浮かない)、雨粒 (weather.fsh) は層の上端より上で薄くして消す。写実の雲 (積雲・中層・上層・積乱雲・雨脚) は一切描かずバニラの形の段だけを描き (雨の日は板を濃くして底を暗くする)、雲影マップにも掛かる。下段の上に、同じ模様を回転・ずらし・間引き・引き伸ばしで別の雲に見せた上の段を重ねる (CLOUD_VANILLA_TIER_COUNT。中段は 8 ブロックの薄い直方体 (格子 36 ブロック、模様を 90 度回して間引く)、上段は 3 ブロックで横に 4 倍引き伸ばした細長いマス。段ごとに流れる向きと速さが違い、高さは下段の底から CLOUD_VANILLA_TIER_HEIGHT の案 (約 190 / 410 ブロック上、または約 70 / 120 ブロック上)。段の列は表を使わず模様から直接求める (vanillaTier)。視線は全段を 1 つの cloudMarchVanilla で入口の近い順に重ね、上の段は雨雲の層の下からは見えない。夜は上の段を暗く薄くし (VANILLA_TIER_NIGHT_GAIN と VANILLA_TIER_NIGHT_THIN。太陽が地平線の十分下で、月明かりの分だけ見えて星空より目立たない)、上段は間引きを 3 マスの塊ごとに決め、側面を広く柔らかくして斜めの辺の階段を薄い縁にぼかし、光のむらは掛けない (薄い板にまだらが出ない)。下段の最初の密度のある点で上の段の影を 1 回だけ求めて、その視線の残りに使う)。積乱雲 (塔と金床) は立てない (CLOUD_CUMULONIMBUS はほかのスタイルの設定)。板の高さにある雲の有無は、prepare2 が毎フレーム作る柱の表 (cloudWeatherImg。テクスチャが 512 より大きいリソースパックでは表を使わず、模様を直接読む) から読む | sky |
 | ルックの LUT | LOOK_LUT 1 はユーザーの PNG ストリップ (`textures/look/user_lut.png`, 32^3, 1024x32, 上の行が緑 0)、2 以降は同梱の 3D LUT (`.dat`, 33^3 RGBA16)。shaders.properties の `#if LOOK_LUT` で `customTexture` を切り替え、final がトーンマップと sRGB エンコードの後、CDL の前に掛ける (sampler は final で 1 個)。作成・変換は `tools/gen_look_lut.py` | post |
 | カラーグレーディング | `lib/post/color_grade.glsl` (final だけ)。Resolve のノードの考え方で、シーンの値 (露出後・トーンマップ前, EV) の段と表示値 (sRGB エンコード後) の段に分ける。シーン: WHITE_BALANCE -> ティント -> オフセット (チャンネルごとの EV) -> CONTRAST とピボット -> 明部の伸び (LK_HIGHLIGHT) -> ゾーン (中間グレーからの EV の境目と柔らかさで分けたシャドー・ミッド・ハイライトの RGB・輝度・コントラスト) -> ハイライトの圧縮・シャドーの持ち上げ (境目の外の EV の差 a を a / sqrt(1 + k a)) -> SATURATION -> ゾーンの彩度・バイブランス・色相ごと 8 色 (Oklab の色相で隣の中心の間を smoothstep で補間、a,b / L で色の薄い所を外す) -> トーンマップ。表示: リフト・ガンマ・ゲイン -> 7 点のトーンカーブ (Fritsch-Butland の単調 3 次エルミート) -> スプリットトーン (Oklab の a,b に L に比例して足す) -> LOOK_LUT -> CDL。設定 GRADE_* とルックのプリセットの基準 LKG_* は和 / 積で重ねる。段ごとの const bool で既定値の段を定数畳み込みで消すので、既定値では前の式と同じ画素 (GPU の格子で全一致を確認)。追加の sampler・パスなし | post |
+| アナログ (CCD ビデオカメラ) | ANALOG (既定 OFF) で 3 段にする。composite26 (compute) が列ごとの平均を SSBO 6 に書き、composite27 (`post/final.fsh` + `FINAL_DEVELOP_PASS`) が final の本体の現像までを表示値で colortex0 に書く。現像の中で、ブルーミング (縦のタップ) と縦スミア (列の平均 x スミア比) を露出の前に足し、ニー (ANALOG_KNEE) が ON ならトーンマップと sRGB の代わりにチャンネルごとの Rec.709 のニーで 109 % まで記録し 100 % で切る。final は記録の段で、colortex0 のミップを読んでインターレース・センサーのノイズ・解像・輪郭強調・ブロックとモスキート・色差の間引きを仮想の形式の画素 (DV は 720 x 480) で掛ける。機材は ANALOG_PRESET (1〜6、0 はカスタム ANALOG_C_*) で `lib/post/analog_presets.glsl` の AP_* を差し替える (LENS_PRESET の型。常に効く値は ANALOG_NOISE_STRENGTH・ANALOG_SMEAR_LIGHT_STRENGTH・ANALOG_INTERLACE_MODE)。値 0 の効果は定数の比較で外れる。プロファイルに載せないので、glslang の検証は validate_shaders.py の検証用の組で行う。設計は `docs/ideas/ccd-analog-look.md` | post |
 
 ---
 
@@ -627,7 +632,7 @@ DEBUG_VIEW の値 (0-12) と表示内容の対応は `shaders/lang/ja_JP.lang` /
 | light (ボクセル・ブロックライト) | ボクセル化、floodfill、光源リスト・ビン、光源シャドウ (DDA)、デノイズ、手持ち光源、エンティティ光源、`traceVoxelRay` (surface の GI / 反射が使う) | `lib/light/*`, `program/light/*` (setup, begin, shadow, shadow_entities / shadow_block, deferred, deferred_a, deferred1, deferred2) |
 | sky (空・大気・雲・フォグ・VL) | 大気 LUT、太陽/月の照度と空の SH、空の描画、星、雲 (体積・2D・影)、高さフォグ、VL、水中フォグ、雨 | `lib/sky/*`, `program/sky/*` (setup1, setup2, prepare, prepare1, prepare2, gbuffers_skybasic / skytextured / clouds / weather, deferred20, deferred21, composite1_a, composite12-14, composite19) |
 | surface (太陽影・GI・マテリアル・水・反射) | gbuffers (不透明/半透明/オーバーレイ)、マテリアル (labPBR・自動法線・POM・揺れ)、BRDF、太陽影、AO・GI、不透明シェーディング (deferred30)、水、反射、半透明合成 | `lib/surface/*`, `lib/common/water.glsl`, `program/surface/*` (gbuffers_* が共有する solid / translucent / overlay, gbuffers_lightning, deferred10, deferred11, deferred30, composite, composite1, composite2_a, composite2) |
-| post (ポストプロセス) | 速度ベクトルの関数、TAA、モーションブラー、DoF、ブルーム、露出、オートフォーカス、トーンマップ、色調整、CAS、レンズフレア、デバッグ表示 | `lib/post/*`, `program/post/*` (composite20-24, composite25, final) |
+| post (ポストプロセス) | 速度ベクトルの関数、TAA、モーションブラー、DoF、ブルーム、露出、オートフォーカス、トーンマップ、色調整、CAS、レンズフレア、アナログ (CCD ビデオカメラ風)、デバッグ表示 | `lib/post/*`, `program/post/*` (composite20-24, composite25, composite26, composite27, final) |
 
 - shadow パスの出力 (shadowcolor の内容) は surface (RSM・色付き影) と sky (色付き光芒) も使う。内容を変える時は「colortex」の節の定義を守り、docs/architecture.md も更新する
 - 表面の光 (light / sky の関数) は surface の `gatherSurfaceLights` が呼ぶ。deferred30・半透明・composite2・二次ヒットは light / sky の照度の関数を直接呼ばない
@@ -791,6 +796,8 @@ post モジュールが提供 (`//@include "/lib/post/post.glsl"`):
 | `GRADE_*_SAT` | `_SATURATION` の略 |
 | `VIGNETTE`、`FILM_GRAIN`、`BLOOM_FOG` | 強さで接尾辞なし |
 | 画面の名前 (`*_SCREEN`、`*_OPTIONS`) | 混在 |
+| `ANALOG_C_*` | カスタムの値を 1 枚の `ANALOG_CUSTOM` にまとめず、効果のまとまりの画面 (`ANALOG_SENSOR` など) に効果と並べて置く (数が多く、1 枚では効果との対応が分からないため) |
+| `LP_*`・`AP_*`・`AF_*` | レンズ・アナログのプリセットとアナログの記録の形式の表の定数。機能の語でなく短い接頭辞 |
 
 ### 検証
 
@@ -828,6 +835,11 @@ shaders.properties の `#if` を評価して `program.*.enabled = false` のプ�
 - 空・雲: aerial perspective は SkyView の地平線色で近似。フォグの透過率は灰色 1ch。雨粒は深度を書かない。上層雲は 160 km まで描くので、地平線際が単調になりうる
 - 影・GI・反射: 水の後ろのガラスが手前に見える。半透明越しの環境反射は空のみ。RSM に可視性はない。F82 は未実装。自動法線は地形とエンティティと手持ち (植物は対象外)
 - ポスト: TAAU は見送り (Iris では gbuffers の解像度を下げられない)
+- アナログ (ANALOG)
+  - Iris 1.7 と Oculus ではゲームの中で確かめていない (コンパイルとリンクだけ)。composite27 が書いた colortex0 のミップを final が今フレームの値で読めるかが未確認で、読めなければ広いタップのぼけが足りず、細かい模様がちらつくおそれがある
+  - 歪曲を final で掛けるプリセットでは、スミアの列の筋が歪曲に沿って曲がる (列の平均は再投影の前の画面で取る)
+  - インターレースの櫛は視点の動きだけで出る (速度はカメラの動きだけで、物体自身の動きは入らない)
+  - ON の間は、ニー (既定 ON) が TONEMAP の選択と溶岩のトーンマップの代わりになり、センサーのノイズ (既定 ON) の間はフィルムグレインを掛けない
 - エンティティのボクセル化は `shadow_entities` / `shadow_block` (Iris 1.8 未満と Oculus では shadow.gsh) で行う。影パスの距離 (`entityShadowDistanceMul`) とフラスタムの外のエンティティは遮蔽物にならない
 - 古い Iris (1.7.x、MC 26.1 未満、Oculus) の違い。新しい Iris ではどれもコンパイルで外れる。Oculus はコンパイルとリンクの確認だけで、実機では読み込んでいない
   - 影のパスにエンティティが来る (専用の影のパスが無い、Iris 1.8 未満と Oculus): 地形も shadow.gsh を通る (`FX_SHADOW_NON_TERRAIN`)。重さは測っていない
