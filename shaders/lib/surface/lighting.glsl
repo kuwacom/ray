@@ -99,7 +99,7 @@ vec3 shadeSecondaryHit(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm) { 
  * 履歴の無い点 (画面外・前フレームの画面外) は prevIndirect.x < 0 で、空の SH のまま
  * blockDirect: 設置光源・手持ち光源の直接光の照度 (secondaryHitBlockLight x SECONDARY_BLOCKLIGHT_GAIN)
  * 太陽・月・空の光 (giSkyBounceAlbedo) と、ブロックライト (floodfill と直接光、giBlockBounceAlbedo) で当たった面の色を分ける。
- * 履歴は両方が混ざった後の光なので素のアルベドのまま
+ * 履歴は両方が混ざった後の光なので、彩度だけを当たりの照度の比で混ぜて掛ける (giHistoryBounceAlbedo)
  */
 vec3 shadeSecondaryHitGi(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm, vec3 prevIndirect, vec3 blockDirect) {
     vec3 sky = secondaryHitSky(playerPos, normal, skyLm);
@@ -119,7 +119,7 @@ vec3 shadeSecondaryHitGi(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm, 
         skyE += sky;
     }
     return RCP_PI * (giSkyBounceAlbedo(albedo) * skyE + giBlockBounceAlbedo(albedo) * blockE
-        + albedo * (prevE + minAmbientIrradiance()));
+        + giHistoryBounceAlbedo(albedo, skyE, blockE) * prevE + albedo * minAmbientIrradiance());
 }
 
 // GI の履歴 (照度, GI_STRENGTH を外した値)。前フレームの画面の外なら x = -1
