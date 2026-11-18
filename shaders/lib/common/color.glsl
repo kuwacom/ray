@@ -29,6 +29,26 @@ vec3 linearToSrgb(vec3 c) {
 
 float luminance(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
 
+// 輝度を保った彩度。s = 0 で灰色、1 でそのまま。1 より上で負になる成分は 0 で止める
+vec3 applySaturation(vec3 c, float saturation) {
+    float l = luminance(c);
+    return max(l + saturation * (c - l), 0.0);
+}
+
+/*
+ * 原色まで届く彩度。s = 0 で灰色、1 でそのまま、2 で一番小さい成分を 0 にした色 (色相・最大成分の比を保つ)
+ * 輝度を保つ式のまま 1 より上へ伸ばすと、輝度に近い成分 (青いラピスの緑など) は 0 に着くまでに他の成分が飛ぶので、
+ * 1 から上は最小成分を引いた色へ寄せてから輝度を戻す
+ */
+vec3 applyVividSaturation(vec3 c, float s) {
+    if (s <= 1.0) return applySaturation(c, s);
+    float hi = maxOf(c);
+    float lo = min(c.r, min(c.g, c.b));
+    vec3 vivid = hi > lo ? (c - lo) * (hi / (hi - lo)) : c;
+    vec3 r = mix(c, vivid, min(s - 1.0, 1.0));
+    return r * (luminance(c) / max(luminance(r), EPS));
+}
+
 vec3 rgbToYCoCg(vec3 c) {
     return vec3(
         0.25 * c.r + 0.5 * c.g + 0.25 * c.b,

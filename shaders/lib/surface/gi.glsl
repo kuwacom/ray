@@ -60,6 +60,19 @@ vec3 giBounceGrade(vec3 c) {
 }
 
 /*
+ * 照り返しの光の出どころごとの、当たった面のアルベド (GI_SKY_BOUNCE_* / GI_BLOCK_BOUNCE_*)
+ * 外から差し込んだ光が色の付いた床に当たって部屋がその色に染まるように、面の色を光の出どころごとに濃くする
+ * 彩度を上げたアルベドは各成分を 1 で止める。量は外から入る光 (太陽・空・ブロックライト) にだけ掛け、
+ * 多重反射の履歴 (前フレームの GI) には素のアルベドを掛けるので、フレームを重ねる反射の利得は 1 未満のまま発散しない
+ */
+vec3 giSkyBounceAlbedo(vec3 albedo) {
+    return min(applySaturation(albedo, GI_SKY_BOUNCE_SATURATION), 1.0) * GI_SKY_BOUNCE_STRENGTH;
+}
+vec3 giBlockBounceAlbedo(vec3 albedo) {
+    return min(applySaturation(albedo, GI_BLOCK_BOUNCE_SATURATION), 1.0) * GI_BLOCK_BOUNCE_STRENGTH;
+}
+
+/*
  * GI のレイが空の光も運ぶ (SSGI / ボクセル RT, 空のあるディメンション)
  * 空へ抜けたレイが方向ごとの空の色を返し、deferred30 は空の環境光 (方向の無いスカイライト x AO の遮蔽) をこれで置き換える。
  * 抜けたレイを 0 にして当たったレイの照り返しを空の光に足すと、軒下・洞窟の入り口・森の中で空の光の向きが無く、

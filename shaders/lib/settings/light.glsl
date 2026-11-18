@@ -21,6 +21,8 @@
 //#define DECOR_GOLD // 金ブロックを発光させる
 #define DECOR_REDSTONE // レッドストーンブロックを発光させる
 #define DECOR_AMETHYST // アメジストブロック・芽生えたアメジストを発光させる
+#define DECOR_BRIGHTNESS 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0] 鉱物ブロックの発光と、周りを照らす光の強さ (0 で光らない)
+#define DECOR_SATURATION 2.0 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 1.75 2.0] 鉱物ブロックの発光と光の色の濃さ (輝度を保つ) 0=白 1=鉱物の色 2=原色
 #define GLOW_LICHEN_LIGHT // ヒカリゴケを光源にする (OFF では周りを照らさない)
 #define GLOW_LICHEN_BRIGHTNESS 0.45 // [0.1 0.2 0.3 0.4 0.45 0.6 0.8 1.0 1.5] ヒカリゴケが周りを照らす光の強さ
 #define FIREFLY_BUSH_BRIGHTNESS 0.25 // [0.05 0.1 0.15 0.2 0.25 0.3 0.4 0.5 0.75 1.0] ホタルの茂みが周りを照らす光の強さ

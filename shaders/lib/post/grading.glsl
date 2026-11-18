@@ -62,11 +62,6 @@ vec3 applyHighlightRange(vec3 c, float range) {
     return c * exp2((range - 1.0) * above);
 }
 
-vec3 applySaturation(vec3 c, float saturation) {
-    float l = luminance(c);
-    return max(l + saturation * (c - l), 0.0);
-}
-
 /*
  * Purkinje 効果: 暗所で桿体が主になり、青緑が相対的に明るく色が抜ける
  * 桿体輝度は Larson et al. 1997 の XYZ 近似、順応状態は自動露出の順応輝度 (シーン単位) から決める

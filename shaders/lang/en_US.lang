@@ -131,6 +131,10 @@ option.DECOR_REDSTONE=Redstone Block
 option.DECOR_REDSTONE.comment=Makes redstone blocks glow.
 option.DECOR_AMETHYST=Amethyst Block
 option.DECOR_AMETHYST.comment=Makes amethyst blocks and budding amethyst glow.
+option.DECOR_BRIGHTNESS=Mineral Block Brightness
+option.DECOR_BRIGHTNESS.comment=How brightly the mineral blocks glow, and how strongly they light their surroundings. 0 = no glow.
+option.DECOR_SATURATION=Mineral Block Color
+option.DECOR_SATURATION.comment=Color strength of the mineral blocks' glow and light. Brightness is kept. 0 = white, 1 = the mineral's color, 2 = pure primary color.
 option.LIGHT_SHADOWS=Light Source Shadows
 option.LIGHT_SHADOWS.comment=Ray traces the strongest nearby lights so blocks, players and entities cast shadows from placed lights.
 option.LIGHT_SHADOW_STRENGTH=Placed Light Shadow Darkness
@@ -249,6 +253,14 @@ option.GI_STRENGTH=GI Strength
 option.GI_STRENGTH.comment=Strength of the bounce light (and, with screen-space or voxel ray tracing, the sky light). Higher values brighten shade, downward faces and rooms and reduce the contrast with sunlight. The effect is scaled per method so the same value looks similar (voxel x1, RSM x0.75, screen-space x0.5).
 option.GI_MULTI_BOUNCE=Multiple Bounces
 option.GI_MULTI_BOUNCE.comment=How much of the previous frame's GI is fed back into the surfaces GI rays hit, so light bounces again with every frame. Lets light reach deeper into cave entrances and rooms at almost no cost. 0 = single bounce, 1 = physically correct (screen-space and voxel ray tracing only).
+option.GI_SKY_BOUNCE_STRENGTH=Sky Light Bounce
+option.GI_SKY_BOUNCE_STRENGTH.comment=How much sun, moon and sky light bounces off the surfaces GI rays hit. Higher values let light coming through a window light up the room more. 0 = no bounce of this light.
+option.GI_SKY_BOUNCE_SATURATION=Sky Light Bounce Color
+option.GI_SKY_BOUNCE_SATURATION.comment=How strongly the color of the surface hit (a red carpet, green grass) tints the bounced sun, moon and sky light. Brightness is kept. 0 = gray bounce.
+option.GI_BLOCK_BOUNCE_STRENGTH=Block Light Bounce
+option.GI_BLOCK_BOUNCE_STRENGTH.comment=How much block light bounces off the surfaces GI rays hit. 0 = no bounce of this light (screen-space and voxel ray tracing only).
+option.GI_BLOCK_BOUNCE_SATURATION=Block Light Bounce Color
+option.GI_BLOCK_BOUNCE_SATURATION.comment=How strongly the color of the surface hit tints the bounced block light. Brightness is kept. 0 = gray bounce (screen-space and voxel ray tracing only).
 option.GI_SKY_OCCLUSION=Sky Light Occlusion
 option.GI_SKY_OCCLUSION.comment=How much of the sky light is occluded by the GI rays. 1 = light only comes from directions that see the sky (eaves, cave entrances and the back of rooms get darker, and openings show their direction). 0 = occlusion from the skylight level only (no direction, counted twice with the bounce). The default 0.5 keeps rooms and cave entrances from getting too dark (at 1 they are too dark even with multiple bounces). Screen-space and voxel ray tracing only. Multiplies the Look preset value (1 with Natural)
 option.GI_GROUND_REPLACE=Ground Bounce Replacement

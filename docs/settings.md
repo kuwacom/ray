@@ -52,6 +52,8 @@
 | DECOR_GOLD | OFF | ON / OFF |
 | DECOR_REDSTONE | ON | ON / OFF |
 | DECOR_AMETHYST | ON | ON / OFF |
+| DECOR_BRIGHTNESS | 1.0 | 0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0 |
+| DECOR_SATURATION | 2.0 | 0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0 |
 | GLOW_LICHEN_LIGHT | ON | ON / OFF |
 | GLOW_LICHEN_BRIGHTNESS | 0.45 | 0.1, 0.2, 0.3, 0.4, 0.45, 0.6, 0.8, 1.0, 1.5 |
 | FIREFLY_BUSH_BRIGHTNESS | 0.25 | 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.75, 1.0 |
@@ -117,6 +119,10 @@
 | GI_SAMPLES | 2 | 1, 2, 4, 8 |
 | GI_STRENGTH | 2.0 | 0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0, 8.0 |
 | GI_MULTI_BOUNCE | 1.0 | 0.0, 0.25, 0.5, 0.75, 1.0 |
+| GI_SKY_BOUNCE_STRENGTH | 1.25 | 0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0 |
+| GI_SKY_BOUNCE_SATURATION | 1.3 | 0.0, 0.25, 0.5, 0.75, 1.0, 1.15, 1.3, 1.5, 1.75, 2.0, 2.5, 3.0 |
+| GI_BLOCK_BOUNCE_STRENGTH | 1.25 | 0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0 |
+| GI_BLOCK_BOUNCE_SATURATION | 1.3 | 0.0, 0.25, 0.5, 0.75, 1.0, 1.15, 1.3, 1.5, 1.75, 2.0, 2.5, 3.0 |
 | GI_SKY_OCCLUSION | 0.5 | 0.0, 0.25, 0.5, 0.75, 1.0 |
 | GI_GROUND_REPLACE | 1.0 | 0.0, 0.25, 0.5, 0.75, 1.0 |
 | GI_RES | 2 | 1, 2 |

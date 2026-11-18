@@ -74,6 +74,16 @@ const ivec3 workGroups = ivec3(1, 1, 1);
 void main() {
     int i = int(gl_LocalInvocationIndex);
     blockData.lightDefs[i] = lightDefStatic(i);
+#if DECORATIVE_BLOCK_LIGHTS == 2
+    /*
+     * 鉱物ブロックの光の色と強さ (DECOR_SATURATION / DECOR_BRIGHTNESS)。色は輝度を保って動かし、最大成分 1 に戻さない
+     * (戻した分を明るさに入れると、届く距離 (lightRange) が色の濃さで伸び縮みする)
+     */
+    if (i >= LIGHT_DECOR_FIRST && i < LIGHT_DECOR_FIRST + LIGHT_DECOR_COUNT) {
+        blockData.lightDefs[i].color.rgb = applyVividSaturation(blockData.lightDefs[i].color.rgb, DECOR_SATURATION);
+        blockData.lightDefs[i].color.a *= DECOR_BRIGHTNESS;
+    }
+#endif
     if (i < SHAPE_TABLE_SIZE) {
         uvec4 s = shapeStatic(i);
         blockData.shapes[i] = s;

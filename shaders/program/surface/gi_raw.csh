@@ -231,7 +231,8 @@ vec3 rsmIndirect(vec3 playerPos, vec3 normal, float rotation) {
         vec3 nV = octDecode(kind.rg);
         float cosV = saturate(dot(nV, dir));
         float cosR = saturate(-dot(normal, dir));
-        vec3 albedo = srgbToLinear(textureLod(shadowcolor0, uv, 0.0).rgb);
+        // RSM の VPL は太陽に照らされた面なので、照り返しは太陽・空の光の分だけ
+        vec3 albedo = giSkyBounceAlbedo(srgbToLinear(textureLod(shadowcolor0, uv, 0.0).rgb));
         vec3 w = albedo * (cosV * cosR / max(dist2, RSM_MIN_DIST2));
         sum += w;
         sumSky += w / max(dot(nV, sun.direction), RSM_SKY_MIN_COS);
@@ -289,8 +290,8 @@ vec3 ssgiIndirect(vec3 viewPos, vec3 normal, float skyLm, vec4 noise) {
         if (dot(h.normal, dir) >= 0.0) continue;
         vec3 hitPlayer = screenToPlayer(hit.xyz);
         vec3 prev = GI_MULTI_BOUNCE > 0.0 ? giHistoryAtPlayer(hitPlayer) : vec3(-1.0);
-        sum += giBounceGrade(shadeSecondaryHitGi(hitPlayer, h.normal, h.albedo, h.lightmap.y, prev)
-            + h.albedo * RCP_PI * secondaryHitBlockLight(hitPlayer, h.normal, ht, handLightIndirectScale(), false) * SECONDARY_BLOCKLIGHT_GAIN
+        vec3 blockE = secondaryHitBlockLight(hitPlayer, h.normal, ht, handLightIndirectScale(), false) * SECONDARY_BLOCKLIGHT_GAIN;
+        sum += giBounceGrade(shadeSecondaryHitGi(hitPlayer, h.normal, h.albedo, h.lightmap.y, prev, blockE)
             + h.albedo * screenHitEmission(h, hitPlayer));
     }
     // 余弦重みサンプルの照度の推定量 E = pi / N * sum(L)

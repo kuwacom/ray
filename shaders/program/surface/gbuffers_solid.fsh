@@ -622,7 +622,12 @@ void main() {
 #endif
 #if defined GBUF_TERRAIN && DECORATIVE_BLOCK_LIGHTS > 0
     // 鉱物ブロック (DECORATIVE_BLOCK_LIGHTS)。光源ブロックより弱く、模様の明るい所ほど光らせる
-    if (isDecorGlowBlock(blockBase)) g.emission = max(g.emission, DECOR_EMISSION * smoothstep(0.15, 0.85, maxOf(albedoDry)));
+    if (isDecorGlowBlock(blockBase)) {
+        float glow = smoothstep(0.15, 0.85, maxOf(albedoDry));
+        g.emission = max(g.emission, min(DECOR_EMISSION * DECOR_BRIGHTNESS, 1.0) * glow);
+        // 発光の色はアルベドなので、光る画素ほど光源と同じ色の濃さ (DECOR_SATURATION) に寄せる
+        g.albedo = mix(g.albedo, min(applyVividSaturation(g.albedo, DECOR_SATURATION), 1.0), glow);
+    }
 #endif
     encodeGBuffer(g, outAlbedo, outNormal, outMaterial);
     outMaterial.a = encodeSurfaceExtra(pomShadow, puddle);
