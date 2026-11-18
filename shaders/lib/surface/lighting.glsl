@@ -14,6 +14,7 @@
 //@include "/lib/common/gbuffer.glsl"
 //@include "/lib/common/look_presets.glsl"
 //@include "/lib/common/math.glsl"
+//@include "/lib/common/noise.glsl"
 //@include "/lib/common/samplers.glsl"
 //@include "/lib/common/shading_types.glsl"
 //@include "/lib/common/transforms.glsl"
@@ -134,20 +135,6 @@ vec3 giHistoryAtPlayer(vec3 playerPos) {
 const float SECONDARY_BLOCKLIGHT_GAIN = 1.5 - 0.5 * GI_MULTI_BOUNCE;
 
 /*
- * GI の当たりの溶岩の直接光の倍率 (着色点の直接光と反射に映る面は変えない)
- * 溶岩の洞窟の照り返しは当たりの floodfill (種 10 倍) が主で、受ける面と同じ FLOODFILL_STRENGTH 倍にすると半分以下になる。
- * 当たりの floodfill を戻すと床の GI の揺れが 1.6 倍になり、floodfill の種・溶岩の直接光を上げると照らされる面そのものが先に明るくなる。
- * 当たりの直接光は解析的に求めるので揺れを増やさず、照り返しだけを戻せる
- */
-const float LAVA_GI_DIRECT_GAIN = 3.5;
-
-// 光源が溶岩か (溶岩の光は表面のセルの中に登録している。program/light/floodfill.csh)
-bool isLavaLight(LightInstance L) {
-    ivec3 c = ivec3(floor(L.posRadius.xyz));
-    return isInVoxelVolume(c) && getBlockLightIndex(fetchVoxelBlockId(c)) == LIGHT_LAVA;
-}
-
-/*
  * 当たりのビンの光源の影なし照度。strongest: 一番強い光源 (無ければ -1)
  * GI (nearField = false) では溶岩の光を LAVA_GI_DIRECT_GAIN 倍にする
  */
@@ -158,7 +145,25 @@ vec3 secondaryHitBinLights(vec3 fromVoxel, vec3 normal, bool nearField, out int 
     uint n = lightBinCount(bin);
     vec3 E = vec3(0.0);
     float strongestW = 0.0;
+#if GI_HIT_LIGHTS > 0
+    /*
+     * 画面の外の GI の当たり (画面に映る当たりと反射は deferred2 の結果を使う) は、光源が多いビンでは
+     * GI_HIT_LIGHTS 個だけを等間隔 (起点は乱数) に拾い、拾った数の比で戻す。ビンは重要度の順なので明るい順に層別される。
+     * 光源ごとに拾われる確率は GI_HIT_LIGHTS / n で、時間で平均すると全部を回した和と同じ
+     */
+    float stride = 1.0;
+    float start = 0.0;
+    uint count = n;
+    if (!nearField && n > uint(GI_HIT_LIGHTS)) {
+        stride = float(n) / float(GI_HIT_LIGHTS);
+        start = hash1(pcgHash(floatBitsToUint(fromVoxel.x) ^ pcgHash(floatBitsToUint(fromVoxel.y + fromVoxel.z))) ^ uint(frameCounter)) * stride;
+        count = uint(GI_HIT_LIGHTS);
+    }
+    for (uint i = 0u; i < count; i++) {
+        uint k = min(uint(start + float(i) * stride), n - 1u);
+#else
     for (uint k = 0u; k < n; k++) {
+#endif
         int ci = lightBinEntry(bin, k);
         LightInstance L = globalLights.lights[ci];
         vec3 e = evalLightIrradiance(L, fromVoxel, normal, normal, nearField);
@@ -168,6 +173,9 @@ vec3 secondaryHitBinLights(vec3 fromVoxel, vec3 normal, bool nearField, out int 
         float w = luminance(e);
         if (w > strongestW) { strongestW = w; strongest = ci; }
     }
+#if GI_HIT_LIGHTS > 0
+    E *= stride;
+#endif
     return E;
 }
 
@@ -183,9 +191,15 @@ vec3 secondaryHitBlockLight(vec3 playerPos, vec3 normal, ivec2 screenTexel, floa
     vec3 fromVoxel = playerToVoxel(playerPos + normal * TRACE_NORMAL_OFFSET);
     int strongest = -1;
     if (screenTexel.x >= 0) {
+    #ifdef GI_HIT_DIRECT_REUSE
+        // colortex6.a は、近距離の放射を除いた影込みの照度の輝度の比 (deferred2 がビンの和と一緒に求める)。光源のループを回さない
+        vec4 direct = texelFetch(colortex6, screenTexel, 0);
+        E = nearField ? direct.rgb : direct.rgb * direct.a;
+    #else
         // colortex6 は近距離の放射込み。除く時は、近距離の放射の無い影なし照度に deferred2 の可視率 (colortex7) を掛ける
         E = nearField ? texelFetch(colortex6, screenTexel, 0).rgb
                       : secondaryHitBinLights(fromVoxel, normal, false, strongest) * texelFetch(colortex7, screenTexel, 0).rgb;
+    #endif
     } else if (isInVoxelVolume(fromVoxel)) {
         E = secondaryHitBinLights(fromVoxel, normal, nearField, strongest);
         if (strongest >= 0) {

@@ -136,6 +136,8 @@ option.LIGHT_SHADOWS.comment=Ray traces the strongest nearby lights so blocks, p
 option.LIGHT_SHADOW_STRENGTH=Placed Light Shadow Darkness
 option.LIGHT_SHADOW_STRENGTH.comment=How dark the shadows cast by placed lights are, including dropped, burning and glowing entities. 0 = no shadows, 1 = full shadows.
 option.LIGHT_TRACE_COUNT=Traced Lights per Pixel
+option.LIGHT_TRACE_SPLIT=Shadow Rays in Dense Areas
+option.LIGHT_TRACE_SPLIT.comment=In pixels lit by more lights than Traced Lights per Pixel, only the much brighter lights are traced every frame and the other rays go to lights picked at random in proportion to their brightness. Where many lights of similar brightness sit together (amethyst clusters), fewer traced lights give less shadow noise. Same cost.
 option.LIGHT_TRACE_RES=Trace Resolution
 option.LIGHT_TRACE_RES.comment=Resolution of the light shadow trace. Lower is faster but noisier.
 value.LIGHT_TRACE_RES.1=Full
@@ -275,6 +277,11 @@ value.GI_SHORT_HISTORY.8=8 frames
 value.GI_SHORT_HISTORY.16=16 frames
 option.GI_VOXEL_FADE=Voxel GI Fade Distance
 option.GI_VOXEL_FADE.comment=Width in blocks over which voxel ray traced GI fades into the plain sky light at the edge of the voxel range. Wider hides the edge better when flying down from the sky or looking at distant terrain. Voxel ray tracing only.
+option.GI_HIT_REUSE=Reuse Light at GI Hits
+option.GI_HIT_REUSE.comment=When a GI ray hits a surface that is on screen, its placed-light lighting is taken from the direct lighting result instead of summing the lights again. Faster where there are many lights. The bounce color leans slightly toward the color of nearby lights. SSGI and voxel ray tracing only.
+option.GI_HIT_LIGHTS=Lights at Off-screen GI Hits
+option.GI_HIT_LIGHTS.comment=Most placed lights summed when a GI ray hits a surface off screen. Where there are many lights, they are taken at even steps in brightness order and scaled by the ratio. Lower is faster where there are many lights, with a little more noise in light bounced from off screen. SSGI and voxel ray tracing only.
+value.GI_HIT_LIGHTS.0=All
 
 # Materials
 option.PBR_FORMAT=PBR Format

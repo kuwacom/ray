@@ -30,6 +30,8 @@
 #endif
 #ifdef LIGHT_SHADOWS
 #endif
+#ifdef LIGHT_TRACE_SPLIT
+#endif
 #ifdef LIGHT_SHAPE_TRACE
 #endif
 #ifdef LIGHT_TRANSLUCENT_TINT
@@ -69,6 +71,8 @@
 #ifdef BLOCK_ENTITY_SHADOWS
 #endif
 #ifdef SCREEN_SPACE_SHADOWS
+#endif
+#ifdef GI_HIT_REUSE
 #endif
 #ifdef NORMAL_MAPPING
 #endif

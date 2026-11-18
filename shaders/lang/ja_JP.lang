@@ -136,6 +136,8 @@ option.LIGHT_SHADOWS.comment=近くの強い光源をレイトレースし、ブ
 option.LIGHT_SHADOW_STRENGTH=設置光源の影の濃さ
 option.LIGHT_SHADOW_STRENGTH.comment=設置した光源 (ドロップ・燃焼・発光エンティティの光も) が落とす影の濃さ。0 で影なし、1 で完全な影
 option.LIGHT_TRACE_COUNT=1 ピクセルあたりの光源数
+option.LIGHT_TRACE_SPLIT=光源の多い所の影の割り振り
+option.LIGHT_TRACE_SPLIT.comment=光の当たる光源が「1 ピクセルあたりの光源数」より多いピクセルで、特に明るい光源だけを毎回トレースし、残りのレイを明るさに比例したくじで選ぶ光源に回す。同じくらいの明るさの光源が並ぶ所 (アメジストの群れなど) で、少ない光源数でも影のノイズが増えにくい。重さは変わらない
 option.LIGHT_TRACE_RES=トレース解像度
 option.LIGHT_TRACE_RES.comment=光源シャドウのトレース解像度。低いほど速いがノイズが増える
 value.LIGHT_TRACE_RES.1=フル
@@ -275,6 +277,11 @@ value.GI_SHORT_HISTORY.8=8 フレーム
 value.GI_SHORT_HISTORY.16=16 フレーム
 option.GI_VOXEL_FADE=ボクセル GI のフェード幅
 option.GI_VOXEL_FADE.comment=ボクセル RT の GI を、ボクセル範囲の端で外側の通常の空の光へ溶かす幅 (ブロック)。大きいほど、空から降りる時や遠景で範囲の境目が目立たない。ボクセル RT のみ
+option.GI_HIT_REUSE=GI の当たりの光源の光を使い回す
+option.GI_HIT_REUSE.comment=GI のレイが画面に映る面に当たった時、その面の設置光源の光を、光源を数え直さずに直接光の結果から求める。光源の多い場所で軽くなる。照り返しの色は、近くの光源の色にわずかに寄る。SSGI とボクセル RT のみ
+option.GI_HIT_LIGHTS=画面外の GI の当たりの光源数
+option.GI_HIT_LIGHTS.comment=GI のレイが画面の外の面に当たった時に数える設置光源の数の上限。光源の多い場所では、明るさの順に等間隔で拾って数の比で戻す。下げると光源の多い場所で軽くなり、画面の外から照り返す光のノイズが少し増える。SSGI とボクセル RT のみ
+value.GI_HIT_LIGHTS.0=全部
 
 # マテリアル
 option.PBR_FORMAT=PBR 形式

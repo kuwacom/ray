@@ -112,6 +112,11 @@ const float HISTORY_DEPTH_ABS = 0.1;
 const float SAFE_RATIO_BIAS = 0.02;      // safeRatio の下地の強さ (輝度に対する比)
 const float WEIGHT_MIN = 1e-4;
 const float HISTORY_MIN_WEIGHT = 0.05;
+#ifdef GI_HIT_DIRECT_REUSE
+// colortex6.a の比を求める下限の明るさと、比の上限 (fp16 で溢れないように。暗い所でテクスチャ法線が光源の裏を向いた画素だけが大きくなる)
+const float GI_REUSE_LUM_MIN = 1e-5;
+const float GI_REUSE_RATIO_MAX = 64.0;
+#endif
 
 // 比の安定化: 輝度の比を下地にして、ある色成分の U がほぼ 0 でも発散しない
 vec3 safeRatio(vec3 s, vec3 u) {
@@ -141,11 +146,21 @@ void main() {
     // ブロック全体が光る光源の面からの近距離の照度は、根元の分を影を掛けずに足し (lightBoxTerms)、
     // 離れた所の広がりの分は光源の影を掛ける full に入れる (同じ形態係数なので 1 回で求める)
     vec3 boxSpread;
+#ifdef GI_HIT_DIRECT_REUSE
+    vec3 box, giFar;
+    int material = readMaterialId(texel);
+    vec3 full = sumBinLightsDeferred(voxelPos, normal, geoNormal, isUpNormalPlant(material, geoNormal), box, boxSpread, giFar) + boxSpread;
+#else
     vec3 box = sumBinBoxIrradiance(voxelPos, geoNormal, true, boxSpread);
     int material = readMaterialId(texel);
     vec3 full = sumBinLightsUnshadowed(voxelPos, normal, geoNormal, true, false, isUpNormalPlant(material, geoNormal)) + boxSpread;
+#endif
     if (maxOf(full) <= 0.0) {
+#ifdef GI_HIT_DIRECT_REUSE
+        outBlockLight = vec4(box, 0.0);
+#else
         outBlockLight = vec4(box, 1.0);
+#endif
         outHistory = vec4(1.0, 1.0, 1.0, viewDist);
         return;
     }
@@ -239,6 +254,13 @@ void main() {
 #endif
 
     ratio = saturate(ratio);
+#ifdef GI_HIT_DIRECT_REUSE
+    // a: 画面に映る GI の当たりが rgb に掛ける比 (lib/surface/lighting.glsl の secondaryHitBlockLight)。色は rgb のまま、明るさだけを合わせる
+    vec3 direct = full * ratio + box;
+    float lum = luminance(direct);
+    outBlockLight = vec4(direct, lum > GI_REUSE_LUM_MIN ? min(luminance(giFar * ratio) / lum, GI_REUSE_RATIO_MAX) : 0.0);
+#else
     outBlockLight = vec4(full * ratio + box, 1.0);
+#endif
     outHistory = vec4(ratio, viewDist);
 }

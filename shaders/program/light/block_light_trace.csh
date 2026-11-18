@@ -93,6 +93,20 @@ layout(local_size_x = 8, local_size_y = 8) in;
 #else
     const int DET_COUNT = 1;
 #endif
+/*
+ * LIGHT_TRACE_SPLIT: 光の当たる光源が LIGHT_TRACE_COUNT より多いピクセルで、レイの割り振りを変える
+ * 上位を確定で追っても、同じくらいの明るさの光源が並ぶ所 (アメジストの群れ) では確定の分が全体の一部にしかならず、
+ * 残りの大半を 1 本のくじが受け持つので、本数のわりに可視率のノイズが減らない。
+ * 確定で追うのは、くじで 1 回以上当たる見込みの光源 (重みが全体の 1 / LIGHT_TRACE_COUNT 以上) だけにし、
+ * 残りの本数はすべて重みに比例したくじ (重複あり、1/確率 倍) に回す
+ */
+#if defined LIGHT_TRACE_SPLIT && LIGHT_TRACE_COUNT >= 2
+    #define TRACE_SPLIT
+    const int SPLIT_RAYS = LIGHT_TRACE_COUNT;
+    // 枠ごとの乱数は 1 つの乱数を 1/枠数ずつずらして作る (枠ごとにハッシュを引くと光源 x 枠の数だけ重くなる)
+    const float SPLIT_STEP = 1.0 / float(SPLIT_RAYS);
+    const int SPLIT_CONTACT_RANK = min(LIGHT_CONTACT_SHADOW_COUNT, LIGHT_TRACE_COUNT - 1) - 1;
+#endif
 // 接触影を付ける光源数 (寄与の大きい順)。全光源に付けると EXTREME で重くなり過ぎる
 const int CONTACT_SHADOW_LIGHTS = LIGHT_CONTACT_SHADOW_COUNT;
 const float LIGHT_CONTACT_LENGTH = 1.25;
@@ -167,6 +181,15 @@ void main() {
         float nextW = 0.0;
         vec3 nextE = vec3(0.0);
     #endif
+    #ifdef TRACE_SPLIT
+        // くじの枠ごとのリザーバ。枠 0 は restIdx と同じ乱数なので、1 から持つ
+        int splitIdx[SPLIT_RAYS];
+        float splitW[SPLIT_RAYS];
+        vec3 splitE[SPLIT_RAYS];
+        for (int m = 0; m < SPLIT_RAYS; m++) { splitIdx[m] = -1; splitW[m] = 0.0; splitE[m] = vec3(0.0); }
+        uint lit = 0u;
+        float litSum = 0.0;
+    #endif
         uint seed = pcgHash(uint(low.x) | (uint(low.y) << 16u)) ^ pcgHash(uint(frameCounter));
 
         for (uint k = 0u; k < n; k++) {
@@ -178,6 +201,10 @@ void main() {
             vec3 e = evalLightIrradiance(L, fromVoxel, ln, lg) * scale;
             float w = luminance(e);
             if (w <= 0.0) continue;
+    #ifdef TRACE_SPLIT
+            lit++;
+            litSum += w;
+    #endif
             // 上位 DET_COUNT 個を挿入ソートで保つ。押し出された光源は残りの集合 (リザーバ) へ
             int ci = li;
             float cw = w;
@@ -197,6 +224,14 @@ void main() {
                 restW = cw;
                 restE = ce;
             }
+    #ifdef TRACE_SPLIT
+            float splitU = hash1(seed + k * 0x9E3779B9u);
+            for (int m = 1; m < SPLIT_RAYS; m++) {
+                if (fract(splitU + float(m) * SPLIT_STEP) * restSum < cw) {
+                    splitIdx[m] = ci; splitW[m] = cw; splitE[m] = ce;
+                }
+            }
+    #endif
     #ifdef STOCHASTIC_SLOT
             if (cw > nextW) {
                 nextIdx = ci;
@@ -217,6 +252,50 @@ void main() {
         vec4 bn = blueNoise(low);
         dominant = topIdx[0];
 
+    #ifdef TRACE_SPLIT
+        // 動くエンティティは下のくじを引かない決まった光源の扱いのまま
+        bool split = lit > uint(LIGHT_TRACE_COUNT) && !isMovingEntityMaterial(material);
+        if (split) {
+            int det = 0;
+            for (int j = 0; j < SPLIT_RAYS - 1; j++) {
+                if (topW[j] * float(SPLIT_RAYS) < litSum) break;
+                det++;
+            }
+            splitIdx[0] = restIdx; splitW[0] = restW; splitE[0] = restE;
+            // 確定で追わない上位の光源をくじの集合へ戻す (重み付きリザーバは足す順によらない)
+            for (int j = 0; j < DET_COUNT; j++) {
+                if (j < det || topIdx[j] < 0) continue;
+                restSum += topW[j];
+                float u = hash1(seed + (n + uint(j)) * 0x9E3779B9u);
+                for (int m = 0; m < SPLIT_RAYS; m++) {
+                    if (fract(u + float(m) * SPLIT_STEP) * restSum < topW[j]) {
+                        splitIdx[m] = topIdx[j]; splitW[m] = topW[j]; splitE[m] = topE[j];
+                    }
+                }
+            }
+            float pickScale = restSum / float(SPLIT_RAYS - det);
+            // くじの枠は同じ分布で独立なので、レイ r には枠 r を使う (r - det で引くと添字が実行時に決まり、配列がローカルメモリに落ちる)
+            for (int r = 0; r < SPLIT_RAYS; r++) {
+                int li;
+                vec3 e;
+                if (r < det) {
+                    li = topIdx[min(r, DET_COUNT - 1)];
+                    e = topE[min(r, DET_COUNT - 1)];
+                } else {
+                    li = splitIdx[r];
+                    e = splitE[r] * (pickScale / max(splitW[r], EPS));
+                }
+                if (li < 0) continue;
+                vec2 xi = fract(bn.xy + r2Sequence(r));
+                float dither = fract(bn.z + DITHER_STEP * float(r));
+                // 接触影は、割り振りを変えない時と同じく上位 CONTACT_SHADOW_LIGHTS 個の光源だけに付ける
+                // (くじの光源すべてに付けると、接触影の付く光の割合が増えて物の根元が暗くなる)
+                bool contact = r < det ? r < CONTACT_SHADOW_LIGHTS : splitW[r] >= topW[SPLIT_CONTACT_RANK];
+                shadowed += e * traceBlockLight(li, fromVoxel, playerPos, geoNormal, flags, skipStart, xi, dither, contact && !plant);
+                unshadowed += e;
+            }
+        } else {
+    #endif
         for (int j = 0; j < DET_COUNT; j++) {
             if (topIdx[j] < 0) break;
             vec2 xi = fract(bn.xy + r2Sequence(j));
@@ -252,6 +331,9 @@ void main() {
             vec3 farE = max(restTotal - pickE, vec3(0.0));
             shadowed += farE * (luminance(shadowed) / max(luminance(unshadowed), EPS));
             unshadowed += farE;
+        }
+    #endif
+    #ifdef TRACE_SPLIT
         }
     #endif
     }

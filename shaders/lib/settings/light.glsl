@@ -28,6 +28,7 @@
 #define LIGHT_SHADOWS // 設置光源の光源シャドウ (直接光のレイトレース)
 #define LIGHT_SHADOW_STRENGTH 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0] 設置光源 (ドロップ・燃焼・発光エンティティの光も) の影の濃さ 0=影なし 1=真っ暗な影
 #define LIGHT_TRACE_COUNT 4 // [1 2 3 4 6 8 12 16] 1 ピクセルあたりトレースする光源数
+//#define LIGHT_TRACE_SPLIT // 光の当たる光源が LIGHT_TRACE_COUNT より多いピクセルで、明るい光源だけを確定でトレースし、残りの本数を明るさに比例したくじに回す
 #define LIGHT_TRACE_RES 2 // [1 2 4] トレース解像度の分母 (1=フル 2=半分 4=1/4)
 #define LIGHT_SHAPE_TRACE // ハーフブロック等の形状で遮蔽判定
 #define LIGHT_SOURCE_SIZE 0.5 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0] 光源サイズ (半影の柔らかさ)

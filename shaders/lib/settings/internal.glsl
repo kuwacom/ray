@@ -89,6 +89,11 @@ const int noiseTextureResolution = 256;
     #define ENTITY_TRI_OCCLUSION 1
 #endif
 
+// 画面に映る GI の当たりの直接光を deferred2 の結果から引く (lib/surface/lighting.glsl)。光源の影 (deferred2) と、当たりで光源を数える GI の方式が要る
+#if defined GI_HIT_REUSE && defined LIGHT_SHADOWS && GI_MODE >= 2
+    #define GI_HIT_DIRECT_REUSE 1
+#endif
+
 // 水に入った自分を、屈折した視線を自分の三角形に当てて描く (water_trace.fsh)。自分の三角形と水の屈折の両方が要る
 #if defined ENTITY_TRI_OCCLUSION && defined LIGHT_PLAYER_OCCLUSION && WATER_REFRACTION >= 1
     #define WATER_SELF_REFRACTION 1
