@@ -312,6 +312,12 @@ option.GENERATED_NORMAL_ENTITIES=エンティティの自動法線
 option.GENERATED_NORMAL_ENTITIES.comment=モブ・防具・手に持った物・落ちたアイテムにも自動法線を付ける。大きな平らな面にも光が当たると凹凸が見える。法線の自動生成が OFF の時は効かない
 option.AUTO_METAL_PARTS=部分金属
 option.AUTO_METAL_PARTS.comment=一部だけ金属のブロック (レール・鉄格子・鎖・ランタンの枠・ホッパー・大釜・銅のドア) と、金属の道具・防具の金属の部分だけを、金属ブロックのように光らせる。木や炎は金属にしない。PBR の specular テクスチャがあるものには使わない
+option.ALBEDO_CONCRETE_STRENGTH=コンクリートの反射率
+option.ALBEDO_CONCRETE_STRENGTH.comment=コンクリートとコンクリートパウダーの色の明るさ。上げると見た目も照り返しも、色の濃さを保ったまま明るくなり、塗料のような強い照り返しになる。1 = バニラのテクスチャの色
+option.ALBEDO_WOOL_STRENGTH=羊毛の反射率
+option.ALBEDO_WOOL_STRENGTH.comment=羊毛の色の明るさ。上げると見た目も照り返しも、色の濃さを保ったまま明るくなる。1 = バニラのテクスチャの色
+option.ALBEDO_TERRACOTTA_STRENGTH=テラコッタの反射率
+option.ALBEDO_TERRACOTTA_STRENGTH.comment=テラコッタ (彩釉テラコッタを除く) の色の明るさ。上げると見た目も照り返しも、色の濃さを保ったまま明るくなる。1 = バニラのテクスチャの色
 option.POM=視差オクルージョンマッピング
 option.POM_DEPTH=POM の深さ
 option.POM_SAMPLES=POM のサンプル数

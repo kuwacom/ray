@@ -86,4 +86,19 @@ const int METAL_GATE_COPPER = 6;
 const int METAL_GATE_NETHERITE = 7;
 const int METAL_GATE_GEM = 8;
 
+// 色の付いた固体 (2000 番台) の種類。0 = その他 (種類の混ざった ID も 0)
+const int COLOR_KIND_CONCRETE = 1; // コンクリート・コンクリートパウダー
+const int COLOR_KIND_WOOL = 2; // 羊毛
+const int COLOR_KIND_TERRACOTTA = 3; // テラコッタ (彩釉テラコッタは BLOCK_GLOSSY の行にある)
+const uint BLOCK_COLOR_KINDS[23] = uint[23](
+    0x00536181u, 0x0C024001u, 0x00820000u, 0x35003010u, 0x08C00070u, 0x00104000u, 0x00000014u, 0x20000003u,
+    0x0030200Cu, 0x00008000u, 0x00040000u, 0x00004100u, 0x0000C010u, 0x00D00000u, 0xC0300020u, 0x0003E040u,
+    0x00000140u, 0xC0000000u, 0x00000012u, 0x04C04000u, 0x11000000u, 0x6A041100u, 0x00000080u
+);
+int blockColorKind(int id) {
+    uint i = uint(id - BLOCK_COLOR_FIRST);
+    if (i >= 356u) return 0;
+    return int((BLOCK_COLOR_KINDS[i / 16u] >> ((i % 16u) * 2u)) & 3u);
+}
+
 #endif

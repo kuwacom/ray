@@ -574,6 +574,9 @@ void main() {
 
     GBufferData g = gbufferDefault();
     g.albedo = srgbToLinear(albedo.rgb);
+#ifdef GBUF_TERRAIN
+    g.albedo = applyColorBlockAlbedo(blockBase, g.albedo);
+#endif
     if (railMirror) g.albedo = min(g.albedo * RAIL_F0_GAIN, vec3(1.0));
 #if defined GBUF_ENTITIES || defined GBUF_HAND
     if (autoMetal) g.albedo = gearMetalReflectance(g.albedo);

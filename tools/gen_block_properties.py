@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -556,7 +557,47 @@ def render_light_ids() -> str:
     return "\n".join(lines)
 
 
-def render_block_ids() -> str:
+# 色の付いた固体 (2000 番台) の種類。反射率の設定 (ALBEDO_*_STRENGTH) を種類ごとに掛けるため。
+# 色ごとにまとめた ID のうち、全部が同じ種類のものだけに付ける (まとめ方と ID の番号は変えない)
+COLOR_KINDS = [
+    ("COLOR_KIND_CONCRETE", re.compile(r"^(\w+_)?concrete(_powder)?$"), "コンクリート・コンクリートパウダー"),
+    ("COLOR_KIND_WOOL", re.compile(r"^\w+_wool$"), "羊毛"),
+    ("COLOR_KIND_TERRACOTTA", re.compile(r"^(\w+_)?terracotta$"), "テラコッタ (彩釉テラコッタは BLOCK_GLOSSY の行にある)"),
+]
+COLOR_KIND_BITS = 2
+
+
+def color_kind(names: list[str]) -> int:
+    for k, (_, pat, _) in enumerate(COLOR_KINDS, start=1):
+        if all(pat.match(n.split(":")[0]) for n in names):
+            return k
+    return 0
+
+
+def render_color_kinds(colored: list[tuple[int, str, list[str]]]) -> list[str]:
+    per_word = 32 // COLOR_KIND_BITS
+    kinds = [color_kind(names) for _, _, names in colored]
+    words = [0] * ((len(kinds) + per_word - 1) // per_word)
+    for i, k in enumerate(kinds):
+        words[i // per_word] |= k << ((i % per_word) * COLOR_KIND_BITS)
+    lines = ["", "// 色の付いた固体 (2000 番台) の種類。0 = その他 (種類の混ざった ID も 0)"]
+    lines += [f"const int {name} = {k}; // {label}" for k, (name, _, label) in enumerate(COLOR_KINDS, start=1)]
+    lines.append(f"const uint BLOCK_COLOR_KINDS[{len(words)}] = uint[{len(words)}](")
+    for j in range(0, len(words), 8):
+        chunk = ", ".join("0x%08Xu" % w for w in words[j:j + 8])
+        lines.append(f"    {chunk}{',' if j + 8 < len(words) else ''}")
+    lines += [
+        ");",
+        "int blockColorKind(int id) {",
+        f"    uint i = uint(id - BLOCK_COLOR_FIRST);",
+        f"    if (i >= {len(kinds)}u) return 0;",
+        f"    return int((BLOCK_COLOR_KINDS[i / {per_word}u] >> ((i % {per_word}u) * {COLOR_KIND_BITS}u)) & {(1 << COLOR_KIND_BITS) - 1}u);",
+        "}",
+    ]
+    return lines
+
+
+def render_block_ids(colored: list[tuple[int, str, list[str]]]) -> str:
     lines = [
         "/*",
         " * ブロック ID (block.properties と同じ表から生成する)",
@@ -583,6 +624,7 @@ def render_block_ids() -> str:
         else:
             _, width, name, value, comment, _in_table = row
             lines.append(trailing(f"const int {name} = {value};", width, comment))
+    lines += render_color_kinds(colored)
     lines += ["", "#endif", ""]
     return "\n".join(lines)
 
@@ -773,7 +815,7 @@ def generated(shaders: Path = SHADERS) -> dict[Path, str]:
         shaders / "item.properties": render("item", light_item_entries(), item_gates, item_metal),
         shaders / "entity.properties": render_entity_properties(),
         ids / "block_albedo.glsl": render_albedo_glsl(colors, tops, palette, palette_top),
-        ids / "block_ids.glsl": render_block_ids(),
+        ids / "block_ids.glsl": render_block_ids(colored),
         ids / "light_ids.glsl": render_light_ids(),
         ids / "entity_ids.glsl": render_entity_ids(),
         shaders / "lib" / "light" / "light_table_data.glsl": render_light_table_data(),
