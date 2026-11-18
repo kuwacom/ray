@@ -134,7 +134,7 @@ option.DECOR_AMETHYST.comment=アメジストブロックと芽生えたアメ�
 option.DECOR_BRIGHTNESS=鉱物ブロックの明るさ
 option.DECOR_BRIGHTNESS.comment=鉱物ブロックの発光の明るさと、周りを照らす光の強さ。0 で光らない
 option.DECOR_SATURATION=鉱物ブロックの色の濃さ
-option.DECOR_SATURATION.comment=鉱物ブロックの発光と光の色の濃さ。明るさは変わらない。0 = 白、1 = 鉱物の色、2 = 原色
+option.DECOR_SATURATION.comment=鉱物ブロックの発光と光の色の濃さ。明るさはほぼ変わらない。0 = 白、1 = 鉱物の色、2 = 原色に近い色
 option.LIGHT_SHADOWS=光源シャドウ
 option.LIGHT_SHADOWS.comment=近くの強い光源をレイトレースし、ブロック・プレイヤー・エンティティが設置光源の影を落とす
 option.LIGHT_SHADOW_STRENGTH=設置光源の影の濃さ
@@ -256,11 +256,11 @@ option.GI_MULTI_BOUNCE.comment=GI のレイが当たった面に前のフレー�
 option.GI_SKY_BOUNCE_STRENGTH=空の光の照り返し
 option.GI_SKY_BOUNCE_STRENGTH.comment=太陽・月・空の光が、GI のレイが当たった面で照り返す量。上げると窓から差し込んだ光で部屋が明るくなる。0 でこの光の照り返しなし
 option.GI_SKY_BOUNCE_SATURATION=空の光の照り返しの色
-option.GI_SKY_BOUNCE_SATURATION.comment=太陽・月・空の光の照り返しに、当たった面の色 (赤いカーペット、緑の草) が乗る濃さ。明るさは変わらない。0 で灰色の照り返し
+option.GI_SKY_BOUNCE_SATURATION.comment=太陽・月・空の光の照り返しに、当たった面の色 (赤いカーペット、緑の草) が乗る濃さ。明るさはほぼ変わらない。0 で灰色の照り返し
 option.GI_BLOCK_BOUNCE_STRENGTH=ブロックライトの照り返し
 option.GI_BLOCK_BOUNCE_STRENGTH.comment=ブロックライトが、GI のレイが当たった面と、照らされた所のすぐ横の壁で照り返す量 (ブロックライトの壁の照り返しにも掛かる)。0 でこの光の照り返しなし
 option.GI_BLOCK_BOUNCE_SATURATION=ブロックライトの照り返しの色
-option.GI_BLOCK_BOUNCE_SATURATION.comment=ブロックライトの照り返しに、当たった面の色 (赤いカーペット、色の付いた壁) が乗る濃さ。明るさは変わらない。0 で灰色の照り返し
+option.GI_BLOCK_BOUNCE_SATURATION.comment=ブロックライトの照り返しに、当たった面の色 (赤いカーペット、色の付いた壁) が乗る濃さ。明るさはほぼ変わらない。0 で灰色の照り返し
 option.GI_SKY_OCCLUSION=空の光の遮蔽
 option.GI_SKY_OCCLUSION.comment=空の光を GI のレイで遮る割合。1 = 空の見える向きだけから光が入る (軒下・洞窟の入り口・室内の奥が暗くなり、入り口の向きが分かる)。0 = スカイライトだけの遮蔽 (向きが無く、照り返しと二重に数える)。既定の 0.5 は室内・洞窟の入り口を暗くしすぎないため (1 では多重反射があっても暗すぎる)。スクリーンスペース / ボクセルレイトレースのみ。ルックのプリセットの値 (ナチュラルでは 1) に掛ける
 option.GI_GROUND_REPLACE=地面の照り返しの置き換え

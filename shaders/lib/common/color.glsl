@@ -38,13 +38,17 @@ vec3 applySaturation(vec3 c, float saturation) {
 /*
  * 原色まで届く彩度。s = 0 で灰色、1 でそのまま、2 で一番小さい成分を 0 にした色 (色相・最大成分の比を保つ)
  * 輝度を保つ式のまま 1 より上へ伸ばすと、輝度に近い成分 (青いラピスの緑など) は 0 に着くまでに他の成分が飛ぶので、
- * 1 から上は最小成分を引いた色へ寄せてから輝度を戻す
+ * 1 から上は最大成分からの差を引き伸ばした色へ寄せてから輝度を戻す
+ * 引き伸ばしは VIVID_STRETCH_MAX 倍まで。灰色に近い画素 (ダイヤの白い模様) は差がわずかで、最小成分を 0 まで
+ * 引き伸ばすと画素ごとに色相が飛ぶため
  */
+const float VIVID_STRETCH_MAX = 4.0;
 vec3 applyVividSaturation(vec3 c, float s) {
     if (s <= 1.0) return applySaturation(c, s);
     float hi = maxOf(c);
     float lo = min(c.r, min(c.g, c.b));
-    vec3 vivid = hi > lo ? (c - lo) * (hi / (hi - lo)) : c;
+    float stretch = min(hi / max(hi - lo, EPS), VIVID_STRETCH_MAX);
+    vec3 vivid = hi - (hi - c) * stretch;
     vec3 r = mix(c, vivid, min(s - 1.0, 1.0));
     return r * (luminance(c) / max(luminance(r), EPS));
 }
