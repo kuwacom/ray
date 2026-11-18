@@ -277,6 +277,11 @@ value.GI_SHORT_HISTORY.8=8 フレーム
 value.GI_SHORT_HISTORY.16=16 フレーム
 option.GI_VOXEL_FADE=ボクセル GI のフェード幅
 option.GI_VOXEL_FADE.comment=ボクセル RT の GI を、ボクセル範囲の端で外側の通常の空の光へ溶かす幅 (ブロック)。大きいほど、空から降りる時や遠景で範囲の境目が目立たない。ボクセル RT のみ
+option.GI_HIT_REUSE=GI の当たりの光源の光を使い回す
+option.GI_HIT_REUSE.comment=GI のレイが画面に映る面に当たった時、その面の設置光源の光を、光源を数え直さずに直接光の結果から求める。光源の多い場所で軽くなる。照り返しの色は、近くの光源の色にわずかに寄る。SSGI とボクセル RT のみ
+option.GI_HIT_LIGHTS=画面外の GI の当たりの光源数
+option.GI_HIT_LIGHTS.comment=GI のレイが画面の外の面に当たった時に数える設置光源の数の上限。光源の多い場所では、明るさの順に等間隔で拾って数の比で戻す。下げると光源の多い場所で軽くなり、画面の外から照り返す光のノイズが少し増える。SSGI とボクセル RT のみ
+value.GI_HIT_LIGHTS.0=全部
 
 # マテリアル
 option.PBR_FORMAT=PBR 形式

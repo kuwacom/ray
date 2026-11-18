@@ -535,6 +535,56 @@ vec3 sumBinLightsUnshadowed(vec3 voxelPos, vec3 normal, vec3 geoNormal, bool nea
     return sum;
 }
 
+/*
+ * GI の当たりの溶岩の直接光の倍率 (着色点の直接光と反射に映る面は変えない)
+ * 溶岩の洞窟の照り返しは当たりの floodfill (種 10 倍) が主で、受ける面と同じ FLOODFILL_STRENGTH 倍にすると半分以下になる。
+ * 当たりの floodfill を戻すと床の GI の揺れが 1.6 倍になり、floodfill の種・溶岩の直接光を上げると照らされる面そのものが先に明るくなる。
+ * 当たりの直接光は解析的に求めるので揺れを増やさず、照り返しだけを戻せる
+ */
+const float LAVA_GI_DIRECT_GAIN = 3.5;
+
+// 光源が溶岩か (溶岩の光は表面のセルの中に登録している。program/light/floodfill.csh)
+bool isLavaLight(LightInstance L) {
+    ivec3 c = ivec3(floor(L.posRadius.xyz));
+    return isInVoxelVolume(c) && getBlockLightIndex(fetchVoxelBlockId(c)) == LIGHT_LAVA;
+}
+
+#ifdef GI_HIT_DIRECT_REUSE
+// 溶岩 (液体) の光源の半径は 1.5 (floodfill.csh の FLUID_LIGHT_SIZE) で、ブロックとエンティティの光源はこれより小さい。
+// ボクセルを引いて溶岩か確かめる光源を、半径で先に絞る
+const float LAVA_LIGHT_SIZE_MIN = 1.0;
+
+/*
+ * deferred2 のビンの和を 1 周で求める。戻り値は影なしの和 (近距離の放射込み、箱の広がりは spread に分ける)、
+ * box と spread は sumBinBoxIrradiance (grid = true) と同じ。giFar は画面に映る GI の当たりが使う照度
+ * (近距離の放射なし、幾何法線、溶岩は LAVA_GI_DIRECT_GAIN 倍。secondaryHitBinLights の nearField = false と同じ式)
+ * 同じ光源を 2 周読まず、GI の当たりで光源を回し直さないように、同じループで足す
+ */
+vec3 sumBinLightsDeferred(vec3 voxelPos, vec3 normal, vec3 geoNormal, bool plant, out vec3 box, out vec3 spread, out vec3 giFar) {
+    box = vec3(0.0);
+    spread = vec3(0.0);
+    giFar = vec3(0.0);
+    if (!isInVoxelVolume(voxelPos)) return vec3(0.0);
+    int bin = lightBinIndex(ivec3(voxelPos));
+    uint n = lightBinCount(bin);
+    vec3 sum = vec3(0.0);
+    for (uint k = 0u; k < n; k++) {
+        LightInstance L = lightBinLight(bin, k);
+        vec3 s;
+        box += lightBoxTerms(L, voxelPos, geoNormal, true, s);
+        if (maxOf(s) > 0.0 && lightBoxSpreadReaches(L, voxelPos, geoNormal)) spread += s;
+        vec3 ln = normal;
+        vec3 lg = geoNormal;
+        float scale = plant ? plantLightNormal(L, voxelPos, ln, lg) : 1.0;
+        sum += evalLightIrradiance(L, voxelPos, ln, lg, true, false) * scale;
+        vec3 far = evalLightIrradiance(L, voxelPos, geoNormal, geoNormal, false);
+        if (L.colorSize.a > LAVA_LIGHT_SIZE_MIN && maxOf(far) > 0.0 && isLavaLight(L)) far *= LAVA_GI_DIRECT_GAIN;
+        giFar += far;
+    }
+    return sum;
+}
+#endif
+
 vec3 sumBinLightsUnshadowed(vec3 voxelPos, vec3 normal, vec3 geoNormal, bool nearField, bool boxSpread) {
     return sumBinLightsUnshadowed(voxelPos, normal, geoNormal, nearField, boxSpread, false);
 }

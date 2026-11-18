@@ -559,6 +559,8 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | GI_SAMPLES | 2 | **1** | **1** | **1** | **1** | 2 | **4** | **4** | **4** | **8** |
 | GI_RES | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | **1** |
 | GI_DENOISE | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 |
+| GI_HIT_REUSE | OFF | OFF | OFF | OFF | OFF | OFF | OFF | OFF | OFF | OFF |
+| GI_HIT_LIGHTS | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | GENERATED_NORMALS | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
 | POM | OFF | OFF | OFF | OFF | OFF | OFF | **ON** | **ON** | **ON** | **ON** |
 | SSS | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |

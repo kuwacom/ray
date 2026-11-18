@@ -72,6 +72,8 @@
 #endif
 #ifdef SCREEN_SPACE_SHADOWS
 #endif
+#ifdef GI_HIT_REUSE
+#endif
 #ifdef NORMAL_MAPPING
 #endif
 #ifdef GENERATED_NORMALS

@@ -31,6 +31,8 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define GI_RESPONSE_STRENGTH 1.0 // [0.5 0.75 1.0 1.5 2.0] GI の履歴を光の変化で縮める強さ。上げると光を置く・消す時に早く追いつき、揺れが少し増える
 #define GI_SHORT_HISTORY 8 // [0 4 8 16] 履歴がこのフレーム数より短い所 (画面の外から入った直後など) は GI を 2 倍の幅でぼかす。0=しない
 #define GI_VOXEL_FADE 32 // [8 16 24 32 48 64] ボクセル RT (GI_MODE=3) の範囲の端で GI を外の空の環境光へ溶かす幅 (ブロック)。体積の各軸の長さの 3/8 まで
+//#define GI_HIT_REUSE // SSGI / ボクセル RT で、画面に映る GI の当たりの設置光源の光を、光源を数え直さずに着色点の直接光から求める
+#define GI_HIT_LIGHTS 0 // [0 8 16 24 32] SSGI / ボクセル RT で、画面の外の GI の当たりが数える設置光源の数の上限 (多いビンは等間隔に拾って比で戻す) 0=全部
 
 // マテリアル / 水 / 反射 (surface モジュール)
 #define PBR_FORMAT 0 // [0 1] 0=なし 1=labPBR

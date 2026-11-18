@@ -277,6 +277,11 @@ value.GI_SHORT_HISTORY.8=8 frames
 value.GI_SHORT_HISTORY.16=16 frames
 option.GI_VOXEL_FADE=Voxel GI Fade Distance
 option.GI_VOXEL_FADE.comment=Width in blocks over which voxel ray traced GI fades into the plain sky light at the edge of the voxel range. Wider hides the edge better when flying down from the sky or looking at distant terrain. Voxel ray tracing only.
+option.GI_HIT_REUSE=Reuse Light at GI Hits
+option.GI_HIT_REUSE.comment=When a GI ray hits a surface that is on screen, its placed-light lighting is taken from the direct lighting result instead of summing the lights again. Faster where there are many lights. The bounce color leans slightly toward the color of nearby lights. SSGI and voxel ray tracing only.
+option.GI_HIT_LIGHTS=Lights at Off-screen GI Hits
+option.GI_HIT_LIGHTS.comment=Most placed lights summed when a GI ray hits a surface off screen. Where there are many lights, they are taken at even steps in brightness order and scaled by the ratio. Lower is faster where there are many lights, with a little more noise in light bounced from off screen. SSGI and voxel ray tracing only.
+value.GI_HIT_LIGHTS.0=All
 
 # Materials
 option.PBR_FORMAT=PBR Format
