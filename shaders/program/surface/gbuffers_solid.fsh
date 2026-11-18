@@ -626,7 +626,7 @@ void main() {
         float glow = smoothstep(0.15, 0.85, maxOf(albedoDry));
         g.emission = max(g.emission, min(DECOR_EMISSION * DECOR_BRIGHTNESS, 1.0) * glow);
         // 発光の色はアルベドなので、光る画素ほど光源と同じ色の濃さ (DECOR_SATURATION) に寄せる。光らせない時は元の色のまま
-        if (DECOR_BRIGHTNESS > 0.0) g.albedo = mix(g.albedo, min(applyVividSaturation(g.albedo, DECOR_SATURATION), 1.0), glow);
+        if (DECOR_BRIGHTNESS > 0.0) g.albedo = mix(g.albedo, min(applyVividSaturation(g.albedo, decorSaturation(blockBase - BLOCK_DECOR_LAPIS)), 1.0), glow);
     }
 #endif
     encodeGBuffer(g, outAlbedo, outNormal, outMaterial);

@@ -80,7 +80,7 @@ void main() {
      * (戻した分を明るさに入れると、届く距離 (lightRange) が色の濃さで伸び縮みする)
      */
     if (i >= LIGHT_DECOR_FIRST && i < LIGHT_DECOR_FIRST + LIGHT_DECOR_COUNT) {
-        blockData.lightDefs[i].color.rgb = applyVividSaturation(blockData.lightDefs[i].color.rgb, DECOR_SATURATION);
+        blockData.lightDefs[i].color.rgb = applyVividSaturation(blockData.lightDefs[i].color.rgb, decorSaturation(i - LIGHT_DECOR_FIRST));
         blockData.lightDefs[i].color.a *= DECOR_BRIGHTNESS;
     }
 #endif

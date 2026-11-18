@@ -134,7 +134,7 @@ option.DECOR_AMETHYST.comment=Makes amethyst blocks and budding amethyst glow.
 option.DECOR_BRIGHTNESS=Mineral Block Brightness
 option.DECOR_BRIGHTNESS.comment=How brightly the mineral blocks glow, and how strongly they light their surroundings. 0 = no glow.
 option.DECOR_SATURATION=Mineral Block Color
-option.DECOR_SATURATION.comment=Color strength of the mineral blocks' glow and light. Brightness stays about the same. 0 = white, 1 = the mineral's color, 2 = close to the pure primary color.
+option.DECOR_SATURATION.comment=Color strength of the mineral blocks' glow and light. Brightness stays about the same. 0 = white, 1 = the mineral's color, 2 = close to the pure primary color (amethyst only gets a slightly deeper purple).
 option.LIGHT_SHADOWS=Light Source Shadows
 option.LIGHT_SHADOWS.comment=Ray traces the strongest nearby lights so blocks, players and entities cast shadows from placed lights.
 option.LIGHT_SHADOW_STRENGTH=Placed Light Shadow Darkness

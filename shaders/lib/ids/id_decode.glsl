@@ -53,6 +53,15 @@ bool isDecorGlowBlock(int blockId) {
     return i <= uint(BLOCK_DECOR_AMETHYST - BLOCK_DECOR_LAPIS) && ((DECOR_GLOW_MASK >> i) & 1u) != 0u;
 }
 
+/*
+ * 鉱物ブロックの色の濃さ (DECOR_SATURATION)。decorIndex は BLOCK_DECOR_LAPIS からの番号 (光源は LIGHT_DECOR_FIRST から同じ順)
+ * アメジストは薄い紫で、原色へ寄せると青が大きく勝って青紫に見えるので、元の紫を少し濃くする所で止める
+ */
+const float DECOR_AMETHYST_SATURATION_MAX = 1.25;
+float decorSaturation(int decorIndex) {
+    return decorIndex == BLOCK_DECOR_AMETHYST - BLOCK_DECOR_LAPIS ? min(DECOR_SATURATION, DECOR_AMETHYST_SATURATION_MAX) : DECOR_SATURATION;
+}
+
 int getBlockLightIndex(int blockId) {
 #if DECORATIVE_BLOCK_LIGHTS == 2
     if (isDecorGlowBlock(blockId)) return LIGHT_DECOR_FIRST + (blockId - BLOCK_DECOR_LAPIS);

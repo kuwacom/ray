@@ -134,7 +134,7 @@ option.DECOR_AMETHYST.comment=アメジストブロックと芽生えたアメ�
 option.DECOR_BRIGHTNESS=鉱物ブロックの明るさ
 option.DECOR_BRIGHTNESS.comment=鉱物ブロックの発光の明るさと、周りを照らす光の強さ。0 で光らない
 option.DECOR_SATURATION=鉱物ブロックの色の濃さ
-option.DECOR_SATURATION.comment=鉱物ブロックの発光と光の色の濃さ。明るさはほぼ変わらない。0 = 白、1 = 鉱物の色、2 = 原色に近い色
+option.DECOR_SATURATION.comment=鉱物ブロックの発光と光の色の濃さ。明るさはほぼ変わらない。0 = 白、1 = 鉱物の色、2 = 原色に近い色 (アメジストは紫を少し濃くするだけ)
 option.LIGHT_SHADOWS=光源シャドウ
 option.LIGHT_SHADOWS.comment=近くの強い光源をレイトレースし、ブロック・プレイヤー・エンティティが設置光源の影を落とす
 option.LIGHT_SHADOW_STRENGTH=設置光源の影の濃さ
