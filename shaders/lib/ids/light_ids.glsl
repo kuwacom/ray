@@ -112,6 +112,7 @@ const uint LIGHT_FLAG_KIND_LANTERN = 2048u; // ランタン (魂・銅を含む)
 const uint LIGHT_FLAG_KIND_BEACON = 4096u;  // ビーコン (ブロック。ビームはマテリアルで分ける)
 const uint LIGHT_FLAG_FLOOD_ONLY = 8192u;   // floodfill の種だけ (点光源の登録と影を持たない。ホタルの茂み)
 const uint LIGHT_FLAG_KIND_EYEBLOSSOM = 16384u; // 開いたアイブロッサム (発光の明るさは EYEBLOSSOM_BRIGHTNESS)
+const uint LIGHT_FLAG_RANGE_MINOR = 32768u; // 弱い・群生する光源 (届く距離に LIGHT_RANGE_MINOR_* を使う。LIGHT_FALLOFF_MODE 1 の時だけ立つ)
 
 // 向きのある光源か (LIGHT_FLAG_FACING の光源。光源の表を引かずに gbuffers で判定する)
 bool isFacingLight(int light) {

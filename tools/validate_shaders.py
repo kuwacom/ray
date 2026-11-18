@@ -86,6 +86,11 @@ VALIDATION_SETS: dict[str, dict[str, str]] = {
                       "ANALOG_C_SMEAR_TINT_MODE": "0", "ANALOG_C_CHROMA_UPSAMPLE_MODE": "1", "ANALOG_C_KNEE_POINT": "1.0",
                       "ANALOG_C_KNEE_RANGE": "1.0", "ANALOG_C_BLOOMING_LENGTH": "16", "ANALOG_C_DROPOUT_RATE": "60.0",
                       "ANALOG_C_FPN_STRENGTH": "2.0", "ANALOG_C_HOT_PIXELS_DENSITY": "0.003", "ANALOG_C_AGC_MAX": "4"},
+    # 光の量の届く距離で、下限が上限より大きい端の値 (lightRange は下限を優先する)
+    "LIGHT_FALLOFF_FLUX": {"LIGHT_FALLOFF_MODE": "1", "LIGHT_RANGE_MAJOR_MAX": "12.0", "LIGHT_RANGE_MAJOR_MIN": "32.0",
+                           "LIGHT_RANGE_MINOR_MAX": "32.0", "LIGHT_RANGE_MINOR_MIN": "4.0"},
+    # レベルに比例する届く距離と窓関数 (以前の方式。プロファイルはどれも光の量)
+    "LIGHT_FALLOFF_LEVEL": {"LIGHT_FALLOFF_MODE": "0"},
 }
 
 STAGE_OF_EXT = {".vsh": "vert", ".fsh": "frag", ".gsh": "geom", ".csh": "comp", ".tcs": "tesc", ".tes": "tese"}
@@ -526,6 +531,12 @@ def static_checks(options: dict[str, Option], profiles: dict[str, list[str]]) ->
             same = (v is True) == default if opt.kind == "bool" else v == default
             if not same:
                 problems.append(f"HIGH と既定値が不一致: {k} (HIGH={v}, 既定={default})")
+    # Iris の <profile> ボタン (1.7 系も 1.11 も ProfileSet) は、継承を解決した後のオプション数の多い順に回り、同数は宣言順になる。
+    # 宣言順が軽い順なので、全プロファイルのオプション数を同じにしておかないと、数の多い高い方のプロファイルが先に来る
+    counts = {p: len(resolve_profile(p, profiles)) for p in profiles}
+    if sorted(profiles, key=lambda p: -counts[p]) != list(profiles):
+        problems.append("プロファイルのボタンの順が宣言順 (軽い順) と違う (オプション数: "
+                        + ", ".join(f"{p}={n}" for p, n in counts.items()) + ")。全プロファイルが同じオプションを書く")
     # Iris は workGroups / workGroupsRender をリテラルとしてしか読めない (式やマクロは #if で分岐して書く)
     for csh in (SHADERS / "program").rglob("*.csh"):
         for i, line in enumerate(csh.read_text(encoding="utf-8").splitlines(), 1):

@@ -259,7 +259,7 @@ world0 の既定値で SSBO を 1 つも宣言しないのは 17 プログラム
 struct LightDef {
     vec4 color;   // rgb = 線形色 (最大成分 1), a = 明るさ倍率
     vec4 shape;   // xyz = ブロック内の発光中心, w = 光源半径 (半影用)
-    vec4 params;  // x = レベル 15 時の到達半径, y = フリッカー量, z = 既定レベル, w = 予備
+    vec4 params;  // x = レベル 15 時の到達半径 (LIGHT_FALLOFF_MODE 1 は明るさ 1 の時), y = フリッカー量, z = 既定レベル, w = 到達半径の下限 (方式 1)
     uvec4 info;   // x = LIGHT_FLAG_*, y = 遮蔽形状, zw = 予備
 };
 struct LightInstance {
@@ -320,6 +320,7 @@ getLightDef(index) -> lightEmission(d, level), lightRange(d, level), lightFallof
 - 実際の光源レベルは `at_midBlock.w` (Iris 1.7+, 状態込みの発光レベル: ロウソク本数・シーピクルス数・リスポーンアンカーの充填等) を優先し、0 ならテーブルの既定レベル
 - 炎系の色は `BLOCKLIGHT_WARMTH` で中性 (sRGB 1.0, 0.86, 0.72) からバニラ寄りの暖色まで動かす。既定 0.6 (黒体で約 3100K。AgX が明るい面の彩度を落とすので見た目は 3500-4000K。0.5 以下ではたいまつの洞窟が中性すぎて炎の色に見えない)
 - 新しい光源の追加 = `tools/id_tables.py` の `LIGHTS` に 1 行足して `uv run tools/gen_block_properties.py` (index の定数、ID、光源の表が生成される)
+- 届く距離 (到達半径) の種類は `Light.reach` (`major` = 主要な光源、`minor` = 弱い・群生する光源。フラグ `LIGHT_FLAG_RANGE_MINOR`)。LIGHT_FALLOFF_MODE 1 では `makeLight` が種類ごとの上限 `LIGHT_RANGE_*_MAX` と下限 `LIGHT_RANGE_*_MIN` を `params.x` / `params.w` に入れ、`lightRange` = clamp(上限 x max(レベル/15, sqrt(明るさ x レベル/15)), 下限, 上限)、`lightFalloff` は 1 次 + 2 次の減衰 g から半径での値 g(R) を (距離/半径)^2 の重みで引き、(g - 引く量)^2 / g で半径で傾きごと 0 にする (窓を掛けない)。方式 0 はレベルに比例する半径と Karis の窓
 - 画面に見える発光の明るさを種類ごとに設定で変える分類は、`Light.kind` (たいまつ・炎・ランタン・ビーコン。フラグ `LIGHT_FLAG_KIND_*`) と、ブロック全体が光る光源 (`LIGHT_FLAG_OCCLUDES`) = 光源ブロック。deferred30 (`opaque_shading.fsh`) が発光の画素の位置のボクセルから光源の表を引いて `EMISSION_*_BRIGHTNESS` を掛ける。ビームはマテリアル、手持ちは持っているアイテムの光源で分ける。溶岩は `LAVA_BRIGHTNESS`。`EMISSION_GLARE` が ON のときは発光の倍率を点の光源 4・面の光源 1.5 にして、白を超えた分を鏡面の白飛び分と同じ経路で TAA の外へ渡す
 
 ### item.properties (`heldItemId` / `heldItemId2` / `currentRenderedItemId`)
@@ -515,6 +516,8 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 |---|---|---|---|---|---|---|---|---|---|---|
 | VOXEL_VOLUME | 2 | **0** | **1** | 2 | 2 | 2 | 2 | 2 | **3** | **3** |
 | FLOODFILL | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
+| LIGHT_RANGE_MAJOR_MIN | 12.0 | **7.0** | **7.0** | **7.0** | 12.0 | 12.0 | 12.0 | 12.0 | 12.0 | 12.0 |
+| LIGHT_RANGE_MINOR_MIN | 12.0 | **7.0** | **7.0** | **7.0** | 12.0 | 12.0 | 12.0 | 12.0 | 12.0 | 12.0 |
 | LIGHT_SHADOWS | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
 | LIGHT_TRACE_COUNT | 4 | **1** | **2** | **2** | 4 | 4 | **8** | **8** | **16** | **16** |
 | LIGHT_TRACE_RES | 2 | **4** | 2 | **4** | **4** | 2 | **1** | 2 | 2 | **1** |

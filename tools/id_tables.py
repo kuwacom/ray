@@ -55,6 +55,9 @@ def state_values(block: str, prop: str, values: list[str]) -> list[str]:
 
 # 発光の見た目の明るさの種類 -> light_def.glsl の LT_* (値は gen_block_properties.py の LIGHT_FLAG_KIND_*)
 KIND_FLAGS = {"torch": "LT_TORCH", "fire": "LT_FIRE", "lantern": "LT_LANTERN", "beacon": "LT_BEACON", "eyeblossom": "LT_EYEBLOSSOM"}
+# 届く距離の種類 -> light_def.glsl の LT_* (major はフラグなし)
+# minor は暗い光源と、自然に群れて多数並ぶ光源 (溶岩・ポータル・ヒカリゴケ・洞窟のツタ)。群れると光源ビンが混むので主要な光源と上限を分ける
+REACH_FLAGS = {"major": "", "minor": "LT_MINOR"}
 
 
 @dataclass(frozen=True)
@@ -76,13 +79,14 @@ class Light:
     facing: bool = False             # 前面だけが光る向きのあるブロック (かまど・ジャック・オ・ランタン)。向きごとに ID を分ける。mask は facing=north を指定する
     kind: str = ""                   # 発光の見た目の明るさを設定で分ける種類 (KIND_FLAGS のキー)。光源ブロック (LT_OCC) は種類を付けずフラグで分ける
     shader_only: bool = False        # エンティティ光源の帯で、エンティティ ID を持たずシェーダーが直接登録するもの
+    reach: str = "major"             # 届く距離の種類 (LIGHT_FALLOFF_MODE 1)。major = 主要な光源 (LIGHT_RANGE_MAJOR_*)、minor = 弱い・群生する光源 (LIGHT_RANGE_MINOR_*)
 
     def make_expr(self) -> str:
         make = self.make + " | LIGHT_FLAG_FACING" if self.facing else self.make
-        if not self.kind:
-            return make
-        flag = KIND_FLAGS[self.kind]
-        return make[:-2] + flag if make.endswith("0u") else f"{make} | {flag}"
+        flags = ([KIND_FLAGS[self.kind]] if self.kind else []) + ([REACH_FLAGS[self.reach]] if REACH_FLAGS[self.reach] else [])
+        for flag in flags:
+            make = make[:-2] + flag if make.endswith(" 0u") else f"{make} | {flag}"
+        return make
 
     def mask_block(self) -> str:
         if self.mask:
@@ -134,7 +138,7 @@ LIGHTS: list[Light] = [
     Light(11, "LIGHT_JACK_O_LANTERN", "jack o'lantern", "fire, 1.0, 15.0, 0.4, LT_CENTER, 0.3, LT_OCC",
           blocks=_lit("jack_o_lantern"), items=_lit("jack_o_lantern"), mask="jack_o_lantern:facing=north", facing=True),
     Light(12, "LIGHT_LAVA", "lava", "LAVA_SRGB, 1.2, 15.0, 0.5, vec3(0.5, 0.45, 0.5), 0.2, LIGHT_FLAG_FLUID",
-          blocks=_lit("lava", "lava_cauldron")),
+          blocks=_lit("lava", "lava_cauldron"), reach="minor"),
     Light(13, "LIGHT_FIRE", "fire", f"{_FIRE_MILD}, 1.1, 15.0, 0.4, {_LOW}, 0.8, 0u", blocks=_lit("fire"), kind="fire"),
     Light(14, "LIGHT_SOUL_FIRE", "soul fire", f"SOUL_SRGB, 0.9, 10.0, 0.4, {_LOW}, 0.6, 0u", blocks=_lit("soul_fire"), kind="fire"),
     Light(15, "LIGHT_CAMPFIRE", "campfire", f"fire, 1.1, 15.0, 0.35, {_LOW}, 0.7, 0u",
@@ -142,7 +146,7 @@ LIGHTS: list[Light] = [
     Light(16, "LIGHT_SOUL_CAMPFIRE", "soul campfire", f"SOUL_SRGB, 0.9, 10.0, 0.35, {_LOW}, 0.5, 0u",
           blocks=_lit("soul_campfire:lit=true"), items=_lit("soul_campfire"), kind="fire"),
     Light(17, "LIGHT_MAGMA_BLOCK", "magma block", "vec3(1.0, 0.40, 0.15), 0.8, 3.0, 0.5, LT_CENTER, 0.1, LT_OCC",
-          blocks=_lit("magma_block"), items=_lit("magma_block")),
+          blocks=_lit("magma_block"), items=_lit("magma_block"), reach="minor"),
     Light(18, "LIGHT_END_ROD", "end rod", "vec3(0.95, 0.90, 1.0), 0.9, 14.0, 0.1, LT_CENTER, 0.0, 0u",
           blocks=_lit("end_rod"), items=_lit("end_rod")),
     Light(19, "LIGHT_BEACON", "beacon", "vec3(0.85, 0.95, 1.0), 1.2, 15.0, 0.4, LT_CENTER, 0.0, 0u",
@@ -150,14 +154,14 @@ LIGHTS: list[Light] = [
     Light(20, "LIGHT_CONDUIT", "conduit", "vec3(0.60, 0.90, 1.0), 1.0, 15.0, 0.2, LT_CENTER, 0.0, 0u",
           blocks=_lit("conduit"), items=_lit("conduit")),
     Light(21, "LIGHT_SEA_PICKLE", "sea pickle", "vec3(0.60, 1.0, 0.75), 0.8, 15.0, 0.15, vec3(0.5, 0.3, 0.5), 0.0, 0u",
-          blocks=_lit("sea_pickle:waterlogged=true"), items=_lit("sea_pickle")),
+          blocks=_lit("sea_pickle:waterlogged=true"), items=_lit("sea_pickle"), reach="minor"),
     Light(22, "LIGHT_GLOW_LICHEN", "glow lichen", "vec3(0.60, 1.0, 0.85), GLOW_LICHEN_BRIGHTNESS, 7.0, 0.3, LT_CENTER, 0.0, 0u",
-          blocks=_lit("glow_lichen"), items=_lit("glow_lichen")),
+          blocks=_lit("glow_lichen"), items=_lit("glow_lichen"), reach="minor"),
     Light(23, "LIGHT_AMETHYST", "amethyst", f"vec3(0.80, 0.55, 1.0), 0.7, 5.0, 0.2, {_LAMP}, 0.0, 0u",
           blocks=_lit("amethyst_cluster", "large_amethyst_bud", "medium_amethyst_bud", "small_amethyst_bud"),
-          items=_lit("amethyst_cluster", "large_amethyst_bud", "medium_amethyst_bud", "small_amethyst_bud")),
+          items=_lit("amethyst_cluster", "large_amethyst_bud", "medium_amethyst_bud", "small_amethyst_bud"), reach="minor"),
     Light(24, "LIGHT_CRYING_OBSIDIAN", "crying obsidian", "vec3(0.60, 0.25, 1.0), 0.8, 10.0, 0.5, LT_CENTER, 0.0, LT_OCC",
-          blocks=_lit("crying_obsidian"), items=_lit("crying_obsidian")),
+          blocks=_lit("crying_obsidian"), items=_lit("crying_obsidian"), reach="minor"),
     Light(25, "LIGHT_RESPAWN_ANCHOR", "respawn anchor", "vec3(0.65, 0.30, 1.0), 1.0, 15.0, 0.4, vec3(0.5, 0.9, 0.5), 0.0, LT_OCC",
           blocks=tuple(state_values("respawn_anchor", "charges", ["1", "2", "3", "4"])), mask="respawn_anchor:charges=4"),
     Light(26, "LIGHT_REDSTONE_LAMP", "redstone lamp", "vec3(1.0, 0.75, 0.55), 1.0, 15.0, 0.5, LT_CENTER, 0.0, LT_OCC",
@@ -179,53 +183,53 @@ LIGHTS: list[Light] = [
     Light(47, "LIGHT_COPPER_BULB", "copper bulb", "vec3(1.0, 0.80, 0.60), 1.0, 15.0, 0.5, LT_CENTER, 0.0, LT_OCC",
           blocks=tuple(with_state([f"{p}copper_bulb" for p in COPPER_PREFIX] + [f"waxed_{p}copper_bulb" for p in COPPER_PREFIX], "lit=true"))),
     Light(48, "LIGHT_REDSTONE_ORE", "lit redstone ore", "vec3(1.0, 0.20, 0.10), 0.6, 9.0, 0.5, LT_CENTER, 0.0, LT_OCC",
-          blocks=_lit("redstone_ore:lit=true", "deepslate_redstone_ore:lit=true")),
+          blocks=_lit("redstone_ore:lit=true", "deepslate_redstone_ore:lit=true"), reach="minor"),
     Light(49, "LIGHT_FURNACE", "lit furnaces", f"{_FIRE_BLAZE}, 0.9, 13.0, 0.3, vec3(0.5, 0.3, 0.5), 0.5, LT_OCC",
           blocks=_lit("furnace:lit=true", "smoker:lit=true", "blast_furnace:lit=true"),
           mask="furnace:lit=true:facing=north", facing=True),
     Light(50, "LIGHT_BREWING_STAND", "brewing stand", "vec3(1.0, 0.85, 0.50), 0.6, 1.0, 0.1, vec3(0.5, 0.2, 0.5), 0.0, 0u",
-          blocks=_lit("brewing_stand")),
+          blocks=_lit("brewing_stand"), reach="minor"),
     Light(51, "LIGHT_ENCHANTING_TABLE", "enchanting table", "vec3(0.70, 0.60, 1.0), 0.6, 7.0, 0.3, vec3(0.5, 0.75, 0.5), 0.0, 0u",
-          blocks=_lit("enchanting_table")),
+          blocks=_lit("enchanting_table"), reach="minor"),
     Light(52, "LIGHT_END_PORTAL_FRAME", "end portal frame (with eye)", "vec3(0.50, 0.90, 0.75), 0.5, 1.0, 0.2, vec3(0.5, 0.9, 0.5), 0.0, 0u",
-          blocks=_lit("end_portal_frame:eye=true")),
+          blocks=_lit("end_portal_frame:eye=true"), reach="minor"),
     Light(53, "LIGHT_END_PORTAL", "end portal", "vec3(0.50, 0.75, 0.90), 0.8, 15.0, 0.5, LT_CENTER, 0.0, 0u",
-          blocks=_lit("end_portal", "end_gateway")),
+          blocks=_lit("end_portal", "end_gateway"), reach="minor"),
     Light(54, "LIGHT_NETHER_PORTAL", "nether portal", "vec3(0.60, 0.25, 1.0), 0.9, 11.0, 0.5, LT_CENTER, 0.2, 0u",
-          blocks=_lit("nether_portal")),
+          blocks=_lit("nether_portal"), reach="minor"),
     Light(55, "LIGHT_LIGHT_BLOCK", "light block", "vec3(1.0, 0.95, 0.90), 1.0, 15.0, 0.0, LT_CENTER, 0.0, 0u",
           blocks=_lit("light"), items=_lit("light")),
     Light(56, "LIGHT_SCULK_CATALYST", "sculk catalyst", "vec3(0.30, 0.85, 0.90), 0.6, 6.0, 0.4, vec3(0.5, 0.9, 0.5), 0.0, LT_OCC",
-          blocks=_lit("sculk_catalyst"), items=_lit("sculk_catalyst")),
+          blocks=_lit("sculk_catalyst"), items=_lit("sculk_catalyst"), reach="minor"),
     Light(57, "LIGHT_SCULK_SENSOR", "sculk sensor", f"vec3(0.30, 0.85, 0.90), 0.5, 1.0, 0.2, {_LOW}, 0.0, 0u",
-          blocks=_lit("sculk_sensor", "calibrated_sculk_sensor")),
+          blocks=_lit("sculk_sensor", "calibrated_sculk_sensor"), reach="minor"),
     Light(58, "LIGHT_CAVE_VINES", "glowing cave vines", "vec3(1.0, 0.75, 0.40), 0.9, 14.0, 0.15, LT_CENTER, 0.0, 0u",
-          blocks=_lit("cave_vines:berries=true", "cave_vines_plant:berries=true")),
+          blocks=_lit("cave_vines:berries=true", "cave_vines_plant:berries=true"), reach="minor"),
     Light(59, "LIGHT_DRAGON_EGG", "dragon egg", "vec3(0.70, 0.30, 1.0), 0.5, 1.0, 0.3, LT_CENTER, 0.0, 0u",
-          blocks=_lit("dragon_egg")),
+          blocks=_lit("dragon_egg"), reach="minor"),
     Light(60, "LIGHT_ENDER_CHEST", "ender chest", "vec3(0.40, 0.90, 0.80), 0.6, 7.0, 0.3, LT_CENTER, 0.0, 0u",
-          blocks=_lit("ender_chest")),
+          blocks=_lit("ender_chest"), reach="minor"),
     Light(61, "LIGHT_FIREFLY_BUSH", "firefly bush", "vec3(0.85, 1.0, 0.50), FIREFLY_BUSH_BRIGHTNESS, 2.0, 0.4, vec3(0.5, 0.7, 0.5), 0.6, LT_FLOOD",
-          blocks=_lit("firefly_bush"), items=_lit("firefly_bush")),
+          blocks=_lit("firefly_bush"), items=_lit("firefly_bush"), reach="minor"),
     Light(62, "LIGHT_TRIAL_SPAWNER", "trial spawner / vault (active)", "vec3(1.0, 0.70, 0.40), 0.8, 8.0, 0.4, LT_CENTER, 0.3, 0u",
           blocks=tuple([*state_values("trial_spawner", "trial_spawner_state", ["active", "waiting_for_reward_ejection", "ejecting_reward"]),
-                        *state_values("vault", "vault_state", ["active", "unlocking", "ejecting"])])),
+                        *state_values("vault", "vault_state", ["active", "unlocking", "ejecting"])]), reach="minor"),
     # 鉱物ブロック (ブロック ID は 13-18。block.properties は BLOCKS 側)
     Light(63, "LIGHT_DECOR_FIRST", "decorative lapis", f"vec3(0.25, 0.45, 1.00), {_DECOR}",
           comment="63-68: BLOCK_DECOR_* (lapis, emerald, diamond, gold, redstone, amethyst)。DECORATIVE_BLOCK_LIGHTS 2 の時だけ使う",
-          label="LIGHT_DECOR_FIRST + 0", mask="lapis_block"),
-    Light(64, None, "decorative emerald", f"vec3(0.30, 1.00, 0.50), {_DECOR}", label="LIGHT_DECOR_FIRST + 1", mask="emerald_block"),
-    Light(65, None, "decorative diamond", f"vec3(0.50, 0.95, 1.00), {_DECOR}", label="LIGHT_DECOR_FIRST + 2", mask="diamond_block"),
-    Light(66, None, "decorative gold", f"vec3(1.00, 0.80, 0.35), {_DECOR}", label="LIGHT_DECOR_FIRST + 3", mask="gold_block"),
-    Light(67, None, "decorative redstone", f"vec3(1.00, 0.15, 0.08), {_DECOR}", label="LIGHT_DECOR_FIRST + 4", mask="redstone_block"),
-    Light(68, None, "decorative amethyst", f"vec3(0.75, 0.50, 1.00), {_DECOR}", label="LIGHT_DECOR_FIRST + 5", mask="amethyst_block"),
+          label="LIGHT_DECOR_FIRST + 0", mask="lapis_block", reach="minor"),
+    Light(64, None, "decorative emerald", f"vec3(0.30, 1.00, 0.50), {_DECOR}", label="LIGHT_DECOR_FIRST + 1", mask="emerald_block", reach="minor"),
+    Light(65, None, "decorative diamond", f"vec3(0.50, 0.95, 1.00), {_DECOR}", label="LIGHT_DECOR_FIRST + 2", mask="diamond_block", reach="minor"),
+    Light(66, None, "decorative gold", f"vec3(1.00, 0.80, 0.35), {_DECOR}", label="LIGHT_DECOR_FIRST + 3", mask="gold_block", reach="minor"),
+    Light(67, None, "decorative redstone", f"vec3(1.00, 0.15, 0.08), {_DECOR}", label="LIGHT_DECOR_FIRST + 4", mask="redstone_block", reach="minor"),
+    Light(68, None, "decorative amethyst", f"vec3(0.75, 0.50, 1.00), {_DECOR}", label="LIGHT_DECOR_FIRST + 5", mask="amethyst_block", reach="minor"),
     # 開いたアイブロッサム (夜)。ホタルの茂みと同じく floodfill の種だけで、点光源と影を持たない。閉じた花は光らない (植物のまま)
     Light(69, "LIGHT_EYEBLOSSOM", "open eyeblossom", "vec3(1.0, 0.65, 0.35), EYEBLOSSOM_BRIGHTNESS * 0.2, 3.0, 0.3, vec3(0.5, 0.6, 0.5), 0.0, LT_FLOOD",
-          blocks=_lit("open_eyeblossom"), items=_lit("open_eyeblossom"), kind="eyeblossom"),
+          blocks=_lit("open_eyeblossom"), items=_lit("open_eyeblossom"), kind="eyeblossom", reach="minor"),
     # 植木鉢の開いたアイブロッサム。揺らさず、鉢の画素は光らせないので花と ID を分ける。花は鉢の上に持ち上がるので発光中心を高くする
     Light(70, "LIGHT_POTTED_EYEBLOSSOM", "potted open eyeblossom",
           "vec3(1.0, 0.65, 0.35), EYEBLOSSOM_BRIGHTNESS * 0.2, 3.0, 0.3, vec3(0.5, 0.7, 0.5), 0.0, LT_FLOOD",
-          blocks=_lit("potted_open_eyeblossom"), kind="eyeblossom"),
+          blocks=_lit("potted_open_eyeblossom"), kind="eyeblossom", reach="minor"),
 
     Light(128, "LIGHT_ITEM_LAVA_BUCKET", "lava bucket", "LAVA_SRGB, 1.0, 15.0, 0.2, LT_CENTER, 0.2, LT_CAT_ITEM", items=_lit("lava_bucket")),
     Light(129, "LIGHT_ITEM_GLOWSTONE_DUST", "glowstone dust", "vec3(1.0, 0.80, 0.52), 0.7, 8.0, 0.1, LT_CENTER, 0.0, LT_CAT_ITEM", items=_lit("glowstone_dust")),
@@ -239,11 +243,11 @@ LIGHTS: list[Light] = [
     Light(137, "LIGHT_ITEM_END_CRYSTAL", "end crystal", "vec3(1.0, 0.70, 0.95), 0.9, 12.0, 0.1, LT_CENTER, 0.0, LT_CAT_ITEM", items=_lit("end_crystal")),
 
     Light(192, "LIGHT_ENTITY_BLAZE", "blaze", f"{_FIRE_BLAZE}, 1.0, 12.0, 0.4, LT_CENTER, 0.5, LT_CAT_GLOW", entities=_lit("minecraft:blaze")),
-    Light(193, "LIGHT_ENTITY_MAGMA_CUBE", "magma cube", "LAVA_SRGB, 0.8, 10.0, 0.4, LT_CENTER, 0.1, LT_CAT_GLOW", entities=_lit("minecraft:magma_cube")),
-    Light(194, "LIGHT_ENTITY_GLOW_SQUID", "glow squid", "vec3(0.40, 1.0, 0.90), 0.6, 6.0, 0.4, LT_CENTER, 0.0, LT_CAT_GLOW", entities=_lit("minecraft:glow_squid")),
-    Light(195, "LIGHT_ENTITY_ALLAY", "allay", "vec3(0.50, 0.85, 1.0), 0.6, 5.0, 0.2, LT_CENTER, 0.0, LT_CAT_GLOW", entities=_lit("minecraft:allay")),
+    Light(193, "LIGHT_ENTITY_MAGMA_CUBE", "magma cube", "LAVA_SRGB, 0.8, 10.0, 0.4, LT_CENTER, 0.1, LT_CAT_GLOW", entities=_lit("minecraft:magma_cube"), reach="minor"),
+    Light(194, "LIGHT_ENTITY_GLOW_SQUID", "glow squid", "vec3(0.40, 1.0, 0.90), 0.6, 6.0, 0.4, LT_CENTER, 0.0, LT_CAT_GLOW", entities=_lit("minecraft:glow_squid"), reach="minor"),
+    Light(195, "LIGHT_ENTITY_ALLAY", "allay", "vec3(0.50, 0.85, 1.0), 0.6, 5.0, 0.2, LT_CENTER, 0.0, LT_CAT_GLOW", entities=_lit("minecraft:allay"), reach="minor"),
     Light(196, "LIGHT_ENTITY_END_CRYSTAL", "end crystal", "vec3(1.0, 0.70, 0.95), 1.2, 15.0, 0.5, LT_CENTER, 0.0, LT_CAT_GLOW", entities=_lit("minecraft:end_crystal")),
-    Light(197, "LIGHT_ENTITY_EXPERIENCE_ORB", "experience orb", "vec3(0.70, 1.0, 0.30), 0.5, 5.0, 0.1, LT_CENTER, 0.0, LT_CAT_GLOW", entities=_lit("minecraft:experience_orb")),
+    Light(197, "LIGHT_ENTITY_EXPERIENCE_ORB", "experience orb", "vec3(0.70, 1.0, 0.30), 0.5, 5.0, 0.1, LT_CENTER, 0.0, LT_CAT_GLOW", entities=_lit("minecraft:experience_orb"), reach="minor"),
     Light(198, "LIGHT_ENTITY_SPECTRAL_ARROW", "spectral arrow", "vec3(1.0, 0.90, 0.50), 0.7, 8.0, 0.05, LT_CENTER, 0.0, LT_CAT_PROJ", entities=_lit("minecraft:spectral_arrow")),
     Light(199, "LIGHT_ENTITY_FIREBALL", "fireball", "fire, 1.0, 13.0, 0.3, LT_CENTER, 0.5, LT_CAT_PROJ", entities=_lit("minecraft:fireball", "minecraft:small_fireball")),
     Light(200, "LIGHT_ENTITY_DRAGON_FIREBALL", "dragon fireball", "vec3(0.85, 0.40, 1.0), 1.0, 12.0, 0.3, LT_CENTER, 0.3, LT_CAT_PROJ", entities=_lit("minecraft:dragon_fireball")),
@@ -253,12 +257,12 @@ LIGHTS: list[Light] = [
     Light(204, "LIGHT_ENTITY_LIGHTNING", "lightning bolt", "vec3(0.80, 0.85, 1.0), 4.0, 15.0, 1.0, LT_CENTER, 0.0, LT_CAT_GLOW", entities=_lit("minecraft:lightning_bolt")),
     Light(205, "LIGHT_ENTITY_FLAME", "entity flame", f"{_FIRE_MILD}, 1.0, 15.0, 0.4, LT_CENTER, 0.8, LT_CAT_BURN",
           entities=_lit("minecraft:entity_flame"), entity_note="Flames on burning entities (Iris hardcoded ID)"),
-    Light(206, "LIGHT_ENTITY_SHULKER_BULLET", "shulker bullet", "vec3(1.0, 0.95, 0.85), 0.6, 6.0, 0.1, LT_CENTER, 0.0, LT_CAT_PROJ", entities=_lit("minecraft:shulker_bullet")),
+    Light(206, "LIGHT_ENTITY_SHULKER_BULLET", "shulker bullet", "vec3(1.0, 0.95, 0.85), 0.6, 6.0, 0.1, LT_CENTER, 0.0, LT_CAT_PROJ", entities=_lit("minecraft:shulker_bullet"), reach="minor"),
     Light(207, "LIGHT_ENTITY_TNT_MINECART", "tnt minecart", "vec3(1.0, 1.0, 1.0), 1.0, 10.0, 0.5, LT_CENTER, 0.0, LT_CAT_GLOW | LIGHT_FLAG_ENTITY_FLASH", entities=_lit("minecraft:tnt_minecart")),
     # 帯電したクリーパーとウィザーの防壁の電気の渦。ID では帯電が分からないので、渦の層を描く影パスが直接登録する
     # 直接光 (影のレイ) にすると帯電クリーパーとウィザーの近くで 0.8-1.2 ms 重く、照らし方も強すぎたので floodfill の種だけにする
     Light(208, "LIGHT_ENTITY_SWIRL", "energy swirl", "vec3(0.80, 0.90, 1.0), CHARGED_CREEPER_LIGHT_BRIGHTNESS, 10.0, 0.4, LT_CENTER, 0.0, LT_FLOOD",
-          shader_only=True),
+          shader_only=True, reach="minor"),
 ]
 
 # 光源にならないエンティティ: (ID, 定数名, GLSL のコメント, 名前, entity.properties の上のコメント)
