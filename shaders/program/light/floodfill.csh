@@ -304,7 +304,7 @@ void main() {
                 if ((((selfFaces >> uint(i)) | (nFaces >> uint(i ^ 1))) & 1u) != 0u) light -= nb[i];
             }
         }
-        if (BLOCKLIGHT_BOUNCE > 0.0) light += floodBounce(cell);
+        if (FLOOD_BOUNCE_STRENGTH > 0.0) light += floodBounce(cell);
         light *= (FLOOD_DECAY / 6.0) * floodCellTransmittance(voxelId);
     }
     light = max(light, emission);

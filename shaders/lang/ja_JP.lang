@@ -258,9 +258,9 @@ option.GI_SKY_BOUNCE_STRENGTH.comment=太陽・月・空の光が、GI のレイ
 option.GI_SKY_BOUNCE_SATURATION=空の光の照り返しの色
 option.GI_SKY_BOUNCE_SATURATION.comment=太陽・月・空の光の照り返しに、当たった面の色 (赤いカーペット、緑の草) が乗る濃さ。明るさは変わらない。0 で灰色の照り返し
 option.GI_BLOCK_BOUNCE_STRENGTH=ブロックライトの照り返し
-option.GI_BLOCK_BOUNCE_STRENGTH.comment=ブロックライトが、GI のレイが当たった面で照り返す量。0 でこの光の照り返しなし (SSGI / ボクセルレイトレースのみ)
+option.GI_BLOCK_BOUNCE_STRENGTH.comment=ブロックライトが、GI のレイが当たった面と、照らされた所のすぐ横の壁で照り返す量 (ブロックライトの壁の照り返しにも掛かる)。0 でこの光の照り返しなし
 option.GI_BLOCK_BOUNCE_SATURATION=ブロックライトの照り返しの色
-option.GI_BLOCK_BOUNCE_SATURATION.comment=ブロックライトの照り返しに、当たった面の色が乗る濃さ。明るさは変わらない。0 で灰色の照り返し (SSGI / ボクセルレイトレースのみ)
+option.GI_BLOCK_BOUNCE_SATURATION.comment=ブロックライトの照り返しに、当たった面の色 (赤いカーペット、色の付いた壁) が乗る濃さ。明るさは変わらない。0 で灰色の照り返し
 option.GI_SKY_OCCLUSION=空の光の遮蔽
 option.GI_SKY_OCCLUSION.comment=空の光を GI のレイで遮る割合。1 = 空の見える向きだけから光が入る (軒下・洞窟の入り口・室内の奥が暗くなり、入り口の向きが分かる)。0 = スカイライトだけの遮蔽 (向きが無く、照り返しと二重に数える)。既定の 0.5 は室内・洞窟の入り口を暗くしすぎないため (1 では多重反射があっても暗すぎる)。スクリーンスペース / ボクセルレイトレースのみ。ルックのプリセットの値 (ナチュラルでは 1) に掛ける
 option.GI_GROUND_REPLACE=地面の照り返しの置き換え
