@@ -158,6 +158,8 @@ value.LIGHT_EMISSION_MASK_MODE.1=光る範囲
 value.LIGHT_EMISSION_MASK_MODE.2=テクスチャのマスク
 option.LIGHT_TRANSLUCENT_TINT=色ガラスの色付け
 option.LIGHT_TRANSLUCENT_TINT.comment=色付きガラスを通った光に色が付く
+option.LIGHT_TRANSLUCENT_TINT_SATURATION=色ガラスを通るブロックライトの色
+option.LIGHT_TRANSLUCENT_TINT_SATURATION.comment=色付きガラスを通るブロックライトの色の濃さ。明るさはほぼ変わらない。0 = 色なし (暗くなるだけ)、1 = ガラスの色
 option.LIGHT_SPECULAR=ブロックライトの鏡面反射
 option.LIGHT_DENOISE=ノイズ除去
 value.LIGHT_DENOISE.0=なし
@@ -235,6 +237,8 @@ option.MOON_SHADOW_STRENGTH=月の影の濃さ
 option.MOON_SHADOW_STRENGTH.comment=月とエンドの光が落とす影の濃さ。0 で影なし、1 で完全な影
 option.SHADOW_COLORED=色付きの影
 option.SHADOW_COLORED.comment=色ガラスや水が色の付いた太陽の影を落とす
+option.SHADOW_COLORED_SATURATION=色ガラスを通る日光の色
+option.SHADOW_COLORED_SATURATION.comment=色付きガラスを通る太陽・月の光 (色付きの影と光芒) の色の濃さ。明るさはほぼ変わらない。0 = 色なし (暗くなるだけ)、1 = ガラスの色
 option.ENTITY_SHADOWS=エンティティの影
 option.BLOCK_ENTITY_SHADOWS=ブロックエンティティの影
 option.SCREEN_SPACE_SHADOWS=接触影
