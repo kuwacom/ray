@@ -136,6 +136,8 @@ option.LIGHT_SHADOWS.comment=Ray traces the strongest nearby lights so blocks, p
 option.LIGHT_SHADOW_STRENGTH=Placed Light Shadow Darkness
 option.LIGHT_SHADOW_STRENGTH.comment=How dark the shadows cast by placed lights are, including dropped, burning and glowing entities. 0 = no shadows, 1 = full shadows.
 option.LIGHT_TRACE_COUNT=Traced Lights per Pixel
+option.LIGHT_TRACE_SPLIT=Shadow Rays in Dense Areas
+option.LIGHT_TRACE_SPLIT.comment=In pixels lit by more lights than Traced Lights per Pixel, only the much brighter lights are traced every frame and the other rays go to lights picked at random in proportion to their brightness. Where many lights of similar brightness sit together (amethyst clusters), fewer traced lights give less shadow noise. Same cost.
 option.LIGHT_TRACE_RES=Trace Resolution
 option.LIGHT_TRACE_RES.comment=Resolution of the light shadow trace. Lower is faster but noisier.
 value.LIGHT_TRACE_RES.1=Full

@@ -30,6 +30,8 @@
 #endif
 #ifdef LIGHT_SHADOWS
 #endif
+#ifdef LIGHT_TRACE_SPLIT
+#endif
 #ifdef LIGHT_SHAPE_TRACE
 #endif
 #ifdef LIGHT_TRANSLUCENT_TINT

@@ -520,6 +520,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | LIGHT_RANGE_MINOR_MIN | 12.0 | **7.0** | **7.0** | **7.0** | 12.0 | 12.0 | 12.0 | 12.0 | 12.0 | 12.0 |
 | LIGHT_SHADOWS | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
 | LIGHT_TRACE_COUNT | 4 | **1** | **2** | **2** | 4 | 4 | **8** | **8** | **16** | **16** |
+| LIGHT_TRACE_SPLIT | OFF | OFF | OFF | OFF | OFF | OFF | OFF | OFF | OFF | OFF |
 | LIGHT_TRACE_RES | 2 | **4** | 2 | **4** | **4** | 2 | **1** | 2 | 2 | **1** |
 | LIGHT_SHAPE_TRACE | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
 | LIGHT_EMISSION_MASK_MODE | 0 | 0 | 0 | 0 | 0 | 0 | **1** | **2** | **2** | **2** |
