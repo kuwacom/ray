@@ -391,9 +391,11 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 [deferred_a.csh] SSBO2 の各光源 -> 到達球が重なるライトビン (8³, ワールド格子) へ重要度の降順で (atomicMax の鎖)
 [deferred1.csh]  ピクセル (1/LIGHT_TRACE_RES) ごとに: 所属ビンの光源を重み (影なし照度の輝度 = 放射 x 減衰 x NdotL) で評価 ->
                  上位 LIGHT_TRACE_COUNT - 1 個を確定で、残りからリザーバサンプリングで選んだ 1 個を 1/確率 倍で DDA トレース
+                 (LIGHT_TRACE_SPLIT: 光源が LIGHT_TRACE_COUNT より多いピクセルは、全体の 1/本数 以上の光源だけを確定で、残りの本数をくじで)
                  -> blockLightRawImg (影あり S) / blockLightAuxImg (影なし U)
 [deferred2.fsh]  可視率 S/U を空間 (法線/深度エッジ停止) + 時間 (再投影 + 分散クリップ) でデノイズし、
                  フル解像度で求めたビン内全光源の影なし照度に掛ける -> colortex6
+                 (GI_HIT_REUSE: colortex6.a に、近距離の放射を除いた照度の輝度の比。画面に映る GI の当たりが光源を数え直さずに使う)
 [deferred30.fsh] gatherSurfaceLights で、直接光 colortex6 + floodfill x FLOODFILL_STRENGTH (+ 手持ち光源 + 鏡面) を集めて合成
 ```
 
@@ -519,8 +521,8 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | LIGHT_RANGE_MAJOR_MIN | 12.0 | **7.0** | **7.0** | **7.0** | 12.0 | 12.0 | 12.0 | 12.0 | 12.0 | 12.0 |
 | LIGHT_RANGE_MINOR_MIN | 12.0 | **7.0** | **7.0** | **7.0** | 12.0 | 12.0 | 12.0 | 12.0 | 12.0 | 12.0 |
 | LIGHT_SHADOWS | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
-| LIGHT_TRACE_COUNT | 4 | **1** | **2** | **2** | 4 | 4 | **8** | **8** | **16** | **16** |
-| LIGHT_TRACE_SPLIT | OFF | OFF | OFF | OFF | OFF | OFF | OFF | OFF | OFF | OFF |
+| LIGHT_TRACE_COUNT | 4 | **1** | **2** | **2** | 4 | 4 | 4 | 4 | **8** | **16** |
+| LIGHT_TRACE_SPLIT | OFF | OFF | OFF | OFF | OFF | OFF | **ON** | **ON** | OFF | OFF |
 | LIGHT_TRACE_RES | 2 | **4** | 2 | **4** | **4** | 2 | **1** | 2 | 2 | **1** |
 | LIGHT_SHAPE_TRACE | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
 | LIGHT_EMISSION_MASK_MODE | 0 | 0 | 0 | 0 | 0 | 0 | **1** | **2** | **2** | **2** |
@@ -533,7 +535,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | LIGHT_ENTITY_TRIANGLES | 4096 | **2048** | **2048** | 4096 | 4096 | 4096 | **8192** | **8192** | **16384** | **16384** |
 | LIGHT_CONTACT_SHADOWS | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
 | LIGHT_MAX_COUNT | 4096 | **2048** | 4096 | 4096 | 4096 | 4096 | 4096 | 4096 | **8192** | **8192** |
-| LIGHT_BIN_LIGHTS | 64 | **32** | 64 | **48** | 64 | 64 | 64 | 64 | **96** | **96** |
+| LIGHT_BIN_LIGHTS | 64 | **24** | **48** | **48** | **48** | 64 | 64 | 64 | 64 | **96** |
 | LIGHT_TRACE_STEPS | 96 | **64** | 96 | 96 | 96 | 96 | 96 | 96 | **128** | **128** |
 | LIGHT_SPECULAR_COUNT | 4 | **2** | **2** | **2** | **2** | 4 | 4 | 4 | 4 | 4 |
 | LIGHT_CONTACT_SHADOW_COUNT | 4 | **1** | **2** | **2** | **2** | 4 | 4 | 4 | 4 | 4 |
@@ -559,8 +561,8 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | GI_SAMPLES | 2 | **1** | **1** | **1** | **1** | 2 | **4** | **4** | **4** | **8** |
 | GI_RES | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | **1** |
 | GI_DENOISE | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 |
-| GI_HIT_REUSE | OFF | OFF | OFF | OFF | OFF | OFF | OFF | OFF | OFF | OFF |
-| GI_HIT_LIGHTS | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| GI_HIT_REUSE | OFF | OFF | OFF | OFF | OFF | OFF | **ON** | **ON** | **ON** | **ON** |
+| GI_HIT_LIGHTS | 0 | 0 | 0 | 0 | 0 | 0 | **16** | **16** | **16** | **16** |
 | GENERATED_NORMALS | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
 | POM | OFF | OFF | OFF | OFF | OFF | OFF | **ON** | **ON** | **ON** | **ON** |
 | SSS | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
