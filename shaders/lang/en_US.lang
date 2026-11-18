@@ -264,8 +264,15 @@ value.GI_HISTORY_MAX.8=8 frames (fast, noisy)
 value.GI_HISTORY_MAX.16=16 frames
 value.GI_HISTORY_MAX.32=32 frames
 value.GI_HISTORY_MAX.64=64 frames (clean)
+value.GI_HISTORY_MAX.128=128 frames (experimental, GI drifts a little darker)
 option.GI_RESPONSE_STRENGTH=GI Response
 option.GI_RESPONSE_STRENGTH.comment=How strongly the GI history is cut when the lighting changes. Higher catches up sooner after placing or breaking a light, with a little more flicker. Needs the GI denoiser. No extra cost.
+option.GI_SHORT_HISTORY=GI Wide Blur for New Areas
+option.GI_SHORT_HISTORY.comment=Where the GI history is shorter than this (just turned into view, uncovered, or the light just changed), GI is blurred twice as wide with the same number of taps, so the blotches calm down sooner. Needs the GI denoiser. No extra cost.
+value.GI_SHORT_HISTORY.0=Off
+value.GI_SHORT_HISTORY.4=4 frames
+value.GI_SHORT_HISTORY.8=8 frames
+value.GI_SHORT_HISTORY.16=16 frames
 option.GI_VOXEL_FADE=Voxel GI Fade Distance
 option.GI_VOXEL_FADE.comment=Width in blocks over which voxel ray traced GI fades into the plain sky light at the edge of the voxel range. Wider hides the edge better when flying down from the sky or looking at distant terrain. Voxel ray tracing only.
 

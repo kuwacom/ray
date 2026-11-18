@@ -27,8 +27,9 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define GI_GROUND_REPLACE 1.0 // [0.0 0.25 0.5 0.75 1.0] 空の環境光の灰色の地面の照り返しを GI (実際の地面の色) に置き換える割合 0=置き換えない (二重に数える)
 #define GI_RES 2 // [1 2] GI 解像度の分母
 #define GI_DENOISE 2 // [0 1 2] 0=なし 1=時間 2=時間+空間
-#define GI_HISTORY_MAX 64 // [8 16 32 64] GI の時間方向の蓄積に使う過去のフレーム数の上限。長いほど静止時の揺れが減る (光の変化は GI_RESPONSE_STRENGTH の検出で追う)
+#define GI_HISTORY_MAX 64 // [8 16 32 64 128] GI の時間方向の蓄積に使う過去のフレーム数の上限。長いほど静止時の揺れが減る (光の変化は GI_RESPONSE_STRENGTH の検出で追う)
 #define GI_RESPONSE_STRENGTH 1.0 // [0.5 0.75 1.0 1.5 2.0] GI の履歴を光の変化で縮める強さ。上げると光を置く・消す時に早く追いつき、揺れが少し増える
+#define GI_SHORT_HISTORY 8 // [0 4 8 16] 履歴がこのフレーム数より短い所 (画面の外から入った直後など) は GI を 2 倍の幅でぼかす。0=しない
 #define GI_VOXEL_FADE 32 // [8 16 24 32 48 64] ボクセル RT (GI_MODE=3) の範囲の端で GI を外の空の環境光へ溶かす幅 (ブロック)。体積の各軸の長さの 3/8 まで
 
 // マテリアル / 水 / 反射 (surface モジュール)

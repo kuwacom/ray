@@ -264,8 +264,15 @@ value.GI_HISTORY_MAX.8=8 フレーム (速い・粗い)
 value.GI_HISTORY_MAX.16=16 フレーム
 value.GI_HISTORY_MAX.32=32 フレーム
 value.GI_HISTORY_MAX.64=64 フレーム (綺麗)
+value.GI_HISTORY_MAX.128=128 フレーム (試し。照り返しが少し暗くずれる)
 option.GI_RESPONSE_STRENGTH=GI の追従
 option.GI_RESPONSE_STRENGTH.comment=光が変わった時に GI の履歴を縮める強さ。上げると光源を置く・壊す時に早く追いつき、ちらつきが少し増える。GI のノイズ除去が必要。重さは変わらない
+option.GI_SHORT_HISTORY=新しく見えた所の GI のぼかし
+option.GI_SHORT_HISTORY.comment=GI の履歴がこれより短い所 (振り向いて画面に入った直後、物の陰から出た所、光が変わった直後) は、同じタップ数で 2 倍の幅にぼかしてまだらを早く落ち着かせる。GI のノイズ除去が必要。重さは変わらない
+value.GI_SHORT_HISTORY.0=なし
+value.GI_SHORT_HISTORY.4=4 フレーム
+value.GI_SHORT_HISTORY.8=8 フレーム
+value.GI_SHORT_HISTORY.16=16 フレーム
 option.GI_VOXEL_FADE=ボクセル GI のフェード幅
 option.GI_VOXEL_FADE.comment=ボクセル RT の GI を、ボクセル範囲の端で外側の通常の空の光へ溶かす幅 (ブロック)。大きいほど、空から降りる時や遠景で範囲の境目が目立たない。ボクセル RT のみ
 
