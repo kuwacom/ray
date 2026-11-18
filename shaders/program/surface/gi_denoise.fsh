@@ -5,6 +5,7 @@
  *
  * 1. 空間: 低解像度テクセルの近傍 (GI_DENOISE=2 で 5x5、それ以外 3x3) を深度・法線の差で重み付けして集める (joint bilateral)
  *    各テクセルが表すフル解像度のピクセルは lowResOffset(frameCounter) で復元し、その深度・法線と比べる
+ *    履歴が GI_SHORT_HISTORY より短い画素は、外側を 2 テクセルおき + 内側の 3x3 にして幅を 2 倍にする (再投影を先に行う)
  * 2. 時間 (GI_DENOISE>=1): 履歴の長さ n を持ち、GI は 1/n で混ぜる (上限 GI_HISTORY_MAX)
  *    再投影は 2x2 の双線形で、履歴の視線距離が合わないタップを捨てる (ディスオクルージョンで長さを 0 に戻す)
  *    変化の検出: 輝度の速い履歴 (平均と分散、混合率 GI_FAST_ALPHA) と GI の履歴の差が、速い履歴の揺れの
@@ -110,6 +111,49 @@ const float GI_HISTORY_MIN = 1.0;      // 変化を検出した時に残す長�
 // エッジ停止は幾何法線で見る (GI / AO は幾何法線で計算している。テクスチャ法線だとテクセルごとに重みが切れてノイズが残る)
 vec3 readGeoNormal(ivec2 texel) { return octDecode(unpack2x8(texelFetch(colortex2, texel, 0).b)); }
 
+#if GI_DENOISE >= 1 && GI_SHORT_HISTORY > 0
+/*
+ * 前フレームの GI と付属 (長さ・視線距離・速い履歴) を 2x2 の双線形で再投影する
+ * 視線距離が合わないタップは捨て、有効な重みが足りなければ info = 0 (長さ 0 = 履歴なし)
+ * 空間のフィルタより前に長さが要る GI_SHORT_HISTORY の時だけ使う。0 の時は main の中の同じ処理
+ * (関数にすると、切った時の機械語が前と変わる)
+ */
+void reprojectGiHistory(ivec2 texel, float depth, float linZ, ivec2 screen, out vec4 history, out vec4 info) {
+    history = vec4(0.0);
+    info = vec4(0.0);
+    vec2 prevUv = getPreviousUv(texcoord, depth);
+    if (reprojectionInside(prevUv)) {
+        // 動くもの (速度ベクトルあり) は距離がほぼ変わらないとみなし、静止物は前フレームのカメラで距離を求める
+        float expected = linZ;
+        if (texelFetch(colortex15, texel, 0).a < 0.5) {
+            vec3 prevPlayer = screenToPlayer(vec3(texcoord, depth)) + (cameraPosition - previousCameraPosition);
+            expected = -(gbufferPreviousModelView * vec4(prevPlayer, 1.0)).z;
+        }
+        float tol = expected * GI_HISTORY_DEPTH_REL + GI_HISTORY_DEPTH_ABS;
+        vec2 pp = prevUv * vec2(screen) - 0.5;
+        ivec2 p0 = ivec2(floor(pp));
+        vec2 f = pp - vec2(p0);
+        float hw = 0.0;
+        for (int i = 0; i < 4; i++) {
+            ivec2 o = ivec2(i & 1, i >> 1);
+            ivec2 p = clamp(p0 + o, ivec2(0), screen - 1);
+            vec4 hi = texelFetch(TEX_GI_AUX, p, 0);
+            vec2 bw = mix(1.0 - f, f, vec2(o));
+            float w = bw.x * bw.y * (hi.r > 0.0 && abs(hi.g - expected) < tol ? 1.0 : 0.0);
+            history += texelFetch(TEX_GI_HIST, p, 0) * w;
+            info += hi * w;
+            hw += w;
+        }
+        if (hw > GI_HISTORY_MIN_WEIGHT) {
+            history /= hw;
+            info /= hw;
+        } else {
+            info = vec4(0.0);
+        }
+    }
+}
+#endif
+
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
     float depth = texelFetch(depthtex1, texel, 0).r;
@@ -136,13 +180,25 @@ void main() {
     const int scale = 2;
 #endif
 
+#if GI_DENOISE >= 1 && GI_SHORT_HISTORY > 0
+    // 履歴の短い画素 (画面の外から入った・遮蔽が外れた・変化を検出した直後) は時間で均せないので、
+    // 同じタップ数のまま 2 画素おきに取って空間の幅を広げる (a-trous の 2 段目と同じ形)。長さは前フレームの値なので循環しない
+    vec4 history;
+    vec4 info;
+    reprojectGiHistory(texel, depth, linZ, screen, history, info);
+    int tapStep = info.r < float(GI_SHORT_HISTORY) ? 2 : 1;
+    #define GI_TAP_OFFSET(o) ((o) * tapStep)
+#else
+    #define GI_TAP_OFFSET(o) (o)
+#endif
+
     vec4 sum = vec4(0.0);
     vec4 sum2 = vec4(0.0);
     float wsum = 0.0;
     float w2sum = 0.0;
     for (int dy = -GI_FILTER_RADIUS; dy <= GI_FILTER_RADIUS; dy++) {
         for (int dx = -GI_FILTER_RADIUS; dx <= GI_FILTER_RADIUS; dx++) {
-            ivec2 L = clamp(center + ivec2(dx, dy), ivec2(0), lowSize - 1);
+            ivec2 L = clamp(center + GI_TAP_OFFSET(ivec2(dx, dy)), ivec2(0), lowSize - 1);
             ivec2 P = min(L * scale + offset, screen - 1);
             float dP = texelFetch(depthtex1, P, 0).r;
             if (dP >= 1.0 || isHandDepth(dP)) continue;
@@ -157,11 +213,36 @@ void main() {
             w2sum += w * w;
         }
     }
+#if GI_DENOISE >= 1 && GI_SHORT_HISTORY > 0
+    // 2 画素おきのタップだけだと、隣り合う画素が別のタップの組を読んで画素ごとの粒が増える。内側の 3x3 を 1 画素おきで足して埋める
+    if (tapStep == 2) {
+        for (int dy = -1; dy <= 1; dy++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                if (dx == 0 && dy == 0) continue;
+                ivec2 L = clamp(center + ivec2(dx, dy), ivec2(0), lowSize - 1);
+                ivec2 P = min(L * scale + offset, screen - 1);
+                float dP = texelFetch(depthtex1, P, 0).r;
+                if (dP >= 1.0 || isHandDepth(dP)) continue;
+                vec4 raw = texelFetch(TEX_GI_RAW, L, 0);
+                float wDepth = bilateralDepthWeight(linearizeDepth(dP), linZ, linZ * GI_DEPTH_SIGMA + 0.05);
+                float wNormal = bilateralNormalWeight(normal, readGeoNormal(P), GI_NORMAL_POWER);
+                // 距離は外側のタップの間隔 (2) を 1 とする単位で、外側と同じ形の重み
+                float wSpatial = exp(-0.25 * float(dx * dx + dy * dy) / float(GI_FILTER_RADIUS * GI_FILTER_RADIUS + 1));
+                float w = wDepth * wNormal * wSpatial + 1e-5;
+                sum += raw * w;
+                sum2 += raw * raw * w;
+                wsum += w;
+                w2sum += w * w;
+            }
+        }
+    }
+#endif
     vec4 mean = wsum > 0.0 ? sum / wsum : texelFetch(TEX_GI_RAW, clamp(center, ivec2(0), lowSize - 1), 0);
     vec4 result = mean;
 
 #if GI_DENOISE >= 1
     vec4 sigma = momentSigma(sum2, mean, max(wsum, 1e-5));
+#if GI_SHORT_HISTORY == 0
     vec4 history = vec4(0.0);
     vec4 info = vec4(0.0);
     vec2 prevUv = getPreviousUv(texcoord, depth);
@@ -194,6 +275,7 @@ void main() {
             info = vec4(0.0);
         }
     }
+#endif
 
     float n = info.r;
     float lumNow = luminance(mean.rgb);

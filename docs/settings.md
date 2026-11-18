@@ -117,6 +117,7 @@
 | GI_DENOISE | 2 | 0, 1, 2 |
 | GI_HISTORY_MAX | 64 | 8, 16, 32, 64 |
 | GI_RESPONSE_STRENGTH | 1.0 | 0.5, 0.75, 1.0, 1.5, 2.0 |
+| GI_SHORT_HISTORY | 8 | 0, 4, 8, 16 |
 | GI_VOXEL_FADE | 32 | 8, 16, 24, 32, 48, 64 |
 | PBR_FORMAT | 0 | 0, 1 |
 | NORMAL_MAPPING | ON | ON / OFF |
