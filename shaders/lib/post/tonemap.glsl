@@ -152,9 +152,13 @@ vec3 tonemap(vec3 x) {
 // 始まりを溶岩の地より上に置き、地は橙のまま割れ目だけ黄色へ寄せる。露出後の最大チャンネルは、グレーディング
 // (コントラスト・彩度) を通ると溶岩の地で輝度の 10 倍前後になる。4 では洞窟・夜の溶岩の 9 割の画素が黄色に寄った
 // (実写でも溶岩は露出オーバーでオレンジが黄色へ変わるので、黄色は割れ目と強い露出オーバーだけに残す)
-const float EMISSIVE_LIFT_START = 12.0;  // 露出後の最大チャンネルがここを超えると弱いチャンネルを持ち上げ始める
-const float EMISSIVE_LIFT_RANGE = 3.0;   // 持ち上げが最大になるまでの段数 (EV)
-const vec3 EMISSIVE_WHITE_LIFT = vec3(0.8, 0.8, 0.35);   // 最大での弱いチャンネルの持ち上げ (比の 1 - この値 乗)
+// 夜の溶岩の実写では、飛んでいない面も彩度 0.75 前後 (色相 22 度前後) で、照らされた岩より淡い。緑だけを持ち上げると
+// 黄色へ寄るので、青も持ち上げて色相を保ったまま淡くする。溶岩の青はグレーディングの後でほぼ 0 で冪では上がらないので、
+// 比に下限 (EMISSIVE_RATIO_FLOOR) を置く。始まりを 4 にし、地 (露出後の最大チャンネル 10-35) も彩度 0.9-0.75 まで淡くする
+const float EMISSIVE_LIFT_START = 4.0;   // 露出後の最大チャンネルがここを超えると弱いチャンネルを持ち上げ始める
+const float EMISSIVE_LIFT_RANGE = 4.0;   // 持ち上げが最大になるまでの段数 (EV)
+const vec3 EMISSIVE_WHITE_LIFT = vec3(0.55, 0.55, 0.6);   // 最大での弱いチャンネルの持ち上げ (比の 1 - この値 乗)
+const float EMISSIVE_RATIO_FLOOR = 0.003;   // 持ち上げる前の弱いチャンネルの比の下限 (持ち上げのない所ではほぼ黒のまま)
 
 vec3 tonemapEmissive(vec3 x) {
     x = max(x, 0.0);
@@ -162,7 +166,7 @@ vec3 tonemapEmissive(vec3 x) {
     if (peak <= 1e-6) return vec3(0.0);
     vec3 mapped = tonemap(vec3(peak));
     float w = saturate(log2(peak / EMISSIVE_LIFT_START) / EMISSIVE_LIFT_RANGE);
-    return mapped * pow(x / peak, 1.0 - EMISSIVE_WHITE_LIFT * w);
+    return mapped * pow(max(x / peak, EMISSIVE_RATIO_FLOOR), 1.0 - EMISSIVE_WHITE_LIFT * w);
 }
 
 #endif
