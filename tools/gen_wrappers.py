@@ -251,7 +251,7 @@ DISABLED: list[Disable] = [
     Disable(("composite21",), "#ifndef MOTION_BLUR"),
     Disable(("composite22",), "#ifndef DOF"),
     # 局所トーンマップもブルームの縮小タイルを読む
-    Disable(("composite23", "composite24"), "#if !defined BLOOM && LOCAL_TONEMAP == 0"),
+    Disable(("composite23", "composite24"), "#if !defined BLOOM && LOCAL_TONEMAP == 0 && !defined EXPOSURE_DR"),
     # properties からは internal.glsl の #undef が見えないので、アナログの効果は親の ANALOG も条件に書く
     Disable(("composite26",), "#if !defined ANALOG || !defined ANALOG_SMEAR"),
     Disable(("composite27",), "#ifndef ANALOG"),

@@ -184,6 +184,8 @@
 #endif
 #ifdef BLOOM
 #endif
+#ifdef EXPOSURE_DR
+#endif
 #ifdef GRADING
 #endif
 #ifdef SELECTION_OUTLINE

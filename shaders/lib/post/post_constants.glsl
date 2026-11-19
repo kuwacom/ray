@@ -88,6 +88,19 @@ const float EXPOSURE_NIGHT_CLIP_SHARE = 0.02;
 const float EXPOSURE_NIGHT_CLIP_LEVEL = 1.3;
 const float EXPOSURE_NIGHT_CLIP_MAX = 1.0;
 /*
+ * DR の補正 (EXPOSURE_DR)。撮る側: 重みの上位 PROTECT_SHARE が露出後に PROTECT_LEVEL (白の手前) を超える分だけ、最大 HIGHLIGHT_MAX EV 暗く撮る
+ * (ハイライト優先は 1 段暗く撮って戻す。最低 ISO が 1 段上がるのはそのため)
+ * 現像の側 (applyDynamicRange): 局所の明るさが平均の RESTORE_EV.x 段上までは暗く撮った分を戻し、.y 段上からは戻さない。
+ * 平均より SHADOW_START 段暗い所から、SHADOW_SLOPE の傾きで最大 SHADOW_MAX 段持ち上げる
+ */
+const float DR_PROTECT_SHARE = 0.02;
+const float DR_PROTECT_LEVEL = 1.0;
+const float DR_HIGHLIGHT_MAX = 1.0;
+const vec2 DR_RESTORE_EV = vec2(0.5, 2.0);
+const float DR_SHADOW_START = 0.5;
+const float DR_SHADOW_SLOPE = 0.5;
+const float DR_SHADOW_MAX = 1.5;
+/*
  * 月が照らす夜 (満ち欠け x 晴れ。水中は外す) だけ、暗い側の計測と持ち上げの傾きを足す。新月・雨の夜・水中は平均の計測と EXPOSURE_NIGHT_SLOPE のまま暗く残す
  * 上限は月夜も EXPOSURE_NIGHT_MAX_LIFT のまま (見た目の判断)。月夜だけ上限を 2.8 EV まで上げると、月の照る暗い草原も 1.3〜1.5 EV
  * 持ち上がり、地形の暗さと空が灰色に浮いて霧っぽくなり、月の照り返しで光る草が浮いて見えなくなった。海の月の道は暗めになる

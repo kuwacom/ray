@@ -73,7 +73,7 @@ vec4 fetchSource(vec2 uv, float lod) {
 
 void main() {
     ivec4 rect;
-#if LOCAL_TONEMAP > 0
+#ifdef LOCAL_TONEMAP_TILE
     if (isInLocalTonemapTile(ivec2(gl_FragCoord.xy), rect)) {
         outBloom = vec4(sampleLocalTonemapSource(colortex0, (gl_FragCoord.xy - vec2(rect.xy)) / vec2(rect.zw)), 0.0, 0.0);
         return;

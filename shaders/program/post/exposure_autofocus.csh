@@ -542,6 +542,20 @@ void main() {
         appliedEv = min(max(appliedEv, adaptedHighEv), EXPOSURE_MAX_EV);
         targetEv = min(max(targetEv, measuredHighEv), EXPOSURE_MAX_EV);
     #endif
+    #ifdef EXPOSURE_DR
+        /*
+         * DR の補正: 明るい側 (重みの上位 DR_PROTECT_SHARE) が露出後に DR_PROTECT_LEVEL を超える分だけ、最大 DR_HIGHLIGHT_MAX EV 暗く撮る
+         * 暗く撮った量は final (applyDynamicRange) が中間と暗い所で戻す
+         */
+        float protectEv = luminanceToEv100(exp2(histogramPercentileLog(1.0 - DR_PROTECT_SHARE))) + log2(EXPOSURE_KEY / DR_PROTECT_LEVEL);
+        float measuredDr = clamp(protectEv - targetEv, 0.0, DR_HIGHLIGHT_MAX);
+        float prevDr = frameData.postParams[5].w;
+        float drEv = initialized && !isnan(prevDr) && !isinf(prevDr)
+                   ? mix(prevDr, measuredDr, 1.0 - exp(-EXPOSURE_SPEED_BRIGHT * dt)) : measuredDr;
+        frameData.postParams[5].w = drEv;
+        appliedEv += drEv;
+        targetEv += measuredDr;
+    #endif
 #endif
 
     float bias = exp2(LOOK_EXPOSURE_BIAS);

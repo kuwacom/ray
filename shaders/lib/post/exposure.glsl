@@ -7,7 +7,7 @@
  * FrameData.postParams[3]: バニラの四角の見えている点の格子位置の重み付きモーメント (x, y, x^2, y^2。見え具合と同じ重みと平滑)
  * FrameData.postParams[4]: フレアのループの回数 (lib/post/lens_flare.glsl)。x = ゴースト, y = ゴーストの波長, z = 画面の光条の線, w = 画面のゴースト
  * FrameData.postParams[5]: 自動露出の順応済みの補助の値。x = ハイライト重点の上限の EV100, y = 評価測光の夜の白飛びを抑える EV100,
- *                         z = 灯りに照らされた所の割合
+ *                         z = 灯りに照らされた所の割合, w = DR の補正で暗く撮った EV (final が戻す)
  */
 #ifndef POST_EXPOSURE_GLSL
 #define POST_EXPOSURE_GLSL
