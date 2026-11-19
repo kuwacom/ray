@@ -1382,7 +1382,7 @@ option.ANALOG_NOISE.comment=Switches the shot, dark, color, fixed pattern and ho
 option.ANALOG_NOISE_STRENGTH=Noise Strength
 option.ANALOG_NOISE_STRENGTH.comment=Applies with every camera. Multiplier for all five kinds of noise. 0 removes the noise (and its cost)
 option.ANALOG_C_AGC_MAX=Auto Gain Limit
-option.ANALOG_C_AGC_MAX.comment=Custom camera only. How far (in stops) the camera raises its sensitivity in dark scenes. Higher gives more noise in the dark. With Camera exposure the ISO sets the gain instead (above ISO 100, up to 4 stops)
+option.ANALOG_C_AGC_MAX.comment=Custom camera only. How far (in stops) the camera raises its sensitivity in dark scenes. Higher gives more noise in the dark. With Camera exposure the ISO sets the gain instead (gain = ISO / 100, keeps rising with ISO)
 option.ANALOG_C_AGC_EV=Auto Gain Start
 option.ANALOG_C_AGC_EV.comment=Custom camera only. The gain starts rising when the scene exposure (applied EV) is darker than this. Clear daylight is about 0, caves about -1, a village at night about -2.5
 option.ANALOG_SHOT_NOISE=Shot Noise

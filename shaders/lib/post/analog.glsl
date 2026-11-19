@@ -510,8 +510,8 @@ vec3 applyAnalogRecord(vec2 uv) {
 #endif
 #ifdef ANALOG_NOISE
     #ifdef EXPOSURE_CAMERA
-    // カメラのモードは自動ゲインの代わりに ISO がゲインを決める (基準の感度から上げた段だけ。ANALOG_ISO_GAIN_MAX 段まで)
-    if (ANALOG_NOISE_STRENGTH > 0.0) analogGain = exp2(clamp(log2(optExposureIso / ANALOG_ISO_BASE), 0.0, ANALOG_ISO_GAIN_MAX));
+    // カメラのモードは自動ゲインの代わりに ISO がゲインを決める (基準の感度から上げた分。上限なしで ISO とともに増え続ける)
+    if (ANALOG_NOISE_STRENGTH > 0.0) analogGain = max(optExposureIso / ANALOG_ISO_BASE, 1.0);
     #else
     // 自動ゲイン: 適用 EV が AP_AGC_EV より暗い分だけ、AP_AGC_MAX 段まで上げる
     if (ANALOG_NOISE_STRENGTH > 0.0) analogGain = exp2(clamp(AP_AGC_EV - frameData.postParams[0].w, 0.0, float(AP_AGC_MAX)));
