@@ -29,7 +29,7 @@ const float PARTICLE_GLOW_MARGIN_PX = 1.5;
 // 元の四角がこの画素数より小さい時はテクスチャの代わりに丸い点で描く
 const vec2 PARTICLE_GLOW_DOT_PX = vec2(2.0, 5.0);
 const float PARTICLE_GLOW_DOT_FALLOFF = 3.0;
-// 露出に合わせた発光 (getVisibleEmissionLuminance) に対する倍率。6 では夜の大きな玉が白い円盤になり、1.5 でも色が淡いピンクに抜けた
+// 露出に合わせた発光 (getVisibleEmissionLuminance。現実の光の比では露出によらず一定) に対する倍率。6 では夜の大きな玉が白い円盤になり、1.5 でも色が淡いピンクに抜けた
 const float PARTICLE_GLOW_GAIN = 0.6;
 // 色の濃さ (最大成分で割った色の累乗)
 const float PARTICLE_GLOW_PURITY = 1.6;

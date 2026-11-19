@@ -21,8 +21,9 @@ const float EPS = 1e-5;
  * ほかの光は太陽に比べてゲーム向けに明るく、昼と夜の差が実写の約 12 段に対して約 6 段しかない。設定は 3 つの段
  * 夜 (EXPOSURE_PHYSICAL_NIGHT、既定 -8.5 段)
  *   MOON: 月の直射と月が照らす空。満月の照り返しは白い床で約 90 lx、実際は 0.05-0.3 lx
- *   NIGHT_SKY (夜 +0.5 段): 星・天の川・大気光・夜空の底。夜空の底は約 0.25 cd/m2、実際の暗い夜空は約 1 mcd/m2
- *   MIN_AMBIENT (夜 -3.5 段): 洞窟と新月の夜の最低限の光。約 33 lx、実際の新月の晴れた夜は約 0.002 lx
+ *   NIGHT_SKY (夜の 8/8.5 倍の段、既定 -8): 星・天の川・大気光・夜空の底。夜空の底は約 0.25 cd/m2、実際の暗い夜空は約 1 mcd/m2
+ *   MIN_AMBIENT (夜の 12/8.5 倍の段、既定 -12): 洞窟と新月の夜の最低限の光。約 33 lx、実際の新月の晴れた夜は約 0.002 lx
+ *   夜を 0 にすると 3 つとも元の明るさ。夜空と最低限の光は既定より下げない (掛けた後の値が fp16 の非正規化数の数段で、さらに下げると 0 になる)
  * 灯り (EXPOSURE_PHYSICAL_BLOCKLIGHT、既定 -8.5 段)
  *   BLOCKLIGHT: ブロック・手持ち・エンティティ・溶岩・雷・花火の照らす光と、発光の面が GI で照らす光、暗視。
  *   たいまつから 1 ブロックの白い床で約 3800 lx (掛けた後は約 11 lx)。灯油ランタン (8-82 lm) の 1 m は 0.6-6.5 lx、60 W の電球 (800 lm) は約 64 lx
@@ -33,11 +34,13 @@ const float EPS = 1e-5;
  * 雷の稲妻・ビーコンの光線・溶岩の面は露出に合わせた明るさのまま (固定の輝度では夜にブルームが画面を白く霞ませる)
  */
 #ifdef PHYSICAL_LIGHT_ACTIVE
-const float PHYSICAL_NIGHT_SKY_STOPS = 0.5;
-const float PHYSICAL_MIN_AMBIENT_STOPS = -3.5;
+const float PHYSICAL_NIGHT_SKY_SLOPE = 8.0 / 8.5;
+const float PHYSICAL_NIGHT_SKY_MIN_STOPS = -8.0;
+const float PHYSICAL_MIN_AMBIENT_SLOPE = 12.0 / 8.5;
+const float PHYSICAL_MIN_AMBIENT_MIN_STOPS = -12.0;
 const float PHYSICAL_MOON = exp2(EXPOSURE_PHYSICAL_NIGHT);
-const float PHYSICAL_NIGHT_SKY = exp2(EXPOSURE_PHYSICAL_NIGHT + PHYSICAL_NIGHT_SKY_STOPS);
-const float PHYSICAL_MIN_AMBIENT = exp2(EXPOSURE_PHYSICAL_NIGHT + PHYSICAL_MIN_AMBIENT_STOPS);
+const float PHYSICAL_NIGHT_SKY = exp2(max(EXPOSURE_PHYSICAL_NIGHT * PHYSICAL_NIGHT_SKY_SLOPE, PHYSICAL_NIGHT_SKY_MIN_STOPS));
+const float PHYSICAL_MIN_AMBIENT = exp2(max(EXPOSURE_PHYSICAL_NIGHT * PHYSICAL_MIN_AMBIENT_SLOPE, PHYSICAL_MIN_AMBIENT_MIN_STOPS));
 const float PHYSICAL_BLOCKLIGHT = exp2(EXPOSURE_PHYSICAL_BLOCKLIGHT);
 const float PHYSICAL_EMISSION = exp2(EXPOSURE_PHYSICAL_EMISSION);
 const float PHYSICAL_DIMENSION = PHYSICAL_BLOCKLIGHT;
@@ -49,6 +52,11 @@ const float PHYSICAL_BLOCKLIGHT = 1.0;
 const float PHYSICAL_EMISSION = 1.0;
 const float PHYSICAL_DIMENSION = 1.0;
 #endif
+/*
+ * 光の明るさを比べる絶対の下限・しきい値に掛ける倍率。ON で光が下がった分だけ下げ、元と同じ相対の位置で効かせる
+ * (下限が値より大きいと、暗い夜に比が潰れたり、灯りの届く範囲が縮んだりする)
+ */
+const float PHYSICAL_DARKEST = min(min(PHYSICAL_MOON, PHYSICAL_NIGHT_SKY), min(PHYSICAL_MIN_AMBIENT, PHYSICAL_BLOCKLIGHT));
 const float SUN_ILLUMINANCE = 6.0;        // 正午の太陽直達照度 (大気透過前)
 const float MOON_ILLUMINANCE = 0.012 * PHYSICAL_MOON; // 満月の直達照度
 /*

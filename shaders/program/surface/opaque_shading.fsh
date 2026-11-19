@@ -338,7 +338,7 @@ void main() {
     if (A.giSky > 0.0) {
         // GI は幾何法線で張った半球なので、テクスチャ法線の凹凸は空の SH の向きによる差で戻す
         // (照度として足すのではなく、2 つの法線の SH の比を取るだけなので gatherSurfaceLights を通さない)
-        float detail = luminance(getSkyIrradiance(g.normal)) / max(luminance(getSkyIrradiance(g.geoNormal)), 1e-6);
+        float detail = luminance(getSkyIrradiance(g.normal)) / max(luminance(getSkyIrradiance(g.geoNormal)), 1e-6 * PHYSICAL_DARKEST);
         // ボクセルに入らない小物 (草・柵・エンティティ) の遮蔽は GTAO で足す。ブロックの遮蔽はレイが見ているので半分だけ
         indirectLight *= mix(1.0, clamp(detail, GI_NORMAL_DETAIL_MIN, GI_NORMAL_DETAIL_MAX) * mix(1.0, indirect.a, GI_SKY_GTAO_WEIGHT), A.giSky);
     }

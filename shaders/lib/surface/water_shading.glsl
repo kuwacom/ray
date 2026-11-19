@@ -208,7 +208,7 @@ bool waterRefractVoxel(vec3 surfPlayer, vec3 dir, vec3 floorPlayer, float d1, fl
             sum += texture(colortex0, uv).rgb;
             n += 1.0;
         }
-        if (n > 0.0 && luminance(Efloor) > 1e-6) {
+        if (n > 0.0 && luminance(Efloor) > 1e-6 * PHYSICAL_DARKEST) {
             // 輝度の比だけ (色ごとの比にすると影の 1 タップの色の差で染まる)。表の色と画面の像の明るさの段を消す
             float tone = clamp(luminance(sum / n) / luminance(Efloor), WATER_REFRACT_D_TONE_CLAMP.x, WATER_REFRACT_D_TONE_CLAMP.y);
             voxelColor *= tone;

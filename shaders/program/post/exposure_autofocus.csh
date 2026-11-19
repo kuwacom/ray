@@ -172,7 +172,7 @@ uint flareVisibilityTap(uint index) {
     if (outside <= 0.0) {
         // SH の DC 項 x Y00 = 空の平均放射 (ルックの空の環境光の強さは空の明るさではないので外す)
         float skyLum = luminance(frameData.skySH[0].rgb) * (0.282095 / LK_SKY_AMBIENT);
-        if (skyLum > 1e-6) {
+        if (skyLum > 1e-6 * PHYSICAL_DARKEST) {
             // 歪曲・魚眼を TAA で組み立てた時は colortex0 が出力の座標なので、光源の出力の位置で読む
             vec2 colorUv = LENS_WARP_TAA ? lensForwardUv(clamped) : clamped;
             float l = luminance(sanitizeColor(textureLod(colortex0, colorUv, 0.0).rgb));

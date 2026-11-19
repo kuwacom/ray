@@ -234,7 +234,7 @@ vec4 marchAirFog(vec3 dir, float endDist, float dither, vec2 farVisibility, floa
         float sunVisibility = inside ? farVisibility.y * caveGate : farSunVisibility;
         float skyVisibility = inside ? max(outdoor, luminance(shadow)) : outdoor;
 
-        float ambientVisibility = max(skyVisibility, VL_MIN_AMBIENT_SCALE * MIN_AMBIENT / max(luminance(fl.ambient), 1e-6));
+        float ambientVisibility = max(skyVisibility, VL_MIN_AMBIENT_SCALE * MIN_AMBIENT / max(luminance(fl.ambient), 1e-6 * PHYSICAL_MIN_AMBIENT));
 #if defined HAS_SKY
         // もやは空の色から影の分を引き (fogHazeRadiance)、霧は太陽と空の光で照らす
         float sunShadow = luminance(shadow) * sunVisibility;
@@ -347,7 +347,7 @@ vec3 marchWaterFog(vec3 dir, float endDist, float dither) {
         vec3 light = celestial.irradiance * shadow * lightT * phase * optVlStrength + skyUp * ambientT * (0.5 * RCP_PI);
 #ifdef FOG_BLOCKLIGHT
         vec3 blockE = sampleBlockLightVolume(p);
-        if (maxOf(blockE) > 1e-5) {
+        if (maxOf(blockE) > 1e-5 * PHYSICAL_BLOCKLIGHT) {
             light += blockE * (FOG_BLOCKLIGHT_STRENGTH * WATER_BLOCKLIGHT_SCATTER * RCP_PI)
                 * waterBlockLightPhaseWeight(playerToVoxel(p), dir);
         }

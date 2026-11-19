@@ -128,7 +128,7 @@ vec3 skyPixelReflection(vec3 R, float skyLm, vec3 lut) {
     vec3 edgeLut = skyReflectionFallback(edgeDir, skyLm, 0.0);
     vec3 sky = textureLod(colortex0, edgeUv, 0.0).rgb * skylightCurve(skyLm);
     // 太陽円盤は水面の太陽の鏡面 (sunSpecular) が別に描くので、雲の明るさまでで頭を抑える
-    float lumRatio = luminance(sky) / max(luminance(edgeLut), 1e-6);
+    float lumRatio = luminance(sky) / max(luminance(edgeLut), 1e-6 * PHYSICAL_DARKEST);
     if (lumRatio > SKY_REFLECTION_MAX_RATIO) {
         sky *= SKY_REFLECTION_MAX_RATIO / lumRatio;
         lumRatio = SKY_REFLECTION_MAX_RATIO;
@@ -137,7 +137,7 @@ vec3 skyPixelReflection(vec3 R, float skyLm, vec3 lut) {
     // (チャンネルごとの比にすると、夕方の LUT の青のような小さい成分で比が発散する)
     float offDist = length(skyUv - edgeUv);
     float borrow = exp(-offDist * SKY_EXTRAPOLATION_FALLOFF);
-    vec3 chroma = mix(lut / max(luminance(lut), 1e-6), sky / max(luminance(sky), 1e-6),
+    vec3 chroma = mix(lut / max(luminance(lut), 1e-6 * PHYSICAL_DARKEST), sky / max(luminance(sky), 1e-6 * PHYSICAL_DARKEST),
         exp(-offDist * SKY_EXTRAPOLATION_FALLOFF * 4.0));
     return chroma * luminance(lut) * mix(1.0, lumRatio, borrow);
 }
