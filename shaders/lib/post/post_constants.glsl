@@ -562,6 +562,8 @@ const float ANALOG_SHARPEN_CORING = 0.01;
  */
 const float ANALOG_SMEAR_SHUTTER_EV_DARK = -2.0;
 const float ANALOG_SMEAR_SHUTTER_EV_DAY = 0.0;
+// シャッター速度が決まっている時 (カメラの露出かシャッター速度の反映) のスミア比の基準の蓄積時間 (秒)。これより長いと弱めない
+const float ANALOG_SMEAR_SHUTTER_REFERENCE = 1.0 / 60.0;
 /*
  * 露出がカメラの時のゲイン: ISO が BASE (0 dB) から上げた段をゲインにする。上限 6 段 (36 dB)。
  * DV の手動のゲインの最大は 18 dB (3 段) で、それより上は実機に無い。36 dB で暗部ノイズが画面を覆う手前の見た目の調整値

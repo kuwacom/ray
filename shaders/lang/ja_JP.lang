@@ -773,7 +773,7 @@ option.DOF_APERTURE_MODE=絞りの決め方
 value.DOF_APERTURE_MODE.0=ボケの量
 value.DOF_APERTURE_MODE.1=レンズの開放 F 値
 value.DOF_APERTURE_MODE.2=F 値を指定
-option.DOF_APERTURE_MODE.comment=レンズの開放 F 値 = レンズプリセットの F 値 (現代の単焦点 f/1.8, Takumar f/1.4 など) で撮る。焦点距離は FOV から決まるので、FOV 70 は 17mm の広角になり、50mm のレンズほどはボケない (ボケを増やすにはセンサーを大きくする)
+option.DOF_APERTURE_MODE.comment=レンズの開放 F 値 = レンズプリセットの F 値 (現代の単焦点 f/1.8, Takumar f/1.4 など) で撮る。焦点距離は FOV から決まるので、FOV 70 は 17mm の広角になり、50mm のレンズほどはボケない (ボケを増やすにはセンサーを大きくする)。露出がカメラの時は常に露出の F 値を使う
 option.DOF_F_NUMBER=F 値
 option.DOF_F_NUMBER.comment=絞りの決め方が「F 値を指定」の時の F 値。露出がカメラの時は露出と被写界深度の F 値 (レンズプリセットの開放 F 値より開かない)。小さいほどボケる
 value.DOF_F_NUMBER.0.95=f/0.95
@@ -1356,7 +1356,7 @@ option.ANALOG_C_SMEAR_TINT_MODE.comment=機材が「カスタム」の時だけ�
 value.ANALOG_C_SMEAR_TINT_MODE.0=光の色
 value.ANALOG_C_SMEAR_TINT_MODE.1=白
 option.ANALOG_C_SMEAR_SHUTTER_STOPS=スミアの露出連動
-option.ANALOG_C_SMEAR_SHUTTER_STOPS.comment=機材が「カスタム」の時だけ。明るい場面ほどシャッターが速くなり、筋が強くなる幅 (段)。夜や洞窟を基準に、晴天で 2^段 倍まで強い。0 で露出に連動しない
+option.ANALOG_C_SMEAR_SHUTTER_STOPS.comment=機材が「カスタム」の時だけ。明るい場面ほどシャッターが速くなり、筋が強くなる幅 (段)。夜や洞窟を基準に、晴天で 2^段 倍まで強い。0 で露出に連動しない。露出がカメラの時とシャッター速度の反映の時は、シャッター速度で決める (1/60 秒より速い分だけ、同じ上限まで強い)
 option.ANALOG_C_SMEAR_LIGHT_THRESHOLD=灯りの筋のしきい値
 option.ANALOG_C_SMEAR_LIGHT_THRESHOLD.comment=機材が「カスタム」の時だけ。たいまつなどの灯りの明るさ (露出の後の白の何倍か) がこれを超えた分だけが筋になる。上げると、灯りが重なった所や近くで大きく写った灯りだけに筋が出る
 option.ANALOG_SMEAR_LIGHT_STRENGTH=灯りの筋の強さ
@@ -1382,7 +1382,7 @@ option.ANALOG_NOISE.comment=ショット・暗部・色・固定パターン・�
 option.ANALOG_NOISE_STRENGTH=ノイズの強さ
 option.ANALOG_NOISE_STRENGTH.comment=機材によらず効く。5 種すべての強さに掛ける倍率。0 でノイズなし (重さも無くなる)
 option.ANALOG_C_AGC_MAX=自動ゲインの上限
-option.ANALOG_C_AGC_MAX.comment=機材が「カスタム」の時だけ。暗い場面でカメラが感度を上げる上限 (段)。上げるほど暗い場面のノイズが多い
+option.ANALOG_C_AGC_MAX.comment=機材が「カスタム」の時だけ。暗い場面でカメラが感度を上げる上限 (段)。上げるほど暗い場面のノイズが多い。露出がカメラの時は ISO がゲインを決める (ISO 100 から上げた段、6 段まで)
 option.ANALOG_C_AGC_EV=自動ゲインの始まり
 option.ANALOG_C_AGC_EV.comment=機材が「カスタム」の時だけ。画面の露出 (適用 EV) がこれより暗いと感度が上がり始める。晴天は 0 前後、洞窟は -1、夜の村は -2.5 程度
 option.ANALOG_SHOT_NOISE=ショットノイズ

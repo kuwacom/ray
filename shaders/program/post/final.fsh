@@ -248,7 +248,15 @@ float lavaToneMask(ivec2 texel) {
     ivec2 maxTexel = ivec2(viewSize()) - 1;
     float sum = 0.0;
     for (int i = 0; i < 5; i++) {
+#ifdef SHUTTER
+        /*
+         * シャッター速度の反映では、長時間露光で溜めた colortex0.a の溶岩の発光の割合 (負の値) で決める。今のフレームの G バッファで
+         * 決めると、溶岩が流れた後の筋や視点を動かした後の流れの上に、今の溶岩の位置だけ持ち上げとトーンマップの切り替えが浮く
+         */
+        sum += clamp(-texelFetch(colortex0, clamp(texel + offsets[i], ivec2(0), maxTexel), 0).a, 0.0, 1.0);
+#else
         if (readMaterialId(clamp(texel + offsets[i], ivec2(0), maxTexel)) == MAT_LAVA) sum += 1.0;
+#endif
     }
     return sum / 5.0;
 }
@@ -336,7 +344,11 @@ void main() {
 #endif
     hdr = max(hdr + casDelta(texelL, center, exposure), 0.0);
 
+#ifdef SHUTTER
+    float lava = lavaToneMask(texelL);
+#else
     float lava = lavaToneMask(texelG);
+#endif
     // 溶岩のブルームの滲みが占める割合。溶岩と同じ色を保つトーンマップに寄せる (AgX では周りの煙・壁の滲みが淡いサーモン色に抜けた)
     float lavaGlowShare = 0.0;
     float depth = texelFetch(depthtex0, texelG, 0).r;
@@ -349,7 +361,13 @@ void main() {
      * DoF の前の値なので、ボケている点には重ねない (玉ボケに任せる)
      * 球面収差・ブルーム・ヘイズの mix より前に掛ける。後に掛けると、mix で縮んだ hdr から縮む前の白飛び分を引き、点の中心が地まで削られて黒く抜けた
      */
-    if (POINT_SPREAD_GAIN > 0.0) {
+    #ifdef SHUTTER
+    // 長時間露光で溜めている間は掛けない。白飛び分 (colortex8) は今のフレームの点なので、溜めた筋の上に今の位置の点が浮く
+    bool spreadPoints = POINT_SPREAD_GAIN > 0.0 && optShutterSpeed <= frameTime;
+    #else
+    const bool spreadPoints = POINT_SPREAD_GAIN > 0.0;
+    #endif
+    if (spreadPoints) {
         float focusFade = POINT_SPREAD_GAIN;
     #ifdef DOF
         float cocDist = depth >= 1.0 ? far * 4.0 : linearizeDepth(fixHandDepth(depth));

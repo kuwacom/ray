@@ -113,7 +113,10 @@ vec3 applyAnalogSmear(vec3 hdr, int column) {
     // 漏れた電荷は列のどの色の画素の読み出しにも同じだけ足されるので、筋は白い (列の平均の輝度)
     vec3 streak = vec3(luminance(mean));
 #endif
-#if AP_SMEAR_SHUTTER_STOPS > 0
+#if AP_SMEAR_SHUTTER_STOPS > 0 && (defined EXPOSURE_CAMERA || defined SHUTTER)
+    // シャッター速度が決まっている時は、その蓄積時間で比を決める (1/60 秒で 1。速いほど強く、2^段 倍まで)
+    streak *= exp2(clamp(log2(ANALOG_SMEAR_SHUTTER_REFERENCE / optShutterSpeed), 0.0, float(AP_SMEAR_SHUTTER_STOPS)));
+#elif AP_SMEAR_SHUTTER_STOPS > 0
     // 露出連動: 比は 1 / 蓄積時間に比例する。明るい場面ほどシャッターが速く、暗い場面 (1/60 秒) より 2^段 倍まで強い
     float bright = saturate((frameData.postParams[0].w - ANALOG_SMEAR_SHUTTER_EV_DARK) / (ANALOG_SMEAR_SHUTTER_EV_DAY - ANALOG_SMEAR_SHUTTER_EV_DARK));
     streak *= exp2(float(AP_SMEAR_SHUTTER_STOPS) * bright);
