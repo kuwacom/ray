@@ -625,7 +625,6 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | LENS_OPTICAL_VIGNETTING | ON | ON | ON | ON | ON | ON | ON | ON | ON | ON |
 | LENS_HALATION | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
 | BLOOM | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
-| EXPOSURE_MODE | 2 | **1** | **1** | 2 | 2 | 2 | 2 | 2 | 2 | 2 |
 <!-- END GENERATED settings -->
 
 DEBUG_VIEW の値 (0-12) と表示内容の対応は `shaders/lang/ja_JP.lang` / `en_US.lang` の `value.DEBUG_VIEW.*` にあり、表示の実装は `shaders/program/post/final.fsh` の `#if DEBUG_VIEW == N` の分岐。

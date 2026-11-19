@@ -157,10 +157,10 @@ const float DOF_SENSOR_HEIGHT = DOF_SENSOR_HEIGHT_FULL;  // 35mm 判 36x24
  * 薄レンズの式はそのまま使い、絞り径だけ誇張してボケを見える量にする
  * 80mm (DOF_STRENGTH 0.5 で 40mm = f/0.4 相当) では、近くの壁や床にピントが合った時に遠くのたいまつが
  * 10 px 以上の玉ボケになり「遠くの光が距離に比例して滲む」という報告があった
- * 16mm (既定 0.5 で 8mm = f/2 相当) にして、手前 2m に合焦した時の遠景のボケを約 2 px@752p (3 px@1080p) に抑える
+ * 16mm (DOF_STRENGTH 0.5 で 8mm = f/2 相当) にして、手前 2m に合焦した時の遠景のボケを約 2 px@752p (3 px@1080p) に抑える
  */
 const float DOF_APERTURE_DIAMETER = 16.0;
-// 既定 (DOF_STRENGTH 0.5, フルサイズ) の絞り径。ボケ半径の上限を広げる基準
+// 基準 (DOF_STRENGTH 0.5, フルサイズ。既定は 2.0) の絞り径。ボケ半径の上限を広げる基準
 const float DOF_APERTURE_REFERENCE = 8.0;
 // ボケ半径の上限 (画面高さ比)。既定の絞りの時の値
 const float DOF_MAX_RADIUS = 0.022;
@@ -256,7 +256,7 @@ const float LAVA_SELF_BLOOM_CUT = max(1.0 - LAVA_SELF_BLOOM / LAVA_BLOOM_GAIN, 0
 
 // レンズ (強さの割合はプリセット lib/post/lens_presets.glsl)
 const float VIGNETTE_SCALE = 0.8;
-// F 値の上限と、DOF_STRENGTH 既定 (0.5) での F 値 (焦点距離 17mm / 絞り径 8mm)。収差の開放連動の基準
+// F 値の上限と、DOF_STRENGTH 0.5 (既定は 2.0) での F 値 (焦点距離 17mm / 絞り径 8mm)。収差の開放連動の基準
 const float LENS_F_MAX = 22.0;
 const float LENS_F_REFERENCE = 2.14;
 /*

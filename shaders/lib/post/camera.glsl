@@ -78,7 +78,7 @@ float lensFNumber() {
     return clamp(cameraFocalLength() / max(cameraApertureDiameter(), 1e-3), LP_F_OPEN, LENS_F_MAX);
 }
 
-// 開放の度合い (DOF_STRENGTH 既定の F 値で 1)。開放ほど強くなる収差 (球面収差・軸上色収差) に掛ける
+// 開放の度合い (DOF_STRENGTH 0.5 の F 値で 1)。開放ほど強くなる収差 (球面収差・軸上色収差) に掛ける
 float lensApertureFactor() {
     return clamp(LENS_F_REFERENCE / lensFNumber(), 0.3, 1.6);
 }
