@@ -86,6 +86,10 @@ const int METER_PER_THREAD = METER_GRID / 16;
 const float FOCUS_TAP_SPACING = 0.012;
 
 shared uint sharedHistogram[256];
+#if defined EXPOSURE_AUTO && defined HAS_SKYLIGHT
+// 灯りに照らされた所の重み (夜の持ち上げを外す割合。EXPOSURE_NIGHT_LIGHT_*)
+shared uint sharedLightLit;
+#endif
 
 #ifdef HAS_SKY
 const uint VIS_SCALE = 1024u;
@@ -238,16 +242,11 @@ float histogramLogAverage(float lowPercent, float highPercent, out bool ok) {
     return sumWeight > 0.0 ? sumLog / sumWeight : histogramBinToLog(0.0);
 }
 
-// ヒストグラムの重みのうち log2 輝度が logL より明るい割合
-float histogramShareAbove(float logL) {
+// ヒストグラムの重みの合計
+float histogramTotal() {
     float total = 0.0;
-    float above = 0.0;
-    for (int i = 0; i < 256; i++) {
-        float n = float(sharedHistogram[i]);
-        total += n;
-        above += histogramBinToLog(float(i)) > logL ? n : 0.0;
-    }
-    return total > 0.0 ? above / total : 0.0;
+    for (int i = 0; i < 256; i++) total += float(sharedHistogram[i]);
+    return total;
 }
 
 // ヒストグラムの重みの上位 1 - percent の境の log2 輝度 (ビンの中は一様とみなして補間)
@@ -471,6 +470,9 @@ float updateFocus(float dt) {
 void main() {
     uint index = gl_LocalInvocationIndex;
     sharedHistogram[index] = 0u;
+#if defined EXPOSURE_AUTO && defined HAS_SKYLIGHT
+    if (index == 0u) sharedLightLit = 0u;
+#endif
 #ifdef HAS_SKY
     if (index == 0u) {
         sharedVisible = 0u;
@@ -502,6 +504,11 @@ void main() {
 #ifdef EXPOSURE_AUTO
     vec2 jitter = r2Sequence(frameCounter & 255);
     vec2 screen = viewSize();
+    #ifdef HAS_SKYLIGHT
+        // 灯りの割合は前のフレームの暗い側の測光から決めた明るさで数える (このフレームの暗い側は集計の後でしか分からない)
+        float prevDark = frameData.postParams[1].y;
+        float lightLum = isnan(prevDark) || isinf(prevDark) ? 1e30 : ev100ToLuminance(prevDark) * exp2(EXPOSURE_NIGHT_LIGHT_EV);
+    #endif
     for (int j = 0; j < METER_PER_THREAD; j++) {
         for (int i = 0; i < METER_PER_THREAD; i++) {
             ivec2 cell = ivec2(gl_LocalInvocationID.xy) + ivec2(i, j) * 16;
@@ -514,6 +521,16 @@ void main() {
             float l = luminance(sanitizeColor(textureLod(colortex0, corner, 0.0).rgb));
             uint w = uint(meteringWeight(uv) * METERING_WEIGHT_SCALE + 0.5);
             atomicAdd(sharedHistogram[luminanceToHistogramBin(l)], w);
+            #ifdef HAS_SKYLIGHT
+            /*
+             * 灯りに照らされた所 = 暗い側より明るく、ライトマップのブロックライトのある所。明るさだけで数えると、
+             * 月の照り返しの道 (夜の海) と月明かりの雪の明るい所まで灯りに数え、月夜の持ち上げが外れた
+             */
+            if (l > lightLum) {
+                ivec2 g = LENS_WARP_TAA ? postSourceTexel(uv) : p;
+                if (unpack2x8(texelFetch(colortex2, g, 0).a).x >= EXPOSURE_NIGHT_LIGHT_BLOCK) atomicAdd(sharedLightLit, w);
+            }
+            #endif
         }
     }
 #endif
@@ -570,8 +587,8 @@ void main() {
             adaptedDarkEv = adaptedDarkSide;
         #endif
         // 灯りに照らされた所の割合。暗い側より EXPOSURE_NIGHT_LIGHT_EV 明るい所を数える (月明かりの地面と空はこの差に届かない)
-        float lightLog = log2(ev100ToLuminance(adaptedDarkSide)) + EXPOSURE_NIGHT_LIGHT_EV;
-        float measuredShare = histogramShareAbove(lightLog);
+        float total = histogramTotal();
+        float measuredShare = total > 0.0 ? float(sharedLightLit) / total : 0.0;
         float prevShare = frameData.postParams[5].z;
         lightShare = initialized && !isnan(prevShare) && !isinf(prevShare)
                    ? mix(prevShare, measuredShare, 1.0 - exp(-EXPOSURE_SPEED_DARK * dt)) : measuredShare;

@@ -86,11 +86,13 @@ const vec2 EXPOSURE_NIGHT_DARK_PERCENT = vec2(0.05, 0.5);
 /*
  * 灯りの多い夜景では夜の持ち上げ (下支えも) を外す。持ち上げは月明かりの地形を読ませるためのもので、灯りの点いた村・街では
  * 暗い空と地面に合わせて持ち上げた分 (0.4〜1.3 EV) だけ照らされた壁と地面が明るく平たくなり、昼のように見えた
- * 灯りに照らされた所 = 暗い側の計測より LIGHT_EV 明るい所。その重みの割合が SHARE.x .. y で持ち上げを 1 -> 0 にする
- * 灯りの村は 5〜20%、月明かりの草原・雪原・海は 0.5% 未満 (月の円盤と照り返しの点だけ)
+ * 灯りに照らされた所 = 暗い側の計測より LIGHT_EV 明るく、ライトマップのブロックライトが LIGHT_BLOCK 以上の所 (月の照り返しと月明かりの雪を数えない)。
+ * その重みの割合が SHARE.x .. y で持ち上げを 1 -> 下支え (EXPOSURE_NIGHT_MIN_LIFT) にする
+ * 村の中で 4〜16%、丘から遠くの灯りの村を見渡すと 1〜5%、灯りの無い月明かりの草原・雪原・海は 0%
  */
 const float EXPOSURE_NIGHT_LIGHT_EV = 5.0;
-const vec2 EXPOSURE_NIGHT_LIGHT_SHARE = vec2(0.005, 0.04);
+const vec2 EXPOSURE_NIGHT_LIGHT_SHARE = vec2(0.002, 0.012);
+const float EXPOSURE_NIGHT_LIGHT_BLOCK = 0.5;
 /*
  * 評価測光の夜の屋外: 白 (CLIP_LEVEL。AgX の白は露出後の約 1.3) を超える所が重みの CLIP_SHARE を超えないよう、最大 CLIP_MAX EV まで暗く写す
  * 実写の灯りの多い夜景で 3 チャンネルとも飛ぶ画素は 0.1〜1.4%、どれかのチャンネルが飛ぶ画素は 0.3〜5%
@@ -315,8 +317,10 @@ const float BLOOM_AMOUNT = 0.16;
  * 昼と同じ混合率では滲みが薄くて光って見えない。地面や空は一様なので、混合しても全体の明るさは変わらない
  * 夜の判定と屋外の判定は露出の持ち上げ (applyEnvironmentExposure) と同じにそろえる (地上の屋外だけ。洞窟・屋内・ネザー・エンドは昼と同じ)
  * ブルームを強めた設定で画面全体がぼけないよう、増した後の混合率は元の値と NIGHT_BLOOM_MIX_MAX の大きいほうまでに止める
+ * 3 倍では満月の夜に丘から見た遠くの村の灯りのにじみの半径 (幅 1280 で) が 12〜19 px になり、実写の遠景の夜景 (3.5〜14 px) より広く霞んで
+ * まぶしく見えた。1.5 倍で 13〜15 px、1 倍 (昼と同じ) で 9〜14 px。新月の 17〜22 px は倍率によらない (灯りに照らされた雪の広がりで、にじみではない)
  */
-const float NIGHT_BLOOM_GAIN = 3.0;
+const float NIGHT_BLOOM_GAIN = 1.0;
 const vec2 NIGHT_BLOOM_SUN_Y = vec2(-0.2, -0.05);
 const float NIGHT_BLOOM_MIX_MAX = 0.35;
 // 雨・水中で広いブルームを足す量
