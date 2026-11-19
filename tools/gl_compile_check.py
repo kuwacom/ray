@@ -650,8 +650,10 @@ def compile_and_link(stages: list[StageSource], level: str, started: list[int] |
 
 # 上限との比較 (静的チェック)
 
-def check_usage(name: str, stages: list[StageSource], res: ProgramResult, limits: dict, buffer_sizes: dict[int, int]) -> list[str]:
+def check_usage(name: str, stages: list[StageSource], res: ProgramResult, limits: dict, buffer_sizes: dict[int, int],
+                buffer_pixels: dict[int, int] | None = None) -> list[str]:
     problems: list[str] = []
+    buffer_pixels = buffer_pixels or {}
     u = res.usage
     # GLSL のブロックが shaders.properties の bufferObject.N より大きいと範囲外アクセスになる
     for key, size in list(u.items()):
@@ -674,6 +676,17 @@ def check_usage(name: str, stages: list[StageSource], res: ProgramResult, limits
             const = names.get(binding)
             if const is None:
                 problems.append(f"SSBO binding {binding} の大きさなしの配列に「要素数:」の注記が無い (lib/buffers)")
+                continue
+            if const == SCREEN_PIXELS_NOTE:
+                # 画面比の確保。要素数は画面の画素数なので、同じ想定の画面の画素数で比べる
+                if binding not in buffer_pixels:
+                    problems.append(f"SSBO binding {binding}: 要素数が画面の画素数なのに bufferObject.{binding} が画面比でない")
+                    continue
+                TAIL_CHECKED.add(binding)
+                need = start + u[f"ssboTailStride.{binding}"] * buffer_pixels[binding]
+                u[f"ssboNeed.{binding}"] = need
+                if alloc is not None and need > alloc:
+                    problems.append(f"SSBO binding {binding} の画面の画素数 ({ASSUMED_SCREEN[0]}x{ASSUMED_SCREEN[1]}) の要素で {need} bytes > bufferObject.{binding} = {alloc}")
                 continue
             if not pre_all:
                 continue  # glslang が無く定数を評価できない
@@ -756,13 +769,50 @@ def check_usage(name: str, stages: list[StageSource], res: ProgramResult, limits
     return problems
 
 
-def buffer_object_sizes(prop_lines: list[str]) -> dict[int, int]:
-    sizes: dict[int, int] = {}
+# 画面比の bufferObject (`bufferObject.N = <1 画素のバイト数> true <横の倍率> <縦の倍率>`) の確保量を見積もる画面。
+# Iris は (int)(幅 x 倍率) x (int)(高さ x 倍率) x バイト数を確保するので、想定する最大の画面で上限と比べる
+ASSUMED_SCREEN = (3840, 2160)
+# lib/buffers の大きさなしの配列の注記で、画面比の確保の画素数を表す語 (`// 要素数: 画面の画素数`)
+SCREEN_PIXELS_NOTE = "画面の画素数"
+BUFFER_OBJECT_RE = re.compile(r"^\s*bufferObject\.(\d+)\s*=\s*(.+?)\s*$")
+
+
+def parse_buffer_object(value: str) -> tuple[int, int | None] | None:
+    """bufferObject の値 -> (想定の画面での確保バイト数, 画面比なら画素数 / 固定なら None)。読めなければ None"""
+    parts = value.split()
+    if len(parts) == 1 and parts[0].isdigit():
+        return int(parts[0]), None
+    if len(parts) == 4 and parts[0].isdigit():
+        try:
+            sx, sy = float(parts[2]), float(parts[3])
+        except ValueError:
+            return None
+        if parts[1].lower() != "true":
+            # Iris は 2 番目が true でなければ画面比にせず、1 番目のバイト数だけを確保する
+            return int(parts[0]), None
+        pixels = int(ASSUMED_SCREEN[0] * sx) * int(ASSUMED_SCREEN[1] * sy)
+        return int(parts[0]) * pixels, pixels
+    return None
+
+
+def buffer_object_entries(prop_lines: list[str]) -> dict[int, tuple[int, int | None]]:
+    out: dict[int, tuple[int, int | None]] = {}
     for ln in prop_lines:
-        m = re.match(r"^\s*bufferObject\.(\d+)\s*=\s*(\d+)", ln)
+        m = BUFFER_OBJECT_RE.match(ln)
         if m:
-            sizes[int(m.group(1))] = int(m.group(2))
-    return sizes
+            parsed = parse_buffer_object(m.group(2))
+            if parsed is not None:
+                out[int(m.group(1))] = parsed
+    return out
+
+
+def buffer_object_sizes(prop_lines: list[str]) -> dict[int, int]:
+    return {b: size for b, (size, _) in buffer_object_entries(prop_lines).items()}
+
+
+def buffer_object_pixels(prop_lines: list[str]) -> dict[int, int]:
+    """画面比の bufferObject の binding -> 想定の画面の画素数"""
+    return {b: px for b, (_, px) in buffer_object_entries(prop_lines).items() if px is not None}
 
 
 def check_properties(prop_lines: list[str], limits: dict) -> list[str]:
@@ -782,9 +832,17 @@ def check_properties(prop_lines: list[str], limits: dict) -> list[str]:
             problems.append(f"{key.strip()}: サイズ {dims} > 上限 {lim}")
     lim = limits.get("GL_MAX_SHADER_STORAGE_BLOCK_SIZE")
     for ln in prop_lines:
-        m = re.match(r"^\s*bufferObject\.(\d+)\s*=\s*(\d+)", ln)
-        if m and isinstance(lim, int) and int(m.group(2)) > lim:
-            problems.append(f"bufferObject.{m.group(1)} = {m.group(2)} > GL_MAX_SHADER_STORAGE_BLOCK_SIZE {lim}")
+        m = BUFFER_OBJECT_RE.match(ln)
+        if not m:
+            continue
+        parsed = parse_buffer_object(m.group(2))
+        if parsed is None:
+            problems.append(f"bufferObject.{m.group(1)} = {m.group(2)}: 書式を読めない")
+            continue
+        size, pixels = parsed
+        if isinstance(lim, int) and size > lim:
+            at = f" ({ASSUMED_SCREEN[0]}x{ASSUMED_SCREEN[1]} の画面で)" if pixels is not None else ""
+            problems.append(f"bufferObject.{m.group(1)} = {size}{at} > GL_MAX_SHADER_STORAGE_BLOCK_SIZE {lim}")
     return problems
 
 
@@ -991,7 +1049,9 @@ def main() -> int:
     configs: list[tuple[str, dict, list[str]]] = []
     if args.profile:
         for p in args.profile.split(","):
-            configs.append((p, {} if p == "DEFAULT" else vs.resolve_profile(p, profiles), worlds_opt or ["world0"]))
+            # validate_shaders.py の検証用の組 (プロファイルに載せない機能を ON にした組) の名前も受け付ける
+            ov = {} if p == "DEFAULT" else vs.VALIDATION_SETS[p] if p in vs.VALIDATION_SETS else vs.resolve_profile(p, profiles)
+            configs.append((p, ov, worlds_opt or ["world0"]))
     elif args.full:
         configs.append(("DEFAULT", {}, worlds_opt or vs.WORLDS))
         for p in profiles:
@@ -1028,6 +1088,7 @@ def main() -> int:
             prop_lines = preprocess_properties(vs.PROPERTIES, macros)
             disabled = unread_programs(ov, options, env)
             buffer_sizes = buffer_object_sizes(prop_lines)
+            buffer_pixels = buffer_object_pixels(prop_lines)
             allocated_bindings |= buffer_sizes.keys()
             for p in check_properties(prop_lines, limits):
                 if p not in seen_static:
@@ -1093,7 +1154,7 @@ def main() -> int:
                     if res is None:
                         pend = linking.pop(key, None)
                         res = finish_link(pend, level) if pend else compile_and_link(stages, level)
-                        res.usage_problems = check_usage(prog_key, stages, res, limits, buffer_sizes)
+                        res.usage_problems = check_usage(prog_key, stages, res, limits, buffer_sizes, buffer_pixels)
                         cache[key] = res
                     checked += 1
                     label = f"[{env.name}/{cfg_name}] {prog_key} ({'+'.join(s.stage for s in stages)})"

@@ -4,10 +4,14 @@
  * 論文のタイル最大速度パスの代わりに、周囲 8 方向の速度を疎に調べて近傍の最大速度を求める
  * (パスを増やさずに、止まった背景の上へ動く物体のブラーが滲み出す所まで再現する)
  * 手は速度 0 で前景扱いなので、ぼけず、周りへ滲みもしない
+ * シャッター速度の反映 (SHUTTER) の時は、ぶれの長さをシャッター速度で決め、ぶれの後の色を画素ごとに溜めて長時間露光にする
+ * (モーションブラーが OFF でも走る。溜める重みは composite21_a が書く)
  * post モジュール (lib/post)
  */
+#define SSBO_SHUTTER_USE
 //@include "/lib/common/common.glsl"
 //@include "/lib/post/post_internal.glsl"
+//@include "/lib/buffers/shutter.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -48,6 +52,7 @@
 #include "/lib/post/lens_flare.glsl"
 #include "/lib/post/lens.glsl"
 #include "/lib/post/post_internal.glsl"
+#include "/lib/buffers/shutter.glsl"
 // END GENERATED includes
 
 in vec2 texcoord;
@@ -57,9 +62,19 @@ layout(location = 0) out vec4 outColor;
 
 float maxBlurLength() { return MOTION_BLUR_MAX_LENGTH * viewHeight; }
 
+#ifdef SHUTTER
+/*
+ * シャッター速度の反映: 1 フレームの移動量のうち、シャッターが開いている割合 (シャッター角 360 x t / フレームの長さ)
+ * 1 フレームより長いシャッターは 360 度で止め、フレームを溜めて残りの時間を足す (溜めたフレームの間を埋め、速い物がとびとびの像にならない)
+ */
+float blurShutterScale() { return min(optShutterSpeed / max(frameTime, SHUTTER_DT_MIN), 1.0); }
+#else
+float blurShutterScale() { return MOTION_BLUR_SHUTTER * MOTION_BLUR_STRENGTH; }
+#endif
+
 // ピクセル単位の露光中の移動量 (今 - 前)。長さは上限で切る
 vec2 blurVelocity(vec2 uv, float depth) {
-    vec2 v = (uv - postPreviousUv(uv, depth)) * viewSize() * (MOTION_BLUR_SHUTTER * MOTION_BLUR_STRENGTH);
+    vec2 v = (uv - postPreviousUv(uv, depth)) * viewSize() * blurShutterScale();
     float len = length(v);
     float maxLen = maxBlurLength();
     return len > maxLen ? v * (maxLen / len) : v;
@@ -75,6 +90,42 @@ float inFront(float dY, float dX) { return saturate(1.0 - (dY - dX) / MOTION_BLU
 float cone(float dist, float speed) { return speed > 1e-3 ? saturate(1.0 - dist / speed) : 0.0; }
 float cylinder(float dist, float speed) { return 1.0 - smoothstep(0.95 * speed, 1.05 * speed, dist); }
 
+#ifdef SHUTTER
+/*
+ * 長時間露光: ぶれの後の色を、composite21_a が決めた重みで画素ごとの平均に溜め、溜めた絵を返す
+ * 手は溜めずに今のフレームを出す (手の後ろは見えていた所の平均のまま)。溜め直しのフレームだけは手の色で埋め、0 (黒) から溜めない
+ */
+vec4 accumulateShutter(ivec2 texel, vec4 color, bool hand) {
+    int width = int(viewWidth);
+    int index = texel.y * width + texel.x;
+    if (texel.x >= width || index >= width * int(viewHeight)) return color;
+    vec4 state = frameData.postParams[SHUTTER_PARAM];
+    uint flags = uint(state.w);
+    vec4 accum = shutterAccum.accum[index];
+    // a も有限に丸める。NaN は mix の重み 1 でも残り (NaN x 0 = NaN)、溜め直すまで溶岩の割合 (final) を壊す
+    vec4 now = vec4(sanitizeColor(color.rgb), isnan(color.a) || isinf(color.a) ? 0.0 : color.a);
+    if (!hand || (flags & SHUTTER_FLAG_RESET) != 0u) accum = mix(accum, now, state.x);
+    shutterAccum.accum[index] = accum;
+    #if SHUTTER_MODE == 1
+    // 1 枚ずつ: 露光を終えたフレームで撮れた絵を移し、次の露光ができるまでそれを出す (最初の 1 枚までは途中経過)
+    if ((flags & SHUTTER_FLAG_COMPLETE) != 0u) {
+        shutterShown.shown[index] = uvec2(packHalf2x16(accum.rg), packHalf2x16(accum.ba));
+    } else if ((flags & SHUTTER_FLAG_SHOWN) != 0u) {
+        uvec2 shown = shutterShown.shown[index];
+        accum = vec4(unpackHalf2x16(shown.x), unpackHalf2x16(shown.y));
+    }
+    #endif
+    return hand ? color : accum;
+}
+#endif
+
+// 出力を書く。シャッター速度の反映の時は溜めた絵にする
+#ifdef SHUTTER
+#define WRITE_OUTPUT(color, hand) outColor = accumulateShutter(texel, color, hand)
+#else
+#define WRITE_OUTPUT(color, hand) outColor = color
+#endif
+
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
     vec4 centerRaw = texelFetch(colortex0, texel, 0);
@@ -83,7 +134,7 @@ void main() {
     float depthX = texelFetch(depthtex0, LENS_WARP_TAA ? postSourceTexel(uv) : texel, 0).r;
 
     if (isHandDepth(depthX)) {
-        outColor = centerRaw;
+        WRITE_OUTPUT(centerRaw, true);
         return;
     }
 
@@ -109,7 +160,7 @@ void main() {
     }
 
     if (speedN < 0.5) {
-        outColor = centerRaw;
+        WRITE_OUTPUT(centerRaw, false);
         return;
     }
 
@@ -142,5 +193,5 @@ void main() {
         wSum += w;
     }
 
-    outColor = vec4(sum / wSum, centerRaw.a);
+    WRITE_OUTPUT(vec4(sum / wSum, centerRaw.a), false);
 }

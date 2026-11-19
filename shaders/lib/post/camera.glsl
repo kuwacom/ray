@@ -26,14 +26,29 @@ float cameraFocalLength() {
 }
 
 /*
+ * 露出がカメラの時の F 値。露出の明るさと被写界深度・レンズの効果に同じ値を使い、レンズプリセットの開放 F 値より開かない
+ * 絞りの無いレンズは開放 F 値のまま (明るさはシャッター速度と ISO で決める)
+ */
+float cameraFNumber() {
+#if defined LENS_FIXED_APERTURE
+    return LP_F_OPEN;
+#else
+    return max(optFNumber, LP_F_OPEN);
+#endif
+}
+
+/*
  * 絞り (入射瞳) の直径 (mm)
  * 0: ボケの量 (DOF_STRENGTH)。センサーに比例させて F 値を保つ (フルサイズでは FOV に依らず一定の径)
  * 1: レンズプリセットの開放 F 値, 2: 指定の F 値 (どちらも焦点距離 / F 値なので FOV で変わる)
  * 絞りの無いレンズ (Hologon の固定 F8) は設定に依らず開放 F 値
+ * 露出がカメラの時は絞りの決め方に依らず露出の F 値 (cameraFNumber)
  */
 float cameraApertureDiameter() {
 #if defined LENS_FIXED_APERTURE
     return cameraFocalLength() / LP_F_OPEN;
+#elif defined EXPOSURE_CAMERA
+    return cameraFocalLength() / cameraFNumber();
 #elif DOF_APERTURE_MODE == 1
     return cameraFocalLength() / LP_F_OPEN;
 #elif DOF_APERTURE_MODE == 2

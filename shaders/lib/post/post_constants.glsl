@@ -16,6 +16,19 @@
 #if EXPOSURE_MODE == 1 || EXPOSURE_MODE == 2
     #define EXPOSURE_AUTO
 #endif
+// カメラのモード (F 値・シャッター速度・ISO から EV100 を出す。自動ではない)。露出と被写界深度の F 値を同じにする
+#if EXPOSURE_MODE == 3
+    #define EXPOSURE_CAMERA
+#endif
+/*
+ * カメラの EV100 (実写の露出表の値) から Ray の EV100 (シーン単位の輝度で測った値) を引く量
+ * Ray の場面の輝度は実写の cd/m^2 より桁が小さい (晴れの昼の測光が 1.3〜2.4、実写の晴天は 15)。
+ * 晴天の 16 の法則 (f/16・1/100 s・ISO 100 = EV100 14.6) が晴れの昼の測光に当たるようにずらす。26.1.2 の晴れの昼に f/16・1/125 s・ISO 100
+ * で撮ると、自動露出 (曲線で昼を明るく残す) より 1.0 段暗く写る
+ * Ray の夜は実写より昼との差が小さい (夜の測光 -7、実写の月夜 -3〜-2)。灯りの点いた夜の村は f/29・2 s・ISO 100 (EV100 8.7) で自動露出より
+ * 約 1.6 段明るく写り、実写の夜景の設定 (EV100 2〜4) より 5〜6 段暗い側の設定で合う
+ */
+const float EXPOSURE_CAMERA_EV_OFFSET = 13.0;
 // DR の補正が働くか (今の方式の自動露出だけ。局所の明るさのタイルもこの時だけ作る)
 #if defined EXPOSURE_DR && defined EXPOSURE_AUTO && EXPOSURE_RESPONSE_MODE == 0
     #define EXPOSURE_DR_ACTIVE
@@ -219,6 +232,19 @@ const float MOTION_BLUR_SHUTTER = 0.5;
 const float MOTION_BLUR_MAX_LENGTH = 0.04;
 // 深度の前後判定の柔らかさ (ブロック)
 const float MOTION_BLUR_DEPTH_SOFTNESS = 0.5;
+// シャッター速度の反映 (SHUTTER)。フレームの長さの下限 (秒): 止まった直後の極端に短いフレームでシャッター角を出し過ぎない
+const float SHUTTER_DT_MIN = 0.001;
+// 溜める 1 フレームの長さの上限 (秒)。引っかかった 1 フレームが長時間露光に強く焼き付かない
+const float SHUTTER_DT_MAX = 0.1;
+/*
+ * 状態 (FrameData.postParams[SHUTTER_PARAM]) の w の印。COMPLETE = このフレームで露光を終えた、SHOWN = 撮れた絵がある、RESET = 溜め直し
+ * w = 印 + RANGE x 画面の高さ (高さ 2^21 まで float で厳密)。印は w の下位 3 ビット
+ */
+const float SHUTTER_FLAG_RANGE = 8.0;
+const int SHUTTER_PARAM = 7;
+const uint SHUTTER_FLAG_COMPLETE = 1u;
+const uint SHUTTER_FLAG_SHOWN = 2u;
+const uint SHUTTER_FLAG_RESET = 4u;
 
 // 被写界深度
 /*
@@ -542,6 +568,13 @@ const float ANALOG_SHARPEN_CORING = 0.01;
  */
 const float ANALOG_SMEAR_SHUTTER_EV_DARK = -2.0;
 const float ANALOG_SMEAR_SHUTTER_EV_DAY = 0.0;
+// シャッター速度が決まっている時 (カメラの露出かシャッター速度の反映) のスミア比の基準の蓄積時間 (秒)。これより長いと弱めない
+const float ANALOG_SMEAR_SHUTTER_REFERENCE = 1.0 / 60.0;
+/*
+ * 露出がカメラの時のゲイン: ISO / BASE (BASE が 0 dB)。上限は置かず、ISO を上げるほどノイズが増え続ける
+ * (5 段 = ISO 3200 で夜の村の空と壁が色ノイズで覆われる。DV の手動のゲインの最大は 18 dB = 3 段)
+ */
+const float ANALOG_ISO_BASE = 100.0;
 // センサーのノイズの強さ 1 の時の線形の振幅 (表示値を Rec.709 の逆で線形へ戻した単位)。見た目の調整値
 // 解像の 3x3 がノイズも平均するので、その後で 26.1.2 の夜の村の暗部の輝度のノイズがプリセット 1 で約 2/255 になるようにした
 const float ANALOG_SHOT_NOISE_SCALE = 0.08;

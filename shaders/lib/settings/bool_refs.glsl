@@ -154,6 +154,8 @@
 #endif
 #ifdef MOTION_BLUR
 #endif
+#ifdef SHUTTER
+#endif
 #ifdef LENS_FLARE
 #endif
 #ifdef LENS_GHOSTS

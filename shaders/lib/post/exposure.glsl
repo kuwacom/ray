@@ -9,6 +9,8 @@
  * FrameData.postParams[5]: 自動露出の順応済みの補助の値。x = ハイライト重点の上限の EV100, y = 評価測光の夜の白飛びを抑える EV100,
  *                         z = 灯りに照らされた所の割合, w = DR の補正で暗く撮った EV (final が戻す)
  * FrameData.postParams[6]: 古い方式の自動露出の状態。x = 絞りの EV100, y = 絞りの動く速さ, z = ゲイン (段), w = 検波した測光 EV100
+ * FrameData.postParams[7]: シャッター速度の反映の状態 (composite21_a が書く)。x = このフレームを溜める重み, y = 今の露光で溜めた秒 (1 枚ずつ),
+ *                         z = 溜め始めた時の画面の幅, w = 印 (SHUTTER_FLAG_*) + 8 x 画面の高さ
  */
 #ifndef POST_EXPOSURE_GLSL
 #define POST_EXPOSURE_GLSL
@@ -27,10 +29,11 @@ float eyeOutdoor() {
 }
 
 const float EXPOSURE_INIT_MARKER = 271.828;
-const float EXPOSURE_ISO = 100.0;
+// EV100 の基準の感度 (設定の EXPOSURE_ISO とは別)
+const float EXPOSURE_ISO_REFERENCE = 100.0;
 
-float luminanceToEv100(float l) { return log2(max(l, 1e-10) * EXPOSURE_ISO / EXPOSURE_CALIBRATION); }
-float ev100ToLuminance(float ev) { return exp2(ev) * EXPOSURE_CALIBRATION / EXPOSURE_ISO; }
+float luminanceToEv100(float l) { return log2(max(l, 1e-10) * EXPOSURE_ISO_REFERENCE / EXPOSURE_CALIBRATION); }
+float ev100ToLuminance(float ev) { return exp2(ev) * EXPOSURE_CALIBRATION / EXPOSURE_ISO_REFERENCE; }
 
 // 平均輝度 2^ev 相当の場面を中間グレーへ写す露出倍率
 float ev100ToExposure(float ev) { return EXPOSURE_KEY / ev100ToLuminance(ev); }

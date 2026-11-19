@@ -545,7 +545,13 @@ void main() {
     bool initialized = frameData.postParams[0].z == EXPOSURE_INIT_MARKER;
 
 #ifndef EXPOSURE_AUTO
+    #ifdef EXPOSURE_CAMERA
+    // EV100 = log2(N^2 / t) - log2(ISO / 100)。マニュアルと同じく環境の補正 (夜の持ち上げ・屋内・雨・水中) は掛けない
+    float fNumber = cameraFNumber();
+    float measuredEv = log2(fNumber * fNumber / optShutterSpeed) - log2(optExposureIso / EXPOSURE_ISO_REFERENCE) - EXPOSURE_CAMERA_EV_OFFSET;
+    #else
     float measuredEv = EXPOSURE_MANUAL_EV;
+    #endif
     float adaptedEv = measuredEv;
     float appliedEv = measuredEv;
     float targetEv = measuredEv;
