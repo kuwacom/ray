@@ -141,6 +141,24 @@ def connected_entries(first: int, label: str, blocks: list[str], arm_values: lis
     return [(first + m, f"{label} (connection mask {m})", names) for m, names in enumerate(names_of)]
 
 
+def block_const(name: str) -> int:
+    return next(r[3] for r in BLOCK_CONSTS if r[0] == "const" and r[2] == name)
+
+
+# 染めた小物 (カーペット・旗・火のないロウソク)。もとは BLOCK_NON_OCCLUDING の行にあったものを、反射率の設定を種類ごとに
+# 掛けるために分けた。質感と遮蔽は BLOCK_NON_OCCLUDING と同じに扱い、BLOCK_NON_OCCLUDING のボクセルの色は分ける前と同じく
+# これらを含めた平均にする (render_albedo_glsl)
+DYED_PROPS: list[tuple[int, str, list[str]]] = [
+    *[(block_const("BLOCK_CARPET") + i, f"{c} carpet", [f"{c}_carpet"]) for i, c in enumerate(COLORS)],
+    *[(block_const("BLOCK_BANNER") + i, f"{c} banner", [f"{c}_banner", f"{c}_wall_banner"]) for i, c in enumerate(COLORS)],
+    (block_const("BLOCK_CANDLE"), "unlit candle", ["candle:lit=false"]),
+    *[(block_const("BLOCK_CANDLE") + 1 + i, f"unlit {c} candle", [f"{c}_candle:lit=false"]) for i, c in enumerate(COLORS)],
+]
+if DYED_PROPS[-1][0] != block_const("BLOCK_DYED_LAST"):
+    raise SystemExit("BLOCK_DYED_LAST が染めた小物の最後の ID と合わない")
+NON_OCCLUDING_ID = block_const("BLOCK_NON_OCCLUDING")
+
+
 # 光源でないブロックの表。光源 (ID 1001-1255) は id_tables.py の LIGHTS
 # (ID, コメント, ブロック一覧) の順に並べる
 # コメントは .properties にそのまま出るので ASCII で書く (Iris は ISO-8859-1 で読み、UTF-8 の日本語は前処理を壊す)
@@ -185,12 +203,11 @@ BLOCKS: list[tuple[int, str, list[str]]] = [
                          *[f"{p}lightning_rod" for p in COPPER_PREFIX], *[f"waxed_{p}lightning_rod" for p in COPPER_PREFIX],
                          "pointed_dripstone", "turtle_egg", "frogspawn", "sea_pickle:waterlogged=false", "moss_carpet",
                          "pale_moss_carpet", "flower_pot", "bell", "redstone_torch:lit=false", "redstone_wall_torch:lit=false",
-                         "candle:lit=false", *with_state(colored("candle"), "lit=false"),
                          "stone_button", "polished_blackstone_button", *wood_prefixed("button"),
                          "stone_pressure_plate", "polished_blackstone_pressure_plate", "light_weighted_pressure_plate",
                          "heavy_weighted_pressure_plate", *wood_prefixed("pressure_plate"),
-                         *colored("carpet"), *wood_prefixed("sign"), *wood_prefixed("wall_sign"), *wood_prefixed("hanging_sign"),
-                         *wood_prefixed("wall_hanging_sign"), *colored("banner"), *colored("wall_banner"),
+                         *wood_prefixed("sign"), *wood_prefixed("wall_sign"), *wood_prefixed("hanging_sign"),
+                         *wood_prefixed("wall_hanging_sign"),
                          *with_state(wood_prefixed("fence_gate"), "open=true"),
                          "end_portal_frame:eye=false", "big_dripleaf", "big_dripleaf_stem",
                          "campfire:lit=false", "soul_campfire:lit=false"]),
@@ -198,6 +215,7 @@ BLOCKS: list[tuple[int, str, list[str]]] = [
     (108, "lily pad", ["lily_pad"]),
     (109, "sugar cane / bamboo", ["sugar_cane", "bamboo", "bamboo_sapling"]),
     (110, "underwater plants", ["seagrass", "tall_seagrass", "kelp", "kelp_plant"]),
+    *DYED_PROPS,
 
     # 水の level は 0 が水源、1-7 が流れる水 (上面が低い)、8 以上が落ちる水 (上面は水源と同じ)
     (200, "water", ["water:level=0", *[f"water:level={k}" for k in range(8, 16)], "bubble_column"]),
@@ -323,6 +341,8 @@ def render_albedo_glsl(colors: dict[str, list[int]], tops: dict[str, list[int]],
         # 向きのある光源の東・南・西は向きなしと同じ色 (blockAlbedoBaseId で引く)
         if LIGHT_ID_BASE + 255 < bid <= LIGHT_FACING_LAST:
             continue
+        if bid == NON_OCCLUDING_ID:
+            names = names + [n for _, _, ns in DYED_PROPS for n in ns]
         known = [n.split(":")[0] for n in names if n.split(":")[0] in colors]
         if known:
             by_id[bid] = mean_srgb([colors[n] for n in known])
@@ -607,6 +627,7 @@ def render_block_ids(colored: list[tuple[int, str, list[str]]]) -> str:
         " *   1        : 未登録の固体 (mc_Entity.x = -1 をボクセルではこれに置き換える)",
         " *   10-19    : マテリアルのヒント付き固体 (完全遮蔽)",
         " *   100-129  : 遮蔽しない植物・小物",
+        " *   130-178  : 染めた小物 (カーペット・旗・火のないロウソク。扱いは BLOCK_NON_OCCLUDING と同じ)",
         " *   200-299  : 半透明 (透過色テーブル index = id - 200)",
         " *   300-399  : 部分形状 (形状テーブル index = id - 300)",
         f" *   {LIGHT_ID_BASE + 1}-{LIGHT_ID_BASE + LIGHT_ENTITY_LAST}: 光源 (光源インデックス = id - {LIGHT_ID_BASE}, lib/ids/light_ids.glsl)",

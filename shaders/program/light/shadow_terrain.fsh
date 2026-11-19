@@ -70,7 +70,7 @@ void main() {
     } else {
         // RSM の VPL の色。G バッファと同じ色の付いた固体の反射率 (ALBEDO_*_STRENGTH) を掛ける
         albedo.a = 1.0;
-        if (COLOR_ALBEDO_ACTIVE && blockId >= BLOCK_COLOR_FIRST) albedo.rgb = linearToSrgb(applyColorBlockAlbedo(blockId, srgbToLinear(albedo.rgb)));
+        if (COLOR_ALBEDO_ACTIVE && isColorAlbedoBlock(blockId)) albedo.rgb = linearToSrgb(applyColorBlockAlbedo(blockId, srgbToLinear(albedo.rgb)));
     }
     outColor = albedo;
     outNormal = vec4(octEncode(normalize(normalPlayer)), skyLight, kind);

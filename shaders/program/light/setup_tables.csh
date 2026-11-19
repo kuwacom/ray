@@ -94,7 +94,7 @@ void main() {
         uint albedo = blockAlbedoPacked(j);
         uint albedoUp = blockAlbedoTopPacked(j);
         // 色の付いた固体の反射率 (ALBEDO_*_STRENGTH)。G バッファと同じ色にして、画面外の GI の当たりと floodfill の壁の照り返しもそろえる
-        if (COLOR_ALBEDO_ACTIVE && j >= BLOCK_COLOR_FIRST) {
+        if (COLOR_ALBEDO_ACTIVE && isColorAlbedoBlock(j)) {
             albedo = packUnorm4x8(vec4(linearToSrgb(applyColorBlockAlbedo(j, srgbToLinear(unpackUnorm4x8(albedo).rgb))), 0.0));
             albedoUp = packUnorm4x8(vec4(linearToSrgb(applyColorBlockAlbedo(j, srgbToLinear(unpackUnorm4x8(albedoUp).rgb))), 0.0));
         }

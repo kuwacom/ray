@@ -314,10 +314,12 @@ option.AUTO_METAL_PARTS=Metal Parts
 option.AUTO_METAL_PARTS.comment=Makes only the metal pixels of partly metal blocks (rails, iron bars, chains, lantern frames, hoppers, cauldrons, copper doors) and of metal tools and armor shine like metal blocks. Wood and flames stay non-metal. Not used for textures that have a PBR specular map.
 option.ALBEDO_CONCRETE_STRENGTH=Concrete Reflectance
 option.ALBEDO_CONCRETE_STRENGTH.comment=Brightness of concrete and concrete powder colors. Higher values make both the blocks and their bounce light brighter while keeping the color strength, for a strong painted look. 1 = the vanilla texture color.
-option.ALBEDO_WOOL_STRENGTH=Wool Reflectance
-option.ALBEDO_WOOL_STRENGTH.comment=Brightness of wool colors. Higher values make both the blocks and their bounce light brighter while keeping the color strength. 1 = the vanilla texture color.
+option.ALBEDO_WOOL_STRENGTH=Wool and Carpet Reflectance
+option.ALBEDO_WOOL_STRENGTH.comment=Brightness of wool and carpet colors. Higher values make both the blocks and their bounce light brighter while keeping the color strength. 1 = the vanilla texture color.
 option.ALBEDO_TERRACOTTA_STRENGTH=Terracotta Reflectance
 option.ALBEDO_TERRACOTTA_STRENGTH.comment=Brightness of terracotta colors (glazed terracotta not included). Higher values make both the blocks and their bounce light brighter while keeping the color strength. 1 = the vanilla texture color.
+option.ALBEDO_DYED_STRENGTH=Banner and Candle Reflectance
+option.ALBEDO_DYED_STRENGTH.comment=Brightness of banner and unlit candle colors. Higher values make both the blocks and their bounce light brighter while keeping the color strength. 1 = the vanilla texture color.
 option.POM=Parallax Occlusion Mapping
 option.POM_DEPTH=POM Depth
 option.POM_SAMPLES=POM Samples

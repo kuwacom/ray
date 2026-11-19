@@ -6,6 +6,7 @@
  *   1        : 未登録の固体 (mc_Entity.x = -1 をボクセルではこれに置き換える)
  *   10-19    : マテリアルのヒント付き固体 (完全遮蔽)
  *   100-129  : 遮蔽しない植物・小物
+ *   130-178  : 染めた小物 (カーペット・旗・火のないロウソク。扱いは BLOCK_NON_OCCLUDING と同じ)
  *   200-299  : 半透明 (透過色テーブル index = id - 200)
  *   300-399  : 部分形状 (形状テーブル index = id - 300)
  *   1001-1255: 光源 (光源インデックス = id - 1000, lib/ids/light_ids.glsl)
@@ -36,11 +37,16 @@ const int BLOCK_PLANT_TALL_UPPER = 102; // 2 ブロックの植物の上半分
 const int BLOCK_LEAVES = 103;
 const int BLOCK_VINES = 104;
 const int BLOCK_CROPS = 105;
-const int BLOCK_NON_OCCLUDING = 106;    // レール・ボタン・カーペット等 (揺れない)
+const int BLOCK_NON_OCCLUDING = 106;    // レール・ボタン等 (揺れない)
 const int BLOCK_COBWEB = 107;
 const int BLOCK_LILY_PAD = 108;
 const int BLOCK_CANE = 109;             // サトウキビ・竹
 const int BLOCK_UNDERWATER_PLANT = 110; // 海草・コンブ
+// 130-178: 染めた小物。質感・遮蔽・揺れは BLOCK_NON_OCCLUDING と同じで、反射率の設定 (ALBEDO_*_STRENGTH) を掛けるために分ける
+const int BLOCK_CARPET = 130;             // 130-145 カーペット (色の順は BLOCK_STAINED_GLASS と同じ)
+const int BLOCK_BANNER = 146;             // 146-161 旗・壁の旗 (同順)
+const int BLOCK_CANDLE = 162;             // 火の付いていないロウソク。163-178 は色付き (同順)
+const int BLOCK_DYED_LAST = 178;
 
 const int BLOCK_WATER = 200;
 const int BLOCK_ICE = 201;

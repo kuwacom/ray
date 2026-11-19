@@ -576,6 +576,9 @@ void main() {
     g.albedo = srgbToLinear(albedo.rgb);
 #ifdef GBUF_TERRAIN
     g.albedo = applyColorBlockAlbedo(blockBase, g.albedo);
+#elif defined GBUF_BLOCK
+    // 旗はブロックエンティティとして描かれる。ブロックのアイテムを描く間 (blockEntityId = 1) は掛けない
+    if (isBlockEntityDraw(blockEntityId)) g.albedo = applyColorBlockAlbedo(stripMetalGate(blockEntityId), g.albedo);
 #endif
     if (railMirror) g.albedo = min(g.albedo * RAIL_F0_GAIN, vec3(1.0));
 #if defined GBUF_ENTITIES || defined GBUF_HAND
