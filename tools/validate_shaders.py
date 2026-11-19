@@ -91,6 +91,18 @@ VALIDATION_SETS: dict[str, dict[str, str]] = {
                            "LIGHT_RANGE_MINOR_MAX": "32.0", "LIGHT_RANGE_MINOR_MIN": "4.0"},
     # レベルに比例する届く距離と窓関数 (以前の方式。プロファイルはどれも光の量)
     "LIGHT_FALLOFF_LEVEL": {"LIGHT_FALLOFF_MODE": "0"},
+    # 測光の選択 (既定でない重みと、ハイライト重点の上限の経路)
+    "METERING_SPOT": {"EXPOSURE_METERING_MODE": "2"},
+    "METERING_HIGHLIGHT": {"EXPOSURE_METERING_MODE": "4"},
+    # DR の補正 (ブルームを切っても局所の明るさのタイルを作る経路)
+    "EXPOSURE_DR": {"EXPOSURE_DR": "true"},
+    "EXPOSURE_DR_NO_BLOOM": {"EXPOSURE_DR": "true", "BLOOM": "false"},
+    # 古い方式の自動露出 (アナログと合わせる想定)
+    "RESPONSE_VHS": {"EXPOSURE_RESPONSE_MODE": "1", "ANALOG": "true", "EXPOSURE_DR": "true"},
+    "RESPONSE_DV": {"EXPOSURE_RESPONSE_MODE": "2", "ANALOG": "true"},
+    # 平均測光 + DR、マニュアル露出で DR と古い方式を選んだ時 (自動でないので働かない経路)
+    "EXPOSURE_AVERAGE_DR": {"EXPOSURE_MODE": "1", "EXPOSURE_DR": "true"},
+    "EXPOSURE_MANUAL_DR": {"EXPOSURE_MODE": "0", "EXPOSURE_DR": "true", "EXPOSURE_RESPONSE_MODE": "1", "BLOOM": "false"},
 }
 
 STAGE_OF_EXT = {".vsh": "vert", ".fsh": "frag", ".gsh": "geom", ".csh": "comp", ".tcs": "tesc", ".tes": "tese"}

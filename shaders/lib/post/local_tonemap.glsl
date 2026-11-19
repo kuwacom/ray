@@ -32,6 +32,10 @@ const float LOCAL_TONEMAP_EDGE_VARIANCE = 1.0;
 const float LOCAL_TONEMAP_LIFT_MAX = 2.0;
 const float LOCAL_TONEMAP_CUT_MAX = 3.0;
 const float LOCAL_TONEMAP_LUM_MIN = 1e-6;
+// 局所の明るさのタイル (composite23 / 24) を作るか。DR の補正も同じタイルを使う
+#if LOCAL_TONEMAP > 0 || defined EXPOSURE_DR_ACTIVE
+    #define LOCAL_TONEMAP_TILE
+#endif
 
 // 1/32 のタイルの場所。画面のフレアのタイル (1/4) の右の空き
 ivec4 localTonemapTileRectPx() {
@@ -63,11 +67,8 @@ vec2 sampleLocalTonemapSource(sampler2D source, vec2 uv) {
     return sum / float(LOCAL_TONEMAP_TAPS * LOCAL_TONEMAP_TAPS);
 }
 
-/*
- * color: 露出後の線形色。pivot: 露出後の画面の平均輝度 (ここを境に上げ下げするので、画面全体の明るさは自動露出のまま)
- * uv はブルームのタイルと同じ座標 (final の uvL)
- */
-vec3 applyLocalTonemap(vec3 color, vec2 uv, float exposure, float pivot) {
+// 局所の明るさ (露出後の log2 輝度)。color は露出後の線形色、uv はブルームのタイルと同じ座標 (final の uvL)
+float localTonemapBase(vec3 color, vec2 uv, float exposure) {
     vec2 screen = viewSize();
     vec4 rect = vec4(localTonemapTileRectPx());
     vec2 moments = sampleBSplineClamped4(TEX_BLOOM, (rect.xy + uv * rect.zw) / screen, screen,
@@ -76,9 +77,30 @@ vec3 applyLocalTonemap(vec3 color, vec2 uv, float exposure, float pivot) {
     float mean = moments.x + log2(exposure);
     float variance = max(moments.y - moments.x * moments.x, 0.0);
     float a = variance / (variance + LOCAL_TONEMAP_EDGE_VARIANCE);
-    float base = mix(mean, own, a);
-    float ev = (log2(max(pivot, LOCAL_TONEMAP_LUM_MIN)) - base) * optLocalTonemapStrength;
+    return mix(mean, own, a);
+}
+
+/*
+ * color: 露出後の線形色。pivot: 露出後の画面の平均輝度 (ここを境に上げ下げするので、画面全体の明るさは自動露出のまま)
+ */
+vec3 applyLocalTonemap(vec3 color, vec2 uv, float exposure, float pivot) {
+    float ev = (log2(max(pivot, LOCAL_TONEMAP_LUM_MIN)) - localTonemapBase(color, uv, exposure)) * optLocalTonemapStrength;
     return color * exp2(clamp(ev, -LOCAL_TONEMAP_CUT_MAX, LOCAL_TONEMAP_LIFT_MAX));
 }
+
+#ifdef EXPOSURE_DR_ACTIVE
+/*
+ * DR の補正 (EXPOSURE_DR) の現像の側。自動露出は明るい所が飛ばないよう drEv だけ暗く撮っている (FrameData.postParams[5].w)
+ * 局所の明るさが平均の DR_RESTORE_EV.x 段上までの所はその分を戻し、.y 段上より明るい所は暗く撮ったまま残す (ハイライト優先)
+ * さらに平均より DR_SHADOW_START 段暗い所を、暗いほど DR_SHADOW_SLOPE の傾きで最大 DR_SHADOW_MAX 段持ち上げる (暗部補正)
+ * 局所の明るさで決めるので、明るい物の周りは戻りが少なく暗い輪が、暗い物の周りは持ち上がって明るい暈が出ることがある
+ */
+vec3 applyDynamicRange(vec3 color, vec2 uv, float exposure, float pivot, float drEv) {
+    float rel = localTonemapBase(color, uv, exposure) - log2(max(pivot, LOCAL_TONEMAP_LUM_MIN));
+    float restore = drEv * (1.0 - smoothstep(DR_RESTORE_EV.x, DR_RESTORE_EV.y, rel));
+    float lift = min(max(-DR_SHADOW_START - rel, 0.0) * DR_SHADOW_SLOPE, DR_SHADOW_MAX);
+    return color * exp2(restore + lift);
+}
+#endif
 
 #endif

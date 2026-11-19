@@ -9,6 +9,17 @@
 //@include "/lib/common/look_presets.glsl"
 
 // 露出
+/*
+ * 自動露出か (測光の選択・夜の持ち上げ・DR の補正・古い方式の対象)。0 はマニュアル。後から足す露出の方式も、自動でなければここに入れない
+ * 自動かどうかの判定はこのマクロだけで書く (EXPOSURE_MODE != 0 と書くと、新しい方式が自動の側に落ちる)
+ */
+#if EXPOSURE_MODE == 1 || EXPOSURE_MODE == 2
+    #define EXPOSURE_AUTO
+#endif
+// DR の補正が働くか (今の方式の自動露出だけ。局所の明るさのタイルもこの時だけ作る)
+#if defined EXPOSURE_DR && defined EXPOSURE_AUTO && EXPOSURE_RESPONSE_MODE == 0
+    #define EXPOSURE_DR_ACTIVE
+#endif
 // 自動露出が平均輝度を写す先の中間グレー (AgX は 0.18 を表示値 0.5 付近に置く)
 const float EXPOSURE_KEY = 0.18;
 // 反射光式の較正定数 (EV100 = log2(L * 100 / K))。設定の EV はこの EV100 として扱う
@@ -73,6 +84,68 @@ const float EXPOSURE_NIGHT_MIN_LIFT = 0.4;
  */
 const vec2 EXPOSURE_NIGHT_DARK_PERCENT = vec2(0.05, 0.5);
 /*
+ * 灯りの多い夜景では夜の持ち上げを下支え (EXPOSURE_NIGHT_MIN_LIFT) まで外す。持ち上げは月明かりの地形を読ませるためのもので、
+ * 灯りの点いた村・街では暗い空と地面に合わせて持ち上げた分 (最大 1.3 EV) だけ照らされた壁と地面が明るく平たくなり、昼のように見えた
+ * 灯りに照らされた所 = 暗い側の計測より LIGHT_EV 明るく、ライトマップのブロックライトが LIGHT_BLOCK 以上の所 (月の照り返しと月明かりの雪を数えない。
+ * 雷は G バッファに光源として書かれるので材質で除く)。その重みの割合が SHARE.x .. y で持ち上げを 1 -> 下支えにする
+ * 測った割合 (ブロックライトで数えた後): 村の中で 1〜3%、丘から 70〜130 ブロック先の灯りの村を見渡すと 0.5〜6% (空が多いと 0.5〜1.4%)、
+ * 灯りの無い月明かりの草原・雪原・海は 0%。遠くの灯りの少ない村 (1% 前後) は途中まで外れる
+ * 割合は LIGHT_SPEED (/秒) で時間方向に均す。範囲が 1% 幅と狭いので、64x64 点の数え方の揺れ (0.7% 付近で標準偏差 約 0.13%) が
+ * 持ち上げで約 0.26 EV の揺れになる。指数の平滑 a = 1 - exp(-k dt) は白い揺れを sqrt(a / (2 - a)) 倍にするので、
+ * 0.5 /秒・60 fps で 0.064 倍 (約 0.017 EV)、30 fps で 0.09 倍 (約 0.024 EV)。EXPOSURE_SPEED_DARK を 10 にした設定でも変わらないよう、順応の速さとは分ける
+ */
+const float EXPOSURE_NIGHT_LIGHT_EV = 5.0;
+const vec2 EXPOSURE_NIGHT_LIGHT_SHARE = vec2(0.002, 0.012);
+const float EXPOSURE_NIGHT_LIGHT_BLOCK = 0.5;
+const float EXPOSURE_NIGHT_LIGHT_SPEED = 0.5;
+/*
+ * 評価測光の夜の屋外: 白 (CLIP_LEVEL。AgX の白は露出後の約 1.3) を超える所が重みの CLIP_SHARE を超えないよう、最大 CLIP_MAX EV まで暗く写す
+ * 実写の灯りの多い夜景で 3 チャンネルとも飛ぶ画素は 0.1〜1.4%、どれかのチャンネルが飛ぶ画素は 0.3〜5%
+ */
+const float EXPOSURE_NIGHT_CLIP_SHARE = 0.02;
+const float EXPOSURE_NIGHT_CLIP_LEVEL = 1.3;
+const float EXPOSURE_NIGHT_CLIP_MAX = 1.0;
+/*
+ * DR の補正 (EXPOSURE_DR)。撮る側: 重みの上位 PROTECT_SHARE が露出後に PROTECT_LEVEL (白の手前) を超える分だけ、最大 HIGHLIGHT_MAX EV 暗く撮る
+ * (ハイライト優先は 1 段暗く撮って戻す。最低 ISO が 1 段上がるのはそのため)
+ * 現像の側 (applyDynamicRange): 局所の明るさが平均の RESTORE_EV.x 段上までは暗く撮った分を戻し、.y 段上からは戻さない。
+ * 平均より SHADOW_START 段暗い所から、SHADOW_SLOPE の傾きで最大 SHADOW_MAX 段持ち上げる
+ */
+const float DR_PROTECT_SHARE = 0.02;
+const float DR_PROTECT_LEVEL = 1.0;
+const float DR_HIGHLIGHT_MAX = 1.0;
+const vec2 DR_RESTORE_EV = vec2(0.5, 2.0);
+const float DR_SHADOW_START = 0.5;
+const float DR_SHADOW_SLOPE = 0.5;
+const float DR_SHADOW_MAX = 1.5;
+/*
+ * 古い方式の自動露出 (EXPOSURE_RESPONSE_MODE)。速さ・ゲイン以外の時間の数字は出典が無く、見た目で決めた調整値
+ * 曲線: 測光の平均を中間グレーに近づける (今の方式の 0.55 より完全補正に近い。夜も昼も明るさの差が小さい)
+ * 絞りの開放: これより明るく写すにはゲインを上げる (晴れの昼と室内・洞窟のたいまつまでは絞りで足りる)
+ * ゲインの上限: DV は 18 dB (2000 年代の民生 DV の手動のゲインの最大、約 3 段)。VHS は 12 dB (2 段。民生機の値は未確認で、DV より暗く残す)
+ */
+const float RESPONSE_CURVE = 0.7;
+/*
+ * 設定の下限 EXPOSURE_MIN_EV も守る。今の方式は夜の持ち上げで下限より EXPOSURE_NIGHT_MAX_LIFT だけ明るく写せるので、同じ所 (既定 -5.3) を下限にする
+ * (既定では DV の 18 dB も届く。下限を上げると、絞りの開放とゲインの上限がその分狭まる)
+ */
+const float RESPONSE_EV_MIN = EXPOSURE_MIN_EV - EXPOSURE_NIGHT_MAX_LIFT;
+const float RESPONSE_IRIS_OPEN_EV = max(-1.5, RESPONSE_EV_MIN);
+const float RESPONSE_GAIN_MAX = min(EXPOSURE_RESPONSE_MODE == 1 ? 12.0 / 6.02 : 18.0 / 6.02, RESPONSE_IRIS_OPEN_EV - RESPONSE_EV_MIN);
+const float RESPONSE_STEP_MAX = 0.02;
+/*
+ * VHS: 測光の検波 (整流して平滑) の速さ、絞りのサーボの固有角周波数 (rad/s) と減衰比。減衰比 0.25 で 1 回目の行き過ぎが約 44%、
+ * 揺れの周期は約 3.6 秒。ハンチングを抑えるため応答を遅くした閉ループ (絞りの自動調整の特許の説明) を、遅れと行き過ぎの両方で出す
+ * AGC は絞りより遅く上がる
+ */
+const float VHS_SENSE_SPEED = 1.0;
+const float VHS_SERVO_OMEGA = 1.8;
+const float VHS_SERVO_DAMPING = 0.25;
+const float VHS_AGC_SPEED = 0.6;
+// DV: 明るくなる向き (絞る・ゲインを下げる) が遅いので、明るい所に入ると数秒白く飛んでから戻る
+const float DV_SPEED_BRIGHT = 0.6;
+const float DV_SPEED_DARK = 0.5;
+/*
  * 月が照らす夜 (満ち欠け x 晴れ。水中は外す) だけ、暗い側の計測と持ち上げの傾きを足す。新月・雨の夜・水中は平均の計測と EXPOSURE_NIGHT_SLOPE のまま暗く残す
  * 上限は月夜も EXPOSURE_NIGHT_MAX_LIFT のまま (見た目の判断)。月夜だけ上限を 2.8 EV まで上げると、月の照る暗い草原も 1.3〜1.5 EV
  * 持ち上がり、地形の暗さと空が灰色に浮いて霧っぽくなり、月の照り返しで光る草が浮いて見えなくなった。海の月の道は暗めになる
@@ -97,8 +170,24 @@ const float HISTOGRAM_LAST_BIN = 255.0;   // ビンは 0 (黒) と 1-255 (log2 �
 // パーセンタイル: 暗すぎる影と空・太陽の外れ値を平均から除く (UE 4.25 方式)
 const float HISTOGRAM_LOW_PERCENT = 0.35;
 const float HISTOGRAM_HIGH_PERCENT = 0.92;
-// 中央重点測光: 画面端の重み
+// 評価測光とハイライト重点の測光の重み: 中央から離れた所の重み (中央から緩やかに下げる)
 const float METERING_EDGE_WEIGHT = 0.35;
+/*
+ * 中央重点測光: 画面の幅の 1/3 の円に重みの 75% を置く (一眼レフの 12 mm の円。3:2 の画面で円の面積は約 13%)。
+ * 円の外の画素の重みは中の 1/20 になる (0.25 / 0.87 と 0.75 / 0.13 の比)。16:9 の画面では円が約 15.5% になり、重みは約 80%
+ */
+const float METERING_CENTER_DIAMETER = 1.0 / 3.0;
+const float METERING_CENTER_OUTSIDE = 0.05;
+// スポット測光: 画面の幅の 1/9 の円 (3:2 で面積の約 1.5%、16:9 で約 1.7%) だけを測る
+const float METERING_SPOT_DIAMETER = 1.0 / 9.0;
+// 円の縁をぼかす幅 (半径に対する割合)。格子の点が縁を出入りする時に測光が跳ばないように
+const vec2 METERING_CIRCLE_EDGE = vec2(0.8, 1.2);
+/*
+ * ハイライト重点測光: 明るい側 (重みの上位 HIGHLIGHT_PERCENT) の log 平均が露出後に METERING_HIGHLIGHT_LEVEL になるより明るくは写さない
+ * 1.0 は AgX の白 (約 1.3) の手前で、明るい所の色と階調が残る
+ */
+const vec2 METERING_HIGHLIGHT_PERCENT = vec2(0.97, 0.995);
+const float METERING_HIGHLIGHT_LEVEL = 1.0;
 
 // Purkinje 効果 (薄暗視の青シフト)
 // 強さは設定 PURKINJE_STRENGTH。青すぎると不評になりやすいので既定は控えめ
@@ -233,8 +322,11 @@ const float BLOOM_AMOUNT = 0.16;
  * 昼と同じ混合率では滲みが薄くて光って見えない。地面や空は一様なので、混合しても全体の明るさは変わらない
  * 夜の判定と屋外の判定は露出の持ち上げ (applyEnvironmentExposure) と同じにそろえる (地上の屋外だけ。洞窟・屋内・ネザー・エンドは昼と同じ)
  * ブルームを強めた設定で画面全体がぼけないよう、増した後の混合率は元の値と NIGHT_BLOOM_MIX_MAX の大きいほうまでに止める
+ * 3 倍では満月の夜に丘から見た遠くの村の灯りのにじみの半径 (幅 1280 で) が 12〜19 px になり、実写の遠景の夜景 (3.5〜14 px) より広く霞んで
+ * まぶしく見えた (撮影で測った値)。1.5 倍で 13〜15 px、1 倍 (昼と同じ) で 9〜14 px。新月の 17〜22 px は倍率によらない (灯りに照らされた雪の広がりで、にじみではない)
+ * 今は 1 にしたので、この倍率と NIGHT_BLOOM_SUN_Y・NIGHT_BLOOM_MIX_MAX は効かない (final の式は昼と同じ混合率になる)。夜だけ強める時に戻すため残す
  */
-const float NIGHT_BLOOM_GAIN = 3.0;
+const float NIGHT_BLOOM_GAIN = 1.0;
 const vec2 NIGHT_BLOOM_SUN_Y = vec2(-0.2, -0.05);
 const float NIGHT_BLOOM_MIX_MAX = 0.35;
 // 雨・水中で広いブルームを足す量

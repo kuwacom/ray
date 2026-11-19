@@ -237,7 +237,7 @@ void main() {
 
     ivec4 rect;
     int level = bloomTileLevelAt(ivec2(gl_FragCoord.xy), rect);
-#if LOCAL_TONEMAP > 0
+#ifdef LOCAL_TONEMAP_TILE
     // 局所トーンマップのタイル (log2 輝度の平均と 2 乗の平均) も同じテントでぼかす
     if (level == 0 && isInLocalTonemapTile(ivec2(gl_FragCoord.xy), rect)) level = -1;
 #endif
