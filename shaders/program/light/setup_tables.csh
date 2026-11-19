@@ -74,6 +74,16 @@ const ivec3 workGroups = ivec3(1, 1, 1);
 void main() {
     int i = int(gl_LocalInvocationIndex);
     blockData.lightDefs[i] = lightDefStatic(i);
+#if DECORATIVE_BLOCK_LIGHTS == 2
+    /*
+     * 鉱物ブロックの光の色と強さ (DECOR_SATURATION / DECOR_BRIGHTNESS)。色は輝度を保って動かし、最大成分 1 に戻さない
+     * (戻した分を明るさに入れると、届く距離 (lightRange) が色の濃さで伸び縮みする)
+     */
+    if (i >= LIGHT_DECOR_FIRST && i < LIGHT_DECOR_FIRST + LIGHT_DECOR_COUNT) {
+        blockData.lightDefs[i].color.rgb = applyVividSaturation(blockData.lightDefs[i].color.rgb, decorSaturation(i - LIGHT_DECOR_FIRST));
+        blockData.lightDefs[i].color.a *= DECOR_BRIGHTNESS;
+    }
+#endif
     if (i < SHAPE_TABLE_SIZE) {
         uvec4 s = shapeStatic(i);
         blockData.shapes[i] = s;
@@ -81,8 +91,15 @@ void main() {
     }
     if (i < TINT_TABLE_SIZE) blockData.tints[i] = tintStatic(i);
     for (int j = i; j < ALBEDO_TABLE_SIZE; j += 256) {
-        blockData.albedo[j] = blockAlbedoPacked(j);
-        blockData.albedoUp[j] = blockAlbedoTopPacked(j);
+        uint albedo = blockAlbedoPacked(j);
+        uint albedoUp = blockAlbedoTopPacked(j);
+        // 色の付いた固体の反射率 (ALBEDO_*_STRENGTH)。G バッファと同じ色にして、画面外の GI の当たりと floodfill の壁の照り返しもそろえる
+        if (COLOR_ALBEDO_ACTIVE && isColorAlbedoBlock(j)) {
+            albedo = packUnorm4x8(vec4(linearToSrgb(applyColorBlockAlbedo(j, srgbToLinear(unpackUnorm4x8(albedo).rgb))), 0.0));
+            albedoUp = packUnorm4x8(vec4(linearToSrgb(applyColorBlockAlbedo(j, srgbToLinear(unpackUnorm4x8(albedoUp).rgb))), 0.0));
+        }
+        blockData.albedo[j] = albedo;
+        blockData.albedoUp[j] = albedoUp;
     }
     if (i < LIGHT_MASK_LIGHTS) {
         uint litFaces = 0u;

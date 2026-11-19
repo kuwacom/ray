@@ -60,6 +60,33 @@ vec3 giBounceGrade(vec3 c) {
 }
 
 /*
+ * 照り返しの光の出どころごとの、当たった面のアルベド (GI_SKY_BOUNCE_* / GI_BLOCK_BOUNCE_*)
+ * 外から差し込んだ光が色の付いた床に当たって部屋がその色に染まるように、面の色を光の出どころごとに濃くする
+ * 彩度を上げたアルベドは各成分を 1 で止める。量は外から入る光 (太陽・空・ブロックライト) にだけ掛け、
+ * 多重反射の履歴 (前フレームの GI) には量を掛けない (giHistoryBounceAlbedo) ので、フレームを重ねる反射の利得は 1 未満のまま発散しない
+ */
+vec3 giSkyBounceAlbedo(vec3 albedo) {
+    return min(applySaturation(albedo, GI_SKY_BOUNCE_SATURATION), 1.0) * GI_SKY_BOUNCE_STRENGTH;
+}
+vec3 giBlockBounceAlbedo(vec3 albedo) {
+    return min(applySaturation(albedo, GI_BLOCK_BOUNCE_SATURATION), 1.0) * GI_BLOCK_BOUNCE_STRENGTH;
+}
+
+/*
+ * 多重反射の履歴 (前フレームの GI) に掛けるアルベド。量は掛けず彩度だけ (各成分 1 以下なので反射の利得は 1 未満のまま)
+ * 履歴は太陽・空の光とブロックライトが混ざった光で、出どころの割合は持っていないので、当たった面に今入る照度
+ * (skyE / blockE) の輝度の比で 2 つの彩度を混ぜて代わりにする (照り返しの多くは同じ光の出どころから来るため)
+ * 日の差す部屋は白い床の照り返しで壁が照らされ、色の付いた壁の色はこの 2 回目からの照り返しで回るので、ここに掛けないと彩度が効かない
+ */
+vec3 giHistoryBounceAlbedo(vec3 albedo, vec3 skyE, vec3 blockE) {
+    if (GI_SKY_BOUNCE_SATURATION == 1.0 && GI_BLOCK_BOUNCE_SATURATION == 1.0) return albedo;
+    float sky = luminance(skyE);
+    float skyShare = sky / max(sky + luminance(blockE), EPS);
+    float saturation = mix(GI_BLOCK_BOUNCE_SATURATION, GI_SKY_BOUNCE_SATURATION, skyShare);
+    return min(applySaturation(albedo, saturation), 1.0);
+}
+
+/*
  * GI のレイが空の光も運ぶ (SSGI / ボクセル RT, 空のあるディメンション)
  * 空へ抜けたレイが方向ごとの空の色を返し、deferred30 は空の環境光 (方向の無いスカイライト x AO の遮蔽) をこれで置き換える。
  * 抜けたレイを 0 にして当たったレイの照り返しを空の光に足すと、軒下・洞窟の入り口・森の中で空の光の向きが無く、

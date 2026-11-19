@@ -387,6 +387,8 @@ vec3 lightBoxTerms(LightInstance L, vec3 voxelPos, vec3 gateNormal, bool grid, o
     if (light >= LIGHT_DECOR_FIRST && light < LIGHT_DECOR_FIRST + LIGHT_DECOR_COUNT) {
         float own = max(luminance(getBlockAlbedo(voxelId)) / max(lightLum, EPS), LIGHT_BOX_DECOR_LUM_MIN);
         faceColor *= mix(own, 1.0, smoothstep(LIGHT_BOX_DECOR_LUM_FADE.x, LIGHT_BOX_DECOR_LUM_FADE.y, s));
+        // power は表の明るさで割って打ち消すので、強さはここで掛ける。色の濃さは光源の表 (setup_tables) と同じ
+        faceColor = applyVividSaturation(faceColor, decorSaturation(light - LIGHT_DECOR_FIRST)) * DECOR_BRIGHTNESS;
     }
     vec3 irradiance = faceColor * (power * LIGHT_BOX_RADIANCE * sum);
     spread = irradiance * lightBoxSpread(s);

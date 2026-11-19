@@ -146,7 +146,7 @@ vec3 voxelCellTransmittance(int id, ivec3 cell, vec3 origin, vec3 rdInv, float t
     if (id < 300) {
         if ((flags & TRACE_TINT) != 0u) {
             vec4 t = getTint(getTintIndex(id));
-            vec3 cellT = t.rgb * (1.0 - t.a);
+            vec3 cellT = voxelTintTransmittance(id, t.rgb * (1.0 - t.a));
             /*
              * 水はセルを通る長さで減衰させる。1 セル 1 回の透過率だと、光が横切るセルの数が変わる所 (水のブロックの
              * 境目を受け面へ写した線) で明るさが 16% ずつ段になり、水の中の床や壁にブロックの境目の線が出る。ガラスは薄い板なので 1 回のまま

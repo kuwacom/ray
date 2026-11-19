@@ -5,6 +5,7 @@
 #ifndef LIGHT_VOXEL_GLSL
 #define LIGHT_VOXEL_GLSL
 
+//@include "/lib/common/color.glsl"
 //@include "/lib/common/voxel_space.glsl"
 //@include "/lib/buffers/images.glsl"
 //@include "/lib/ids/block_ids.glsl"
@@ -44,11 +45,20 @@ bool isVoxelOpaque(int voxelId) {
  */
 const float FLOOD_LEAVES_TRANSMITTANCE = 0.7;
 
+/*
+ * ブロックライトがガラスなど色の付いた半透明のセルを通る時の透過率の色の濃さ (LIGHT_TRANSLUCENT_TINT_SATURATION)。
+ * floodfill と光源の影のレイで共有する。輝度を保って掛け、0 で灰色 (白い光が暗くなって通る)。水の吸収は色の濃さを変えない
+ */
+vec3 voxelTintTransmittance(int voxelId, vec3 t) {
+    if (voxelId == BLOCK_WATER) return t;
+    return min(applySaturation(t, LIGHT_TRANSLUCENT_TINT_SATURATION), 1.0);
+}
+
 vec3 floodCellTransmittance(int voxelId) {
     if (voxelId == BLOCK_LEAVES) return vec3(FLOOD_LEAVES_TRANSMITTANCE);
     if (isTintBlock(voxelId)) {
         vec4 t = getTint(getTintIndex(voxelId));
-        return t.rgb * (1.0 - t.a);
+        return voxelTintTransmittance(voxelId, t.rgb * (1.0 - t.a));
     }
     return vec3(1.0);
 }

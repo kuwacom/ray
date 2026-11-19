@@ -14,6 +14,7 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define SUN_SHADOW_STRENGTH 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0] 太陽の影の濃さ 0=影なし 1=真っ暗な影
 #define MOON_SHADOW_STRENGTH 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0] 月 (エンドの光も) の影の濃さ 0=影なし 1=真っ暗な影
 #define SHADOW_COLORED // 半透明ブロックの色付き影
+#define SHADOW_COLORED_SATURATION 1.5 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0] 色付きガラスなど水以外の半透明を通る太陽・月の光 (色付きの影と光芒) の色の濃さ (輝度を保つ) 0=色なし
 #define ENTITY_SHADOWS // エンティティの太陽影
 #define BLOCK_ENTITY_SHADOWS // ブロックエンティティの太陽影
 #define SCREEN_SPACE_SHADOWS // 太陽影のスクリーンスペース接触影
@@ -23,6 +24,10 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define GI_SAMPLES 2 // [1 2 4 8]
 #define GI_STRENGTH 2.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0 6.0 8.0] 既定 2 は、地面の照り返しを GI に置き換える (GI_GROUND_REPLACE) と暗くなる日陰・地面を向く面の明るさを補うため。方式ごとの効きは lib/surface/gi.glsl GI_MODE_GAIN
 #define GI_MULTI_BOUNCE 1.0 // [0.0 0.25 0.5 0.75 1.0] 多重反射: GI のレイが当たった面に前フレームの GI を返す量 (フレームを重ねて反射の回数が増える) 0=1 回だけ
+#define GI_SKY_BOUNCE_STRENGTH 1.25 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 1.75 2.0 2.5 3.0] 太陽・月・空の光が GI のレイの当たった面で照り返す量 0=照り返しなし
+#define GI_SKY_BOUNCE_SATURATION 1.3 // [0.0 0.25 0.5 0.75 1.0 1.15 1.3 1.5 1.75 2.0 2.5 3.0] 太陽・月・空の光の照り返しに乗る面の色の濃さ (輝度をなるべく保つ) 0=灰色
+#define GI_BLOCK_BOUNCE_STRENGTH 1.25 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 1.75 2.0 2.5 3.0] ブロックライトが GI のレイの当たった面と floodfill の壁 (BLOCKLIGHT_BOUNCE) で照り返す量 0=照り返しなし
+#define GI_BLOCK_BOUNCE_SATURATION 1.3 // [0.0 0.25 0.5 0.75 1.0 1.15 1.3 1.5 1.75 2.0 2.5 3.0] ブロックライトの照り返し (GI と floodfill の壁) に乗る面の色の濃さ (輝度をなるべく保つ) 0=灰色
 #define GI_SKY_OCCLUSION 0.5 // [0.0 0.25 0.5 0.75 1.0] SSGI / ボクセル RT で空の光を GI のレイの遮蔽 (向きあり) にする割合 0=スカイライトだけ (向きなし)
 #define GI_GROUND_REPLACE 1.0 // [0.0 0.25 0.5 0.75 1.0] 空の環境光の灰色の地面の照り返しを GI (実際の地面の色) に置き換える割合 0=置き換えない (二重に数える)
 #define GI_RES 2 // [1 2] GI 解像度の分母
@@ -40,6 +45,10 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define GENERATED_NORMALS // テクスチャからの法線自動生成 (PBR なしのとき)
 #define GENERATED_NORMAL_STRENGTH 1.5 // [0.5 0.75 1.0 1.25 1.5 1.75 2.0 2.5 3.0] 自動法線の凹凸の強さ。テクスチャの解像度によらず、16 テクセル/ブロックの絵の強さを 1 とする
 #define GENERATED_NORMAL_ENTITIES // エンティティ (モブ・防具・手に持った物・落ちたアイテム) にも自動法線を付ける
+#define ALBEDO_CONCRETE_STRENGTH 1.0 // [0.5 0.75 1.0 1.25 1.5 1.75 2.0 2.5 3.0 4.0] コンクリート・コンクリートパウダーの反射率の倍率 (見た目と照り返しの両方。色相と色の濃さを保ち、各成分 0.9 で止める)
+#define ALBEDO_WOOL_STRENGTH 1.0 // [0.5 0.75 1.0 1.25 1.5 1.75 2.0 2.5 3.0 4.0] 羊毛・カーペットの反射率の倍率
+#define ALBEDO_TERRACOTTA_STRENGTH 1.0 // [0.5 0.75 1.0 1.25 1.5 1.75 2.0 2.5 3.0 4.0] テラコッタの反射率の倍率 (彩釉テラコッタは含まない)
+#define ALBEDO_DYED_STRENGTH 1.0 // [0.5 0.75 1.0 1.25 1.5 1.75 2.0 2.5 3.0 4.0] 旗・火の付いていないロウソクの反射率の倍率
 #define AUTO_METAL_PARTS // 一部だけ金属のブロック (レール・鉄格子・鎖・ランタンの枠・ホッパー) と、金属の道具・防具を、金属の画素だけ金属にする (PBR なしのとき)
 //#define POM // 視差オクルージョンマッピング
 #define POM_DEPTH 0.25 // [0.05 0.1 0.15 0.2 0.25 0.3 0.4 0.5 0.75 1.0]

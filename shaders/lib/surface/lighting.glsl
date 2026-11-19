@@ -60,12 +60,14 @@ const float GI_HIT_FLOOD_SCALE = FLOODFILL_STRENGTH;
 const float GI_HIT_FLOOD_SCALE = 1.0;
 #endif
 
-vec3 secondaryHitDirect(vec3 playerPos, vec3 normal, float skyLm) {
+// sun: 太陽・月の照度、block: floodfill の照度。照り返しの色を光の出どころごとに変えるので分けて返す
+void secondaryHitDirect(vec3 playerPos, vec3 normal, float skyLm, out vec3 sun, out vec3 block) {
     // 省く項: 手持ち光源と直接光 (secondaryHitBlockLight が別に返す)、GI と AO と鏡面 (拡散の放射輝度だけ)
     SurfacePoint p = surfacePoint(playerPos, normal);
     p.lightmap.y = skyLm;
     SurfaceLights L = gatherSurfaceLights(p, SL_SUN_VOLUME, SL_BLOCK_HIT_FLOOD, 0u);
-    return L.sun.irradiance + L.block * GI_HIT_FLOOD_SCALE;
+    sun = L.sun.irradiance;
+    block = L.block * GI_HIT_FLOOD_SCALE;
 }
 
 // ヒット点の空の拡散照度 (スカイライトの絞り込み)
@@ -95,20 +97,29 @@ vec3 shadeSecondaryHit(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm) { 
  * - GI_TRACES_SKY では履歴に空の光も入っているので、ヒット点の空の SH (方向の無い空の光) を履歴で置き換える。
  *   GI_SKY_OCCLUSION < 1 の時に deferred30 が空の環境光として足す分は履歴に入っていないので、その割合の SH を足す
  * 履歴の無い点 (画面外・前フレームの画面外) は prevIndirect.x < 0 で、空の SH のまま
+ * blockDirect: 設置光源・手持ち光源の直接光の照度 (secondaryHitBlockLight x SECONDARY_BLOCKLIGHT_GAIN)
+ * 太陽・月・空の光 (giSkyBounceAlbedo) と、ブロックライト (floodfill と直接光、giBlockBounceAlbedo) で当たった面の色を分ける。
+ * 履歴は両方が混ざった後の光なので、彩度だけを当たりの照度の比で混ぜて掛ける (giHistoryBounceAlbedo)
  */
-vec3 shadeSecondaryHitGi(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm, vec3 prevIndirect) {
+vec3 shadeSecondaryHitGi(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm, vec3 prevIndirect, vec3 blockDirect) {
     vec3 sky = secondaryHitSky(playerPos, normal, skyLm);
-    vec3 E = secondaryHitDirect(playerPos, normal, skyLm);
+    vec3 skyE, blockE;
+    secondaryHitDirect(playerPos, normal, skyLm, skyE, blockE);
+    blockE += blockDirect;
+    vec3 prevE = vec3(0.0);
     if (prevIndirect.x >= 0.0) {
 #ifdef GI_TRACES_SKY
-        E += mix(sky, prevIndirect + sky * (1.0 - LOOK_GI_SKY_OCCLUSION), GI_MULTI_BOUNCE);
+        // mix(sky, prevIndirect + sky * (1 - 遮蔽), GI_MULTI_BOUNCE) を空と履歴に分けた形
+        skyE += sky * (1.0 - GI_MULTI_BOUNCE * LOOK_GI_SKY_OCCLUSION);
 #else
-        E += sky + prevIndirect * GI_MULTI_BOUNCE;
+        skyE += sky;
 #endif
+        prevE = prevIndirect * GI_MULTI_BOUNCE;
     } else {
-        E += sky;
+        skyE += sky;
     }
-    return albedo * RCP_PI * (E + minAmbientIrradiance());
+    return RCP_PI * (giSkyBounceAlbedo(albedo) * skyE + giBlockBounceAlbedo(albedo) * blockE
+        + giHistoryBounceAlbedo(albedo, skyE, blockE) * prevE + albedo * minAmbientIrradiance());
 }
 
 // GI の履歴 (照度, GI_STRENGTH を外した値)。前フレームの画面の外なら x = -1
@@ -448,7 +459,7 @@ vec4 traceVoxelRadiance(vec3 originPlayer, vec3 dir, float maxDist, float skyLm,
     }
     vec3 E = secondaryHitBlockLight(hitPlayer, hitNormal, screenTexel, handLightIndirectScale(), false) * SECONDARY_BLOCKLIGHT_GAIN;
     vec3 prev = GI_MULTI_BOUNCE > 0.0 && screenTexel.x >= 0 ? giHistoryAtPlayer(hitPlayer) : vec3(-1.0);
-    return vec4(shadeSecondaryHitGi(hitPlayer, hitNormal, albedo, skyLm, prev) + albedo * RCP_PI * E
+    return vec4(shadeSecondaryHitGi(hitPlayer, hitNormal, albedo, skyLm, prev, E)
         + albedo * secondaryHitEmission(emission, hitBlock, hitMaterial), 1.0);
 }
 

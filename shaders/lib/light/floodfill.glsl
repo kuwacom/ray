@@ -7,6 +7,7 @@
 #define LIGHT_FLOODFILL_GLSL
 
 //@include "/lib/settings.glsl"
+//@include "/lib/common/color.glsl"
 //@include "/lib/common/uniforms.glsl"
 //@include "/lib/common/voxel_space.glsl"
 //@include "/lib/buffers/images.glsl"
@@ -94,14 +95,22 @@ const float BOUNCE_LOCAL_FORM_FACTOR = 0.5;
 // 壁 1 面の反射率の上限 (伝搬の照り返しと同じ)
 const float BOUNCE_MAX_REFLECTANCE = 0.9;
 
+/*
+ * GI のブロックライトの照り返し (GI_BLOCK_BOUNCE_*) も掛ける。RSM の GI にはブロックライトの照り返しが無く、
+ * 色の付いた壁がブロックライトを染めるのはこの照り返しだけなので、GI の方式によらず同じ設定で色を変えられるようにする
+ * 彩度を上げた色は各成分を 1 で止め、反射率の上限 (BOUNCE_MAX_REFLECTANCE) もそのままなので伝搬は発散しない
+ */
+const float FLOOD_BOUNCE_STRENGTH = BLOCKLIGHT_BOUNCE * GI_BLOCK_BOUNCE_STRENGTH;
+
 vec3 wallBounceReflectance(int voxelId) {
-    return min(getBlockAlbedo(voxelId) * BLOCKLIGHT_BOUNCE, vec3(BOUNCE_MAX_REFLECTANCE));
+    vec3 albedo = min(applySaturation(getBlockAlbedo(voxelId), GI_BLOCK_BOUNCE_SATURATION), 1.0);
+    return min(albedo * FLOOD_BOUNCE_STRENGTH, vec3(BOUNCE_MAX_REFLECTANCE));
 }
 
 vec3 localWallBounce(vec3 playerPos, vec3 geoNormal) {
     vec3 sum = vec3(0.0);
 #ifdef FLOODFILL
-    if (BLOCKLIGHT_BOUNCE <= 0.0) return sum;
+    if (FLOOD_BOUNCE_STRENGTH <= 0.0) return sum;
     vec3 v = playerToVoxel(playerPos + geoNormal * 0.5);
     if (!isInVoxelVolume(v)) return sum;
     vec3 an = abs(geoNormal);

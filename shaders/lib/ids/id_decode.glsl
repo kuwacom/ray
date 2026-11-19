@@ -53,6 +53,51 @@ bool isDecorGlowBlock(int blockId) {
     return i <= uint(BLOCK_DECOR_AMETHYST - BLOCK_DECOR_LAPIS) && ((DECOR_GLOW_MASK >> i) & 1u) != 0u;
 }
 
+/*
+ * 鉱物ブロックの色の濃さ (DECOR_SATURATION)。decorIndex は BLOCK_DECOR_LAPIS からの番号 (光源は LIGHT_DECOR_FIRST から同じ順)
+ * アメジストは薄い紫で、原色へ寄せると青が大きく勝って青紫に見えるので、元の紫を少し濃くする所で止める
+ */
+const float DECOR_AMETHYST_SATURATION_MAX = 1.25;
+float decorSaturation(int decorIndex) {
+    return decorIndex == BLOCK_DECOR_AMETHYST - BLOCK_DECOR_LAPIS ? min(DECOR_SATURATION, DECOR_AMETHYST_SATURATION_MAX) : DECOR_SATURATION;
+}
+
+/*
+ * 色の付いた固体の反射率 (ALBEDO_*_STRENGTH)。線形のアルベドを種類ごとの倍率で明るくする
+ * 各成分を同じ倍率で掛けて色相と色の濃さ (成分の比) を保ち、一番大きい成分が COLOR_ALBEDO_MAX に着いた所で倍率を止める
+ * (成分ごとに上限で切ると、明るい成分から頭打ちになって白っぽくなる)。もともと上限を超える画素は 1 倍以上では暗くしない
+ * G バッファ・影マップ (RSM の VPL)・ボクセルの色の表に同じものを掛け、見た目と照り返しの色をそろえる
+ */
+const float COLOR_ALBEDO_MAX = 0.9;
+// 全部 1 倍の時は呼ぶ側も色の変換 (sRGB と線形の往復) を省いて、8bit の色を 1 段も動かさない
+const bool COLOR_ALBEDO_ACTIVE = ALBEDO_CONCRETE_STRENGTH != 1.0 || ALBEDO_WOOL_STRENGTH != 1.0 || ALBEDO_TERRACOTTA_STRENGTH != 1.0
+                               || ALBEDO_DYED_STRENGTH != 1.0;
+
+// 反射率の設定の対象になりうる ID (2000 番台の色の付いた固体と、130-178 の染めた小物)
+bool isColorAlbedoBlock(int blockId) {
+    return blockId >= BLOCK_COLOR_FIRST || (blockId >= BLOCK_CARPET && blockId <= BLOCK_DYED_LAST);
+}
+
+float colorBlockAlbedoStrength(int blockId) {
+    if (blockId >= BLOCK_COLOR_FIRST) {
+        int kind = blockColorKind(blockId);
+        return kind == COLOR_KIND_CONCRETE ? ALBEDO_CONCRETE_STRENGTH
+             : kind == COLOR_KIND_WOOL ? ALBEDO_WOOL_STRENGTH
+             : kind == COLOR_KIND_TERRACOTTA ? ALBEDO_TERRACOTTA_STRENGTH : 1.0;
+    }
+    if (blockId >= BLOCK_CARPET && blockId < BLOCK_BANNER) return ALBEDO_WOOL_STRENGTH;
+    if (blockId >= BLOCK_BANNER && blockId <= BLOCK_DYED_LAST) return ALBEDO_DYED_STRENGTH;
+    return 1.0;
+}
+
+vec3 applyColorBlockAlbedo(int blockId, vec3 albedo) {
+    if (!COLOR_ALBEDO_ACTIVE || !isColorAlbedoBlock(blockId)) return albedo;
+    float s = colorBlockAlbedoStrength(blockId);
+    if (s == 1.0) return albedo;
+    float k = s < 1.0 ? s : max(1.0, min(s, COLOR_ALBEDO_MAX / max(maxOf(albedo), 1e-4)));
+    return albedo * k;
+}
+
 int getBlockLightIndex(int blockId) {
 #if DECORATIVE_BLOCK_LIGHTS == 2
     if (isDecorGlowBlock(blockId)) return LIGHT_DECOR_FIRST + (blockId - BLOCK_DECOR_LAPIS);
@@ -123,7 +168,7 @@ int blockIdToMaterial(int blockId) {
     if (blockId == BLOCK_UNDERWATER_PLANT) return MAT_UNDERWATER_PLANT;
     // 光を通す小物 (ドア・トラップドア・看板・ボタン・線路など) は植物の帯にあるが、法線と質感はふつうのブロック
     // 植物にすると法線が上向きに固定され、開いたトラップドアのような立った面まで地面のように照らされててかった
-    if (blockId == BLOCK_NON_OCCLUDING) return MAT_TERRAIN;
+    if (blockId == BLOCK_NON_OCCLUDING || (blockId >= BLOCK_CARPET && blockId <= BLOCK_DYED_LAST)) return MAT_TERRAIN;
     if (isPlantBlock(blockId)) return MAT_PLANT;
     if (blockId == BLOCK_WATER) return MAT_WATER;
     if (blockId == BLOCK_ICE) return MAT_ICE;

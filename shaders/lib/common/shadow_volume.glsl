@@ -31,7 +31,8 @@ vec3 shadowTranslucentTint(vec2 uv, float z, vec3 receiverPlayer, bool caustics)
         return caustics ? t * waterCaustics(receiverPlayer + cameraPosition, depthBelow, L) : t;
     }
     vec4 c = texture(shadowcolor0, uv);
-    return mix(vec3(1.0), srgbToLinear(c.rgb), c.a);
+    // 色の濃さ (SHADOW_COLORED_SATURATION) は透過率に輝度を保って掛ける。0 で灰色 (白い光が暗くなって通る)
+    return min(applySaturation(mix(vec3(1.0), srgbToLinear(c.rgb), c.a), SHADOW_COLORED_SATURATION), 1.0);
 #else
     return vec3(1.0);
 #endif

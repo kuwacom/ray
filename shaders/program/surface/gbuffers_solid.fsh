@@ -574,6 +574,12 @@ void main() {
 
     GBufferData g = gbufferDefault();
     g.albedo = srgbToLinear(albedo.rgb);
+#ifdef GBUF_TERRAIN
+    g.albedo = applyColorBlockAlbedo(blockBase, g.albedo);
+#elif defined GBUF_BLOCK
+    // 旗はブロックエンティティとして描かれる。ブロックのアイテムを描く間 (blockEntityId = 1) は掛けない
+    if (isBlockEntityDraw(blockEntityId)) g.albedo = applyColorBlockAlbedo(stripMetalGate(blockEntityId), g.albedo);
+#endif
     if (railMirror) g.albedo = min(g.albedo * RAIL_F0_GAIN, vec3(1.0));
 #if defined GBUF_ENTITIES || defined GBUF_HAND
     if (autoMetal) g.albedo = gearMetalReflectance(g.albedo);
@@ -622,7 +628,12 @@ void main() {
 #endif
 #if defined GBUF_TERRAIN && DECORATIVE_BLOCK_LIGHTS > 0
     // 鉱物ブロック (DECORATIVE_BLOCK_LIGHTS)。光源ブロックより弱く、模様の明るい所ほど光らせる
-    if (isDecorGlowBlock(blockBase)) g.emission = max(g.emission, DECOR_EMISSION * smoothstep(0.15, 0.85, maxOf(albedoDry)));
+    if (isDecorGlowBlock(blockBase)) {
+        float glow = smoothstep(0.15, 0.85, maxOf(albedoDry));
+        g.emission = max(g.emission, min(DECOR_EMISSION * DECOR_BRIGHTNESS, 1.0) * glow);
+        // 発光の色はアルベドなので、光る画素ほど光源と同じ色の濃さ (DECOR_SATURATION) に寄せる。光らせない時は元の色のまま
+        if (DECOR_BRIGHTNESS > 0.0) g.albedo = mix(g.albedo, min(applyVividSaturation(g.albedo, decorSaturation(blockBase - BLOCK_DECOR_LAPIS)), 1.0), glow);
+    }
 #endif
     encodeGBuffer(g, outAlbedo, outNormal, outMaterial);
     outMaterial.a = encodeSurfaceExtra(pomShadow, puddle);

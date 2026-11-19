@@ -131,6 +131,10 @@ option.DECOR_REDSTONE=レッドストーンブロック
 option.DECOR_REDSTONE.comment=レッドストーンブロックを発光させる
 option.DECOR_AMETHYST=アメジストブロック
 option.DECOR_AMETHYST.comment=アメジストブロックと芽生えたアメジストを発光させる
+option.DECOR_BRIGHTNESS=鉱物ブロックの明るさ
+option.DECOR_BRIGHTNESS.comment=鉱物ブロックの発光の明るさと、周りを照らす光の強さ。0 で光らない
+option.DECOR_SATURATION=鉱物ブロックの色の濃さ
+option.DECOR_SATURATION.comment=鉱物ブロックの発光と光の色の濃さ。明るさはほぼ変わらない。0 = 白、1 = 鉱物の色、2 = 原色に近い色 (アメジストは紫を少し濃くするだけ)
 option.LIGHT_SHADOWS=光源シャドウ
 option.LIGHT_SHADOWS.comment=近くの強い光源をレイトレースし、ブロック・プレイヤー・エンティティが設置光源の影を落とす
 option.LIGHT_SHADOW_STRENGTH=設置光源の影の濃さ
@@ -154,6 +158,8 @@ value.LIGHT_EMISSION_MASK_MODE.1=光る範囲
 value.LIGHT_EMISSION_MASK_MODE.2=テクスチャのマスク
 option.LIGHT_TRANSLUCENT_TINT=色ガラスの色付け
 option.LIGHT_TRANSLUCENT_TINT.comment=色付きガラスを通った光に色が付く
+option.LIGHT_TRANSLUCENT_TINT_SATURATION=色ガラスを通るブロックライトの色
+option.LIGHT_TRANSLUCENT_TINT_SATURATION.comment=色付きガラスなど水以外の半透明 (氷・スライム・ハチミツも) を通るブロックライトの色の濃さ。明るさはほぼ変わらない。0 = 色なし (暗くなるだけ)、1 = ガラスの色
 option.LIGHT_SPECULAR=ブロックライトの鏡面反射
 option.LIGHT_DENOISE=ノイズ除去
 value.LIGHT_DENOISE.0=なし
@@ -231,6 +237,8 @@ option.MOON_SHADOW_STRENGTH=月の影の濃さ
 option.MOON_SHADOW_STRENGTH.comment=月とエンドの光が落とす影の濃さ。0 で影なし、1 で完全な影
 option.SHADOW_COLORED=色付きの影
 option.SHADOW_COLORED.comment=色ガラスや水が色の付いた太陽の影を落とす
+option.SHADOW_COLORED_SATURATION=色ガラスを通る日光の色
+option.SHADOW_COLORED_SATURATION.comment=色付きガラスなど水以外の半透明 (氷・スライム・ハチミツも) を通る太陽・月の光 (色付きの影と光芒) の色の濃さ。明るさはほぼ変わらない。0 = 色なし (暗くなるだけ)、1 = ガラスの色
 option.ENTITY_SHADOWS=エンティティの影
 option.BLOCK_ENTITY_SHADOWS=ブロックエンティティの影
 option.SCREEN_SPACE_SHADOWS=接触影
@@ -249,6 +257,14 @@ option.GI_STRENGTH=GI の強さ
 option.GI_STRENGTH.comment=照り返し (と SSGI / ボクセルレイトレースでは空の光) の強さ。上げると日陰・地面を向く面・室内が明るくなり、日向との差が小さくなる。同じ値でどの方式も近い明るさになるよう、内部で方式ごとに効きを変えている (ボクセル 1 倍、RSM 0.75 倍、スクリーンスペース 0.5 倍)
 option.GI_MULTI_BOUNCE=多重反射
 option.GI_MULTI_BOUNCE.comment=GI のレイが当たった面に前のフレームの GI を返し、フレームを重ねて照り返しを何回も跳ね返らせる量。洞窟の入り口や室内の奥まで光が回る。重さはほぼ変わらない。0 = 1 回だけ、1 = 物理的に正しい (SSGI / ボクセルレイトレースのみ)
+option.GI_SKY_BOUNCE_STRENGTH=空の光の照り返し
+option.GI_SKY_BOUNCE_STRENGTH.comment=太陽・月・空の光が、GI のレイが当たった面で照り返す量。上げると窓から差し込んだ光で部屋が明るくなる。0 でこの光の照り返しなし
+option.GI_SKY_BOUNCE_SATURATION=空の光の照り返しの色
+option.GI_SKY_BOUNCE_SATURATION.comment=太陽・月・空の光の照り返しに、当たった面の色 (赤いカーペット、緑の草) が乗る濃さ。明るさはほぼ変わらない。0 で灰色の照り返し
+option.GI_BLOCK_BOUNCE_STRENGTH=ブロックライトの照り返し
+option.GI_BLOCK_BOUNCE_STRENGTH.comment=ブロックライトが、GI のレイが当たった面と、照らされた所のすぐ横の壁で照り返す量 (ブロックライトの壁の照り返しにも掛かる)。0 でこの光の照り返しなし
+option.GI_BLOCK_BOUNCE_SATURATION=ブロックライトの照り返しの色
+option.GI_BLOCK_BOUNCE_SATURATION.comment=ブロックライトの照り返しに、当たった面の色 (赤いカーペット、色の付いた壁) が乗る濃さ。明るさはほぼ変わらない。0 で灰色の照り返し
 option.GI_SKY_OCCLUSION=空の光の遮蔽
 option.GI_SKY_OCCLUSION.comment=空の光を GI のレイで遮る割合。1 = 空の見える向きだけから光が入る (軒下・洞窟の入り口・室内の奥が暗くなり、入り口の向きが分かる)。0 = スカイライトだけの遮蔽 (向きが無く、照り返しと二重に数える)。既定の 0.5 は室内・洞窟の入り口を暗くしすぎないため (1 では多重反射があっても暗すぎる)。スクリーンスペース / ボクセルレイトレースのみ。ルックのプリセットの値 (ナチュラルでは 1) に掛ける
 option.GI_GROUND_REPLACE=地面の照り返しの置き換え
@@ -296,6 +312,14 @@ option.GENERATED_NORMAL_ENTITIES=エンティティの自動法線
 option.GENERATED_NORMAL_ENTITIES.comment=モブ・防具・手に持った物・落ちたアイテムにも自動法線を付ける。大きな平らな面にも光が当たると凹凸が見える。法線の自動生成が OFF の時は効かない
 option.AUTO_METAL_PARTS=部分金属
 option.AUTO_METAL_PARTS.comment=一部だけ金属のブロック (レール・鉄格子・鎖・ランタンの枠・ホッパー・大釜・銅のドア) と、金属の道具・防具の金属の部分だけを、金属ブロックのように光らせる。木や炎は金属にしない。PBR の specular テクスチャがあるものには使わない
+option.ALBEDO_CONCRETE_STRENGTH=コンクリートの反射率
+option.ALBEDO_CONCRETE_STRENGTH.comment=コンクリートとコンクリートパウダーの色の明るさ。上げると見た目も照り返しも、色の濃さを保ったまま明るくなり、塗料のような強い照り返しになる。1 = バニラのテクスチャの色
+option.ALBEDO_WOOL_STRENGTH=羊毛・カーペットの反射率
+option.ALBEDO_WOOL_STRENGTH.comment=羊毛とカーペットの色の明るさ。上げると見た目も照り返しも、色の濃さを保ったまま明るくなる。1 = バニラのテクスチャの色
+option.ALBEDO_TERRACOTTA_STRENGTH=テラコッタの反射率
+option.ALBEDO_TERRACOTTA_STRENGTH.comment=テラコッタ (彩釉テラコッタを除く) の色の明るさ。上げると見た目も照り返しも、色の濃さを保ったまま明るくなる。1 = バニラのテクスチャの色
+option.ALBEDO_DYED_STRENGTH=旗・ロウソクの反射率
+option.ALBEDO_DYED_STRENGTH.comment=旗と、火の付いていないロウソクの色の明るさ。上げると見た目も照り返しも、色の濃さを保ったまま明るくなる。1 = バニラのテクスチャの色
 option.POM=視差オクルージョンマッピング
 option.POM_DEPTH=POM の深さ
 option.POM_SAMPLES=POM のサンプル数

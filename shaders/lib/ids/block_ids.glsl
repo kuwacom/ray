@@ -6,6 +6,7 @@
  *   1        : 未登録の固体 (mc_Entity.x = -1 をボクセルではこれに置き換える)
  *   10-19    : マテリアルのヒント付き固体 (完全遮蔽)
  *   100-129  : 遮蔽しない植物・小物
+ *   130-178  : 染めた小物 (カーペット・旗・火のないロウソク。扱いは BLOCK_NON_OCCLUDING と同じ)
  *   200-299  : 半透明 (透過色テーブル index = id - 200)
  *   300-399  : 部分形状 (形状テーブル index = id - 300)
  *   1001-1255: 光源 (光源インデックス = id - 1000, lib/ids/light_ids.glsl)
@@ -36,11 +37,16 @@ const int BLOCK_PLANT_TALL_UPPER = 102; // 2 ブロックの植物の上半分
 const int BLOCK_LEAVES = 103;
 const int BLOCK_VINES = 104;
 const int BLOCK_CROPS = 105;
-const int BLOCK_NON_OCCLUDING = 106;    // レール・ボタン・カーペット等 (揺れない)
+const int BLOCK_NON_OCCLUDING = 106;    // レール・ボタン等 (揺れない)
 const int BLOCK_COBWEB = 107;
 const int BLOCK_LILY_PAD = 108;
 const int BLOCK_CANE = 109;             // サトウキビ・竹
 const int BLOCK_UNDERWATER_PLANT = 110; // 海草・コンブ
+// 130-178: 染めた小物。質感・遮蔽・揺れは BLOCK_NON_OCCLUDING と同じで、反射率の設定 (ALBEDO_*_STRENGTH) を掛けるために分ける
+const int BLOCK_CARPET = 130;             // 130-145 カーペット (色の順は BLOCK_STAINED_GLASS と同じ)
+const int BLOCK_BANNER = 146;             // 146-161 旗・壁の旗 (同順)
+const int BLOCK_CANDLE = 162;             // 火の付いていないロウソク。163-178 は色付き (同順)
+const int BLOCK_DYED_LAST = 178;
 
 const int BLOCK_WATER = 200;
 const int BLOCK_ICE = 201;
@@ -85,5 +91,20 @@ const int METAL_GATE_GOLD = 5;
 const int METAL_GATE_COPPER = 6;
 const int METAL_GATE_NETHERITE = 7;
 const int METAL_GATE_GEM = 8;
+
+// 色の付いた固体 (2000 番台) の種類。0 = その他 (種類の混ざった ID も 0)
+const int COLOR_KIND_CONCRETE = 1; // コンクリート・コンクリートパウダー
+const int COLOR_KIND_WOOL = 2; // 羊毛
+const int COLOR_KIND_TERRACOTTA = 3; // テラコッタ (彩釉テラコッタは BLOCK_GLOSSY の行にある)
+const uint BLOCK_COLOR_KINDS[23] = uint[23](
+    0x00536181u, 0x0C024001u, 0x00820000u, 0x35003010u, 0x08C00070u, 0x00104000u, 0x00000014u, 0x20000003u,
+    0x0030200Cu, 0x00008000u, 0x00040000u, 0x00004100u, 0x0000C010u, 0x00D00000u, 0xC0300020u, 0x0003E040u,
+    0x00000140u, 0xC0000000u, 0x00000012u, 0x04C04000u, 0x11000000u, 0x6A041100u, 0x00000080u
+);
+int blockColorKind(int id) {
+    uint i = uint(id - BLOCK_COLOR_FIRST);
+    if (i >= 356u) return 0;
+    return int((BLOCK_COLOR_KINDS[i / 16u] >> ((i % 16u) * 2u)) & 3u);
+}
 
 #endif
