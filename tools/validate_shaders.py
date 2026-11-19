@@ -103,6 +103,8 @@ VALIDATION_SETS: dict[str, dict[str, str]] = {
     # カメラの露出 (F 値・SS・ISO)。アナログでは ISO がゲインを決める。絞りの無いレンズ (Hologon) と、古い方式を選んだまま
     "EXPOSURE_CAMERA": {"EXPOSURE_MODE": "3", "DOF_APERTURE_MODE": "1"},
     "EXPOSURE_CAMERA_ANALOG": {"EXPOSURE_MODE": "3", "ANALOG": "true", "EXPOSURE_RESPONSE_MODE": "2", "LENS_PRESET": "10"},
+    # シャッター速度の反映 (モーションブラーを切っても composite21 が走る)
+    "SHUTTER": {"SHUTTER": "true", "MOTION_BLUR": "false"},
     # 平均測光 + DR、マニュアル露出で DR と古い方式を選んだ時 (自動でないので働かない経路)
     "EXPOSURE_AVERAGE_DR": {"EXPOSURE_MODE": "1", "EXPOSURE_DR": "true"},
     "EXPOSURE_MANUAL_DR": {"EXPOSURE_MODE": "0", "EXPOSURE_DR": "true", "EXPOSURE_RESPONSE_MODE": "1", "BLOOM": "false"},

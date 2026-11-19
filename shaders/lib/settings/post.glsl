@@ -17,6 +17,7 @@
 #define DOF_FOCUS_WATER // オートフォーカスが水面に合う
 #define MOTION_BLUR
 #define MOTION_BLUR_STRENGTH 1.0 // [0.1 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0]
+//#define SHUTTER // シャッター速度 (SHUTTER_SPEED) を絵に反映する。ぶれの長さがシャッター速度になり、1 フレームより長いとフレームを溜めた長時間露光になる (モーションブラーの強さは使わない)
 #define VIGNETTE 0.3 // [0.0 0.1 0.2 0.3 0.4 0.5 0.75 1.0 1.5 2.0]
 
 /*

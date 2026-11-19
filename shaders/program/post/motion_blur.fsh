@@ -57,9 +57,19 @@ layout(location = 0) out vec4 outColor;
 
 float maxBlurLength() { return MOTION_BLUR_MAX_LENGTH * viewHeight; }
 
+#ifdef SHUTTER
+/*
+ * シャッター速度の反映: 1 フレームの移動量のうち、シャッターが開いている割合 (シャッター角 360 x t / フレームの長さ)
+ * 1 フレームより長いシャッターは 360 度で止め、フレームを溜めて残りの時間を足す (溜めたフレームの間を埋め、速い物がとびとびの像にならない)
+ */
+float blurShutterScale() { return min(optShutterSpeed / max(frameTime, SHUTTER_DT_MIN), 1.0); }
+#else
+float blurShutterScale() { return MOTION_BLUR_SHUTTER * MOTION_BLUR_STRENGTH; }
+#endif
+
 // ピクセル単位の露光中の移動量 (今 - 前)。長さは上限で切る
 vec2 blurVelocity(vec2 uv, float depth) {
-    vec2 v = (uv - postPreviousUv(uv, depth)) * viewSize() * (MOTION_BLUR_SHUTTER * MOTION_BLUR_STRENGTH);
+    vec2 v = (uv - postPreviousUv(uv, depth)) * viewSize() * blurShutterScale();
     float len = length(v);
     float maxLen = maxBlurLength();
     return len > maxLen ? v * (maxLen / len) : v;

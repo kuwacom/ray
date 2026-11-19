@@ -358,6 +358,7 @@
 | DOF_FOCUS_WATER | ON | ON / OFF |
 | MOTION_BLUR | ON | ON / OFF |
 | MOTION_BLUR_STRENGTH | 1.0 | 0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0 |
+| SHUTTER | OFF | ON / OFF |
 | VIGNETTE | 0.3 | 0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0, 1.5, 2.0 |
 | LENS_PRESET | 1 | 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18 |
 | LENS_QUALITY | 2 | 0, 1, 2, 3 |

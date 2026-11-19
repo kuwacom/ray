@@ -230,6 +230,8 @@ const float MOTION_BLUR_SHUTTER = 0.5;
 const float MOTION_BLUR_MAX_LENGTH = 0.04;
 // 深度の前後判定の柔らかさ (ブロック)
 const float MOTION_BLUR_DEPTH_SOFTNESS = 0.5;
+// シャッター速度の反映 (SHUTTER)。フレームの長さの下限 (秒): 止まった直後の極端に短いフレームでシャッター角を出し過ぎない
+const float SHUTTER_DT_MIN = 0.001;
 
 // 被写界深度
 /*

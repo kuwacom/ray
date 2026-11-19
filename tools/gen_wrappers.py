@@ -248,7 +248,8 @@ DISABLED: list[Disable] = [
     Disable(("composite",), "#if REFLECTIONS == 0"),
     Disable(("composite1_a",), "#ifndef VL"),
     Disable(("composite20",), "#ifndef TAA"),
-    Disable(("composite21",), "#ifndef MOTION_BLUR"),
+    # シャッター速度の反映はモーションブラーが OFF でもシャッターのぶれを掛ける
+    Disable(("composite21",), "#if !defined MOTION_BLUR && !defined SHUTTER"),
     Disable(("composite22",), "#ifndef DOF"),
     # 局所トーンマップもブルームの縮小タイルを読む
     Disable(("composite23", "composite24"), "#if !defined BLOOM && LOCAL_TONEMAP == 0 && !(defined EXPOSURE_DR && (EXPOSURE_MODE == 1 || EXPOSURE_MODE == 2) && EXPOSURE_RESPONSE_MODE == 0)"),
