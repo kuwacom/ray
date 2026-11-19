@@ -166,8 +166,8 @@ vec4 accumulateShutter(ivec2 texel, vec4 color, bool hand) {
     if ((flags & SHUTTER_FLAG_COMPLETE) != 0u) {
         shutterShown.shown[index] = uvec2(packHalf2x16(accum.rg), packHalf2x16(accum.ba));
     } else if ((flags & SHUTTER_FLAG_SHOWN) != 0u) {
-        uvec2 packed = shutterShown.shown[index];
-        accum = vec4(unpackHalf2x16(packed.x), unpackHalf2x16(packed.y));
+        uvec2 shown = shutterShown.shown[index];
+        accum = vec4(unpackHalf2x16(shown.x), unpackHalf2x16(shown.y));
     }
     #endif
     return hand ? color : accum;

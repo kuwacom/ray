@@ -1049,7 +1049,9 @@ def main() -> int:
     configs: list[tuple[str, dict, list[str]]] = []
     if args.profile:
         for p in args.profile.split(","):
-            configs.append((p, {} if p == "DEFAULT" else vs.resolve_profile(p, profiles), worlds_opt or ["world0"]))
+            # validate_shaders.py の検証用の組 (プロファイルに載せない機能を ON にした組) の名前も受け付ける
+            ov = {} if p == "DEFAULT" else vs.VALIDATION_SETS[p] if p in vs.VALIDATION_SETS else vs.resolve_profile(p, profiles)
+            configs.append((p, ov, worlds_opt or ["world0"]))
     elif args.full:
         configs.append(("DEFAULT", {}, worlds_opt or vs.WORLDS))
         for p in profiles:
