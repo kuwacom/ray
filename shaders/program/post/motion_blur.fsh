@@ -90,7 +90,53 @@ float inFront(float dY, float dX) { return saturate(1.0 - (dY - dX) / MOTION_BLU
 float cone(float dist, float speed) { return speed > 1e-3 ? saturate(1.0 - dist / speed) : 0.0; }
 float cylinder(float dist, float speed) { return 1.0 - smoothstep(0.95 * speed, 1.05 * speed, dist); }
 
-vec4 motionBlur(vec4 centerRaw, vec2 uv, float depthX) {
+#ifdef SHUTTER
+/*
+ * 長時間露光: ぶれの後の色を、composite21_a が決めた重みで画素ごとの平均に溜め、溜めた絵を返す
+ * 手は溜めずに今のフレームを出す (手の後ろは見えていた所の平均のまま)。溜め直しのフレームだけは手の色で埋め、0 (黒) から溜めない
+ */
+vec4 accumulateShutter(ivec2 texel, vec4 color, bool hand) {
+    int width = int(viewWidth);
+    int index = texel.y * width + texel.x;
+    if (texel.x >= width || index >= width * int(viewHeight)) return color;
+    vec4 state = frameData.postParams[SHUTTER_PARAM];
+    uint flags = uint(state.w);
+    vec4 accum = shutterAccum.accum[index];
+    vec4 now = vec4(sanitizeColor(color.rgb), color.a);
+    if (!hand || (flags & SHUTTER_FLAG_RESET) != 0u) accum = mix(accum, now, state.x);
+    shutterAccum.accum[index] = accum;
+    #if SHUTTER_MODE == 1
+    // 1 枚ずつ: 露光を終えたフレームで撮れた絵を移し、次の露光ができるまでそれを出す (最初の 1 枚までは途中経過)
+    if ((flags & SHUTTER_FLAG_COMPLETE) != 0u) {
+        shutterShown.shown[index] = uvec2(packHalf2x16(accum.rg), packHalf2x16(accum.ba));
+    } else if ((flags & SHUTTER_FLAG_SHOWN) != 0u) {
+        uvec2 shown = shutterShown.shown[index];
+        accum = vec4(unpackHalf2x16(shown.x), unpackHalf2x16(shown.y));
+    }
+    #endif
+    return hand ? color : accum;
+}
+#endif
+
+// 出力を書く。シャッター速度の反映の時は溜めた絵にする
+#ifdef SHUTTER
+#define WRITE_OUTPUT(color, hand) outColor = accumulateShutter(texel, color, hand)
+#else
+#define WRITE_OUTPUT(color, hand) outColor = color
+#endif
+
+void main() {
+    ivec2 texel = ivec2(gl_FragCoord.xy);
+    vec4 centerRaw = texelFetch(colortex0, texel, 0);
+    vec2 uv = (vec2(texel) + 0.5) * texelSize();
+    // 歪曲・魚眼を TAA で組み立てた時は colortex0 が出力の座標なので、深度は元画像の位置で読む (lib/post/lens.glsl)
+    float depthX = texelFetch(depthtex0, LENS_WARP_TAA ? postSourceTexel(uv) : texel, 0).r;
+
+    if (isHandDepth(depthX)) {
+        WRITE_OUTPUT(centerRaw, true);
+        return;
+    }
+
     vec2 vX = blurVelocity(uv, depthX);
     float speedX = length(vX);
 
@@ -112,7 +158,10 @@ vec4 motionBlur(vec4 centerRaw, vec2 uv, float depthX) {
         }
     }
 
-    if (speedN < 0.5) return centerRaw;
+    if (speedN < 0.5) {
+        WRITE_OUTPUT(centerRaw, false);
+        return;
+    }
 
     float distX = viewDistance(depthX);
     float jitter = interleavedGradientNoise(gl_FragCoord.xy, frameCounter) - 0.5;
@@ -143,47 +192,5 @@ vec4 motionBlur(vec4 centerRaw, vec2 uv, float depthX) {
         wSum += w;
     }
 
-    return vec4(sum / wSum, centerRaw.a);
-}
-
-#ifdef SHUTTER
-/*
- * 長時間露光: ぶれの後の色を、composite21_a が決めた重みで画素ごとの平均に溜め、溜めた絵を返す
- * 手は溜めずに今のフレームを出す (手の後ろは見えていた所の平均のまま)。溜め直しのフレームだけは手の色で埋め、0 (黒) から溜めない
- */
-vec4 accumulateShutter(ivec2 texel, vec4 color, bool hand) {
-    int width = int(viewWidth);
-    int index = texel.y * width + texel.x;
-    if (texel.x >= width || index >= width * int(viewHeight)) return color;
-    vec4 state = frameData.postParams[SHUTTER_PARAM];
-    uint flags = uint(state.w);
-    vec4 accum = shutterAccum.accum[index];
-    vec4 now = vec4(sanitizeColor(color.rgb), color.a);
-    if (!hand || (flags & SHUTTER_FLAG_RESET) != 0u) accum = mix(accum, now, state.x);
-    shutterAccum.accum[index] = accum;
-    #if SHUTTER_MODE == 1
-    // 1 枚ずつ: 露光を終えたフレームで撮れた絵を移し、次の露光ができるまでそれを出す (最初の 1 枚までは途中経過)
-    if ((flags & SHUTTER_FLAG_COMPLETE) != 0u) {
-        shutterShown.shown[index] = uvec2(packHalf2x16(accum.rg), packHalf2x16(accum.ba));
-    } else if ((flags & SHUTTER_FLAG_SHOWN) != 0u) {
-        uvec2 shown = shutterShown.shown[index];
-        accum = vec4(unpackHalf2x16(shown.x), unpackHalf2x16(shown.y));
-    }
-    #endif
-    return hand ? color : accum;
-}
-#endif
-
-void main() {
-    ivec2 texel = ivec2(gl_FragCoord.xy);
-    vec4 centerRaw = texelFetch(colortex0, texel, 0);
-    vec2 uv = (vec2(texel) + 0.5) * texelSize();
-    // 歪曲・魚眼を TAA で組み立てた時は colortex0 が出力の座標なので、深度は元画像の位置で読む (lib/post/lens.glsl)
-    float depthX = texelFetch(depthtex0, LENS_WARP_TAA ? postSourceTexel(uv) : texel, 0).r;
-    bool hand = isHandDepth(depthX);
-    vec4 color = hand ? centerRaw : motionBlur(centerRaw, uv, depthX);
-#ifdef SHUTTER
-    color = accumulateShutter(texel, color, hand);
-#endif
-    outColor = color;
+    WRITE_OUTPUT(vec4(sum / wSum, centerRaw.a), false);
 }
