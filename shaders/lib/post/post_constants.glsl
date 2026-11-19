@@ -9,6 +9,17 @@
 //@include "/lib/common/look_presets.glsl"
 
 // 露出
+/*
+ * 自動露出か (測光の選択・夜の持ち上げ・DR の補正・古い方式の対象)。0 はマニュアル。後から足す露出の方式も、自動でなければここに入れない
+ * 自動かどうかの判定はこのマクロだけで書く (EXPOSURE_MODE != 0 と書くと、新しい方式が自動の側に落ちる)
+ */
+#if EXPOSURE_MODE == 1 || EXPOSURE_MODE == 2
+    #define EXPOSURE_AUTO
+#endif
+// DR の補正が働くか (今の方式の自動露出だけ。局所の明るさのタイルもこの時だけ作る)
+#if defined EXPOSURE_DR && defined EXPOSURE_AUTO && EXPOSURE_RESPONSE_MODE == 0
+    #define EXPOSURE_DR_ACTIVE
+#endif
 // 自動露出が平均輝度を写す先の中間グレー (AgX は 0.18 を表示値 0.5 付近に置く)
 const float EXPOSURE_KEY = 0.18;
 // 反射光式の較正定数 (EV100 = log2(L * 100 / K))。設定の EV はこの EV100 として扱う
@@ -107,8 +118,13 @@ const float DR_SHADOW_MAX = 1.5;
  * ゲインの上限: DV は 18 dB (2000 年代の民生 DV の手動のゲインの最大、約 3 段)。VHS は 12 dB (2 段。民生機の値は未確認で、DV より暗く残す)
  */
 const float RESPONSE_CURVE = 0.7;
-const float RESPONSE_IRIS_OPEN_EV = -1.5;
-const float RESPONSE_GAIN_MAX = EXPOSURE_RESPONSE_MODE == 1 ? 12.0 / 6.02 : 18.0 / 6.02;
+/*
+ * 設定の下限 EXPOSURE_MIN_EV も守る。今の方式は夜の持ち上げで下限より EXPOSURE_NIGHT_MAX_LIFT だけ明るく写せるので、同じ所 (既定 -5.3) を下限にする
+ * (既定では DV の 18 dB も届く。下限を上げると、絞りの開放とゲインの上限がその分狭まる)
+ */
+const float RESPONSE_EV_MIN = EXPOSURE_MIN_EV - EXPOSURE_NIGHT_MAX_LIFT;
+const float RESPONSE_IRIS_OPEN_EV = max(-1.5, RESPONSE_EV_MIN);
+const float RESPONSE_GAIN_MAX = min(EXPOSURE_RESPONSE_MODE == 1 ? 12.0 / 6.02 : 18.0 / 6.02, RESPONSE_IRIS_OPEN_EV - RESPONSE_EV_MIN);
 const float RESPONSE_STEP_MAX = 0.02;
 /*
  * VHS: 測光の検波 (整流して平滑) の速さ、絞りのサーボの固有角周波数 (rad/s) と減衰比。減衰比 0.25 で 1 回目の行き過ぎが約 44%、
@@ -150,12 +166,12 @@ const float HISTOGRAM_HIGH_PERCENT = 0.92;
 // 評価測光とハイライト重点の測光の重み: 中央から離れた所の重み (中央から緩やかに下げる)
 const float METERING_EDGE_WEIGHT = 0.35;
 /*
- * 中央重点測光: 画面の幅の 1/3 の円に重みの 75% を置く (一眼レフの 12 mm の円。円の面積は画面の約 13%)。
- * 円の外の画素の重みは中の 1/20 になる (0.25 / 0.87 と 0.75 / 0.13 の比)
+ * 中央重点測光: 画面の幅の 1/3 の円に重みの 75% を置く (一眼レフの 12 mm の円。3:2 の画面で円の面積は約 13%)。
+ * 円の外の画素の重みは中の 1/20 になる (0.25 / 0.87 と 0.75 / 0.13 の比)。16:9 の画面では円が約 15.5% になり、重みは約 80%
  */
 const float METERING_CENTER_DIAMETER = 1.0 / 3.0;
 const float METERING_CENTER_OUTSIDE = 0.05;
-// スポット測光: 画面の幅の 1/9 の円 (面積の約 1.5%) だけを測る
+// スポット測光: 画面の幅の 1/9 の円 (3:2 で面積の約 1.5%、16:9 で約 1.7%) だけを測る
 const float METERING_SPOT_DIAMETER = 1.0 / 9.0;
 // 円の縁をぼかす幅 (半径に対する割合)。格子の点が縁を出入りする時に測光が跳ばないように
 const vec2 METERING_CIRCLE_EDGE = vec2(0.8, 1.2);

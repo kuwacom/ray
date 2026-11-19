@@ -33,7 +33,7 @@ const float LOCAL_TONEMAP_LIFT_MAX = 2.0;
 const float LOCAL_TONEMAP_CUT_MAX = 3.0;
 const float LOCAL_TONEMAP_LUM_MIN = 1e-6;
 // 局所の明るさのタイル (composite23 / 24) を作るか。DR の補正も同じタイルを使う
-#if LOCAL_TONEMAP > 0 || defined EXPOSURE_DR
+#if LOCAL_TONEMAP > 0 || defined EXPOSURE_DR_ACTIVE
     #define LOCAL_TONEMAP_TILE
 #endif
 
@@ -88,7 +88,7 @@ vec3 applyLocalTonemap(vec3 color, vec2 uv, float exposure, float pivot) {
     return color * exp2(clamp(ev, -LOCAL_TONEMAP_CUT_MAX, LOCAL_TONEMAP_LIFT_MAX));
 }
 
-#ifdef EXPOSURE_DR
+#ifdef EXPOSURE_DR_ACTIVE
 /*
  * DR の補正 (EXPOSURE_DR) の現像の側。自動露出は明るい所が飛ばないよう drEv だけ暗く撮っている (FrameData.postParams[5].w)
  * 局所の明るさが平均の DR_RESTORE_EV.x 段上までの所はその分を戻し、.y 段上より明るい所は暗く撮ったまま残す (ハイライト優先)

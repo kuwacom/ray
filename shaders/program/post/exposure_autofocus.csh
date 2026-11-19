@@ -185,24 +185,24 @@ uint flareVisibilityTap(uint index) {
 
 // 測光の重み。古い方式の自動露出は機材の測光に決め打ち (VHS は中央重点、DV は平均)
 #if EXPOSURE_RESPONSE_MODE == 1
-    #define METER_MODE 1
+    #define METERING_ACTIVE_MODE 1
 #elif EXPOSURE_RESPONSE_MODE == 2
-    #define METER_MODE 3
+    #define METERING_ACTIVE_MODE 3
 #else
-    #define METER_MODE EXPOSURE_METERING_MODE
+    #define METERING_ACTIVE_MODE EXPOSURE_METERING_MODE
 #endif
 // 重みはヒストグラムに整数で足すので、この倍率で丸める (中央重点の外側 0.05 も 0 にならないように)
-const float METER_WEIGHT_SCALE = 64.0;
+const float METERING_WEIGHT_SCALE = 64.0;
 
 float meteringWeight(vec2 uv) {
     vec2 d = (uv - 0.5) * vec2(aspectRatio, 1.0);
-#if METER_MODE == 1
+#if METERING_ACTIVE_MODE == 1
     float r = length(d) / (0.5 * METERING_CENTER_DIAMETER * aspectRatio);
     return mix(1.0, METERING_CENTER_OUTSIDE, smoothstep(METERING_CIRCLE_EDGE.x, METERING_CIRCLE_EDGE.y, r));
-#elif METER_MODE == 2
+#elif METERING_ACTIVE_MODE == 2
     float r = length(d) / (0.5 * METERING_SPOT_DIAMETER * aspectRatio);
     return 1.0 - smoothstep(METERING_CIRCLE_EDGE.x, METERING_CIRCLE_EDGE.y, r);
-#elif METER_MODE == 3
+#elif METERING_ACTIVE_MODE == 3
     return 1.0;
 #else
     return mix(METERING_EDGE_WEIGHT, 1.0, exp(-dot(d, d) * 6.0));
@@ -254,6 +254,7 @@ float histogramShareAbove(float logL) {
 float histogramPercentileLog(float percent) {
     float total = 0.0;
     for (int i = 0; i < 256; i++) total += float(sharedHistogram[i]);
+    if (total <= 0.0) return HISTOGRAM_LOG_MIN;
     float target = total * percent;
     float cumulative = 0.0;
     for (int i = 0; i < 256; i++) {
@@ -345,8 +346,8 @@ float applyEnvironmentExposure(float appliedEv, float ev, float darkEv, float li
     float liftEv = mix(ev, min(darkEv, ev), moonLit);
     float slope = EXPOSURE_NIGHT_SLOPE + EXPOSURE_NIGHT_MOON_SLOPE * moonLit;
     float lift = min(slope * max(EXPOSURE_NIGHT_EV_START - liftEv, 0.0), EXPOSURE_NIGHT_MAX_LIFT);
-    lift = max(lift, EXPOSURE_NIGHT_MIN_LIFT * night) * EXPOSURE_NIGHT_LIFT_STRENGTH;
     lift *= 1.0 - smoothstep(EXPOSURE_NIGHT_LIGHT_SHARE.x, EXPOSURE_NIGHT_LIGHT_SHARE.y, lightShare);
+    lift = max(lift, EXPOSURE_NIGHT_MIN_LIFT * night) * EXPOSURE_NIGHT_LIFT_STRENGTH;
     float dim = EXPOSURE_INDOOR_DIM * smoothstep(EXPOSURE_INDOOR_EV.x, EXPOSURE_INDOOR_EV.y, ev)
               * (1.0 - smoothstep(EXPOSURE_INDOOR_EV.z, EXPOSURE_INDOOR_EV.w, ev))
               * smoothstep(EXPOSURE_INDOOR_BLOCKLIGHT.x, EXPOSURE_INDOOR_BLOCKLIGHT.y, eyeBlockLight());
@@ -498,7 +499,7 @@ void main() {
     atomicAdd(sharedFarHidden, farHiddenTap(index));
 #endif
 
-#if EXPOSURE_MODE != 0
+#ifdef EXPOSURE_AUTO
     vec2 jitter = r2Sequence(frameCounter & 255);
     vec2 screen = viewSize();
     for (int j = 0; j < METER_PER_THREAD; j++) {
@@ -511,7 +512,7 @@ void main() {
             // テクセルの角で双線形サンプルすると 2x2 の平均が 1 回で取れる
             vec2 corner = vec2(max(p, ivec2(1))) / screen;
             float l = luminance(sanitizeColor(textureLod(colortex0, corner, 0.0).rgb));
-            uint w = uint(meteringWeight(uv) * METER_WEIGHT_SCALE + 0.5);
+            uint w = uint(meteringWeight(uv) * METERING_WEIGHT_SCALE + 0.5);
             atomicAdd(sharedHistogram[luminanceToHistogramBin(l)], w);
         }
     }
@@ -524,7 +525,7 @@ void main() {
     float dt = clamp(frameTime, 0.0, 0.5);
     bool initialized = frameData.postParams[0].z == EXPOSURE_INIT_MARKER;
 
-#if EXPOSURE_MODE == 0
+#ifndef EXPOSURE_AUTO
     float measuredEv = EXPOSURE_MANUAL_EV;
     float adaptedEv = measuredEv;
     float appliedEv = measuredEv;
@@ -544,13 +545,15 @@ void main() {
     float measuredEv = ok ? luminanceToEv100(exp2(logAverage)) : prevEv;
     float adaptedEv = adaptEv(prevEv, measuredEv, initialized, dt);
 #endif
-#if EXPOSURE_MODE != 0 && EXPOSURE_RESPONSE_MODE != 0
+#if defined EXPOSURE_AUTO && EXPOSURE_RESPONSE_MODE != 0
     vec4 response = updateResponse(frameData.postParams[6], measuredEv, initialized, dt);
     frameData.postParams[6] = response;
     float underwater = isEyeInWater == 1 ? EXPOSURE_UNDERWATER_DIM : 0.0;
     float appliedEv = response.x - response.z + underwater;
     float targetEv = responseIrisEv(measuredEv) - responseGain(measuredEv) + underwater;
-#elif EXPOSURE_MODE != 0
+    // Purkinje と局所トーンマップの基準 (averageLuminance) は、測光の順応ではなく今の絞りとゲインが中間グレーに写す明るさにする
+    adaptedEv = EXPOSURE_ANCHOR_EV + (response.x - response.z - EXPOSURE_ANCHOR_EV) / RESPONSE_CURVE;
+#elif defined EXPOSURE_AUTO
 
     // 暗い所の計測 EV (夜の持ち上げ用)。平均の側と同じ速さで順応させ、持ち上げが跳ばないようにする
     float measuredDarkEv = measuredEv;
@@ -576,35 +579,35 @@ void main() {
     #endif
     float appliedEv = applyEnvironmentExposure(clamp(exposureCurve(adaptedEv), EXPOSURE_MIN_EV, EXPOSURE_MAX_EV), adaptedEv, adaptedDarkEv, lightShare);
     float targetEv = applyEnvironmentExposure(clamp(exposureCurve(measuredEv), EXPOSURE_MIN_EV, EXPOSURE_MAX_EV), measuredEv, measuredDarkEv, lightShare);
-    #if METER_MODE == 0 && defined HAS_SKYLIGHT
+    #if METERING_ACTIVE_MODE == 0 && defined HAS_SKYLIGHT
         /*
          * 評価測光: 夜の屋外で灯りに照らされた所が白く飛ぶ時は、白を超える所が重みの EXPOSURE_NIGHT_CLIP_SHARE までになる所まで暗く写す
          * (最大 EXPOSURE_NIGHT_CLIP_MAX EV)。平均を見る測光は暗い地面と空に引かれて、灯りの周りを白く飛ばす
          */
         float measuredClipEv = luminanceToEv100(exp2(histogramPercentileLog(1.0 - EXPOSURE_NIGHT_CLIP_SHARE)))
-                             + log2(EXPOSURE_KEY / EXPOSURE_NIGHT_CLIP_LEVEL);
+                             + log2(EXPOSURE_KEY / EXPOSURE_NIGHT_CLIP_LEVEL) + LOOK_EXPOSURE_BIAS;
         float adaptedClipEv = adaptEv(frameData.postParams[5].y, measuredClipEv, initialized, dt);
         frameData.postParams[5].y = adaptedClipEv;
         float nightOutdoor = nightFactor() * eyeOutdoor();
         appliedEv += nightOutdoor * clamp(adaptedClipEv - appliedEv, 0.0, EXPOSURE_NIGHT_CLIP_MAX);
         targetEv += nightOutdoor * clamp(measuredClipEv - targetEv, 0.0, EXPOSURE_NIGHT_CLIP_MAX);
     #endif
-    #if METER_MODE == 4
+    #if METERING_ACTIVE_MODE == 4
         // ハイライト重点: 明るい側が露出後に METERING_HIGHLIGHT_LEVEL を超えるほど明るくは写さない (夜の持ち上げの後にも効かせる)
         bool highOk;
         float highLogAverage = histogramLogAverage(METERING_HIGHLIGHT_PERCENT.x, METERING_HIGHLIGHT_PERCENT.y, highOk);
-        float measuredHighEv = highOk ? luminanceToEv100(exp2(highLogAverage)) + log2(EXPOSURE_KEY / METERING_HIGHLIGHT_LEVEL) : targetEv;
+        float measuredHighEv = highOk ? luminanceToEv100(exp2(highLogAverage)) + log2(EXPOSURE_KEY / METERING_HIGHLIGHT_LEVEL) + LOOK_EXPOSURE_BIAS : targetEv;
         float adaptedHighEv = adaptEv(frameData.postParams[5].x, measuredHighEv, initialized, dt);
         frameData.postParams[5].x = adaptedHighEv;
         appliedEv = min(max(appliedEv, adaptedHighEv), EXPOSURE_MAX_EV);
         targetEv = min(max(targetEv, measuredHighEv), EXPOSURE_MAX_EV);
     #endif
-    #ifdef EXPOSURE_DR
+    #ifdef EXPOSURE_DR_ACTIVE
         /*
          * DR の補正: 明るい側 (重みの上位 DR_PROTECT_SHARE) が露出後に DR_PROTECT_LEVEL を超える分だけ、最大 DR_HIGHLIGHT_MAX EV 暗く撮る
          * 暗く撮った量は final (applyDynamicRange) が中間と暗い所で戻す
          */
-        float protectEv = luminanceToEv100(exp2(histogramPercentileLog(1.0 - DR_PROTECT_SHARE))) + log2(EXPOSURE_KEY / DR_PROTECT_LEVEL);
+        float protectEv = luminanceToEv100(exp2(histogramPercentileLog(1.0 - DR_PROTECT_SHARE))) + log2(EXPOSURE_KEY / DR_PROTECT_LEVEL) + LOOK_EXPOSURE_BIAS;
         float measuredDr = clamp(protectEv - targetEv, 0.0, DR_HIGHLIGHT_MAX);
         float prevDr = frameData.postParams[5].w;
         float drEv = initialized && !isnan(prevDr) && !isinf(prevDr)
