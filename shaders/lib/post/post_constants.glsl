@@ -101,6 +101,28 @@ const float DR_SHADOW_START = 0.5;
 const float DR_SHADOW_SLOPE = 0.5;
 const float DR_SHADOW_MAX = 1.5;
 /*
+ * 古い方式の自動露出 (EXPOSURE_RESPONSE_MODE)。速さ・ゲイン以外の時間の数字は出典が無く、見た目で決めた調整値
+ * 曲線: 測光の平均を中間グレーに近づける (今の方式の 0.55 より完全補正に近い。夜も昼も明るさの差が小さい)
+ * 絞りの開放: これより明るく写すにはゲインを上げる (晴れの昼と室内・洞窟のたいまつまでは絞りで足りる)
+ * ゲインの上限: DV は 18 dB (2000 年代の民生 DV の手動のゲインの最大、約 3 段)。VHS は 12 dB (2 段。民生機の値は未確認で、DV より暗く残す)
+ */
+const float RESPONSE_CURVE = 0.7;
+const float RESPONSE_IRIS_OPEN_EV = -1.5;
+const float RESPONSE_GAIN_MAX = EXPOSURE_RESPONSE_MODE == 1 ? 12.0 / 6.02 : 18.0 / 6.02;
+const float RESPONSE_STEP_MAX = 0.02;
+/*
+ * VHS: 測光の検波 (整流して平滑) の速さ、絞りのサーボの固有角周波数 (rad/s) と減衰比。減衰比 0.25 で 1 回目の行き過ぎが約 44%、
+ * 揺れの周期は約 3.6 秒。ハンチングを抑えるため応答を遅くした閉ループ (絞りの自動調整の特許の説明) を、遅れと行き過ぎの両方で出す
+ * AGC は絞りより遅く上がる
+ */
+const float VHS_SENSE_SPEED = 1.0;
+const float VHS_SERVO_OMEGA = 1.8;
+const float VHS_SERVO_DAMPING = 0.25;
+const float VHS_AGC_SPEED = 0.6;
+// DV: 明るくなる向き (絞る・ゲインを下げる) が遅いので、明るい所に入ると数秒白く飛んでから戻る
+const float DV_SPEED_BRIGHT = 0.6;
+const float DV_SPEED_DARK = 0.5;
+/*
  * 月が照らす夜 (満ち欠け x 晴れ。水中は外す) だけ、暗い側の計測と持ち上げの傾きを足す。新月・雨の夜・水中は平均の計測と EXPOSURE_NIGHT_SLOPE のまま暗く残す
  * 上限は月夜も EXPOSURE_NIGHT_MAX_LIFT のまま (見た目の判断)。月夜だけ上限を 2.8 EV まで上げると、月の照る暗い草原も 1.3〜1.5 EV
  * 持ち上がり、地形の暗さと空が灰色に浮いて霧っぽくなり、月の照り返しで光る草が浮いて見えなくなった。海の月の道は暗めになる

@@ -494,7 +494,7 @@ void main() {
     hdr = applyPurkinje(hdr, frameData.averageLuminance, exposure);
     vec3 color = hdr * exposure;
     // DR の補正: 明るい所を守って暗く撮った分を中間と暗い所で戻し、暗部を持ち上げる
-#if defined EXPOSURE_DR && EXPOSURE_MODE != 0
+#if defined EXPOSURE_DR && EXPOSURE_MODE != 0 && EXPOSURE_RESPONSE_MODE == 0
     color = applyDynamicRange(color, uvL, exposure, frameData.averageLuminance * exposure, frameData.postParams[5].w);
 #endif
     // 現像の前に局所の明暗を縮める (ホワイトバランス・グレーディングは縮めた後の明るさに掛かる)

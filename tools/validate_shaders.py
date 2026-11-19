@@ -97,6 +97,9 @@ VALIDATION_SETS: dict[str, dict[str, str]] = {
     # DR の補正 (ブルームを切っても局所の明るさのタイルを作る経路)
     "EXPOSURE_DR": {"EXPOSURE_DR": "true"},
     "EXPOSURE_DR_NO_BLOOM": {"EXPOSURE_DR": "true", "BLOOM": "false"},
+    # 古い方式の自動露出 (アナログと合わせる想定)
+    "RESPONSE_VHS": {"EXPOSURE_RESPONSE_MODE": "1", "ANALOG": "true", "EXPOSURE_DR": "true"},
+    "RESPONSE_DV": {"EXPOSURE_RESPONSE_MODE": "2", "ANALOG": "true"},
 }
 
 STAGE_OF_EXT = {".vsh": "vert", ".fsh": "frag", ".gsh": "geom", ".csh": "comp", ".tcs": "tesc", ".tes": "tese"}

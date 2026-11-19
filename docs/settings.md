@@ -424,6 +424,7 @@
 | EXPOSURE_NIGHT_LIFT_STRENGTH | 1.0 | 0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5 |
 | EXPOSURE_METERING_MODE | 0 | 0, 1, 2, 3, 4 |
 | EXPOSURE_DR | OFF | ON / OFF |
+| EXPOSURE_RESPONSE_MODE | 0 | 0, 1, 2 |
 | TONEMAP | 0 | 0, 1, 2, 3, 4, 5 |
 | LOCAL_TONEMAP | 0 | 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 |
 | SATURATION | 1.0 | 0.0, 0.25, 0.5, 0.75, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5, 1.75, 2.0 |

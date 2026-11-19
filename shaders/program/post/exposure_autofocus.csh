@@ -272,6 +272,54 @@ float exposureCurve(float ev) {
     return EXPOSURE_ANCHOR_EV + (ev - EXPOSURE_ANCHOR_EV) * EXPOSURE_CURVE - boost;
 }
 
+#if EXPOSURE_RESPONSE_MODE != 0
+/*
+ * 古い方式の自動露出 (EXPOSURE_RESPONSE_MODE)。測光 EV -> 目標 (今の曲線より完全補正に近い) -> 絞りの動きと暗い所の AGC
+ * 絞りは開放 (RESPONSE_IRIS_OPEN_EV) より明るくは写せず、その先はゲインで上げる (上限 RESPONSE_GAIN_MAX 段)
+ * VHS: 測光の検波の遅れの後に、絞りのサーボが 2 次の遅れで動く (行き過ぎて行ったり来たりする)
+ * DV: 絞りとゲインが 1 次の遅れでゆっくり追う (明るい所に入ると、しばらく白く飛んでから戻る)
+ * state: x = 絞りの EV, y = 絞りの動く速さ (EV/秒), z = ゲイン (段), w = 検波した測光 EV
+ */
+float responseTargetEv(float ev) {
+    return EXPOSURE_ANCHOR_EV + (ev - EXPOSURE_ANCHOR_EV) * RESPONSE_CURVE;
+}
+
+float responseIrisEv(float ev) { return clamp(responseTargetEv(ev), RESPONSE_IRIS_OPEN_EV, EXPOSURE_MAX_EV); }
+float responseGain(float ev) { return clamp(RESPONSE_IRIS_OPEN_EV - responseTargetEv(ev), 0.0, RESPONSE_GAIN_MAX); }
+
+vec4 updateResponse(vec4 state, float measuredEv, bool initialized, float dt) {
+    if (!initialized || any(isnan(state)) || any(isinf(state))) {
+        return vec4(responseIrisEv(measuredEv), 0.0, responseGain(measuredEv), measuredEv);
+    }
+#if EXPOSURE_RESPONSE_MODE == 1
+    // 2 次の式は刻みを細かくして解く (フレームの時間が長いと発散する)
+    int steps = int(ceil(dt / RESPONSE_STEP_MAX));
+    float h = dt / float(max(steps, 1));
+    for (int i = 0; i < steps; i++) {
+        state.w = mix(state.w, measuredEv, 1.0 - exp(-VHS_SENSE_SPEED * h));
+        float accel = VHS_SERVO_OMEGA * VHS_SERVO_OMEGA * (responseIrisEv(state.w) - state.x)
+                    - 2.0 * VHS_SERVO_DAMPING * VHS_SERVO_OMEGA * state.y;
+        state.y += accel * h;
+        state.x += state.y * h;
+        // 絞りの端 (開放と最小) に当たると止まる
+        if (state.x < RESPONSE_IRIS_OPEN_EV || state.x > EXPOSURE_MAX_EV) {
+            state.x = clamp(state.x, RESPONSE_IRIS_OPEN_EV, EXPOSURE_MAX_EV);
+            state.y = 0.0;
+        }
+    }
+    state.z = mix(state.z, responseGain(state.w), 1.0 - exp(-VHS_AGC_SPEED * dt));
+#else
+    float iris = responseIrisEv(measuredEv);
+    state.x = mix(state.x, iris, 1.0 - exp(-(iris > state.x ? DV_SPEED_BRIGHT : DV_SPEED_DARK) * dt));
+    float gain = responseGain(measuredEv);
+    state.z = mix(state.z, gain, 1.0 - exp(-(gain < state.z ? DV_SPEED_BRIGHT : DV_SPEED_DARK) * dt));
+    state.y = 0.0;
+    state.w = measuredEv;
+#endif
+    return state;
+}
+#endif
+
 // 太陽が地平線の下 [0,1]
 float nightFactor() { return 1.0 - smoothstep(-0.2, -0.05, getSunDir().y); }
 
@@ -482,7 +530,8 @@ void main() {
     float appliedEv = measuredEv;
     float targetEv = measuredEv;
 #else
-    #if EXPOSURE_MODE == 1
+    // 古い方式の測光は外れ値を除かない平均 (ビデオの信号の平均を見る)
+    #if EXPOSURE_MODE == 1 || EXPOSURE_RESPONSE_MODE != 0
         const float lowPercent = 0.0;
         const float highPercent = 1.0;
     #else
@@ -494,6 +543,14 @@ void main() {
     float prevEv = frameData.postParams[0].x;
     float measuredEv = ok ? luminanceToEv100(exp2(logAverage)) : prevEv;
     float adaptedEv = adaptEv(prevEv, measuredEv, initialized, dt);
+#endif
+#if EXPOSURE_MODE != 0 && EXPOSURE_RESPONSE_MODE != 0
+    vec4 response = updateResponse(frameData.postParams[6], measuredEv, initialized, dt);
+    frameData.postParams[6] = response;
+    float underwater = isEyeInWater == 1 ? EXPOSURE_UNDERWATER_DIM : 0.0;
+    float appliedEv = response.x - response.z + underwater;
+    float targetEv = responseIrisEv(measuredEv) - responseGain(measuredEv) + underwater;
+#elif EXPOSURE_MODE != 0
 
     // 暗い所の計測 EV (夜の持ち上げ用)。平均の側と同じ速さで順応させ、持ち上げが跳ばないようにする
     float measuredDarkEv = measuredEv;

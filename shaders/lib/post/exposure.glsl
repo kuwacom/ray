@@ -8,6 +8,7 @@
  * FrameData.postParams[4]: フレアのループの回数 (lib/post/lens_flare.glsl)。x = ゴースト, y = ゴーストの波長, z = 画面の光条の線, w = 画面のゴースト
  * FrameData.postParams[5]: 自動露出の順応済みの補助の値。x = ハイライト重点の上限の EV100, y = 評価測光の夜の白飛びを抑える EV100,
  *                         z = 灯りに照らされた所の割合, w = DR の補正で暗く撮った EV (final が戻す)
+ * FrameData.postParams[6]: 古い方式の自動露出の状態。x = 絞りの EV100, y = 絞りの動く速さ, z = ゲイン (段), w = 検波した測光 EV100
  */
 #ifndef POST_EXPOSURE_GLSL
 #define POST_EXPOSURE_GLSL
