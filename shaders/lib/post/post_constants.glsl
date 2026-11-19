@@ -371,6 +371,14 @@ const float LAVA_BLOOM_GAIN = 1.0 + 9.0 * LAVA_BLOOM;
 // 倍率によらず、溶岩の上に乗る自分のブルームが元の 1.5 倍 (倍率 10 で 0.85 下げた量) になるよう倍率から決める
 const float LAVA_SELF_BLOOM = 1.5;
 const float LAVA_SELF_BLOOM_CUT = max(1.0 - LAVA_SELF_BLOOM / LAVA_BLOOM_GAIN, 0.0);
+/*
+ * 溶岩の面を淡くする量 (final)。LAVA_BRIGHTNESS が LAVA_PALE_FROM (溶岩のトーンマップの持ち上げが頭打ちになる所) を超えた分で、
+ * 設定の上限 LAVA_PALE_TO で LAVA_PALE_MAX。0.4 で面の輝度が 0.65 前後 (色相はそのまま、彩度 0.3 前後) になり、照り返しに並ぶ
+ */
+const float LAVA_PALE_FROM = 1.0;
+const float LAVA_PALE_TO = 5.0;
+const float LAVA_PALE_MAX = 0.4;
+const float LAVA_FACE_PALE = clamp((LAVA_BRIGHTNESS - LAVA_PALE_FROM) / (LAVA_PALE_TO - LAVA_PALE_FROM), 0.0, 1.0) * LAVA_PALE_MAX;
 
 // レンズ (強さの割合はプリセット lib/post/lens_presets.glsl)
 const float VIGNETTE_SCALE = 0.8;

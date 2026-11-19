@@ -546,12 +546,18 @@ void main() {
      * 赤はほぼ上限なので、明るさは tonemapEmissive で緑 (と少し青) が持ち上がる形で出る (暗い殻 -> 橙 -> 黄の割れ目)
      */
     color *= 1.0 + LAVA_BRIGHTNESS * lava;
+    float lavaFace = lava;
     lava = max(lava, lavaGlowShare);
 #if defined ANALOG && defined ANALOG_KNEE
     // ビデオのニーがトーンマップの代わり (TONEMAP の選択と溶岩のトーンマップは使わない)。709 の値をそのまま表示値にする
     color = applyAnalogKnee(color);
 #else
     color = lava > 0.0 ? mix(tonemap(color), tonemapEmissive(color), lava) : tonemap(color);
+    /*
+     * 溶岩のトーンマップは橙の彩度を保つので、面の輝度は 0.45 前後で頭打ちになり、LAVA_BRIGHTNESS を上げても
+     * 明るく照らされた周りの岩 (輝度 0.6-0.8) に届かない。頭打ちから先は、白を同じ量ずつ足して色相を保ったまま淡くする
+     */
+    color = mix(color, vec3(maxOf(color)), LAVA_FACE_PALE * lavaFace);
     color = linearToSrgb(color);
 #endif
     // 表示値のグレード (リフト・ガンマ・ゲイン -> カーブ -> スプリットトーン) は、フィルムの LUT の下 (前) に置く
