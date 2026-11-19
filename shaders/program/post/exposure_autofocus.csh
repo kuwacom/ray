@@ -528,7 +528,9 @@ void main() {
              */
             if (l > lightLum) {
                 ivec2 g = LENS_WARP_TAA ? postSourceTexel(uv) : p;
-                if (unpack2x8(texelFetch(colortex2, g, 0).a).x >= EXPOSURE_NIGHT_LIGHT_BLOCK) atomicAdd(sharedLightLit, w);
+                if (unpack2x8(texelFetch(colortex2, g, 0).a).x >= EXPOSURE_NIGHT_LIGHT_BLOCK && readMaterialId(g) != MAT_LIGHTNING) {
+                    atomicAdd(sharedLightLit, w);
+                }
             }
             #endif
         }
@@ -591,7 +593,7 @@ void main() {
         float measuredShare = total > 0.0 ? float(sharedLightLit) / total : 0.0;
         float prevShare = frameData.postParams[5].z;
         lightShare = initialized && !isnan(prevShare) && !isinf(prevShare)
-                   ? mix(prevShare, measuredShare, 1.0 - exp(-EXPOSURE_SPEED_DARK * dt)) : measuredShare;
+                   ? mix(prevShare, measuredShare, 1.0 - exp(-EXPOSURE_NIGHT_LIGHT_SPEED * dt)) : measuredShare;
         frameData.postParams[5].z = lightShare;
     #endif
     float appliedEv = applyEnvironmentExposure(clamp(exposureCurve(adaptedEv), EXPOSURE_MIN_EV, EXPOSURE_MAX_EV), adaptedEv, adaptedDarkEv, lightShare);
