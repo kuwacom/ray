@@ -94,6 +94,11 @@ const int noiseTextureResolution = 256;
     #define GI_HIT_DIRECT_REUSE 1
 #endif
 
+// 光源の明るさを現実の比にする (lib/common/constants.glsl)。カメラの露出の時だけ効かせる
+#if EXPOSURE_MODE == 3 && defined EXPOSURE_PHYSICAL_LIGHT
+    #define PHYSICAL_LIGHT_ACTIVE 1
+#endif
+
 // 水に入った自分を、屈折した視線を自分の三角形に当てて描く (water_trace.fsh)。自分の三角形と水の屈折の両方が要る
 #if defined ENTITY_TRI_OCCLUSION && defined LIGHT_PLAYER_OCCLUSION && WATER_REFRACTION >= 1
     #define WATER_SELF_REFRACTION 1

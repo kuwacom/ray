@@ -22,6 +22,7 @@
 #include "/lib/settings/internal.glsl"
 #include "/lib/settings/bool_refs.glsl"
 #include "/lib/settings.glsl"
+#include "/lib/common/constants.glsl"
 #include "/lib/common/look_presets.glsl"
 #include "/lib/post/post_constants.glsl"
 // END GENERATED includes

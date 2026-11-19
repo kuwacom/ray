@@ -148,7 +148,7 @@ vec3 fogBiomeScale() {
 const float NETHER_FOG_EXTINCTION = 0.008;
 const float NETHER_FOG_CLEAR_DIST = 32.0;
 const float END_FOG_EXTINCTION = 0.0025;
-const vec3 END_FOG_COLOR = vec3(0.30, 0.22, 0.45);
+const vec3 END_FOG_COLOR = vec3(0.30, 0.22, 0.45) * PHYSICAL_DIMENSION;
 
 // 水中の係数は水面側 (lib/common/water.glsl) の waterAbsorption / waterScattering を共有する (上から見た水と潜った時の色を揃える)
 const vec3 FOG_LAVA_EXTINCTION = vec3(1.6);

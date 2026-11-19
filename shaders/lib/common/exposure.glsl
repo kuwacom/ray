@@ -1,6 +1,8 @@
 #ifndef COMMON_EXPOSURE_GLSL
 #define COMMON_EXPOSURE_GLSL
 
+//@include "/lib/settings.glsl"
+//@include "/lib/common/constants.glsl"
 //@include "/lib/buffers/frame_data.glsl"
 
 // 露出 (post の composite25 が FrameData に書く)。誰でも読める
@@ -14,6 +16,11 @@ float getExposure() { return frameData.exposure > 0.0 ? frameData.exposure : 1.0
  */
 const float EMISSION_VISIBLE_LUMINANCE = 1.0;
 const float EMISSION_EXPOSURE_ADAPT = 0.45;
+#ifdef PHYSICAL_LIGHT_ACTIVE
+// 現実の光の比では露出に合わせて下げない (F 値・シャッター速度・ISO を変えても面の輝度は変わらない)
+float getVisibleEmissionLuminance() { return EMISSION_VISIBLE_LUMINANCE * PHYSICAL_EMISSION; }
+#else
 float getVisibleEmissionLuminance() { return EMISSION_VISIBLE_LUMINANCE * pow(getExposure(), -EMISSION_EXPOSURE_ADAPT); }
+#endif
 
 #endif

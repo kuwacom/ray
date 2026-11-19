@@ -1,6 +1,8 @@
 #ifndef COMMON_CONSTANTS_GLSL
 #define COMMON_CONSTANTS_GLSL
 
+//@include "/lib/settings.glsl"
+
 const float PI = 3.14159265358979;
 const float TAU = 6.28318530717959;
 const float HALF_PI = 1.57079632679490;
@@ -13,8 +15,37 @@ const float EPS = 1e-5;
  * シーンは線形 HDR。値は物理単位ではなく、自動露出 (post モジュール) が吸収する前提の相対値
  * 各モジュールはこの定数を掛けて出力し、勝手に別スケールを作らない
  */
+/*
+ * 現実の光の比 (カメラの露出で EXPOSURE_PHYSICAL_LIGHT の時)。光の種類ごとに 1 つの倍率を光源の側に掛ける
+ * 太陽と昼の空は 1 (カメラの EV のずらしが晴れの昼に合わせてある。Ray の照度 1 は約 8200 lx、輝度 1 は約 8200 cd/m2)。
+ * ほかの光は太陽に比べてゲーム向けに明るく、昼と夜の差が実写の約 12 段に対して約 6 段しかない。値は 2 の冪の段
+ * MOON (-8.5 段): 月の直射と月が照らす空。満月の照り返しは白い床で約 90 lx、実際は 0.05-0.3 lx
+ * NIGHT_SKY (-8 段): 星・天の川・大気光・夜空の底。夜空の底は約 0.25 cd/m2、実際の暗い夜空は約 1 mcd/m2
+ * MIN_AMBIENT (-12 段): 洞窟と新月の夜の最低限の光。約 33 lx、実際の新月の晴れた夜は約 0.002 lx
+ * BLOCKLIGHT (-8.5 段): ブロック・手持ち・エンティティ・溶岩・雷・花火の照らす光と、発光の面が GI で照らす光、暗視。
+ *   たいまつから 1 ブロックの白い床で約 3800 lx (掛けた後は約 11 lx)。灯油ランタン (8-82 lm) の 1 m は 0.6-6.5 lx、60 W の電球 (800 lm) は約 64 lx
+ * EMISSION (-6 段): 画面に見える発光の面の輝度 (露出に合わせて下げずに一定にする)。花火の火花も。
+ *   炎の輝度 (約 1 万 cd/m2) のままの 1 では、夜の設定で小さな炎が何千倍も白を超え、ブルームとボケが大きな白い円になった
+ * DIMENSION (-8.5 段): ネザー・エンドの環境光とエンドの平行光・空・霧
+ * 雷の稲妻とビーコンの光線は露出に合わせた明るさのまま (固定の輝度では夜にブルームが画面を白く霞ませる)
+ */
+#ifdef PHYSICAL_LIGHT_ACTIVE
+const float PHYSICAL_MOON = 0.0028;
+const float PHYSICAL_NIGHT_SKY = 0.0039;
+const float PHYSICAL_MIN_AMBIENT = 0.00024;
+const float PHYSICAL_BLOCKLIGHT = 0.0028;
+const float PHYSICAL_EMISSION = 0.016;
+const float PHYSICAL_DIMENSION = 0.0028;
+#else
+const float PHYSICAL_MOON = 1.0;
+const float PHYSICAL_NIGHT_SKY = 1.0;
+const float PHYSICAL_MIN_AMBIENT = 1.0;
+const float PHYSICAL_BLOCKLIGHT = 1.0;
+const float PHYSICAL_EMISSION = 1.0;
+const float PHYSICAL_DIMENSION = 1.0;
+#endif
 const float SUN_ILLUMINANCE = 6.0;        // 正午の太陽直達照度 (大気透過前)
-const float MOON_ILLUMINANCE = 0.012;     // 満月の直達照度
+const float MOON_ILLUMINANCE = 0.012 * PHYSICAL_MOON; // 満月の直達照度
 /*
  * 夜の月の放射の倍率 (見た目の調整)。物理的な放射のままだと、鏡像が空の月より桁違いに明るい白い塊になり、
  * フレアも小さな円盤から昼の太陽並みに伸びるので、地球照・フレアの基準はこの値にする。
@@ -41,10 +72,10 @@ float moonDiscBoost(float sunY, float nightGain) {
     return mix(MOON_NIGHT_BRIGHTNESS * nightGain, 1.0, day) / mix(MOON_NIGHT_BRIGHTNESS, 1.0, day);
 }
 const float SKY_ILLUMINANCE = 1.0;        // 空の拡散照度の基準
-const float BLOCKLIGHT_ILLUMINANCE = 2.5; // 光源レベル 15 の光源から 1 ブロック離れた面の照度
-const float EMISSION_LUMINANCE = 4.0;     // 発光テクスチャ (emission=1) の輝度
-const float MIN_AMBIENT = 0.004;          // 洞窟の最低限の可視光 (真っ暗を避ける)
-const float NIGHT_VISION_AMBIENT = 0.6;
+const float BLOCKLIGHT_ILLUMINANCE = 2.5 * PHYSICAL_BLOCKLIGHT; // 光源レベル 15 の光源から 1 ブロック離れた面の照度
+const float EMISSION_LUMINANCE = 4.0 * PHYSICAL_BLOCKLIGHT;     // 発光テクスチャ (emission=1) の輝度
+const float MIN_AMBIENT = 0.004 * PHYSICAL_MIN_AMBIENT;          // 洞窟の最低限の可視光 (真っ暗を避ける)
+const float NIGHT_VISION_AMBIENT = 0.6 * PHYSICAL_BLOCKLIGHT;
 const float LIGHT_LEVEL_MAX = 15.0;       // バニラの光源レベルの最大値
 
 // ライトマップ座標を [0,1] に直す: (x - 1/32) * 32 / 30 で、1/32 が 0、31/32 が 1

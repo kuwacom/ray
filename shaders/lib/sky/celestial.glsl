@@ -30,17 +30,17 @@ const float MOON_PHOTO_LIMB = 0.985;
 #endif
 const float STAR_GRID = 110.0;          // 天球を刻む格子の細かさ (セル 1 つに星は最大 1 個)
 const float STAR_DENSITY = 0.055;       // 星があるセルの割合
-const float STAR_RADIANCE = 0.03;       // 最も明るい星の中心の放射
-const float MILKY_WAY_RADIANCE = 4e-4;
-const float AIRGLOW_RADIANCE = 6e-5;
+const float STAR_RADIANCE = 0.03 * PHYSICAL_NIGHT_SKY;       // 最も明るい星の中心の放射
+const float MILKY_WAY_RADIANCE = 4e-4 * PHYSICAL_NIGHT_SKY;
+const float AIRGLOW_RADIANCE = 6e-5 * PHYSICAL_NIGHT_SKY;
 const vec3 MILKY_WAY_POLE = vec3(0.3302, 0.5503, 0.7670); // 天球座標での銀河面の法線 (正規化済み)
 const vec3 MILKY_WAY_CORE = vec3(0.9184, -0.0, -0.3954);   // 銀河中心の方向 (銀河面上)
 
-const vec3 END_SKY_COLOR = vec3(0.045, 0.030, 0.070);
+const vec3 END_SKY_COLOR = vec3(0.045, 0.030, 0.070) * PHYSICAL_DIMENSION;
 const vec3 END_NEBULA_COLOR = vec3(0.30, 0.18, 0.55);
 const vec3 END_NEBULA_COLOR_COOL = vec3(0.10, 0.20, 0.50); // 星雲の寒色側 (紫一色だと平板なので色相に幅を持たせる)
 const float END_ZENITH_DARKEN = 0.3;    // 天頂の暗さ (END_SKY_COLOR に対する倍率)。地平線ほど星雲の光が積もって明るい
-const float END_NEBULA_RADIANCE = 0.16; // 星雲の最も明るい所の放射 (END_NEBULA_COLOR に対する倍率)
+const float END_NEBULA_RADIANCE = 0.16 * PHYSICAL_DIMENSION; // 星雲の最も明るい所の放射 (END_NEBULA_COLOR に対する倍率)
 
 // 画面 1 ピクセルの見込み角 (rad)。星と円盤の縁のアンチエイリアス幅
 float skyPixelAngle() { return 2.0 / (viewHeight * gbufferProjection[1][1]); }
