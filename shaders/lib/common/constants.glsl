@@ -16,26 +16,31 @@ const float EPS = 1e-5;
  * 各モジュールはこの定数を掛けて出力し、勝手に別スケールを作らない
  */
 /*
- * 現実の光の比 (カメラの露出で EXPOSURE_PHYSICAL_LIGHT の時)。光の種類ごとに 1 つの倍率を光源の側に掛ける
+ * 現実の光の比 (カメラの露出で EXPOSURE_PHYSICAL_LIGHT の時)。光の種類ごとの倍率を光源の側に掛ける
  * 太陽と昼の空は 1 (カメラの EV のずらしが晴れの昼に合わせてある。Ray の照度 1 は約 8200 lx、輝度 1 は約 8200 cd/m2)。
- * ほかの光は太陽に比べてゲーム向けに明るく、昼と夜の差が実写の約 12 段に対して約 6 段しかない。値は 2 の冪の段
- * MOON (-8.5 段): 月の直射と月が照らす空。満月の照り返しは白い床で約 90 lx、実際は 0.05-0.3 lx
- * NIGHT_SKY (-8 段): 星・天の川・大気光・夜空の底。夜空の底は約 0.25 cd/m2、実際の暗い夜空は約 1 mcd/m2
- * MIN_AMBIENT (-12 段): 洞窟と新月の夜の最低限の光。約 33 lx、実際の新月の晴れた夜は約 0.002 lx
- * BLOCKLIGHT (-8.5 段): ブロック・手持ち・エンティティ・溶岩・雷・花火の照らす光と、発光の面が GI で照らす光、暗視。
+ * ほかの光は太陽に比べてゲーム向けに明るく、昼と夜の差が実写の約 12 段に対して約 6 段しかない。設定は 3 つの段
+ * 夜 (EXPOSURE_PHYSICAL_NIGHT、既定 -8.5 段)
+ *   MOON: 月の直射と月が照らす空。満月の照り返しは白い床で約 90 lx、実際は 0.05-0.3 lx
+ *   NIGHT_SKY (夜 +0.5 段): 星・天の川・大気光・夜空の底。夜空の底は約 0.25 cd/m2、実際の暗い夜空は約 1 mcd/m2
+ *   MIN_AMBIENT (夜 -3.5 段): 洞窟と新月の夜の最低限の光。約 33 lx、実際の新月の晴れた夜は約 0.002 lx
+ * 灯り (EXPOSURE_PHYSICAL_BLOCKLIGHT、既定 -8.5 段)
+ *   BLOCKLIGHT: ブロック・手持ち・エンティティ・溶岩・雷・花火の照らす光と、発光の面が GI で照らす光、暗視。
  *   たいまつから 1 ブロックの白い床で約 3800 lx (掛けた後は約 11 lx)。灯油ランタン (8-82 lm) の 1 m は 0.6-6.5 lx、60 W の電球 (800 lm) は約 64 lx
- * EMISSION (-6 段): 画面に見える発光の面の輝度 (露出に合わせて下げずに一定にする)。花火の火花も。
+ *   DIMENSION: ネザー・エンドの環境光とエンドの平行光・空・霧。昼夜の無い場所で、溶岩や灯りとの比を保つため灯りにそろえる
+ * 光る面 (EXPOSURE_PHYSICAL_EMISSION、既定 -6 段)
+ *   EMISSION: 画面に見える発光の面の輝度 (露出に合わせて下げずに一定にする)。花火の火花も。
  *   炎の輝度 (約 1 万 cd/m2) のままの 1 では、夜の設定で小さな炎が何千倍も白を超え、ブルームとボケが大きな白い円になった
- * DIMENSION (-8.5 段): ネザー・エンドの環境光とエンドの平行光・空・霧
- * 雷の稲妻とビーコンの光線は露出に合わせた明るさのまま (固定の輝度では夜にブルームが画面を白く霞ませる)
+ * 雷の稲妻・ビーコンの光線・溶岩の面は露出に合わせた明るさのまま (固定の輝度では夜にブルームが画面を白く霞ませる)
  */
 #ifdef PHYSICAL_LIGHT_ACTIVE
-const float PHYSICAL_MOON = 0.0028;
-const float PHYSICAL_NIGHT_SKY = 0.0039;
-const float PHYSICAL_MIN_AMBIENT = 0.00024;
-const float PHYSICAL_BLOCKLIGHT = 0.0028;
-const float PHYSICAL_EMISSION = 0.016;
-const float PHYSICAL_DIMENSION = 0.0028;
+const float PHYSICAL_NIGHT_SKY_STOPS = 0.5;
+const float PHYSICAL_MIN_AMBIENT_STOPS = -3.5;
+const float PHYSICAL_MOON = exp2(EXPOSURE_PHYSICAL_NIGHT);
+const float PHYSICAL_NIGHT_SKY = exp2(EXPOSURE_PHYSICAL_NIGHT + PHYSICAL_NIGHT_SKY_STOPS);
+const float PHYSICAL_MIN_AMBIENT = exp2(EXPOSURE_PHYSICAL_NIGHT + PHYSICAL_MIN_AMBIENT_STOPS);
+const float PHYSICAL_BLOCKLIGHT = exp2(EXPOSURE_PHYSICAL_BLOCKLIGHT);
+const float PHYSICAL_EMISSION = exp2(EXPOSURE_PHYSICAL_EMISSION);
+const float PHYSICAL_DIMENSION = PHYSICAL_BLOCKLIGHT;
 #else
 const float PHYSICAL_MOON = 1.0;
 const float PHYSICAL_NIGHT_SKY = 1.0;
