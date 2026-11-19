@@ -92,6 +92,7 @@ const float FLUID_LIGHT_SIZE = 1.5;
 /*
  * 溶岩の光 (設定 LAVA_LIGHT = 1 のときの倍率)。表示上の溶岩本体は頭打ちで、近くの壁は直接光だけで白く飛んで本体より明るくなる
  * 直接光は 0.4 倍に抑えて近い壁を本体より暗くし、洞窟の遠い壁と床は floodfill の種を 10 倍にして持ち上げる
+ * LAVA_LIGHT の既定は 2.0 なので、既定での実効は直接光 0.8 倍、floodfill の種 20 倍
  */
 const float LAVA_DIRECT_GAIN = 0.4;
 const float LAVA_FLOOD_GAIN = 10.0;
