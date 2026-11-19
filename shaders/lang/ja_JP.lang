@@ -997,7 +997,7 @@ value.EXPOSURE_MODE.0=マニュアル
 value.EXPOSURE_MODE.1=オート (平均)
 value.EXPOSURE_MODE.2=オート (ヒストグラム)
 value.EXPOSURE_MODE.3=カメラ (F 値・シャッター速度・ISO)
-option.EXPOSURE_MODE.comment=カメラ: F 値・シャッター速度・ISO から明るさを決める (EV100 = log2(N^2 / t) - log2(ISO / 100))。晴天の 16 の法則 (f/16・1/100 秒・ISO 100) が晴れの昼に合う。露出補正は効き、夜の持ち上げ・屋内の減光・VHS / DV の動きは効かない
+option.EXPOSURE_MODE.comment=カメラ: F 値・シャッター速度・ISO から明るさを決める (EV100 = log2(N^2 / t) - log2(ISO / 100))。晴天の 16 の法則 (f/16・1/100 秒・ISO 100) が晴れの昼に合う。夜は実写より明るいので、実写の夜景の設定より 5 段ほど暗い設定で合う (灯りの点いた村で f/29・2 秒・ISO 100 くらい)。露出補正は効き、夜の持ち上げ・屋内の減光・VHS / DV の動きは効かない
 option.EXPOSURE_BIAS=露出補正
 option.EXPOSURE_BIAS.comment=ルックのプリセットの露出に足す (ナチュラルでは 0)
 suffix.EXPOSURE_BIAS= EV
@@ -1382,7 +1382,7 @@ option.ANALOG_NOISE.comment=ショット・暗部・色・固定パターン・�
 option.ANALOG_NOISE_STRENGTH=ノイズの強さ
 option.ANALOG_NOISE_STRENGTH.comment=機材によらず効く。5 種すべての強さに掛ける倍率。0 でノイズなし (重さも無くなる)
 option.ANALOG_C_AGC_MAX=自動ゲインの上限
-option.ANALOG_C_AGC_MAX.comment=機材が「カスタム」の時だけ。暗い場面でカメラが感度を上げる上限 (段)。上げるほど暗い場面のノイズが多い。露出がカメラの時は ISO がゲインを決める (ISO 100 から上げた段、6 段まで)
+option.ANALOG_C_AGC_MAX.comment=機材が「カスタム」の時だけ。暗い場面でカメラが感度を上げる上限 (段)。上げるほど暗い場面のノイズが多い。露出がカメラの時は ISO がゲインを決める (ISO 100 から上げた段、4 段まで)
 option.ANALOG_C_AGC_EV=自動ゲインの始まり
 option.ANALOG_C_AGC_EV.comment=機材が「カスタム」の時だけ。画面の露出 (適用 EV) がこれより暗いと感度が上がり始める。晴天は 0 前後、洞窟は -1、夜の村は -2.5 程度
 option.ANALOG_SHOT_NOISE=ショットノイズ
