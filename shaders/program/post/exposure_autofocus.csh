@@ -183,9 +183,37 @@ uint flareVisibilityTap(uint index) {
 }
 #endif
 
+// 測光の重み。古い方式の自動露出は機材の測光に決め打ち (VHS は中央重点、DV は平均)
+#if EXPOSURE_RESPONSE_MODE == 1
+    #define METER_MODE 1
+#elif EXPOSURE_RESPONSE_MODE == 2
+    #define METER_MODE 3
+#else
+    #define METER_MODE EXPOSURE_METERING_MODE
+#endif
+// 重みはヒストグラムに整数で足すので、この倍率で丸める (中央重点の外側 0.05 も 0 にならないように)
+const float METER_WEIGHT_SCALE = 64.0;
+
 float meteringWeight(vec2 uv) {
     vec2 d = (uv - 0.5) * vec2(aspectRatio, 1.0);
+#if METER_MODE == 1
+    float r = length(d) / (0.5 * METERING_CENTER_DIAMETER * aspectRatio);
+    return mix(1.0, METERING_CENTER_OUTSIDE, smoothstep(METERING_CIRCLE_EDGE.x, METERING_CIRCLE_EDGE.y, r));
+#elif METER_MODE == 2
+    float r = length(d) / (0.5 * METERING_SPOT_DIAMETER * aspectRatio);
+    return 1.0 - smoothstep(METERING_CIRCLE_EDGE.x, METERING_CIRCLE_EDGE.y, r);
+#elif METER_MODE == 3
+    return 1.0;
+#else
     return mix(METERING_EDGE_WEIGHT, 1.0, exp(-dot(d, d) * 6.0));
+#endif
+}
+
+// 順応: EV のまま指数補間。明るい場面へは EXPOSURE_SPEED_BRIGHT、暗い場面へは EXPOSURE_SPEED_DARK
+float adaptEv(float prev, float measured, bool initialized, float dt) {
+    if (!initialized || isnan(prev) || isinf(prev)) return measured;
+    float speed = measured > prev ? EXPOSURE_SPEED_BRIGHT : EXPOSURE_SPEED_DARK;
+    return mix(prev, measured, 1.0 - exp(-speed * dt));
 }
 
 // ヒストグラムの [low, high] パーセンタイル区間の log2 輝度の平均
@@ -402,7 +430,7 @@ void main() {
             // テクセルの角で双線形サンプルすると 2x2 の平均が 1 回で取れる
             vec2 corner = vec2(max(p, ivec2(1))) / screen;
             float l = luminance(sanitizeColor(textureLod(colortex0, corner, 0.0).rgb));
-            uint w = uint(meteringWeight(uv) * 16.0 + 0.5);
+            uint w = uint(meteringWeight(uv) * METER_WEIGHT_SCALE + 0.5);
             atomicAdd(sharedHistogram[luminanceToHistogramBin(l)], w);
         }
     }
@@ -432,10 +460,7 @@ void main() {
     float logAverage = histogramLogAverage(lowPercent, highPercent, ok);
     float prevEv = frameData.postParams[0].x;
     float measuredEv = ok ? luminanceToEv100(exp2(logAverage)) : prevEv;
-    if (!initialized || isnan(prevEv) || isinf(prevEv)) prevEv = measuredEv;
-
-    float speed = measuredEv > prevEv ? EXPOSURE_SPEED_BRIGHT : EXPOSURE_SPEED_DARK;
-    float adaptedEv = mix(prevEv, measuredEv, 1.0 - exp(-speed * dt));
+    float adaptedEv = adaptEv(prevEv, measuredEv, initialized, dt);
 
     // 暗い所の計測 EV (夜の持ち上げ用)。平均の側と同じ速さで順応させ、持ち上げが跳ばないようにする
     float measuredDarkEv = measuredEv;
@@ -443,15 +468,22 @@ void main() {
     #if EXPOSURE_MODE == 2 && defined HAS_SKYLIGHT
         bool darkOk;
         float darkLogAverage = histogramLogAverage(EXPOSURE_NIGHT_DARK_PERCENT.x, EXPOSURE_NIGHT_DARK_PERCENT.y, darkOk);
-        float prevDarkEv = frameData.postParams[1].y;
         if (darkOk) measuredDarkEv = luminanceToEv100(exp2(darkLogAverage));
-        if (!initialized || isnan(prevDarkEv) || isinf(prevDarkEv)) prevDarkEv = measuredDarkEv;
-        float darkSpeed = measuredDarkEv > prevDarkEv ? EXPOSURE_SPEED_BRIGHT : EXPOSURE_SPEED_DARK;
-        adaptedDarkEv = mix(prevDarkEv, measuredDarkEv, 1.0 - exp(-darkSpeed * dt));
+        adaptedDarkEv = adaptEv(frameData.postParams[1].y, measuredDarkEv, initialized, dt);
         frameData.postParams[1].y = adaptedDarkEv;
     #endif
     float appliedEv = applyEnvironmentExposure(clamp(exposureCurve(adaptedEv), EXPOSURE_MIN_EV, EXPOSURE_MAX_EV), adaptedEv, adaptedDarkEv);
     float targetEv = applyEnvironmentExposure(clamp(exposureCurve(measuredEv), EXPOSURE_MIN_EV, EXPOSURE_MAX_EV), measuredEv, measuredDarkEv);
+    #if METER_MODE == 4
+        // ハイライト重点: 明るい側が露出後に METERING_HIGHLIGHT_LEVEL を超えるほど明るくは写さない (夜の持ち上げの後にも効かせる)
+        bool highOk;
+        float highLogAverage = histogramLogAverage(METERING_HIGHLIGHT_PERCENT.x, METERING_HIGHLIGHT_PERCENT.y, highOk);
+        float measuredHighEv = highOk ? luminanceToEv100(exp2(highLogAverage)) + log2(EXPOSURE_KEY / METERING_HIGHLIGHT_LEVEL) : targetEv;
+        float adaptedHighEv = adaptEv(frameData.postParams[5].x, measuredHighEv, initialized, dt);
+        frameData.postParams[5].x = adaptedHighEv;
+        appliedEv = min(max(appliedEv, adaptedHighEv), EXPOSURE_MAX_EV);
+        targetEv = min(max(targetEv, measuredHighEv), EXPOSURE_MAX_EV);
+    #endif
 #endif
 
     float bias = exp2(LOOK_EXPOSURE_BIAS);

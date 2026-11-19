@@ -89,6 +89,7 @@
 #define EXPOSURE_MIN_EV -4.0 // [-10.0 -8.0 -6.0 -5.0 -4.0 -3.0 -2.0 -1.0 0.0]
 #define EXPOSURE_MAX_EV 6.0 // [1.0 2.0 4.0 6.0 8.0 10.0 12.0 14.0 16.0]
 #define EXPOSURE_NIGHT_LIFT_STRENGTH 1.0 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5] 屋外の夜に自動露出が画面を持ち上げる量への倍率 (0 = 持ち上げなし)
+#define EXPOSURE_METERING_MODE 0 // [0 1 2 3 4] 測光 0=評価 1=中央重点 2=スポット 3=平均 4=ハイライト重点
 #define TONEMAP 0 // [0 1 2 3 4 5] 0=AgX 1=AgX Punchy 2=ACES 3=Reinhard-Jodie 4=AgX Golden 5=PBR Neutral
 /*
   HDR モード (局所トーンマップ)。周りごと明るい所を下げ暗い所を上げて、画面の明暗の差を縮める

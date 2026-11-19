@@ -97,8 +97,24 @@ const float HISTOGRAM_LAST_BIN = 255.0;   // ビンは 0 (黒) と 1-255 (log2 �
 // パーセンタイル: 暗すぎる影と空・太陽の外れ値を平均から除く (UE 4.25 方式)
 const float HISTOGRAM_LOW_PERCENT = 0.35;
 const float HISTOGRAM_HIGH_PERCENT = 0.92;
-// 中央重点測光: 画面端の重み
+// 評価測光とハイライト重点の測光の重み: 中央から離れた所の重み (中央から緩やかに下げる)
 const float METERING_EDGE_WEIGHT = 0.35;
+/*
+ * 中央重点測光: 画面の幅の 1/3 の円に重みの 75% を置く (一眼レフの 12 mm の円。円の面積は画面の約 13%)。
+ * 円の外の画素の重みは中の 1/20 になる (0.25 / 0.87 と 0.75 / 0.13 の比)
+ */
+const float METERING_CENTER_DIAMETER = 1.0 / 3.0;
+const float METERING_CENTER_OUTSIDE = 0.05;
+// スポット測光: 画面の幅の 1/9 の円 (面積の約 1.5%) だけを測る
+const float METERING_SPOT_DIAMETER = 1.0 / 9.0;
+// 円の縁をぼかす幅 (半径に対する割合)。格子の点が縁を出入りする時に測光が跳ばないように
+const vec2 METERING_CIRCLE_EDGE = vec2(0.8, 1.2);
+/*
+ * ハイライト重点測光: 明るい側 (重みの上位 HIGHLIGHT_PERCENT) の log 平均が露出後に METERING_HIGHLIGHT_LEVEL になるより明るくは写さない
+ * 1.0 は AgX の白 (約 1.3) の手前で、明るい所の色と階調が残る
+ */
+const vec2 METERING_HIGHLIGHT_PERCENT = vec2(0.97, 0.995);
+const float METERING_HIGHLIGHT_LEVEL = 1.0;
 
 // Purkinje 効果 (薄暗視の青シフト)
 // 強さは設定 PURKINJE_STRENGTH。青すぎると不評になりやすいので既定は控えめ

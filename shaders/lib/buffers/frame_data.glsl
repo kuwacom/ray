@@ -13,7 +13,7 @@
     #define SSBO_FRAME_DATA_ACCESS readonly
 #endif
 
-const int FRAME_POST_PARAMS = 5;
+const int FRAME_POST_PARAMS = 7;
 // 1 フレームに描くビーコンの光線の区間 (柱の位置と色ごと) の上限。超えた分は描かない
 const int BEACON_BEAM_MAX = 8;
 layout(std430, binding = 0) SSBO_FRAME_DATA_ACCESS buffer FrameDataBuffer {

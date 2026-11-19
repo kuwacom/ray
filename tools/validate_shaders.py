@@ -91,6 +91,9 @@ VALIDATION_SETS: dict[str, dict[str, str]] = {
                            "LIGHT_RANGE_MINOR_MAX": "32.0", "LIGHT_RANGE_MINOR_MIN": "4.0"},
     # レベルに比例する届く距離と窓関数 (以前の方式。プロファイルはどれも光の量)
     "LIGHT_FALLOFF_LEVEL": {"LIGHT_FALLOFF_MODE": "0"},
+    # 測光の選択 (既定でない重みと、ハイライト重点の上限の経路)
+    "METERING_SPOT": {"EXPOSURE_METERING_MODE": "2"},
+    "METERING_HIGHLIGHT": {"EXPOSURE_METERING_MODE": "4"},
 }
 
 STAGE_OF_EXT = {".vsh": "vert", ".fsh": "frag", ".gsh": "geom", ".csh": "comp", ".tcs": "tesc", ".tes": "tese"}
