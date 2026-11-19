@@ -36,7 +36,7 @@
 #define LIGHT_SOURCE_SIZE 0.5 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0] 光源サイズ (半影の柔らかさ)
 #define LIGHT_EMISSION_MASK_MODE 0 // [0 1 2] 光るブロックの照り返しの面の光り方 0=面全体 1=光る範囲の四角 2=テクスチャのマスク
 #define LIGHT_TRANSLUCENT_TINT // 色ガラス越しの光の色付け
-#define LIGHT_TRANSLUCENT_TINT_SATURATION 1.5 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0] 色付きガラスを通るブロックライト (floodfill と光源の影) の色の濃さ (輝度を保つ) 0=色なし
+#define LIGHT_TRANSLUCENT_TINT_SATURATION 1.5 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0] 色付きガラスなど水以外の半透明を通るブロックライト (floodfill と光源の影) の色の濃さ (輝度を保つ) 0=色なし
 #define LIGHT_SPECULAR // ブロックライトの鏡面反射
 #define LIGHT_DENOISE 2 // [0 1 2] 0=なし 1=時間 2=時間+空間
 #define LIGHT_ENTITY_OCCLUSION // エンティティがブロックライトを遮る

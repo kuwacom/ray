@@ -14,7 +14,7 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define SUN_SHADOW_STRENGTH 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0] 太陽の影の濃さ 0=影なし 1=真っ暗な影
 #define MOON_SHADOW_STRENGTH 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0] 月 (エンドの光も) の影の濃さ 0=影なし 1=真っ暗な影
 #define SHADOW_COLORED // 半透明ブロックの色付き影
-#define SHADOW_COLORED_SATURATION 1.5 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0] 色付きガラスを通る太陽・月の光 (色付きの影と光芒) の色の濃さ (輝度を保つ) 0=色なし
+#define SHADOW_COLORED_SATURATION 1.5 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0] 色付きガラスなど水以外の半透明を通る太陽・月の光 (色付きの影と光芒) の色の濃さ (輝度を保つ) 0=色なし
 #define ENTITY_SHADOWS // エンティティの太陽影
 #define BLOCK_ENTITY_SHADOWS // ブロックエンティティの太陽影
 #define SCREEN_SPACE_SHADOWS // 太陽影のスクリーンスペース接触影

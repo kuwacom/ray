@@ -159,7 +159,7 @@ value.LIGHT_EMISSION_MASK_MODE.2=Texture Mask
 option.LIGHT_TRANSLUCENT_TINT=Stained Glass Tint
 option.LIGHT_TRANSLUCENT_TINT.comment=Light passing through stained glass is colored.
 option.LIGHT_TRANSLUCENT_TINT_SATURATION=Stained Glass Block Light Color
-option.LIGHT_TRANSLUCENT_TINT_SATURATION.comment=Color strength of block light passing through stained glass. Brightness stays about the same. 0 = no color (the light only dims), 1 = the glass color.
+option.LIGHT_TRANSLUCENT_TINT_SATURATION.comment=Color strength of block light passing through stained glass and other see-through blocks except water (ice, slime, honey). Brightness stays about the same. 0 = no color (the light only dims), 1 = the glass color.
 option.LIGHT_SPECULAR=Block Light Specular
 option.LIGHT_DENOISE=Light Denoiser
 value.LIGHT_DENOISE.0=Off
@@ -238,7 +238,7 @@ option.MOON_SHADOW_STRENGTH.comment=How dark the shadows cast by the moon and th
 option.SHADOW_COLORED=Colored Shadows
 option.SHADOW_COLORED.comment=Stained glass and water cast colored sun shadows.
 option.SHADOW_COLORED_SATURATION=Stained Glass Sunlight Color
-option.SHADOW_COLORED_SATURATION.comment=Color strength of sun and moon light passing through stained glass, in shadows and light shafts. Brightness stays about the same. 0 = no color (the light only dims), 1 = the glass color.
+option.SHADOW_COLORED_SATURATION.comment=Color strength of sun and moon light passing through stained glass and other see-through blocks except water (ice, slime, honey), in shadows and light shafts. Brightness stays about the same. 0 = no color (the light only dims), 1 = the glass color.
 option.ENTITY_SHADOWS=Entity Shadows
 option.BLOCK_ENTITY_SHADOWS=Block Entity Shadows
 option.SCREEN_SPACE_SHADOWS=Contact Shadows

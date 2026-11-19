@@ -5,6 +5,7 @@
 #ifndef LIGHT_VOXEL_GLSL
 #define LIGHT_VOXEL_GLSL
 
+//@include "/lib/common/color.glsl"
 //@include "/lib/common/voxel_space.glsl"
 //@include "/lib/buffers/images.glsl"
 //@include "/lib/ids/block_ids.glsl"
