@@ -238,11 +238,42 @@ float histogramLogAverage(float lowPercent, float highPercent, out bool ok) {
     return sumWeight > 0.0 ? sumLog / sumWeight : histogramBinToLog(0.0);
 }
 
+// ヒストグラムの重みのうち log2 輝度が logL より明るい割合
+float histogramShareAbove(float logL) {
+    float total = 0.0;
+    float above = 0.0;
+    for (int i = 0; i < 256; i++) {
+        float n = float(sharedHistogram[i]);
+        total += n;
+        above += histogramBinToLog(float(i)) > logL ? n : 0.0;
+    }
+    return total > 0.0 ? above / total : 0.0;
+}
+
+// ヒストグラムの重みの上位 1 - percent の境の log2 輝度 (ビンの中は一様とみなして補間)
+float histogramPercentileLog(float percent) {
+    float total = 0.0;
+    for (int i = 0; i < 256; i++) total += float(sharedHistogram[i]);
+    float target = total * percent;
+    float cumulative = 0.0;
+    for (int i = 0; i < 256; i++) {
+        float n = float(sharedHistogram[i]);
+        if (n > 0.0 && cumulative + n >= target) {
+            return histogramBinToLog(float(i) - 0.5 + (target - cumulative) / n);
+        }
+        cumulative += n;
+    }
+    return HISTOGRAM_LOG_MAX;
+}
+
 // 計測 EV -> 適用 EV (完全補正にしない。基準から離れるほど明暗を残し、明るい場面はさらに明るく写す)
 float exposureCurve(float ev) {
     float boost = EXPOSURE_BRIGHT_BOOST * smoothstep(EXPOSURE_BRIGHT_EV_LOW, EXPOSURE_BRIGHT_EV_HIGH, ev);
     return EXPOSURE_ANCHOR_EV + (ev - EXPOSURE_ANCHOR_EV) * EXPOSURE_CURVE - boost;
 }
+
+// 太陽が地平線の下 [0,1]
+float nightFactor() { return 1.0 - smoothstep(-0.2, -0.05, getSunDir().y); }
 
 // 目の位置のブロックライト [0,1]。手持ちの光源は eyeBrightness に入らないので持っている光源の明るさも見る
 float eyeBlockLight() {
@@ -254,11 +285,12 @@ float eyeBlockLight() {
  * 曲線と下限で止めた EV を目の位置の明るさ (屋外 / 屋内・洞窟) で補正する
  * 屋外の夜は明るく写す (下限 EXPOSURE_MIN_EV は洞窟の暗さのために残す)、灯りの点いた屋内・洞窟は少し暗く写す
  * darkEv は画面の暗い側だけの計測 EV (EXPOSURE_NIGHT_DARK_PERCENT)。夜の持ち上げだけに使う
+ * lightShare は灯りに照らされた所の割合 (EXPOSURE_NIGHT_LIGHT_*)。灯りの多い夜景では持ち上げを外す
  */
-float applyEnvironmentExposure(float appliedEv, float ev, float darkEv) {
+float applyEnvironmentExposure(float appliedEv, float ev, float darkEv, float lightShare) {
 #ifdef HAS_SKYLIGHT
     float outdoor = eyeOutdoor();
-    float night = 1.0 - smoothstep(-0.2, -0.05, getSunDir().y);
+    float night = nightFactor();
     // 月が照らす夜だけ強く持ち上げる (新月・雨の夜の暗さは残す)。水中は EXPOSURE_UNDERWATER_DIM の暗さを打ち消さないよう外す
     float moonLit = moonPhaseFactor() * (1.0 - rainStrength) * night * (isEyeInWater == 0 ? 1.0 : 0.0);
     // 実写の夜景のように暗い所 (水面・地面・空の暗い所) に合わせて持ち上げる (EXPOSURE_NIGHT_DARK_PERCENT)。昼・新月・雨は平均の計測のまま
@@ -266,6 +298,7 @@ float applyEnvironmentExposure(float appliedEv, float ev, float darkEv) {
     float slope = EXPOSURE_NIGHT_SLOPE + EXPOSURE_NIGHT_MOON_SLOPE * moonLit;
     float lift = min(slope * max(EXPOSURE_NIGHT_EV_START - liftEv, 0.0), EXPOSURE_NIGHT_MAX_LIFT);
     lift = max(lift, EXPOSURE_NIGHT_MIN_LIFT * night) * EXPOSURE_NIGHT_LIFT_STRENGTH;
+    lift *= 1.0 - smoothstep(EXPOSURE_NIGHT_LIGHT_SHARE.x, EXPOSURE_NIGHT_LIGHT_SHARE.y, lightShare);
     float dim = EXPOSURE_INDOOR_DIM * smoothstep(EXPOSURE_INDOOR_EV.x, EXPOSURE_INDOOR_EV.y, ev)
               * (1.0 - smoothstep(EXPOSURE_INDOOR_EV.z, EXPOSURE_INDOOR_EV.w, ev))
               * smoothstep(EXPOSURE_INDOOR_BLOCKLIGHT.x, EXPOSURE_INDOOR_BLOCKLIGHT.y, eyeBlockLight());
@@ -465,15 +498,40 @@ void main() {
     // 暗い所の計測 EV (夜の持ち上げ用)。平均の側と同じ速さで順応させ、持ち上げが跳ばないようにする
     float measuredDarkEv = measuredEv;
     float adaptedDarkEv = adaptedEv;
-    #if EXPOSURE_MODE == 2 && defined HAS_SKYLIGHT
+    float lightShare = 0.0;
+    #ifdef HAS_SKYLIGHT
         bool darkOk;
         float darkLogAverage = histogramLogAverage(EXPOSURE_NIGHT_DARK_PERCENT.x, EXPOSURE_NIGHT_DARK_PERCENT.y, darkOk);
-        if (darkOk) measuredDarkEv = luminanceToEv100(exp2(darkLogAverage));
-        adaptedDarkEv = adaptEv(frameData.postParams[1].y, measuredDarkEv, initialized, dt);
-        frameData.postParams[1].y = adaptedDarkEv;
+        float measuredDarkSide = darkOk ? luminanceToEv100(exp2(darkLogAverage)) : measuredEv;
+        float adaptedDarkSide = adaptEv(frameData.postParams[1].y, measuredDarkSide, initialized, dt);
+        frameData.postParams[1].y = adaptedDarkSide;
+        #if EXPOSURE_MODE == 2
+            measuredDarkEv = measuredDarkSide;
+            adaptedDarkEv = adaptedDarkSide;
+        #endif
+        // 灯りに照らされた所の割合。暗い側より EXPOSURE_NIGHT_LIGHT_EV 明るい所を数える (月明かりの地面と空はこの差に届かない)
+        float lightLog = log2(ev100ToLuminance(adaptedDarkSide)) + EXPOSURE_NIGHT_LIGHT_EV;
+        float measuredShare = histogramShareAbove(lightLog);
+        float prevShare = frameData.postParams[5].z;
+        lightShare = initialized && !isnan(prevShare) && !isinf(prevShare)
+                   ? mix(prevShare, measuredShare, 1.0 - exp(-EXPOSURE_SPEED_DARK * dt)) : measuredShare;
+        frameData.postParams[5].z = lightShare;
     #endif
-    float appliedEv = applyEnvironmentExposure(clamp(exposureCurve(adaptedEv), EXPOSURE_MIN_EV, EXPOSURE_MAX_EV), adaptedEv, adaptedDarkEv);
-    float targetEv = applyEnvironmentExposure(clamp(exposureCurve(measuredEv), EXPOSURE_MIN_EV, EXPOSURE_MAX_EV), measuredEv, measuredDarkEv);
+    float appliedEv = applyEnvironmentExposure(clamp(exposureCurve(adaptedEv), EXPOSURE_MIN_EV, EXPOSURE_MAX_EV), adaptedEv, adaptedDarkEv, lightShare);
+    float targetEv = applyEnvironmentExposure(clamp(exposureCurve(measuredEv), EXPOSURE_MIN_EV, EXPOSURE_MAX_EV), measuredEv, measuredDarkEv, lightShare);
+    #if METER_MODE == 0 && defined HAS_SKYLIGHT
+        /*
+         * 評価測光: 夜の屋外で灯りに照らされた所が白く飛ぶ時は、白を超える所が重みの EXPOSURE_NIGHT_CLIP_SHARE までになる所まで暗く写す
+         * (最大 EXPOSURE_NIGHT_CLIP_MAX EV)。平均を見る測光は暗い地面と空に引かれて、灯りの周りを白く飛ばす
+         */
+        float measuredClipEv = luminanceToEv100(exp2(histogramPercentileLog(1.0 - EXPOSURE_NIGHT_CLIP_SHARE)))
+                             + log2(EXPOSURE_KEY / EXPOSURE_NIGHT_CLIP_LEVEL);
+        float adaptedClipEv = adaptEv(frameData.postParams[5].y, measuredClipEv, initialized, dt);
+        frameData.postParams[5].y = adaptedClipEv;
+        float nightOutdoor = nightFactor() * eyeOutdoor();
+        appliedEv += nightOutdoor * clamp(adaptedClipEv - appliedEv, 0.0, EXPOSURE_NIGHT_CLIP_MAX);
+        targetEv += nightOutdoor * clamp(measuredClipEv - targetEv, 0.0, EXPOSURE_NIGHT_CLIP_MAX);
+    #endif
     #if METER_MODE == 4
         // ハイライト重点: 明るい側が露出後に METERING_HIGHLIGHT_LEVEL を超えるほど明るくは写さない (夜の持ち上げの後にも効かせる)
         bool highOk;

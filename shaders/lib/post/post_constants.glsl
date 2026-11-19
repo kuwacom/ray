@@ -73,6 +73,21 @@ const float EXPOSURE_NIGHT_MIN_LIFT = 0.4;
  */
 const vec2 EXPOSURE_NIGHT_DARK_PERCENT = vec2(0.05, 0.5);
 /*
+ * 灯りの多い夜景では夜の持ち上げ (下支えも) を外す。持ち上げは月明かりの地形を読ませるためのもので、灯りの点いた村・街では
+ * 暗い空と地面に合わせて持ち上げた分 (0.4〜1.3 EV) だけ照らされた壁と地面が明るく平たくなり、昼のように見えた
+ * 灯りに照らされた所 = 暗い側の計測より LIGHT_EV 明るい所。その重みの割合が SHARE.x .. y で持ち上げを 1 -> 0 にする
+ * 灯りの村は 5〜20%、月明かりの草原・雪原・海は 0.5% 未満 (月の円盤と照り返しの点だけ)
+ */
+const float EXPOSURE_NIGHT_LIGHT_EV = 5.0;
+const vec2 EXPOSURE_NIGHT_LIGHT_SHARE = vec2(0.005, 0.04);
+/*
+ * 評価測光の夜の屋外: 白 (CLIP_LEVEL。AgX の白は露出後の約 1.3) を超える所が重みの CLIP_SHARE を超えないよう、最大 CLIP_MAX EV まで暗く写す
+ * 実写の灯りの多い夜景で 3 チャンネルとも飛ぶ画素は 0.1〜1.4%、どれかのチャンネルが飛ぶ画素は 0.3〜5%
+ */
+const float EXPOSURE_NIGHT_CLIP_SHARE = 0.02;
+const float EXPOSURE_NIGHT_CLIP_LEVEL = 1.3;
+const float EXPOSURE_NIGHT_CLIP_MAX = 1.0;
+/*
  * 月が照らす夜 (満ち欠け x 晴れ。水中は外す) だけ、暗い側の計測と持ち上げの傾きを足す。新月・雨の夜・水中は平均の計測と EXPOSURE_NIGHT_SLOPE のまま暗く残す
  * 上限は月夜も EXPOSURE_NIGHT_MAX_LIFT のまま (見た目の判断)。月夜だけ上限を 2.8 EV まで上げると、月の照る暗い草原も 1.3〜1.5 EV
  * 持ち上がり、地形の暗さと空が灰色に浮いて霧っぽくなり、月の照り返しで光る草が浮いて見えなくなった。海の月の道は暗めになる
