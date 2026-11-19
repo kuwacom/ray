@@ -236,7 +236,11 @@ const float MOTION_BLUR_DEPTH_SOFTNESS = 0.5;
 const float SHUTTER_DT_MIN = 0.001;
 // 溜める 1 フレームの長さの上限 (秒)。引っかかった 1 フレームが長時間露光に強く焼き付かない
 const float SHUTTER_DT_MAX = 0.1;
-// 状態 (FrameData.postParams[SHUTTER_PARAM]) の w の印。COMPLETE = このフレームで露光を終えた、SHOWN = 撮れた絵がある、RESET = 溜め直し
+/*
+ * 状態 (FrameData.postParams[SHUTTER_PARAM]) の w の印。COMPLETE = このフレームで露光を終えた、SHOWN = 撮れた絵がある、RESET = 溜め直し
+ * w = 印 + RANGE x 画面の高さ (高さ 2^21 まで float で厳密)。印は w の下位 3 ビット
+ */
+const float SHUTTER_FLAG_RANGE = 8.0;
 const int SHUTTER_PARAM = 7;
 const uint SHUTTER_FLAG_COMPLETE = 1u;
 const uint SHUTTER_FLAG_SHOWN = 2u;

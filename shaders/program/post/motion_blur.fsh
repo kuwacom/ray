@@ -102,7 +102,8 @@ vec4 accumulateShutter(ivec2 texel, vec4 color, bool hand) {
     vec4 state = frameData.postParams[SHUTTER_PARAM];
     uint flags = uint(state.w);
     vec4 accum = shutterAccum.accum[index];
-    vec4 now = vec4(sanitizeColor(color.rgb), color.a);
+    // a も有限に丸める。NaN は mix の重み 1 でも残り (NaN x 0 = NaN)、溜め直すまで溶岩の割合 (final) を壊す
+    vec4 now = vec4(sanitizeColor(color.rgb), isnan(color.a) || isinf(color.a) ? 0.0 : color.a);
     if (!hand || (flags & SHUTTER_FLAG_RESET) != 0u) accum = mix(accum, now, state.x);
     shutterAccum.accum[index] = accum;
     #if SHUTTER_MODE == 1

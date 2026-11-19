@@ -2,7 +2,7 @@
  * SSBO binding 7 / 8: シャッター速度の反映 (SHUTTER) の長時間露光 (post, program/post/motion_blur.fsh)
  * composite21 がモーションブラーの後の colortex0 (線形 HDR、露出前) を画素ごとに溜め、溜めた絵を colortex0 に書き戻す
  * 確保は画面比 (shaders.properties の bufferObject.7 = 16 true 1.0 1.0、bufferObject.8 = 8 true 1.0 1.0)。
- * Iris は画面の大きさが変わると作り直して 0 で埋めるので、状態 (FrameData.postParams[7]) も画素数が変わったら溜め直す
+ * Iris は画面の大きさが変わると作り直して 0 で埋めるので、状態 (FrameData.postParams[7]) も幅か高さが変わったら溜め直す
  * 宣言は opt-in: 使うプログラム (composite21) は include の前に SSBO_SHUTTER_USE を定義する。SHUTTER が OFF なら宣言ごと入らない
  * 添字は y x int(viewWidth) + x
  */
