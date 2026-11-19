@@ -16,6 +16,17 @@
 #if EXPOSURE_MODE == 1 || EXPOSURE_MODE == 2
     #define EXPOSURE_AUTO
 #endif
+// カメラのモード (F 値・シャッター速度・ISO から EV100 を出す。自動ではない)。露出と被写界深度の F 値を同じにする
+#if EXPOSURE_MODE == 3
+    #define EXPOSURE_CAMERA
+#endif
+/*
+ * カメラの EV100 (実写の露出表の値) から Ray の EV100 (シーン単位の輝度で測った値) を引く量
+ * Ray の場面の輝度は実写の cd/m^2 より桁が小さい (晴れの昼の測光が 1.3〜2.4、実写の晴天は 15)。
+ * 晴天の 16 の法則 (f/16・1/100 s・ISO 100 = EV100 14.6) が晴れの昼の測光に当たるようにずらす
+ * Ray の夜は実写より昼との差が小さい (夜の測光 -7、実写の月夜 -3〜-2) ので、夜は実写の設定より 4〜5 段暗い側の設定で合う
+ */
+const float EXPOSURE_CAMERA_EV_OFFSET = 13.0;
 // DR の補正が働くか (今の方式の自動露出だけ。局所の明るさのタイルもこの時だけ作る)
 #if defined EXPOSURE_DR && defined EXPOSURE_AUTO && EXPOSURE_RESPONSE_MODE == 0
     #define EXPOSURE_DR_ACTIVE
@@ -542,6 +553,12 @@ const float ANALOG_SHARPEN_CORING = 0.01;
  */
 const float ANALOG_SMEAR_SHUTTER_EV_DARK = -2.0;
 const float ANALOG_SMEAR_SHUTTER_EV_DAY = 0.0;
+/*
+ * 露出がカメラの時のゲイン: ISO が BASE (0 dB) から上げた段をゲインにする。上限 6 段 (36 dB)。
+ * DV の手動のゲインの最大は 18 dB (3 段) で、それより上は実機に無い。36 dB で暗部ノイズが画面を覆う手前の見た目の調整値
+ */
+const float ANALOG_ISO_BASE = 100.0;
+const float ANALOG_ISO_GAIN_MAX = 6.0;
 // センサーのノイズの強さ 1 の時の線形の振幅 (表示値を Rec.709 の逆で線形へ戻した単位)。見た目の調整値
 // 解像の 3x3 がノイズも平均するので、その後で 26.1.2 の夜の村の暗部の輝度のノイズがプリセット 1 で約 2/255 になるようにした
 const float ANALOG_SHOT_NOISE_SCALE = 0.08;
