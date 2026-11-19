@@ -1,8 +1,9 @@
 /*
  * composite21_a (compute): シャッター速度の反映 (SHUTTER) の長時間露光の状態を、フレームに 1 回だけ進める
  * 同じパスの composite21 (fragment) より先に走り、Iris がその間にバリアを入れる。composite21 は書いた重みと印で画素ごとに溜める
- * 指数の平均。重み a = 2 dt / (t + dt) は、t 秒の箱の平均と平均の古さがそろう値 (t / dt フレームの単純移動平均と同じ)。
+ * - 連続 (SHUTTER_MODE 0): 指数の平均。重み a = 2 dt / (t + dt) は、t 秒の箱の平均と平均の古さがそろう値 (t / dt フレームの単純移動平均と同じ)。
  *   1 フレームより短いシャッターでは 1 (溜めない)
+ * - 1 枚ずつ (SHUTTER_MODE 1): 露光の始まりから時間の重みの逐次平均。溜めた秒が t に届いたフレームで露光を終え、次のフレームから溜め直す
  * post モジュール (lib/post)
  */
 // このプログラムで書く SSBO (lib/buffers。ほかのプログラムでは readonly)
@@ -36,6 +37,19 @@ void main() {
     float pixels = float(int(viewWidth) * int(viewHeight));
     bool reset = state.z != pixels;
     uint flags = reset ? SHUTTER_FLAG_RESET : 0u;
+#if SHUTTER_MODE == 1
+    float exposed = reset ? 0.0 : state.y;
+    if (!reset && (uint(state.w) & SHUTTER_FLAG_SHOWN) != 0u) flags |= SHUTTER_FLAG_SHOWN;
+    float weight = dt / (exposed + dt);
+    exposed += dt;
+    // 最後のフレームのはみ出しは捨てる (誤差は 1 フレーム / t 以下)
+    if (exposed >= t) {
+        flags |= SHUTTER_FLAG_COMPLETE | SHUTTER_FLAG_SHOWN;
+        exposed = 0.0;
+    }
+    frameData.postParams[SHUTTER_PARAM] = vec4(weight, exposed, pixels, float(flags));
+#else
     float weight = reset ? 1.0 : min(2.0 * dt / (t + dt), 1.0);
     frameData.postParams[SHUTTER_PARAM] = vec4(weight, 0.0, pixels, float(flags));
+#endif
 }

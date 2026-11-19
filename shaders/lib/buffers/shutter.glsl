@@ -21,6 +21,12 @@ layout(std430, binding = 7) buffer ShutterAccumBuffer {
     vec4 accum[];  // rgb = 溜めた平均の色 (線形、露出前), a = colortex0.a の平均 (正 = 鏡面の白飛び分の割合、負 = 溶岩の発光の割合)。要素数: 画面の画素数
 } shutterAccum;
 
+#if SHUTTER_MODE == 1
+// 1 枚ずつ: 撮り終えた露光の絵 (表示だけなので fp16)
+layout(std430, binding = 8) buffer ShutterShownBuffer {
+    uvec2 shown[];  // packHalf2x16 の (r, g), (b, a)。要素数: 画面の画素数
+} shutterShown;
+#endif
 
 #endif
 

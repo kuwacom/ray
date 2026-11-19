@@ -161,6 +161,15 @@ vec4 accumulateShutter(ivec2 texel, vec4 color, bool hand) {
     vec4 now = vec4(sanitizeColor(color.rgb), color.a);
     if (!hand || (flags & SHUTTER_FLAG_RESET) != 0u) accum = mix(accum, now, state.x);
     shutterAccum.accum[index] = accum;
+    #if SHUTTER_MODE == 1
+    // 1 枚ずつ: 露光を終えたフレームで撮れた絵を移し、次の露光ができるまでそれを出す (最初の 1 枚までは途中経過)
+    if ((flags & SHUTTER_FLAG_COMPLETE) != 0u) {
+        shutterShown.shown[index] = uvec2(packHalf2x16(accum.rg), packHalf2x16(accum.ba));
+    } else if ((flags & SHUTTER_FLAG_SHOWN) != 0u) {
+        uvec2 packed = shutterShown.shown[index];
+        accum = vec4(unpackHalf2x16(packed.x), unpackHalf2x16(packed.y));
+    }
+    #endif
     return hand ? color : accum;
 }
 #endif
