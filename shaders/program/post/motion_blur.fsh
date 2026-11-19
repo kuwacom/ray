@@ -4,10 +4,14 @@
  * 論文のタイル最大速度パスの代わりに、周囲 8 方向の速度を疎に調べて近傍の最大速度を求める
  * (パスを増やさずに、止まった背景の上へ動く物体のブラーが滲み出す所まで再現する)
  * 手は速度 0 で前景扱いなので、ぼけず、周りへ滲みもしない
+ * シャッター速度の反映 (SHUTTER) の時は、ぶれの長さをシャッター速度で決め、ぶれの後の色を画素ごとに溜めて長時間露光にする
+ * (モーションブラーが OFF でも走る。溜める重みは composite21_a が書く)
  * post モジュール (lib/post)
  */
+#define SSBO_SHUTTER_USE
 //@include "/lib/common/common.glsl"
 //@include "/lib/post/post_internal.glsl"
+//@include "/lib/buffers/shutter.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -48,6 +52,7 @@
 #include "/lib/post/lens_flare.glsl"
 #include "/lib/post/lens.glsl"
 #include "/lib/post/post_internal.glsl"
+#include "/lib/buffers/shutter.glsl"
 // END GENERATED includes
 
 in vec2 texcoord;
@@ -85,18 +90,7 @@ float inFront(float dY, float dX) { return saturate(1.0 - (dY - dX) / MOTION_BLU
 float cone(float dist, float speed) { return speed > 1e-3 ? saturate(1.0 - dist / speed) : 0.0; }
 float cylinder(float dist, float speed) { return 1.0 - smoothstep(0.95 * speed, 1.05 * speed, dist); }
 
-void main() {
-    ivec2 texel = ivec2(gl_FragCoord.xy);
-    vec4 centerRaw = texelFetch(colortex0, texel, 0);
-    vec2 uv = (vec2(texel) + 0.5) * texelSize();
-    // 歪曲・魚眼を TAA で組み立てた時は colortex0 が出力の座標なので、深度は元画像の位置で読む (lib/post/lens.glsl)
-    float depthX = texelFetch(depthtex0, LENS_WARP_TAA ? postSourceTexel(uv) : texel, 0).r;
-
-    if (isHandDepth(depthX)) {
-        outColor = centerRaw;
-        return;
-    }
-
+vec4 motionBlur(vec4 centerRaw, vec2 uv, float depthX) {
     vec2 vX = blurVelocity(uv, depthX);
     float speedX = length(vX);
 
@@ -118,10 +112,7 @@ void main() {
         }
     }
 
-    if (speedN < 0.5) {
-        outColor = centerRaw;
-        return;
-    }
+    if (speedN < 0.5) return centerRaw;
 
     float distX = viewDistance(depthX);
     float jitter = interleavedGradientNoise(gl_FragCoord.xy, frameCounter) - 0.5;
@@ -152,5 +143,38 @@ void main() {
         wSum += w;
     }
 
-    outColor = vec4(sum / wSum, centerRaw.a);
+    return vec4(sum / wSum, centerRaw.a);
+}
+
+#ifdef SHUTTER
+/*
+ * 長時間露光: ぶれの後の色を、composite21_a が決めた重みで画素ごとの平均に溜め、溜めた絵を返す
+ * 手は溜めずに今のフレームを出す (手の後ろは見えていた所の平均のまま)。溜め直しのフレームだけは手の色で埋め、0 (黒) から溜めない
+ */
+vec4 accumulateShutter(ivec2 texel, vec4 color, bool hand) {
+    int width = int(viewWidth);
+    int index = texel.y * width + texel.x;
+    if (texel.x >= width || index >= width * int(viewHeight)) return color;
+    vec4 state = frameData.postParams[SHUTTER_PARAM];
+    uint flags = uint(state.w);
+    vec4 accum = shutterAccum.accum[index];
+    vec4 now = vec4(sanitizeColor(color.rgb), color.a);
+    if (!hand || (flags & SHUTTER_FLAG_RESET) != 0u) accum = mix(accum, now, state.x);
+    shutterAccum.accum[index] = accum;
+    return hand ? color : accum;
+}
+#endif
+
+void main() {
+    ivec2 texel = ivec2(gl_FragCoord.xy);
+    vec4 centerRaw = texelFetch(colortex0, texel, 0);
+    vec2 uv = (vec2(texel) + 0.5) * texelSize();
+    // 歪曲・魚眼を TAA で組み立てた時は colortex0 が出力の座標なので、深度は元画像の位置で読む (lib/post/lens.glsl)
+    float depthX = texelFetch(depthtex0, LENS_WARP_TAA ? postSourceTexel(uv) : texel, 0).r;
+    bool hand = isHandDepth(depthX);
+    vec4 color = hand ? centerRaw : motionBlur(centerRaw, uv, depthX);
+#ifdef SHUTTER
+    color = accumulateShutter(texel, color, hand);
+#endif
+    outColor = color;
 }

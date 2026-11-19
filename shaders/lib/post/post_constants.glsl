@@ -232,6 +232,13 @@ const float MOTION_BLUR_MAX_LENGTH = 0.04;
 const float MOTION_BLUR_DEPTH_SOFTNESS = 0.5;
 // シャッター速度の反映 (SHUTTER)。フレームの長さの下限 (秒): 止まった直後の極端に短いフレームでシャッター角を出し過ぎない
 const float SHUTTER_DT_MIN = 0.001;
+// 溜める 1 フレームの長さの上限 (秒)。引っかかった 1 フレームが長時間露光に強く焼き付かない
+const float SHUTTER_DT_MAX = 0.1;
+// 状態 (FrameData.postParams[SHUTTER_PARAM]) の w の印。COMPLETE = このフレームで露光を終えた、SHOWN = 撮れた絵がある、RESET = 溜め直し
+const int SHUTTER_PARAM = 7;
+const uint SHUTTER_FLAG_COMPLETE = 1u;
+const uint SHUTTER_FLAG_SHOWN = 2u;
+const uint SHUTTER_FLAG_RESET = 4u;
 
 // 被写界深度
 /*

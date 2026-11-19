@@ -86,6 +86,7 @@ BODIES: dict[str, str] = {
     # post
     "composite20.fsh": "post/taa.fsh",
     "composite21.fsh": "post/motion_blur.fsh",
+    "composite21_a.csh": "post/shutter_state.csh",
     "composite22.fsh": "post/dof.fsh",
     "composite23.fsh": "post/bloom_down.fsh",
     "composite24.fsh": "post/bloom_blur.fsh",
@@ -173,7 +174,8 @@ PROGRAMS: dict[str, list[str] | dict[str, Body | None]] = {
     "composite14": {"vsh": FULLSCREEN_VSH, "fsh": ("sky/godrays.fsh", ("GODRAYS_PASS_2",))},
     "composite19": fullscreen("fsh"),
     "composite20": fullscreen("fsh"),
-    "composite21": fullscreen("fsh"),
+    # composite21_a はシャッター速度の反映の状態をフレームに 1 回進める (fragment より先に走る)
+    "composite21": fullscreen("fsh", "csh_a"),
     "composite22": fullscreen("fsh"),
     "composite23": fullscreen("fsh"),
     "composite24": fullscreen("fsh"),
@@ -250,6 +252,7 @@ DISABLED: list[Disable] = [
     Disable(("composite20",), "#ifndef TAA"),
     # シャッター速度の反映はモーションブラーが OFF でもシャッターのぶれを掛ける
     Disable(("composite21",), "#if !defined MOTION_BLUR && !defined SHUTTER"),
+    Disable(("composite21_a",), "#ifndef SHUTTER"),
     Disable(("composite22",), "#ifndef DOF"),
     # 局所トーンマップもブルームの縮小タイルを読む
     Disable(("composite23", "composite24"), "#if !defined BLOOM && LOCAL_TONEMAP == 0 && !(defined EXPOSURE_DR && (EXPOSURE_MODE == 1 || EXPOSURE_MODE == 2) && EXPOSURE_RESPONSE_MODE == 0)"),

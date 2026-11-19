@@ -2,7 +2,7 @@
  * SSBO binding 0: フレーム共有データ (永続)
  * 確保: 4096 バイト (shaders.properties の bufferObject.0)
  * レイアウトは使う全プログラムで同一でなければならない (Iris の仕様)。書き込むモジュールをフィールドごとに明記。それ以外は読むだけ
- * 既定は readonly。書くプログラム (setup・begin・prepare・prepare2・deferred_a・composite25) は include の前に SSBO_FRAME_DATA_WRITE を定義する
+ * 既定は readonly。書くプログラム (setup・begin・prepare・prepare2・deferred_a・composite21_a・composite25) は include の前に SSBO_FRAME_DATA_WRITE を定義する
  */
 #ifndef BUFFERS_FRAME_DATA_GLSL
 #define BUFFERS_FRAME_DATA_GLSL
@@ -13,7 +13,7 @@
     #define SSBO_FRAME_DATA_ACCESS readonly
 #endif
 
-const int FRAME_POST_PARAMS = 7;
+const int FRAME_POST_PARAMS = 8;
 // 1 フレームに描くビーコンの光線の区間 (柱の位置と色ごと) の上限。超えた分は描かない
 const int BEACON_BEAM_MAX = 8;
 layout(std430, binding = 0) SSBO_FRAME_DATA_ACCESS buffer FrameDataBuffer {
