@@ -110,7 +110,7 @@ float sunMask(vec2 uv, float spreadPx) {
  * 8 画素は 1/4 タイルの双線形 (半径 4 画素) と、フレアのタイルの拡大のぼけで線につながる間隔
  */
 const float SCREEN_STAR_SPACING_PX = 8.0;
-const int SCREEN_STAR_TAPS_MIN = 6;
+const int SCREEN_STAR_TAPS_MIN = 6;                // 光条 1 本 (片側) のタップ数の下限 (以前の固定のタップ数)
 const int SCREEN_STAR_TAPS_MAX = 32;
 // 上限のタップ数でも間隔が広い長い光条は、この倍率 x 双線形の半径 (2^level 画素) が間隔を覆う粗いレベルで読む
 const float SCREEN_STAR_SPACING_PER_RADIUS = 2.0;
@@ -143,6 +143,7 @@ vec3 screenStars(vec2 uv, float exposure, float fNumber) {
         float a = DOF_BLADE_ROTATION + float(j) * TAU / float(spikes);
         vec2 dir = vec2(cos(a) / aspectRatio, sin(a)) * len;
         for (int t = 0; t < taps; t++) {
+            // 以前は光源の近くほど細かく刻んでいたが、外側の間隔が広がって明るい光源で点に割れたので、等間隔にして光条の長さでタップ数を決める
             // 重みは光条の裾 (指数減衰) x 刻み幅
             float x = (float(t) + 0.5) / float(taps);
             float w = exp(-x / 0.3) / float(taps);
