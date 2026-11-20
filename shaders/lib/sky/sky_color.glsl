@@ -36,7 +36,7 @@ const float SKY_OVERCAST_DARKEN = 0.55;
 // 雨雲の層より上から見る空に残す曇天の割合 (雲の上の空は普通の空で、少しだけ暗い)
 const float SKY_OVERCAST_ABOVE_DECK = 0.2;
 // 月も無い夜の空の下限 (大気光・星明かり)
-const vec3 SKY_NIGHT_FLOOR = vec3(0.55, 0.75, 1.0) * 3e-5;
+const vec3 SKY_NIGHT_FLOOR = vec3(0.55, 0.75, 1.0) * (3e-5 * PHYSICAL_NIGHT_SKY);
 /*
  * 空の色の彩度 (LUT の値に掛ける見た目の調整)
  * そのままだと AgX を通した昼の天頂が灰青、夕方の太陽まわりが白っぽい桃色に寄った
@@ -77,7 +77,7 @@ const float SKY_SHADOWED_HAZE_FADE_MU = 0.03; // 地平線からこの深さま�
  * 環境光は控えめな色味 (溶岩・菌糸の照り返しの暖色 / 魂の炎の寒色)、霧は煤や灰の色として地形と同程度の明るさにする
  * ambient: 環境光の色 (輝度 1 に正規化して使う) と明るさ, fog: 霧の散乱アルベドの色, density: 霧の濃さの倍率
  */
-const float NETHER_AMBIENT_IRRADIANCE = 0.09;  // 荒地の環境光の照度
+const float NETHER_AMBIENT_IRRADIANCE = 0.09 * PHYSICAL_DIMENSION;  // 荒地の環境光の照度
 struct NetherPalette {
     vec3 ambient;   // 一様な環境光の照度
     vec3 fogAlbedo; // 霧の散乱アルベド (内散乱 = アルベド x 環境光の放射)
@@ -123,8 +123,8 @@ vec3 getNetherFogRadiance() {
     return p.fogAlbedo * p.ambient * RCP_PI;
 }
 // エンドの平行光と環境光。0.30 / 0.10 (比 3) では影の中も外も明るさの差が小さく、地形が平たく見えた
-const vec3 END_LIGHT_IRRADIANCE = vec3(0.30, 0.26, 0.40) * 2.0;
-const vec3 END_AMBIENT_IRRADIANCE = vec3(0.10, 0.08, 0.15) * 0.6;
+const vec3 END_LIGHT_IRRADIANCE = vec3(0.30, 0.26, 0.40) * (2.0 * PHYSICAL_DIMENSION);
+const vec3 END_AMBIENT_IRRADIANCE = vec3(0.10, 0.08, 0.15) * (0.6 * PHYSICAL_DIMENSION);
 const float END_AMBIENT_UP = 1.6;   // 上向きの面の環境光の倍率
 const float END_AMBIENT_DOWN = 0.2; // 下向きの面 (虚空側)
 

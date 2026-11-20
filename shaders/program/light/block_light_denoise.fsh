@@ -114,7 +114,7 @@ const float WEIGHT_MIN = 1e-4;
 const float HISTORY_MIN_WEIGHT = 0.05;
 #ifdef GI_HIT_DIRECT_REUSE
 // colortex6.a の比を求める下限の明るさと、比の上限 (fp16 で溢れないように。暗い所でテクスチャ法線が光源の裏を向いた画素だけが大きくなる)
-const float GI_REUSE_LUM_MIN = 1e-5;
+const float GI_REUSE_LUM_MIN = 1e-5 * PHYSICAL_BLOCKLIGHT;
 const float GI_REUSE_RATIO_MAX = 64.0;
 #endif
 

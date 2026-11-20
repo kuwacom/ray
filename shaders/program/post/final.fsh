@@ -460,7 +460,7 @@ void main() {
             vec2 lightUv = viewToScreen(shadowLightPosition).xy;
             if (distort && flareOutput) lightUv = lensForwardUv(lightUv);
             vec3 lightColor = sanitizeColor(frameData.shadowLightIrradiance.rgb);
-            vec3 lightTint = lightColor / max(luminance(lightColor), 1e-6);
+            vec3 lightTint = lightColor / max(luminance(lightColor), 1e-6 * PHYSICAL_MOON);
             // 太陽が沈むと光源は月に切り替わる (薄明は照度が小さいので境目は目立たない)
             float day = smoothstep(-0.1, 0.1, getSunDir().y);
             float gain = mix(LENS_MOON_FLARE, 1.0, day);

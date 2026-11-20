@@ -12,6 +12,7 @@
 #define LIGHT_FIREWORK_LIGHT_GLSL
 
 //@include "/lib/settings.glsl"
+//@include "/lib/common/constants.glsl"
 //@include "/lib/common/uniforms.glsl"
 //@include "/lib/common/math.glsl"
 //@include "/lib/common/phase.glsl"
@@ -28,7 +29,7 @@ const float FIREWORK_LIGHT_MIN_SPARKS = 12.0;
 const float FIREWORK_LIGHT_FULL_SPARKS = 150.0;
 const float FIREWORK_LIGHT_GAIN_MAX = 2.0;
 // 強さ 1 の放射強度。40 ブロック下の地面の照度が満月の月明かり (MOON_ILLUMINANCE) と同じくらい
-const float FIREWORK_LIGHT_INTENSITY = 20.0;
+const float FIREWORK_LIGHT_INTENSITY = 20.0 * PHYSICAL_BLOCKLIGHT;
 // 火花が広がる球の半径 (ブロック)。真下の地面だけが点で強く照らされないように距離に足す
 const float FIREWORK_LIGHT_RADIUS = 5.0;
 // 粒の数の揺れ (バニラの点滅する花火) で光がちらつき過ぎないように均す時定数 (秒)

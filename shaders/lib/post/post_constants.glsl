@@ -6,6 +6,7 @@
 #define POST_POST_CONSTANTS_GLSL
 
 //@include "/lib/settings.glsl"
+//@include "/lib/common/constants.glsl"
 //@include "/lib/common/look_presets.glsl"
 
 // 露出
@@ -206,8 +207,9 @@ const float METERING_HIGHLIGHT_LEVEL = 1.0;
 // 強さは設定 PURKINJE_STRENGTH。青すぎると不評になりやすいので既定は控えめ
 // 順応輝度 (露出前のシーン単位) がこの範囲で錐体 -> 桿体へ移る
 // 室内・洞窟のたいまつ (順応輝度 0.015-0.025) で効くと木材や石が灰緑に濁るので、月明かりの水準 (0.002 前後) から下だけにする
-const float PURKINJE_LUM_LOW = 0.0005;
-const float PURKINJE_LUM_HIGH = 0.008;
+// 現実の光の比では夜の明るさが月の倍率で下がるので、同じ月明かりの水準で効くようにそろえる
+const float PURKINJE_LUM_LOW = 0.0005 * PHYSICAL_MOON;
+const float PURKINJE_LUM_HIGH = 0.008 * PHYSICAL_MOON;
 
 // TAA
 // 静止時の今フレームの重み (= 履歴の実効長 1/α フレーム)

@@ -394,7 +394,7 @@ bool findVoxelBorrowPoint(vec3 hitPlayer, vec3 hitNormal, int hitBlock, bool thr
 // 借りた色 (借りた点の画面の色を、当たりの点と借りた点の照明の明るさの比で直す)。借りた点が暗くて比が取れなければ false
 bool voxelBorrowColor(ivec2 qt, vec3 Ehit, vec3 Eq, out vec3 color) {
     color = vec3(0.0);
-    if (luminance(Eq) <= 1e-6) return false;
+    if (luminance(Eq) <= 1e-6 * PHYSICAL_DARKEST) return false;
     color = texelFetch(colortex0, qt, 0).rgb * clamp(luminance(Ehit) / luminance(Eq), VOXEL_BORROW_RATIO_CLAMP.x, VOXEL_BORROW_RATIO_CLAMP.y);
     return true;
 }
