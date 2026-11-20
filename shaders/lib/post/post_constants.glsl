@@ -211,7 +211,15 @@ const float EXPOSURE_UNDERWATER_DIM = 0.9;
 const float EXPOSURE_RAIN_DIM = 0.45;
 const float EXPOSURE_THUNDER_DIM = 1.0;
 // ヒストグラムの範囲 (log2 輝度)。MIN_AMBIENT 付近の暗所から太陽円盤の手前まで
+/*
+ * カメラの自動露出 (P・A・S) は下を -28 まで広げる。現実の光の比 (#404) の満月の野原は輝度が約 2^-19 (カメラの EV100 約 -3) で、
+ * -16 のままだと黒のビンに落ちて測光がカメラの EV100 約 0 で止まり、ISO 5000・1/15 で 3 段暗く写った。-28 は fp16 の非正規化数の下 (2^-24) より下
+ */
+#ifdef EXPOSURE_CAMERA_AE
+const float HISTOGRAM_LOG_MIN = -28.0;
+#else
 const float HISTOGRAM_LOG_MIN = -16.0;
+#endif
 const float HISTOGRAM_LOG_MAX = 10.0;
 const float HISTOGRAM_LAST_BIN = 255.0;   // ビンは 0 (黒) と 1-255 (log2 輝度の等間隔)
 // パーセンタイル: 暗すぎる影と空・太陽の外れ値を平均から除く (UE 4.25 方式)

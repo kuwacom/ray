@@ -373,8 +373,8 @@ CameraExposure cameraAutoExposure(float sceneEv) {
     e.fNumber = sqrt(e.shutter * exp2(sceneEv + log2(e.iso / EXPOSURE_ISO_REFERENCE)));
         #endif
     // 絞りの無いレンズは n0 = n1 なので、ISO オートが合わせ切れない時は常に点滅
-    if (e.fNumber < n0 * CAMERA_F_TOLERANCE) e.limits |= CAMERA_LIMIT_OPEN;
-    if (e.fNumber > n1 / CAMERA_F_TOLERANCE) e.limits |= CAMERA_LIMIT_CLOSED;
+    if (e.fNumber < n0 / CAMERA_F_TOLERANCE) e.limits |= CAMERA_LIMIT_OPEN;
+    if (e.fNumber > n1 * CAMERA_F_TOLERANCE) e.limits |= CAMERA_LIMIT_CLOSED;
     e.fNumber = clamp(e.fNumber, n0, n1);
     #endif
     return e;
