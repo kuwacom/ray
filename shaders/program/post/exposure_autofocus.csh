@@ -226,6 +226,15 @@ float adaptEv(float prev, float measured, bool initialized, float dt) {
     return mix(prev, measured, 1.0 - exp(-speed * dt));
 }
 
+#ifdef EXPOSURE_CAMERA_AE
+// カメラの AE の追従 (EXPOSURE_CAMERA_SPEED_*)。ゲーム向けの順応と別に変えられるようにする
+float adaptCameraEv(float prev, float measured, bool initialized, float dt) {
+    if (!initialized || isnan(prev) || isinf(prev)) return measured;
+    float speed = measured > prev ? EXPOSURE_CAMERA_SPEED_BRIGHT : EXPOSURE_CAMERA_SPEED_DARK;
+    return mix(prev, measured, 1.0 - exp(-speed * dt));
+}
+#endif
+
 // ヒストグラムの [low, high] パーセンタイル区間の log2 輝度の平均
 float histogramLogAverage(float lowPercent, float highPercent, out bool ok) {
     float total = 0.0;
@@ -751,7 +760,7 @@ void main() {
 #ifdef EXPOSURE_CAMERA_AE
     /*
      * 評価測光は外れ値 (深い影と太陽・灯りの芯) を除いた対数平均、ほかの測光は除かない (実機の平均を見る測光と同じ)
-     * 順応 (EXPOSURE_SPEED_BRIGHT / DARK) は場面の EV に掛け、決める SS・F 値・ISO はそこから毎フレーム出す (ライブビューの AE のように滑らかに動く)
+     * 追従 (EXPOSURE_CAMERA_SPEED_BRIGHT / DARK) は場面の EV に掛け、決める SS・F 値・ISO はそこから毎フレーム出す (ライブビューの AE のように滑らかに動く)
      */
     #if METERING_ACTIVE_MODE == 0 || METERING_ACTIVE_MODE == 4
         const float lowPercent = HISTOGRAM_LOW_PERCENT;
@@ -772,7 +781,7 @@ void main() {
         float highLogAverage = histogramLogAverage(METERING_HIGHLIGHT_PERCENT.x, METERING_HIGHLIGHT_PERCENT.y, highOk);
         if (highOk) measuredEv = max(measuredEv, luminanceToEv100(exp2(highLogAverage)) + log2(EXPOSURE_KEY / METERING_HIGHLIGHT_LEVEL));
     #endif
-    float adaptedEv = adaptEv(prevEv, measuredEv, initialized, dt);
+    float adaptedEv = adaptCameraEv(prevEv, measuredEv, initialized, dt);
     // 露出補正は決める組に入れる (画に別に掛けると二重になる)
     float sceneOffset = EXPOSURE_CAMERA_EV_OFFSET - LOOK_EXPOSURE_BIAS;
     CameraExposure camera = cameraAutoExposure(adaptedEv + sceneOffset);
