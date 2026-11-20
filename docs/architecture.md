@@ -113,6 +113,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 21 | deferred30.vsh/fsh | surface | 不透明シェーディング (全モジュールの光を合成) + 空の描画 | G バッファ, colortex6/8/11, SSBO0 | colortex0 | 画面 | 常時 |
 | 22 | gbuffers_water / hand_water / particles_translucent / weather / clouds | surface (weather・clouds は sky) | 半透明の前方シェーディング (clouds は CLOUDS=1 のバニラの雲。deferred の後に描かれるので前方で色を決め、colortex4 だけに書く) | アトラス, 影, flood | colortex4 (乗算済み), colortex5 | 画面 | 常時 |
 | 23 | composite.csh | surface | 反射 (SSR / ラフ / ボクセル補完) | colortex0/2/3/5, voxel | reflectionImg | local 8², 0.5 | REFLECTIONS>0 |
+| 23a | composite_a.csh | surface | 粗い不透明面の反射を同じ平面・ローブの近傍で空間にぼかす (時間蓄積の後、明るさの重み c/(1+L))。鏡面・半透明はそのまま写す | reflectionImg (上の半分), depthtex0/1, colortex2/5 | reflectionImg (下の半分) | local 8², 0.5 | REFLECTIONS>0 |
 | 24 | composite1_a.csh | sky | VL / 高さフォグのレイマーチ (影マップ空間 + floodfill + 雲影) | 影マップ, flood, cloudShadow | colorimg12 (左上 1/VL_RES), fogHistoryImg | local 8², 1/VL_RES | VL |
 | 25 | composite1.vsh/fsh | surface | 水面の光線を辿る部分: 屈折先の色と水の中の経路長 (画面の歩き + ボクセルの屈折、側面の水の厚み)、上向きの水面の太陽の可視率 (PCSS + 雲影)、鏡面の映り込みのフル解像度の SSR (映り込みを散らさない凪の水面だけ)。水の画素だけ書く。合成と分けるのは、光線を辿る処理と影が合成のシェーダーに入ると、合成の重い経路でレジスタの数が決まってワープが減り、水の画素の全部の処理が遅くなるため | colortex0/5, depthtex0/1, voxel, 影マップ | colortex14, blockLightRawImg (太陽の可視率), giRawImg (SSR、REFLECTIONS>0) (image は imageStore で、deferred の用途から composite1 -> 2 の間だけ借りる) | 画面 | 常時 |
 | 26 | composite2_a.csh | surface | 何もしない compute。Iris が compute の後に出す glMemoryBarrier で、composite1 の fragment の imageStore を composite2 の sampler の読みより前に終わらせる | - | - | (1,1,1) | 常時 |
@@ -202,7 +203,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | blockLightRawImg | RGBA16F | 画面 1.0 | 永続 | light, surface | deferred1 -> 2: トレース生値: rgb 影あり照度 S, a 視線方向の距離 (左上 1/LIGHT_TRACE_RES を使用)。composite1 -> 2: 水の画素だけ、上向きの水面の太陽の可視率 (影の PCSS + 雲影、rgb。内散乱・泡・波頭の透過光と太陽の照り返しに使う), a = 水の屈折先の白飛び分の輝度 (屈折先の deferred30 の a から) |
 | blockLightAuxImg | RGBA16F | 画面 1.0 | 永続 | light | rgb 同じ光源選択での影なし照度 U, a 寄与最大の光源インデックス (鏡面用) |
 | giRawImg | RGBA16F | 画面 1.0 | 永続 | surface | deferred10 -> 11: GI / AO 生値。composite1 -> 2: 水の画素のうち映り込みを散らさない凪の水面だけ、鏡面の映り込みのフル解像度の SSR (rgb = 当たりの色 x 画面端の重み, a = 重み、外れは 0)、REFLECTIONS > 0 |
-| reflectionImg | RGBA16F | 画面 1.0 | 永続 | surface | 反射 |
+| reflectionImg | RGBA16F | 画面 1.0 | 永続 | surface | 反射。上の半分は半分の解像度の 2 面 (偶奇のフレームで交互、時間蓄積の履歴)、下の半分の左は空間でぼかした結果 |
 | fogHistoryImg | RGBA16F | 画面 1.0 | 永続 | sky | VL の時間蓄積 |
 | debugImg | RGBA16F | 画面 1.0 | 毎フレーム | 全員 | デバッグ出力。IMG_DEBUG を定義したプログラムが書き、DEBUG_VIEW=12 で表示 (現在書いているプログラムはない) |
 

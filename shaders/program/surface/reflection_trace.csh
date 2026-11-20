@@ -274,7 +274,13 @@ void main() {
             ivec2 pl = clamp(ivec2(prevUv * vec2(lowSize)), ivec2(0), lowSize - 1);
             vec4 h = imageLoad(reflectionImg, pl + prevRegion);
             float expected = length(playerPos + cameraPosition - previousCameraPosition);
-            if (h.a > 0.0 && abs(h.a - expected) < expected * 0.04 + 0.1) radiance = mix(h.rgb, radiance, alpha);
+            if (h.a > 0.0 && abs(h.a - expected) < expected * 0.04 + 0.1) {
+                // 明るい側の重みを 1/(1+L) で下げて混ぜる。たまたま灯りを引いた 1 本が履歴に数フレーム居座って点に見えていた
+                float e = getExposure();
+                float wNew = alpha / (1.0 + luminance(radiance) * e);
+                float wHist = (1.0 - alpha) / (1.0 + luminance(h.rgb) * e);
+                radiance = (h.rgb * wHist + radiance * wNew) / (wHist + wNew);
+            }
         }
     }
 #endif

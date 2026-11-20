@@ -269,7 +269,7 @@ bool refractionInWater(vec2 uv, float surfaceDepth, float surfaceY, bool checkHe
  */
 vec4 sampleWaterReflection(ivec2 texel, float dist, out float skyWeight) {
     ivec2 lowSize = reflectionLowResSize();
-    ivec2 region = reflectionRegion(frameCounter);
+    ivec2 region = reflectionFilteredRegion();
     ivec2 offset = lowResOffset(frameCounter);
     ivec2 base = (texel - offset) >> 1;
     vec3 sum = vec3(0.0);

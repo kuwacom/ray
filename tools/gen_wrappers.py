@@ -80,6 +80,7 @@ BODIES: dict[str, str] = {
     "deferred11.fsh": "surface/gi_denoise.fsh",
     "deferred30.fsh": "surface/opaque_shading.fsh",
     "composite.csh": "surface/reflection_trace.csh",
+    "composite_a.csh": "surface/reflection_filter.csh",
     "composite1.fsh": "surface/water_trace.fsh",
     "composite2_a.csh": "surface/water_barrier.csh",
     "composite2.fsh": "surface/translucent_composite.fsh",
@@ -164,7 +165,8 @@ PROGRAMS: dict[str, list[str] | dict[str, Body | None]] = {
     "deferred21": fullscreen("fsh"),
     "deferred30": fullscreen("fsh"),
     # composite
-    "composite": ["csh"],
+    # composite_a は composite の反射を空間でぼかす (Iris が compute の間にバリアを入れる)
+    "composite": ["csh", "csh_a"],
     "composite1": fullscreen("fsh", "csh_a"),
     # composite2_a は composite1 の imageStore の後のバリアを Iris に出させる空の compute
     "composite2": fullscreen("fsh", "csh_a"),
@@ -247,7 +249,7 @@ DISABLED: list[Disable] = [
     Disable(("composite12", "composite13", "composite14"), None, ("world-1", "world1"),
             "Screen-space god rays need the sun"),
     Disable(("setup1", "setup2", "prepare1"), "#if ATMOSPHERE_MODE == 0", ("world0",)),
-    Disable(("composite",), "#if REFLECTIONS == 0"),
+    Disable(("composite", "composite_a"), "#if REFLECTIONS == 0"),
     Disable(("composite1_a",), "#ifndef VL"),
     Disable(("composite20",), "#ifndef TAA"),
     # シャッター速度の反映はモーションブラーが OFF でもシャッターのぶれを掛ける

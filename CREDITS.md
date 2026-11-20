@@ -51,7 +51,9 @@
 | ACES fit | Stephen Hill, "ACES Filmic Tone Mapping Curve" (BakingLab, MIT) の近似式 | lib/post/tonemap.glsl |
 | PBR Neutral トーンマップ | Khronos Group, "Khronos PBR Neutral Tone Mapper" 仕様 | lib/post/tonemap.glsl |
 | ブルームの縮小フィルタ | Jimenez, "Next Generation Post Processing in Call of Duty: Advanced Warfare", SIGGRAPH 2014 | program/post/bloom_down.fsh |
-| Karis average / TAA | Karis, "High Quality Temporal Supersampling", SIGGRAPH 2014 | program/post/taa.fsh, bloom_down.fsh |
+| Karis average / TAA | Karis, "High Quality Temporal Supersampling", SIGGRAPH 2014 | program/post/taa.fsh, bloom_down.fsh, program/surface/reflection_trace.csh, reflection_filter.csh |
+| 粗い反射の空間のぼかしの法線の重み (ローブの半角 90 m/(1+m) 度) | Zhdan, "Fast Denoising with Self-Stabilizing Recurrent Blurs" (ReBLUR), NVIDIA GTC 2020 | program/surface/reflection_filter.csh |
+| 法線の傾きを粗さに足す (法線のばらつきから粗さを広げる) | Toksvig, "Mipmapping Normal Maps", Journal of Graphics Tools 2005 | program/surface/gbuffers_solid.fsh |
 | TAA の variance clipping | Salvi, "An Excursion in Temporal Supersampling", GDC 2016 / Pedersen, "Temporal Reprojection Anti-Aliasing in INSIDE", GDC 2016 | program/post/taa.fsh |
 | モーションブラー | McGuire et al., "A Reconstruction Filter for Plausible Motion Blur", I3D 2012 | program/post/motion_blur.fsh |
 | CAS | AMD FidelityFX Contrast Adaptive Sharpening (アルゴリズムを参照して自前実装) | program/post/final.fsh |

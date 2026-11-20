@@ -152,6 +152,15 @@ const float CHARGED_SWIRL_GAIN = 3.0;
 
 // 手に持った物の自動法線の強さ (ブロックに対する割合)。目の前で 1 テクセルが大きく、ブロックと同じ強さでは近くの光源の照り返しが面ごとに散って光った
 const float HAND_GENERATED_NORMAL_SCALE = 0.5;
+/*
+ * 鏡面のローブが狭い面 (推定の金属・つやのある石) の自動法線。銅の斜めの筋・鉄の横線・格子の穴の縁のテクセルごとの傾きで、
+ * 映り込みと照り返しが筋ごとに出たり消えたりし、斜めに見ると帯の重なり (モアレ) になって光沢が抜けた
+ * 傾きの分だけ粗さを足し (Toksvig と同じ考え。α^2 に傾きの二乗を足す)、筋の上の照り返しを点滅ではなく広い光沢の濃淡にする
+ * 斜めに見るほど筋が画面で詰まって縞になるので、傾き自体も斜めほど弱める (正面は元の強さで凹凸を残す)
+ */
+const float GLOSSY_NORMAL_ROUGHNESS_GAIN = 1.0;     // 傾き (tan) の二乗に掛けて α^2 に足す量
+const float GLOSSY_NORMAL_OBLIQUE_MIN = 0.5;        // 最も斜めに見た時の自動法線の強さ (正面に対する割合)
+const vec2 GLOSSY_NORMAL_OBLIQUE_NOV = vec2(0.1, 0.5); // 視線と面の内積がこの範囲で、斜めの弱めを元の強さへ戻す
 // 面の法線の最大成分がこれより大きいツタの面は軸に沿った平らな面 (十字の植物は 0.71)
 const float FLAT_VINE_MIN_AXIS = 0.9;
 const float POM_DISTANCE = 32.0;         // POM を掛ける距離 (ブロック)。この手前 30% で滑らかに消す
@@ -500,6 +509,14 @@ void main() {
 #elif defined USE_GENERATED_NORMALS
     // 磨いた線路は平らなまま (テクセルごとに向きが違う法線は、滑らかな面の映り込みを砂目にする)
     if (!isPlant && !railMirror) normalTs = generatedNormal(uv, playerPos, tileMid, tileHalf);
+    if (autoMetal || materialId == MAT_GLOSSY) {
+        float nov = abs(dot(geoN, normalize(playerPos)));
+        float oblique = mix(GLOSSY_NORMAL_OBLIQUE_MIN, 1.0, smoothstep(GLOSSY_NORMAL_OBLIQUE_NOV.x, GLOSSY_NORMAL_OBLIQUE_NOV.y, nov));
+        normalTs = normalize(mix(vec3(0.0, 0.0, 1.0), normalTs, oblique));
+        float slope2 = dot(normalTs.xy, normalTs.xy) / max(normalTs.z * normalTs.z, 1e-4);
+        float alpha = (1.0 - sp.smoothness) * (1.0 - sp.smoothness);
+        sp.smoothness = 1.0 - min(sqrt(sqrt(alpha * alpha + GLOSSY_NORMAL_ROUGHNESS_GAIN * slope2)), 1.0);
+    }
     #ifdef GBUF_HAND
         normalTs = normalize(mix(vec3(0.0, 0.0, 1.0), normalTs, HAND_GENERATED_NORMAL_SCALE));
     #endif

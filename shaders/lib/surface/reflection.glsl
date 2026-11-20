@@ -6,6 +6,7 @@
  *   もう片方の面が前フレームの結果 (ラフ反射の時間蓄積に使う)。同じイメージの別の領域なので読み書きが衝突しない
  *   rgb = 反射の放射輝度 (フレネル前), a = 反射した面のカメラからの距離 (0 = 無効)。距離はアップサンプルと再投影の判定に使う
  * 低解像度の 1 テクセルはフル解像度の (2L + lowResOffset(frameCounter)) を表す (GI と同じジッター)
+ * 下の半分 (y が [lowSize.y, 2 lowSize.y) の左) は、そのフレームの面を空間でぼかした結果。composite_a が書き、合成が読む
  */
 #ifndef SURFACE_REFLECTION_GLSL
 #define SURFACE_REFLECTION_GLSL
@@ -201,6 +202,7 @@ vec3 reflectionHitRadiance(vec2 uv) { return max(textureLod(colortex0, uv, 0.0).
 
 ivec2 reflectionLowResSize() { return ivec2(viewSize()) / 2; }
 ivec2 reflectionRegion(int frame) { return (frame & 1) == 0 ? ivec2(0) : ivec2(reflectionLowResSize().x, 0); }
+ivec2 reflectionFilteredRegion() { return ivec2(0, reflectionLowResSize().y); }
 
 // アップサンプルの法線の重み (不透明面のみ)。下限があるのは、全近傍の法線が違う時に反射が空のフォールバックへ落ちないため
 const float REFLECTION_NORMAL_POWER = 16.0;
@@ -213,7 +215,7 @@ const float REFLECTION_NORMAL_WEIGHT_MIN = 0.02;
  */
 vec4 sampleReflection(ivec2 texel, float dist, vec3 normal) {
     ivec2 lowSize = reflectionLowResSize();
-    ivec2 region = reflectionRegion(frameCounter);
+    ivec2 region = reflectionFilteredRegion();
     ivec2 offset = lowResOffset(frameCounter);
     ivec2 base = (texel - offset) >> 1;
     bool useNormal = dot(normal, normal) > 0.5;
