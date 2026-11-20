@@ -493,6 +493,7 @@ void writeCameraInfo(CameraExposure e) {
         }
         frameData.postParams[CAMERA_INFO_PARAM + w / 4][w % 4] = float(word);
     }
+    frameData.postParams[CAMERA_INFO_PARAM + 1].z = float(min(infoLength, CAMERA_INFO_CHARS));
 }
     #endif
 #endif

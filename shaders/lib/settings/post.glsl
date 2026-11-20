@@ -104,7 +104,7 @@
 #define EXPOSURE_MAX_EV 6.0 // [1.0 2.0 4.0 6.0 8.0 10.0 12.0 14.0 16.0]
 #define EXPOSURE_NIGHT_LIFT_STRENGTH 1.0 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5] 屋外の夜に自動露出が画面を持ち上げる量への倍率 (0 = 持ち上げなし)
 #define EXPOSURE_METERING_MODE 0 // [0 1 2 3 4 5] 測光 0=評価 1=中央重点 2=スポット 3=平均 4=ハイライト重点 5=部分
-#define EXPOSURE_INFO_MODE 1 // [0 1 2] カメラ P・A・S と M + ISO オートの SS・F 値・ISO の表示 (画面の左下) 0=出さない 1=限界の時に点滅 2=常に出す
+#define EXPOSURE_INFO_MODE 1 // [0 1 2] カメラ P・A・S と M + ISO オートの SS・F 値・ISO の表示 (画面の上の中央) 0=出さない 1=限界の時に点滅 2=常に出す
 //#define EXPOSURE_DR // DR の補正 (明るい所を守って暗く撮り、中間と暗い所を戻して持ち上げる)
 #define EXPOSURE_RESPONSE_MODE 0 // [0 1 2] 自動露出の動き 0=現代 1=VHS (1980-90 年代) 2=DV (2000 年代)
 #define TONEMAP 0 // [0 1 2 3 4 5] 0=AgX 1=AgX Punchy 2=ACES 3=Reinhard-Jodie 4=AgX Golden 5=PBR Neutral
