@@ -87,12 +87,21 @@
 #include "/lib/common/exposure.glsl"
 // END GENERATED includes
 
-#define REFLECTION_FILTER_GROUP 8
-layout(local_size_x = REFLECTION_FILTER_GROUP, local_size_y = REFLECTION_FILTER_GROUP) in;
+layout(local_size_x = 8, local_size_y = 8) in;
 const vec2 workGroupsRender = vec2(0.5, 0.5);
+const int REFLECTION_FILTER_GROUP = 8;        // local_size と同じ
 
-const int REFLECTION_FILTER_RADIUS = 3;       // 半分の解像度のテクセルで (7x7)
-const float REFLECTION_FILTER_SIGMA = 2.5;    // 最も粗い面のガウスの幅 (テクセル)
+// 半径は半分の解像度のテクセルで、ガウスの幅は最も粗い面の値
+#if REFLECTION_FILTER_STRENGTH == 1
+    const int REFLECTION_FILTER_RADIUS = 2;
+    const float REFLECTION_FILTER_SIGMA = 1.5;
+#elif REFLECTION_FILTER_STRENGTH == 3
+    const int REFLECTION_FILTER_RADIUS = 4;
+    const float REFLECTION_FILTER_SIGMA = 3.5;
+#else
+    const int REFLECTION_FILTER_RADIUS = 3;
+    const float REFLECTION_FILTER_SIGMA = 2.5;
+#endif
 const float REFLECTION_FILTER_SIGMA_MIN = 0.6;
 const float REFLECTION_FILTER_PLANE = 0.02;   // 同じ平面とみなす距離 (ブロック + 視線距離に対する比)
 const float REFLECTION_FILTER_PLANE_REL = 0.01;
@@ -102,11 +111,24 @@ const float REFLECTION_FILTER_PLANE_REL = 0.01;
  * radiance: rgb = 放射 x 明るさの重み 1 / (1 + L)、a = その重み (使えない近傍は 0)。pos: player 空間の位置。normal: テクスチャ法線
  */
 const int REFLECTION_FILTER_TILE = REFLECTION_FILTER_GROUP + 2 * REFLECTION_FILTER_RADIUS;
+#if REFLECTION_FILTER_STRENGTH > 0
 shared vec4 tileRadiance[REFLECTION_FILTER_TILE * REFLECTION_FILTER_TILE];
 shared vec3 tilePos[REFLECTION_FILTER_TILE * REFLECTION_FILTER_TILE];
 shared vec3 tileNormal[REFLECTION_FILTER_TILE * REFLECTION_FILTER_TILE];
+#endif
+
+// 履歴に NaN / Inf が 1 つあると、ぼかしで近傍へ広がる (2x2 のアップサンプルより広く) ので 0 にする
+vec4 loadReflection(ivec2 p) {
+    vec4 h = imageLoad(reflectionImg, p);
+    return any(isnan(h)) || any(isinf(h)) ? vec4(0.0) : h;
+}
 
 void main() {
+#if REFLECTION_FILTER_STRENGTH == 0
+    ivec2 low = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(low, reflectionLowResSize()))) return;
+    imageStore(reflectionImg, low + reflectionFilteredRegion(), loadReflection(low + reflectionRegion(frameCounter)));
+#else
     ivec2 lowSize = reflectionLowResSize();
     ivec2 region = reflectionRegion(frameCounter);
     ivec2 offset = lowResOffset(frameCounter);
@@ -119,7 +141,7 @@ void main() {
         vec3 q = vec3(0.0);
         vec3 n = vec3(0.0);
         if (all(greaterThanEqual(L, ivec2(0))) && all(lessThan(L, lowSize))) {
-            vec4 h = imageLoad(reflectionImg, L + region);
+            vec4 h = loadReflection(L + region);
             if (h.a > 0.0) {
                 ivec2 nt = min(L * 2 + offset, screen - 1);
                 float d1 = texelFetch(depthtex1, nt, 0).r;
@@ -144,7 +166,7 @@ void main() {
     ivec2 low = ivec2(gl_GlobalInvocationID.xy);
     if (any(greaterThanEqual(low, lowSize))) return;
     ivec2 outLow = low + reflectionFilteredRegion();
-    vec4 center = imageLoad(reflectionImg, low + region);
+    vec4 center = loadReflection(low + region);
     if (center.a <= 0.0) {
         imageStore(reflectionImg, outLow, center);
         return;
@@ -182,4 +204,5 @@ void main() {
     }
     // 中心は必ず入るので sum.a > 0。明るさの重みで割った分を戻す
     imageStore(reflectionImg, outLow, vec4(sum.rgb / max(sum.a, 1e-8), center.a));
+#endif
 }
