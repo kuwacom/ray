@@ -27,6 +27,7 @@
 //@include "/lib/buffers/slots.glsl"
 //@include "/lib/surface/gi.glsl"
 //@include "/lib/post/analog.glsl"
+//@include "/lib/post/camera_info.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -91,6 +92,7 @@
 #include "/lib/post/analog_presets.glsl"
 #include "/lib/post/analog_formats.glsl"
 #include "/lib/post/analog.glsl"
+#include "/lib/post/camera_info.glsl"
 // END GENERATED includes
 
 // アナログの final は colortex8 を読まない (読むのは現像の composite27) ので、毎フレームの余分なミップを作らない
@@ -280,6 +282,9 @@ void main() {
     color = applyGrain(saturate(color), gl_FragCoord.xy);
 #endif
 
+#if defined EXPOSURE_CAMERA_AE && EXPOSURE_INFO_MODE > 0
+    color = applyCameraInfo(color, gl_FragCoord.xy);
+#endif
     color = debugView(texel, color);
     // 8bit 出力のバンディング対策
     color += (interleavedGradientNoise(gl_FragCoord.xy, frameCounter) - 0.5) / OUTPUT_LEVELS;
@@ -580,6 +585,9 @@ void main() {
 #else
     color = applyGrain(color, gl_FragCoord.xy);
 
+#if defined EXPOSURE_CAMERA_AE && EXPOSURE_INFO_MODE > 0
+    color = applyCameraInfo(color, gl_FragCoord.xy);
+#endif
     color = debugView(texel, color);
     // 8bit 出力のバンディング対策
     color += (interleavedGradientNoise(gl_FragCoord.xy, frameCounter) - 0.5) / OUTPUT_LEVELS;

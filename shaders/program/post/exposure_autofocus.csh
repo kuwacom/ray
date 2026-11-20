@@ -21,6 +21,7 @@
 //@include "/lib/light/voxel_read.glsl"
 //@include "/lib/post/post_internal.glsl"
 //@include "/lib/sky/sky_color.glsl"
+//@include "/lib/post/camera_info.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -76,6 +77,7 @@
 #include "/lib/sky/clouds.glsl"
 #include "/lib/sky/sh.glsl"
 #include "/lib/sky/sky_color.glsl"
+#include "/lib/post/camera_info.glsl"
 // END GENERATED includes
 
 layout(local_size_x = 16, local_size_y = 16) in;
@@ -382,6 +384,96 @@ CameraExposure cameraAutoExposure(float sceneEv) {
 float cameraExposureEv(CameraExposure e) {
     return log2(e.fNumber * e.fNumber / e.shutter) - log2(e.iso / EXPOSURE_ISO_REFERENCE) - EXPOSURE_CAMERA_EV_OFFSET;
 }
+
+    #if EXPOSURE_INFO_MODE > 0
+/*
+ * SS・F 値・ISO の表示の文字 (lib/post/camera_info.glsl)。決める値は連続なので、表示だけ実機の 1/3 段の目盛りに丸める
+ * 1/4 より速い SS の分母 (1/3 段の番号 6..39)、それより遅い SS の秒 x 10 (番号 5..-21 = 0"3..120")、F 値 x 10 (f/0.7..32)、ISO (25..102400)
+ */
+const int INFO_SHUTTER_DENOMINATORS[34] = int[34](4, 5, 6, 8, 10, 13, 15, 20, 25, 30, 40, 50, 60, 80, 100, 125, 160, 200, 250, 320,
+    400, 500, 640, 800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6400, 8000);
+const int INFO_SHUTTER_TENTHS[27] = int[27](3, 4, 5, 6, 8, 10, 13, 16, 20, 25, 32, 40, 50, 60, 80, 100, 130, 150, 200, 250, 300, 400,
+    500, 600, 800, 1000, 1200);
+const int INFO_F_TENTHS[34] = int[34](7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 25, 28, 32, 35, 40, 45, 50, 56, 63, 71, 80, 90, 100, 110,
+    130, 140, 160, 180, 200, 220, 250, 290, 320);
+const int INFO_ISO_STEPS[37] = int[37](25, 32, 40, 50, 64, 80, 100, 125, 160, 200, 250, 320, 400, 500, 640, 800, 1000, 1250, 1600, 2000,
+    2500, 3200, 4000, 5000, 6400, 8000, 10000, 12800, 16000, 20000, 25600, 32000, 40000, 51200, 64000, 80000, 102400);
+
+int infoText[CAMERA_INFO_CHARS];
+int infoLength = 0;
+
+void infoPut(int code) {
+    if (infoLength < CAMERA_INFO_CHARS) infoText[infoLength] = code;
+    infoLength++;
+}
+
+void infoInteger(int value, int blink) {
+    int divisor = 1;
+    while (divisor * 10 <= value) divisor *= 10;
+    for (; divisor > 0; divisor /= 10) infoPut(CAMERA_INFO_DIGIT + (value / divisor) % 10 + blink);
+}
+
+// 10 倍の値を、端数があれば小数 1 桁で (10 以上は整数)
+void infoTenths(int tenths, int blink) {
+    infoInteger(tenths / 10, blink);
+    if (tenths % 10 != 0 && tenths < 100) {
+        infoPut(CAMERA_INFO_DOT + blink);
+        infoPut(CAMERA_INFO_DIGIT + tenths % 10 + blink);
+    }
+}
+
+void infoShutter(float t, int blink) {
+    int step = int(round(3.0 * log2(1.0 / t)));
+    if (step >= 6) {
+        infoPut(CAMERA_INFO_DIGIT + 1 + blink);
+        infoPut(CAMERA_INFO_SLASH + blink);
+        infoInteger(INFO_SHUTTER_DENOMINATORS[min(step, 39) - 6], blink);
+    } else {
+        infoTenths(INFO_SHUTTER_TENTHS[clamp(5 - step, 0, 26)], blink);
+        infoPut(CAMERA_INFO_SECONDS + blink);
+    }
+}
+
+void infoFNumber(float n, int blink) {
+    infoPut(CAMERA_INFO_F + blink);
+    infoTenths(INFO_F_TENTHS[clamp(int(round(6.0 * log2(n))) + 3, 0, 33)], blink);
+}
+
+void infoIso(float iso) {
+    infoPut(CAMERA_INFO_I);
+    infoPut(CAMERA_INFO_S);
+    infoPut(CAMERA_INFO_O);
+    infoInteger(INFO_ISO_STEPS[clamp(int(round(3.0 * log2(iso / 25.0))), 0, 36)], 0);
+}
+
+/*
+ * 1 = 限界の時に、限界に着いた側 (P は SS と F 値、A は SS、S は F 値) だけを点滅。2 = 常に SS・F 値・ISO を出し、限界の側を点滅
+ */
+void writeCameraInfo(CameraExposure e) {
+    infoLength = 0;
+    for (int i = 0; i < CAMERA_INFO_CHARS; i++) infoText[i] = 0;
+    int blinkShutter = (e.limits & (CAMERA_LIMIT_SLOW | CAMERA_LIMIT_FAST)) != 0u ? CAMERA_INFO_BLINK : 0;
+    int blinkF = (e.limits & (CAMERA_LIMIT_OPEN | CAMERA_LIMIT_CLOSED)) != 0u ? CAMERA_INFO_BLINK : 0;
+        #if EXPOSURE_INFO_MODE == 2
+    infoShutter(e.shutter, blinkShutter);
+    infoPut(CAMERA_INFO_SPACE);
+    infoFNumber(e.fNumber, blinkF);
+    infoPut(CAMERA_INFO_SPACE);
+    infoIso(e.iso);
+        #else
+    if (blinkShutter != 0) infoShutter(e.shutter, blinkShutter);
+    if (blinkShutter != 0 && blinkF != 0) infoPut(CAMERA_INFO_SPACE);
+    if (blinkF != 0) infoFNumber(e.fNumber, blinkF);
+        #endif
+    for (int w = 0; w < CAMERA_INFO_CHARS / CAMERA_INFO_CHARS_PER_WORD; w++) {
+        int word = 0;
+        for (int c = 0; c < CAMERA_INFO_CHARS_PER_WORD; c++) {
+            word |= infoText[w * CAMERA_INFO_CHARS_PER_WORD + c] << (CAMERA_INFO_CHAR_BITS * c);
+        }
+        frameData.postParams[CAMERA_INFO_PARAM + w / 4][w % 4] = float(word);
+    }
+}
+    #endif
 #endif
 
 #if EXPOSURE_RESPONSE_MODE != 0
@@ -685,6 +777,9 @@ void main() {
     float sceneOffset = EXPOSURE_CAMERA_EV_OFFSET - LOOK_EXPOSURE_BIAS;
     CameraExposure camera = cameraAutoExposure(adaptedEv + sceneOffset);
     frameData.postParams[CAMERA_AE_PARAM] = vec4(camera.shutter, camera.fNumber, camera.iso, float(camera.limits));
+    #if EXPOSURE_INFO_MODE > 0
+    writeCameraInfo(camera);
+    #endif
     float appliedEv = cameraExposureEv(camera);
     float targetEv = cameraExposureEv(cameraAutoExposure(measuredEv + sceneOffset));
 #elif !defined EXPOSURE_AUTO
