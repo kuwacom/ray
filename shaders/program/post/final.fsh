@@ -555,9 +555,12 @@ void main() {
     color = lava > 0.0 ? mix(tonemap(color), tonemapEmissive(color), lava) : tonemap(color);
     /*
      * 溶岩のトーンマップは橙の彩度を保つので、面の輝度は 0.45 前後で頭打ちになり、LAVA_BRIGHTNESS を上げても
-     * 明るく照らされた周りの岩 (輝度 0.6-0.8) に届かない。頭打ちから先は、白を同じ量ずつ足して色相を保ったまま淡くする
+     * 明るく照らされた周りの岩 (輝度 0.6-0.8) に届かない。頭打ちから先は、明るく淡い橙 (LAVA_PALE_TINT) へ寄せる
+     * 最大チャンネルはほぼ 1 に揃うので、どこも同じだけ寄せると模様が消えて一様な淡い面になった。黄色い筋 (緑の比が高い所) ほど強く
+     * 寄せ、暗い橙の所は LAVA_PALE_COOL の割合に留めて、殻と割れ目の明暗と色の差を残す
      */
-    color = mix(color, vec3(maxOf(color)), LAVA_FACE_PALE * lavaFace);
+    float lavaHot = smoothstep(LAVA_PALE_HOT.x, LAVA_PALE_HOT.y, color.g / max(color.r, 1e-4));
+    color = mix(color, LAVA_PALE_TINT * maxOf(color), LAVA_FACE_PALE * mix(LAVA_PALE_COOL, 1.0, lavaHot) * lavaFace);
     color = linearToSrgb(color);
 #endif
     // 表示値のグレード (リフト・ガンマ・ゲイン -> カーブ -> スプリットトーン) は、フィルムの LUT の下 (前) に置く

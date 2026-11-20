@@ -374,10 +374,16 @@ const float LAVA_SELF_BLOOM_CUT = max(1.0 - LAVA_SELF_BLOOM / LAVA_BLOOM_GAIN, 0
 /*
  * 溶岩の面を淡くする量 (final)。LAVA_BRIGHTNESS が LAVA_PALE_FROM (溶岩のトーンマップの持ち上げが頭打ちになる所) を超えた分で、
  * 設定の上限 LAVA_PALE_TO で LAVA_PALE_MAX。0.4 で面の輝度が 0.65 前後 (色相はそのまま、彩度 0.3 前後) になり、照り返しに並ぶ
+ * 白へ寄せると青も上がって桃色寄り (色相 14 度) になった。夜の溶岩湖の実写の明るく淡い所は (255, 196, 140) 前後
+ * (色相 30-45 度、彩度 0.45 前後) なので、白ではなくその色 (LAVA_PALE_TINT、線形) へ寄せる
  */
 const float LAVA_PALE_FROM = 1.0;
 const float LAVA_PALE_TO = 5.0;
-const float LAVA_PALE_MAX = 0.4;
+const float LAVA_PALE_MAX = 0.8;
+const vec3 LAVA_PALE_TINT = vec3(1.0, 0.66, 0.36);
+// 寄せる割合を決める、トーンマップ後の線形の緑 / 赤の範囲 (LAVA_BRIGHTNESS 5 で溶岩の画素の 1 割-9 割)。暗い所の割合
+const vec2 LAVA_PALE_HOT = vec2(0.2, 0.42);
+const float LAVA_PALE_COOL = 0.3;
 const float LAVA_FACE_PALE = clamp((LAVA_BRIGHTNESS - LAVA_PALE_FROM) / (LAVA_PALE_TO - LAVA_PALE_FROM), 0.0, 1.0) * LAVA_PALE_MAX;
 
 // レンズ (強さの割合はプリセット lib/post/lens_presets.glsl)
