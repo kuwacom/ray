@@ -18,14 +18,14 @@
     #define EXPOSURE_AUTO
 #endif
 // カメラのモード (F 値・シャッター速度・ISO から EV100 を出す。自動ではない)。露出と被写界深度の F 値を同じにする
-#if EXPOSURE_MODE == 3 || EXPOSURE_MODE == 4
+#if EXPOSURE_MODE >= 3 && EXPOSURE_MODE <= 6
     #define EXPOSURE_CAMERA
 #endif
 /*
- * カメラの自動露出 (P = 4)。測った明るさから SS・F 値・ISO を実機と同じ考え方で決め、その組で EV100 を出す
+ * カメラの自動露出 (4 = P、5 = A (絞り優先)、6 = S (シャッター優先))。測った明るさから SS・F 値・ISO を実機と同じ考え方で決め、その組で EV100 を出す
  * ゲーム向けの自動露出 (EXPOSURE_AUTO) の曲線・夜の持ち上げ・屋内の減光は掛けない (実機と同じく中間グレーへ完全に補正する)
  */
-#if EXPOSURE_MODE == 4
+#if EXPOSURE_MODE >= 4 && EXPOSURE_MODE <= 6
     #define EXPOSURE_CAMERA_AE
 #endif
 /*
@@ -49,6 +49,8 @@ const float CAMERA_PROGRAM_CORNER_SHUTTER = 0.125;
 // 自動で決める SS の範囲 (秒)。実機の機械シャッターの 1/8000〜30 秒。M と S で選べる SS は設定の範囲 (120 秒まで)
 const float CAMERA_SHUTTER_FAST = 1.0 / 8000.0;
 const float CAMERA_SHUTTER_SLOW = 30.0;
+// S で絞りが限界と見なす比 (約 1/17 段)。絞りの無いレンズで ISO オートが合わせた時に、丸めの誤差で限界の表示が点かないように
+const float CAMERA_F_TOLERANCE = 1.02;
 // FrameData.postParams の、自動で決めた SS・F 値・ISO と限界の印を置く場所 (lib/post/exposure.glsl)
 const int CAMERA_AE_PARAM = 8;
 // 限界の印 (postParams[CAMERA_AE_PARAM].w)。SS が遅い側 / 速い側、絞りが開放 / 最小に着いて、露出が合わない

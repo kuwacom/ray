@@ -332,11 +332,13 @@ CameraExposure cameraAutoExposure(float sceneEv) {
     float isoMax = max(float(EXPOSURE_ISO_AUTO_MAX), isoMin);
     float minShutter = cameraMinShutter();
     #endif
+    #if EXPOSURE_MODE == 4
+    // P: F 値と SS を線で決める
     float corner = programCornerEv(n0);
-    #ifdef EXPOSURE_ISO_AUTO
+        #ifdef EXPOSURE_ISO_AUTO
     // 線の上で SS が低速限界になる EV まで、足りない分だけ ISO を上げる
     e.iso = clamp(EXPOSURE_ISO_REFERENCE * exp2(programEvForShutter(minShutter, n0, n1, corner) - sceneEv), isoMin, isoMax);
-    #endif
+        #endif
     float ev = sceneEv + log2(e.iso / EXPOSURE_ISO_REFERENCE);
     e.fNumber = programFNumber(ev, n0, n1, corner);
     e.shutter = e.fNumber * e.fNumber / exp2(ev);
@@ -344,6 +346,32 @@ CameraExposure cameraAutoExposure(float sceneEv) {
     if (e.shutter > CAMERA_SHUTTER_SLOW) e.limits |= CAMERA_LIMIT_SLOW | CAMERA_LIMIT_OPEN;
     if (e.shutter < CAMERA_SHUTTER_FAST) e.limits |= CAMERA_LIMIT_FAST | CAMERA_LIMIT_CLOSED;
     e.shutter = clamp(e.shutter, CAMERA_SHUTTER_FAST, CAMERA_SHUTTER_SLOW);
+    #elif EXPOSURE_MODE == 5
+    // A: F 値は設定 (絞りの無いレンズは開放のまま)。SS を決め、低速限界より遅くなる分だけ ISO を上げる
+    e.fNumber = cameraSetFNumber();
+    float exposureEv = log2(e.fNumber * e.fNumber);
+    e.shutter = exp2(exposureEv - sceneEv - log2(isoMin / EXPOSURE_ISO_REFERENCE));
+        #ifdef EXPOSURE_ISO_AUTO
+    e.iso = clamp(isoMin * e.shutter / minShutter, isoMin, isoMax);
+    e.shutter = exp2(exposureEv - sceneEv - log2(e.iso / EXPOSURE_ISO_REFERENCE));
+        #endif
+    // 範囲の外は SS が点滅 (暗い側は 30 秒、明るい側は 1/8000。ISO は下限なので明るい側は警告だけ)
+    if (e.shutter > CAMERA_SHUTTER_SLOW) e.limits |= CAMERA_LIMIT_SLOW;
+    if (e.shutter < CAMERA_SHUTTER_FAST) e.limits |= CAMERA_LIMIT_FAST;
+    e.shutter = clamp(e.shutter, CAMERA_SHUTTER_FAST, CAMERA_SHUTTER_SLOW);
+    #else
+    // S: SS は設定。F 値を決め、開放に着いたら足りない分だけ ISO を上げる。最小絞りに着いたら ISO は下限なので警告だけ
+    e.shutter = optShutterSpeed;
+    e.fNumber = sqrt(e.shutter * exp2(sceneEv + log2(isoMin / EXPOSURE_ISO_REFERENCE)));
+        #ifdef EXPOSURE_ISO_AUTO
+    e.iso = clamp(isoMin * (n0 * n0) / (e.fNumber * e.fNumber), isoMin, isoMax);
+    e.fNumber = sqrt(e.shutter * exp2(sceneEv + log2(e.iso / EXPOSURE_ISO_REFERENCE)));
+        #endif
+    // 絞りの無いレンズは n0 = n1 なので、ISO オートが合わせ切れない時は常に点滅
+    if (e.fNumber < n0 * CAMERA_F_TOLERANCE) e.limits |= CAMERA_LIMIT_OPEN;
+    if (e.fNumber > n1 / CAMERA_F_TOLERANCE) e.limits |= CAMERA_LIMIT_CLOSED;
+    e.fNumber = clamp(e.fNumber, n0, n1);
+    #endif
     return e;
 }
 
