@@ -276,6 +276,7 @@ void main() {
             float expected = length(playerPos + cameraPosition - previousCameraPosition);
             if (h.a > 0.0 && abs(h.a - expected) < expected * 0.04 + 0.1) {
                 // 明るい側の重みを 1/(1+L) で下げて混ぜる。たまたま灯りを引いた 1 本が履歴に数フレーム居座って点に見えていた
+                // 引き換えに混合は暗い側へ偏り (調和平均寄り)、暗い履歴の上に明るい反射が現れるのは遅れる。重みの下限は 1/(1+上限の明るさ) で遅れは有限
                 float e = getExposure();
                 float wNew = alpha / (1.0 + luminance(radiance) * e);
                 float wHist = (1.0 - alpha) / (1.0 + luminance(h.rgb) * e);
