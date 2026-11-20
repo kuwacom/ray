@@ -90,8 +90,8 @@
 layout(local_size_x = 8, local_size_y = 8) in;
 const vec2 workGroupsRender = vec2(0.5, 0.5);
 
-const int REFLECTION_FILTER_RADIUS = 2;       // 半分の解像度のテクセルで (5x5)
-const float REFLECTION_FILTER_SIGMA = 1.5;    // 最も粗い面のガウスの幅 (テクセル)
+const int REFLECTION_FILTER_RADIUS = 3;       // 半分の解像度のテクセルで (7x7)
+const float REFLECTION_FILTER_SIGMA = 2.5;    // 最も粗い面のガウスの幅 (テクセル)
 const float REFLECTION_FILTER_SIGMA_MIN = 0.6;
 const float REFLECTION_FILTER_PLANE = 0.02;   // 同じ平面とみなす距離 (ブロック + 視線距離に対する比)
 const float REFLECTION_FILTER_PLANE_REL = 0.01;
