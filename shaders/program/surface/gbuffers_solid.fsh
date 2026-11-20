@@ -152,6 +152,12 @@ const float CHARGED_SWIRL_GAIN = 3.0;
 
 // 手に持った物の自動法線の強さ (ブロックに対する割合)。目の前で 1 テクセルが大きく、ブロックと同じ強さでは近くの光源の照り返しが面ごとに散って光った
 const float HAND_GENERATED_NORMAL_SCALE = 0.5;
+/*
+ * 推定で金属にした画素の自動法線の強さ (ブロックに対する割合)。金属の絵の明暗 (銅の斜めの筋、鉄の横線、格子の穴の縁) は
+ * 凹凸ではないのに、ローブの狭い鏡面ではテクセルごとの傾きで映り込みと照り返しが筋ごとに出たり消えたりし、
+ * 斜めに見ると帯の重なり (モアレ) になって光沢が抜けた
+ */
+const float METAL_GENERATED_NORMAL_SCALE = 0.4;
 // 面の法線の最大成分がこれより大きいツタの面は軸に沿った平らな面 (十字の植物は 0.71)
 const float FLAT_VINE_MIN_AXIS = 0.9;
 const float POM_DISTANCE = 32.0;         // POM を掛ける距離 (ブロック)。この手前 30% で滑らかに消す
@@ -500,6 +506,7 @@ void main() {
 #elif defined USE_GENERATED_NORMALS
     // 磨いた線路は平らなまま (テクセルごとに向きが違う法線は、滑らかな面の映り込みを砂目にする)
     if (!isPlant && !railMirror) normalTs = generatedNormal(uv, playerPos, tileMid, tileHalf);
+    if (autoMetal) normalTs = normalize(mix(vec3(0.0, 0.0, 1.0), normalTs, METAL_GENERATED_NORMAL_SCALE));
     #ifdef GBUF_HAND
         normalTs = normalize(mix(vec3(0.0, 0.0, 1.0), normalTs, HAND_GENERATED_NORMAL_SCALE));
     #endif
