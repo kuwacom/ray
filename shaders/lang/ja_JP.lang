@@ -1010,11 +1010,11 @@ option.EXPOSURE_MODE=露出
 value.EXPOSURE_MODE.0=マニュアル
 value.EXPOSURE_MODE.1=オート (平均)
 value.EXPOSURE_MODE.2=オート (ヒストグラム)
-value.EXPOSURE_MODE.3=カメラ M (F 値・シャッター速度・ISO)
+value.EXPOSURE_MODE.3=M
 value.EXPOSURE_MODE.4=P
 value.EXPOSURE_MODE.5=A
 value.EXPOSURE_MODE.6=S
-option.EXPOSURE_MODE.comment=カメラ M (マニュアル): F 値・シャッター速度・ISO から明るさを決める (EV100 = log2(N^2 / t) - log2(ISO / 100))。晴天の 16 の法則 (f/16・1/100 秒・ISO 100) が晴れの昼に合う。現実の光の比が ON なら夜も実写の設定で合う (灯りの夜景で f/8・2 秒・ISO 400)。OFF では実写の夜景の設定より 5 段ほど暗い設定で合う。P (プログラム): 実際のカメラのプログラム線図のように F 値と SS を決める (f/1.4 のレンズで 1/8 秒までは開放、その先は半段ずつ)。ISO オートは SS が低速限界より遅くなる所から ISO を上げる。A (絞り優先): F 値を決めると SS (30 秒〜1/8000) を自動で決め、ISO オートは P と同じ。S (シャッター優先): SS を決めると F 値を自動で決め、ISO オートは絞りが開放に着いた所から ISO を上げる。実機と同じく測った明るさを中間グレーに合わせるので、月夜も SS が 30 秒か ISO が上限に着くまでは明るく写る。露出補正はどのカメラのモードでも効き、夜の持ち上げ・屋内の減光・VHS / DV の動きは効かない
+option.EXPOSURE_MODE.comment=M (マニュアル): F 値・シャッター速度・ISO から明るさを決める (EV100 = log2(N^2 / t) - log2(ISO / 100))。晴天の 16 の法則 (f/16・1/100 秒・ISO 100) が晴れの昼に合う。現実の光の比が ON なら夜も実写の設定で合う (灯りの夜景で f/8・2 秒・ISO 400)。OFF では実写の夜景の設定より 5 段ほど暗い設定で合う。P (プログラム): 実際のカメラのプログラム線図のように F 値と SS を決める (f/1.4 のレンズで 1/8 秒までは開放、その先は半段ずつ)。ISO オートは SS が低速限界より遅くなる所から ISO を上げる。A (絞り優先): F 値を決めると SS (30 秒〜1/8000) を自動で決め、ISO オートは P と同じ。S (シャッター優先): SS を決めると F 値を自動で決め、ISO オートは絞りが開放に着いた所から ISO を上げる。実機と同じく測った明るさを中間グレーに合わせるので、月夜も SS が 30 秒か ISO が上限に着くまでは明るく写る。露出補正はどのカメラのモードでも効き、夜の持ち上げ・屋内の減光・VHS / DV の動きは効かない
 option.EXPOSURE_BIAS=露出補正
 option.EXPOSURE_BIAS.comment=ルックのプリセットの露出に足す (ナチュラルでは 0)
 suffix.EXPOSURE_BIAS= EV

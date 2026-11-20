@@ -1010,11 +1010,11 @@ option.EXPOSURE_MODE=Exposure
 value.EXPOSURE_MODE.0=Manual
 value.EXPOSURE_MODE.1=Auto (Average)
 value.EXPOSURE_MODE.2=Auto (Histogram)
-value.EXPOSURE_MODE.3=Camera M (f-number, Shutter, ISO)
+value.EXPOSURE_MODE.3=M
 value.EXPOSURE_MODE.4=P
 value.EXPOSURE_MODE.5=A
 value.EXPOSURE_MODE.6=S
-option.EXPOSURE_MODE.comment=Camera M (Manual): brightness from f-number, shutter speed and ISO (EV100 = log2(N^2 / t) - log2(ISO / 100)). Sunny 16 (f/16, 1/100 s, ISO 100) matches a sunny day. With Real-World Light Ratios on, real night settings work too (a lit town: f/8, 2 s, ISO 400); with it off, night scenes need settings about 5 stops darker. P (Program): picks the f-number and shutter speed like a real camera's program line (wide open up to 1/8 s with an f/1.4 lens, then half a stop each), and Auto ISO raises the ISO once the shutter gets slower than the slow limit. A (Aperture Priority): you set the f-number, the camera sets the shutter speed (30 s to 1/8000) and Auto ISO as in P. S (Shutter Priority): you set the shutter speed, the camera sets the f-number and Auto ISO raises the ISO once the lens is wide open. Like a real camera it exposes the metered scene to middle grey, so moonlit nights look bright until the shutter reaches 30 s or the ISO reaches its limit. Exposure compensation applies to every Camera mode; night lift, indoor dimming and the VHS / DV response do not
+option.EXPOSURE_MODE.comment=M (Manual): brightness from f-number, shutter speed and ISO (EV100 = log2(N^2 / t) - log2(ISO / 100)). Sunny 16 (f/16, 1/100 s, ISO 100) matches a sunny day. With Real-World Light Ratios on, real night settings work too (a lit town: f/8, 2 s, ISO 400); with it off, night scenes need settings about 5 stops darker. P (Program): picks the f-number and shutter speed like a real camera's program line (wide open up to 1/8 s with an f/1.4 lens, then half a stop each), and Auto ISO raises the ISO once the shutter gets slower than the slow limit. A (Aperture Priority): you set the f-number, the camera sets the shutter speed (30 s to 1/8000) and Auto ISO as in P. S (Shutter Priority): you set the shutter speed, the camera sets the f-number and Auto ISO raises the ISO once the lens is wide open. Like a real camera it exposes the metered scene to middle grey, so moonlit nights look bright until the shutter reaches 30 s or the ISO reaches its limit. Exposure compensation applies to every Camera mode; night lift, indoor dimming and the VHS / DV response do not
 option.EXPOSURE_BIAS=Exposure Compensation
 option.EXPOSURE_BIAS.comment=Added to the Look preset exposure (0 with Natural)
 suffix.EXPOSURE_BIAS= EV
