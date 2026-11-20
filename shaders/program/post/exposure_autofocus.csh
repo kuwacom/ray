@@ -306,7 +306,7 @@ float cameraClosedFNumber() {
 #ifdef LENS_FIXED_APERTURE
     return LP_F_OPEN;
 #else
-    return max(LENS_F_MAX, LP_F_OPEN);
+    return max(CAMERA_F_CLOSED, LP_F_OPEN);
 #endif
 }
 

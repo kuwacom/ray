@@ -46,6 +46,11 @@ const float EXPOSURE_CAMERA_EV_OFFSET = 13.0;
 const float CAMERA_PROGRAM_EV_REF = 4.0;
 const float CAMERA_PROGRAM_F_REF = 1.4;
 const float CAMERA_PROGRAM_CORNER_SHUTTER = 0.125;
+/*
+ * P・S で自動で決める F 値の最小絞り。A・M で選べる F 値 (DOF_F_NUMBER の選択肢) の上限 f/32 にそろえる
+ * (A・M の側を LENS_F_MAX (22) で止めると M の機械語が main と変わるので、P・S の側を広げた。レンズの効果の F 値はどのモードも LENS_F_MAX で止まる)
+ */
+const float CAMERA_F_CLOSED = 32.0;
 // 自動で決める SS の範囲 (秒)。実機の機械シャッターの 1/8000〜30 秒。M と S で選べる SS は設定の範囲 (120 秒まで)
 const float CAMERA_SHUTTER_FAST = 1.0 / 8000.0;
 const float CAMERA_SHUTTER_SLOW = 30.0;
