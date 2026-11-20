@@ -249,7 +249,7 @@ DISABLED: list[Disable] = [
     Disable(("composite12", "composite13", "composite14"), None, ("world-1", "world1"),
             "Screen-space god rays need the sun"),
     Disable(("setup1", "setup2", "prepare1"), "#if ATMOSPHERE_MODE == 0", ("world0",)),
-    Disable(("composite",), "#if REFLECTIONS == 0"),
+    Disable(("composite", "composite_a"), "#if REFLECTIONS == 0"),
     Disable(("composite1_a",), "#ifndef VL"),
     Disable(("composite20",), "#ifndef TAA"),
     # シャッター速度の反映はモーションブラーが OFF でもシャッターのぶれを掛ける
