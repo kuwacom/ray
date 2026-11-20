@@ -49,6 +49,11 @@ const float CAMERA_PROGRAM_CORNER_SHUTTER = 0.125;
 // 自動で決める SS の範囲 (秒)。実機の機械シャッターの 1/8000〜30 秒。M と S で選べる SS は設定の範囲 (120 秒まで)
 const float CAMERA_SHUTTER_FAST = 1.0 / 8000.0;
 const float CAMERA_SHUTTER_SLOW = 30.0;
+/*
+ * 評価測光の明るい側の上限 (カメラの EV100)。Nikon D850 の取説の注記「マルチパターン測光では 16 1/3 EV を超える値は 16 1/3 EV に下げる」から。
+ * 目的は書かれていない (雪・砂を明るく写す意図か、測光の範囲か) ので Ray の調整値。晴れの昼 (14.3) には効かず、雪原・空を見上げた時だけ明るめに写す
+ */
+const float CAMERA_EVALUATIVE_EV_MAX = 16.0 + 1.0 / 3.0;
 // S で絞りが限界と見なす比 (約 1/17 段)。絞りの無いレンズで ISO オートが合わせた時に、丸めの誤差で限界の表示が点かないように
 const float CAMERA_F_TOLERANCE = 1.02;
 // FrameData.postParams の、自動で決めた SS・F 値・ISO と限界の印を置く場所 (lib/post/exposure.glsl)
@@ -222,6 +227,11 @@ const float METERING_CENTER_DIAMETER = 1.0 / 3.0;
 const float METERING_CENTER_OUTSIDE = 0.05;
 // スポット測光: 画面の幅の 1/9 の円 (3:2 で面積の約 1.5%、16:9 で約 1.7%) だけを測る
 const float METERING_SPOT_DIAMETER = 1.0 / 9.0;
+/*
+ * 部分測光: 画面の幅の 0.22 の円だけを測る (3:2 で面積の約 5.9% = Canon の部分測光、16:9 で約 6.7%)
+ * 大きさは Nikon の中央重点の「小」(8 mm の円) とほぼ同じで、違いは円の外を測らないこと
+ */
+const float METERING_PARTIAL_DIAMETER = 0.22;
 // 円の縁をぼかす幅 (半径に対する割合)。格子の点が縁を出入りする時に測光が跳ばないように
 const vec2 METERING_CIRCLE_EDGE = vec2(0.8, 1.2);
 /*

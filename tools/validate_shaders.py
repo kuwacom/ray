@@ -94,6 +94,7 @@ VALIDATION_SETS: dict[str, dict[str, str]] = {
     # 測光の選択 (既定でない重みと、ハイライト重点の上限の経路)
     "METERING_SPOT": {"EXPOSURE_METERING_MODE": "2"},
     "METERING_HIGHLIGHT": {"EXPOSURE_METERING_MODE": "4"},
+    "METERING_PARTIAL": {"EXPOSURE_METERING_MODE": "5"},
     # DR の補正 (ブルームを切っても局所の明るさのタイルを作る経路)
     "EXPOSURE_DR": {"EXPOSURE_DR": "true"},
     "EXPOSURE_DR_NO_BLOOM": {"EXPOSURE_DR": "true", "BLOOM": "false"},

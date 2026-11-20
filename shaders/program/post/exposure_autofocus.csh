@@ -209,6 +209,9 @@ float meteringWeight(vec2 uv) {
     return 1.0 - smoothstep(METERING_CIRCLE_EDGE.x, METERING_CIRCLE_EDGE.y, r);
 #elif METERING_ACTIVE_MODE == 3
     return 1.0;
+#elif METERING_ACTIVE_MODE == 5
+    float r = length(d) / (0.5 * METERING_PARTIAL_DIAMETER * aspectRatio);
+    return 1.0 - smoothstep(METERING_CIRCLE_EDGE.x, METERING_CIRCLE_EDGE.y, r);
 #else
     return mix(METERING_EDGE_WEIGHT, 1.0, exp(-dot(d, d) * 6.0));
 #endif
@@ -669,6 +672,14 @@ void main() {
     float logAverage = histogramLogAverage(lowPercent, highPercent, ok);
     float prevEv = frameData.postParams[0].x;
     float measuredEv = ok ? luminanceToEv100(exp2(logAverage)) : prevEv;
+    #if METERING_ACTIVE_MODE == 0
+        measuredEv = min(measuredEv, CAMERA_EVALUATIVE_EV_MAX - EXPOSURE_CAMERA_EV_OFFSET);
+    #elif METERING_ACTIVE_MODE == 4
+        // ハイライト重点: 明るい側が露出後に METERING_HIGHLIGHT_LEVEL を超えるほど明るくは写さない (ゲーム向けのモードと同じ)
+        bool highOk;
+        float highLogAverage = histogramLogAverage(METERING_HIGHLIGHT_PERCENT.x, METERING_HIGHLIGHT_PERCENT.y, highOk);
+        if (highOk) measuredEv = max(measuredEv, luminanceToEv100(exp2(highLogAverage)) + log2(EXPOSURE_KEY / METERING_HIGHLIGHT_LEVEL));
+    #endif
     float adaptedEv = adaptEv(prevEv, measuredEv, initialized, dt);
     // 露出補正は決める組に入れる (画に別に掛けると二重になる)
     float sceneOffset = EXPOSURE_CAMERA_EV_OFFSET - LOOK_EXPOSURE_BIAS;
