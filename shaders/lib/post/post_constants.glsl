@@ -18,8 +18,15 @@
     #define EXPOSURE_AUTO
 #endif
 // カメラのモード (F 値・シャッター速度・ISO から EV100 を出す。自動ではない)。露出と被写界深度の F 値を同じにする
-#if EXPOSURE_MODE == 3
+#if EXPOSURE_MODE >= 3 && EXPOSURE_MODE <= 6
     #define EXPOSURE_CAMERA
+#endif
+/*
+ * カメラの自動露出 (4 = P、5 = A (絞り優先)、6 = S (シャッター優先)、3 = M で ISO オートの時)。測った明るさから SS・F 値・ISO を実機と同じ考え方で決め、その組で EV100 を出す
+ * ゲーム向けの自動露出 (EXPOSURE_AUTO) の曲線・夜の持ち上げ・屋内の減光は掛けない (実機と同じく中間グレーへ完全に補正する)
+ */
+#if (EXPOSURE_MODE >= 4 && EXPOSURE_MODE <= 6) || (EXPOSURE_MODE == 3 && defined EXPOSURE_ISO_AUTO_M)
+    #define EXPOSURE_CAMERA_AE
 #endif
 /*
  * カメラの EV100 (実写の露出表の値) から Ray の EV100 (シーン単位の輝度で測った値) を引く量
@@ -30,6 +37,39 @@
  * 約 1.6 段明るく写り、実写の夜景の設定 (EV100 2〜4) より 5〜6 段暗い側の設定で合う
  */
 const float EXPOSURE_CAMERA_EV_OFFSET = 13.0;
+/*
+ * カメラの自動露出の数値。どれもカメラの EV100 (実写の露出表の値) で持ち、Ray の EV への変換は EXPOSURE_CAMERA_EV_OFFSET の 1 か所だけ
+ * P の線 (Nikon D850 の取説のプログラム線図、ISO 100・f/1.4 のレンズ): EV 4 (f/1.4・1/8 s) までは開放のまま SS だけ、その先は
+ * SS と絞りに 1/2 段ずつ。斜線は (F 値, SS) の上で 1 本なので、暗いレンズほど速い SS で斜線に入る (折れ点 = EV_REF + 4 log2(N0 / N_REF))。
+ * f/1.4 より明るいレンズは式だと折れ点が遅い SS になる (f/0.95 で約 1/4 s) ので、折れ点の SS を CORNER_SHUTTER より遅くしない
+ */
+const float CAMERA_PROGRAM_EV_REF = 4.0;
+const float CAMERA_PROGRAM_F_REF = 1.4;
+const float CAMERA_PROGRAM_CORNER_SHUTTER = 0.125;
+/*
+ * P・S で自動で決める F 値の最小絞り。A・M で選べる F 値 (DOF_F_NUMBER の選択肢) の上限 f/32 にそろえる
+ * (A・M の側を LENS_F_MAX (22) で止めると M の機械語が main と変わるので、P・S の側を広げた。レンズの効果の F 値はどのモードも LENS_F_MAX で止まる)
+ */
+const float CAMERA_F_CLOSED = 32.0;
+// 自動で決める SS の範囲 (秒)。実機の機械シャッターの 1/8000〜30 秒。M と S で選べる SS は設定の範囲 (120 秒まで)
+const float CAMERA_SHUTTER_FAST = 1.0 / 8000.0;
+const float CAMERA_SHUTTER_SLOW = 30.0;
+/*
+ * 評価測光の明るい側の上限 (カメラの EV100)。Nikon D850 の取説の注記「マルチパターン測光では 16 1/3 EV を超える値は 16 1/3 EV に下げる」から。
+ * 目的は書かれていない (雪・砂を明るく写す意図か、測光の範囲か) ので Ray の調整値。晴れの昼 (14.3) には効かず、雪原・空を見上げた時だけ明るめに写す
+ */
+const float CAMERA_EVALUATIVE_EV_MAX = 16.0 + 1.0 / 3.0;
+// 絞り (S) と ISO (M + ISO オート) が限界と見なす比 (約 1/17 段)。ちょうど端で合わせた時に、丸めの誤差で限界の表示が点かないように
+const float CAMERA_LIMIT_TOLERANCE = 1.02;
+// FrameData.postParams の、自動で決めた SS・F 値・ISO と限界の印を置く場所 (lib/post/exposure.glsl)
+const int CAMERA_AE_PARAM = 8;
+// 限界の印 (postParams[CAMERA_AE_PARAM].w)。SS が遅い側 / 速い側、絞りが開放 / 最小、ISO が範囲の端に着いて、露出が合わない
+const uint CAMERA_LIMIT_SLOW = 1u;
+const uint CAMERA_LIMIT_FAST = 2u;
+const uint CAMERA_LIMIT_OPEN = 4u;
+const uint CAMERA_LIMIT_CLOSED = 8u;
+// M + ISO オートで ISO が下限か上限に着いて露出が合わない (Sony は ISO の表示が点滅)
+const uint CAMERA_LIMIT_ISO = 16u;
 // DR の補正が働くか (今の方式の自動露出だけ。局所の明るさのタイルもこの時だけ作る)
 #if defined EXPOSURE_DR && defined EXPOSURE_AUTO && EXPOSURE_RESPONSE_MODE == 0
     #define EXPOSURE_DR_ACTIVE
@@ -178,7 +218,15 @@ const float EXPOSURE_UNDERWATER_DIM = 0.9;
 const float EXPOSURE_RAIN_DIM = 0.45;
 const float EXPOSURE_THUNDER_DIM = 1.0;
 // ヒストグラムの範囲 (log2 輝度)。MIN_AMBIENT 付近の暗所から太陽円盤の手前まで
+/*
+ * カメラの自動露出 (P・A・S) は下を -28 まで広げる。現実の光の比 (#404) の満月の野原は輝度が約 2^-19 (カメラの EV100 約 -3) で、
+ * -16 のままだと黒のビンに落ちて測光がカメラの EV100 約 0 で止まり、ISO 5000・1/15 で 3 段暗く写った。-28 は fp16 の非正規化数の下 (2^-24) より下
+ */
+#ifdef EXPOSURE_CAMERA_AE
+const float HISTOGRAM_LOG_MIN = -28.0;
+#else
 const float HISTOGRAM_LOG_MIN = -16.0;
+#endif
 const float HISTOGRAM_LOG_MAX = 10.0;
 const float HISTOGRAM_LAST_BIN = 255.0;   // ビンは 0 (黒) と 1-255 (log2 輝度の等間隔)
 // パーセンタイル: 暗すぎる影と空・太陽の外れ値を平均から除く (UE 4.25 方式)
@@ -194,6 +242,11 @@ const float METERING_CENTER_DIAMETER = 1.0 / 3.0;
 const float METERING_CENTER_OUTSIDE = 0.05;
 // スポット測光: 画面の幅の 1/9 の円 (3:2 で面積の約 1.5%、16:9 で約 1.7%) だけを測る
 const float METERING_SPOT_DIAMETER = 1.0 / 9.0;
+/*
+ * 部分測光: 画面の幅の 0.22 の円だけを測る (3:2 で面積の約 5.9% = Canon の部分測光、16:9 で約 6.7%)
+ * 大きさは Nikon の中央重点の「小」(8 mm の円) とほぼ同じで、違いは円の外を測らないこと
+ */
+const float METERING_PARTIAL_DIAMETER = 0.22;
 // 円の縁をぼかす幅 (半径に対する割合)。格子の点が縁を出入りする時に測光が跳ばないように
 const vec2 METERING_CIRCLE_EDGE = vec2(0.8, 1.2);
 /*

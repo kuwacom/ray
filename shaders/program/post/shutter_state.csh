@@ -11,6 +11,7 @@
 //@include "/lib/common/uniforms.glsl"
 //@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/post/post_constants.glsl"
+//@include "/lib/post/camera_exposure.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/common/uniforms.glsl"
 #include "/lib/buffers/frame_data.glsl"
@@ -25,13 +26,14 @@
 #include "/lib/common/constants.glsl"
 #include "/lib/common/look_presets.glsl"
 #include "/lib/post/post_constants.glsl"
+#include "/lib/post/camera_exposure.glsl"
 // END GENERATED includes
 
 layout(local_size_x = 1, local_size_y = 1) in;
 const ivec3 workGroups = ivec3(1, 1, 1);
 
 void main() {
-    float t = optShutterSpeed;
+    float t = cameraShutterSpeed();
     float dt = clamp(frameTime, SHUTTER_DT_MIN, SHUTTER_DT_MAX);
     vec4 state = frameData.postParams[SHUTTER_PARAM];
     /*

@@ -94,6 +94,7 @@ VALIDATION_SETS: dict[str, dict[str, str]] = {
     # 測光の選択 (既定でない重みと、ハイライト重点の上限の経路)
     "METERING_SPOT": {"EXPOSURE_METERING_MODE": "2"},
     "METERING_HIGHLIGHT": {"EXPOSURE_METERING_MODE": "4"},
+    "METERING_PARTIAL": {"EXPOSURE_METERING_MODE": "5"},
     # DR の補正 (ブルームを切っても局所の明るさのタイルを作る経路)
     "EXPOSURE_DR": {"EXPOSURE_DR": "true"},
     "EXPOSURE_DR_NO_BLOOM": {"EXPOSURE_DR": "true", "BLOOM": "false"},
@@ -103,6 +104,14 @@ VALIDATION_SETS: dict[str, dict[str, str]] = {
     # カメラの露出 (F 値・SS・ISO)。アナログでは ISO がゲインを決める。絞りの無いレンズ (Hologon) と、古い方式を選んだまま
     "EXPOSURE_CAMERA": {"EXPOSURE_MODE": "3", "DOF_APERTURE_MODE": "1"},
     "EXPOSURE_CAMERA_ANALOG": {"EXPOSURE_MODE": "3", "ANALOG": "true", "EXPOSURE_RESPONSE_MODE": "2", "LENS_PRESET": "10"},
+    # カメラの自動露出 P (ISO オート・シャッターの反映・アナログのゲイン)、ISO オートなしで絞りの無いレンズ
+    "EXPOSURE_CAMERA_P": {"EXPOSURE_MODE": "4", "SHUTTER": "true", "ANALOG": "true"},
+    "EXPOSURE_CAMERA_P_FIXED": {"EXPOSURE_MODE": "4", "EXPOSURE_ISO_AUTO": "false", "LENS_PRESET": "10", "EXPOSURE_METERING_MODE": "4"},
+    # M + ISO オート (シャッターの反映とアナログのゲイン)
+    "EXPOSURE_CAMERA_M_ISO_AUTO": {"EXPOSURE_MODE": "3", "EXPOSURE_ISO_AUTO_M": "true", "SHUTTER": "true", "ANALOG": "true"},
+    # A と S (S は 1 枚ずつのシャッター、A はアナログ)
+    "EXPOSURE_CAMERA_A": {"EXPOSURE_MODE": "5", "ANALOG": "true", "EXPOSURE_METERING_MODE": "1"},
+    "EXPOSURE_CAMERA_S": {"EXPOSURE_MODE": "6", "SHUTTER": "true", "SHUTTER_MODE": "1", "EXPOSURE_ISO_AUTO": "false", "EXPOSURE_INFO_MODE": "2"},
     # シャッター速度の反映 (モーションブラーを切っても composite21 が走る)
     "SHUTTER": {"SHUTTER": "true", "MOTION_BLUR": "false"},
     # 1 枚ずつ (SSBO 8 も確保する) とカメラの露出・アナログ

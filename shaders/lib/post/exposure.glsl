@@ -11,6 +11,7 @@
  * FrameData.postParams[6]: 古い方式の自動露出の状態。x = 絞りの EV100, y = 絞りの動く速さ, z = ゲイン (段), w = 検波した測光 EV100
  * FrameData.postParams[7]: シャッター速度の反映の状態 (composite21_a が書く)。x = このフレームを溜める重み, y = 今の露光で溜めた秒 (1 枚ずつ),
  *                         z = 溜め始めた時の画面の幅, w = 印 (SHUTTER_FLAG_*) + 8 x 画面の高さ
+ * FrameData.postParams[8]: カメラの自動露出 (P・A・S) が決めた値 (composite25 が書く)。x = SS (秒), y = F 値, z = ISO, w = 限界の印 (CAMERA_LIMIT_*)
  */
 #ifndef POST_EXPOSURE_GLSL
 #define POST_EXPOSURE_GLSL

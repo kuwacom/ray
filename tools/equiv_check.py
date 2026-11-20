@@ -98,6 +98,9 @@ def programs(tree: Tree, cfg: str, world: str, flt: str, env: vs.Env | None = No
         ov: dict = {}
     elif cfg in tree.profiles:
         ov = vs.resolve_profile(cfg, tree.profiles)
+    elif "=" in cfg:
+        # 設定の組を直接 (KEY=VALUE を + でつなぐ。例 EXPOSURE_MODE=3+SHUTTER=true)
+        ov = dict(kv.split("=", 1) for kv in cfg.split("+"))
     else:
         return None
     disabled = gcc.unread_programs(ov, tree.options, env)
@@ -199,7 +202,7 @@ def main() -> int:
     ap.add_argument("--base", default="HEAD", help="基準のコミット (既定 HEAD)")
     ap.add_argument("--new", default="", help="比べるコミット (既定: 作業ツリー)")
     ap.add_argument("--full", action="store_true", help="既定値 x 3 ディメンション + 全プロファイル (world0)")
-    ap.add_argument("--profile", help="この設定だけ (カンマ区切り。DEFAULT で既定値)")
+    ap.add_argument("--profile", help="この設定だけ (カンマ区切り。DEFAULT で既定値。KEY=VALUE を + でつないだ組も可)")
     ap.add_argument("--world", default="", help="ディメンション (カンマ区切り。既定 world0、--full の既定値は 3 つ)")
     ap.add_argument("--filter", default="", help="プログラム名にこの文字列を含むものだけ")
     ap.add_argument("--text", action="store_true", help="バイナリの代わりに前処理後の本文を比べる (GL を使わない)")
