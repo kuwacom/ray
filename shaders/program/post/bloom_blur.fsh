@@ -103,7 +103,17 @@ float sunMask(vec2 uv, float spreadPx) {
  * 光条の向きは絞り羽根に垂直 (lens.glsl の lensStarburst と同じ本数・向き)。光条の線に沿って光源の側を集める
  * 元は 1/4 タイルの周囲 (2 段粗いレベル) より明るい分だけ (一様に明るい空・雪原からは出さない)
  */
-const int SCREEN_STAR_TAPS = 6;                // 光条 1 本 (片側) のタップ数
+/*
+ * 光条 1 本 (片側) のタップの間隔 (画素) と数の範囲。間隔は光条の長さに依らず一定にする
+ * 間隔が広いと、白を大きく超えた光源 (夜の長時間露光・明るい溶岩) で光条がタップごとの点に割れ、光源の周りに点の輪が何重にも並んだ
+ * (6 タップを光源の近くほど細かく刻んでいた時、外側の間隔は F8 で 20 画素を超えた)
+ * 8 画素は 1/4 タイルの双線形 (半径 4 画素) と、フレアのタイルの拡大のぼけで線につながる間隔
+ */
+const float SCREEN_STAR_SPACING_PX = 8.0;
+const int SCREEN_STAR_TAPS_MIN = 6;
+const int SCREEN_STAR_TAPS_MAX = 32;
+// 上限のタップ数でも間隔が広い長い光条は、この倍率 x 双線形の半径 (2^level 画素) が間隔を覆う粗いレベルで読む
+const float SCREEN_STAR_SPACING_PER_RADIUS = 2.0;
 const float LENS_SCREEN_STAR_LENGTH = 0.07;    // 光条の長さの目安 (画面の高さ比, F2.14 の時)
 const float LENS_SCREEN_STAR_THRESHOLD = 1.5;  // 露出後の明るさの閾値 (1/4 タイル)
 // ニーの幅。回折の光条は本来明るさに比例するので、閾値の付近で明るさが揺れる点の光条が点いたり消えたりしないよう、閾値と同じ幅で 0 からなめらかに立ち上げる
@@ -120,22 +130,29 @@ vec3 screenStars(vec2 uv, float exposure, float fNumber) {
     float len = LENS_SCREEN_STAR_LENGTH * LP_STAR_SIZE * sqrt(n);
     float gain = LP_STARBURST * LENS_SCREEN_STAR_GAIN * clamp(n, 0.5, 3.0) * (1.0 - 0.7 * LP_BLADE_ROUNDNESS);
     gain *= mix(LENS_STAR_OPEN, 1.0, saturate((fNumber / LP_F_OPEN - 1.0) / LENS_STAR_STOPDOWN_RANGE));
+    float lenPx = len * viewHeight;
+    int taps = clamp(int(ceil(lenPx / SCREEN_STAR_SPACING_PX)), SCREEN_STAR_TAPS_MIN, SCREEN_STAR_TAPS_MAX);
+    int level = clamp(int(ceil(log2(max(lenPx / float(taps) / SCREEN_STAR_SPACING_PER_RADIUS, 1.0)))), 2, BLOOM_LEVELS - 2);
+    // 粗いレベルほど小さな光源は薄まるので、閾値もその分だけ下げる (画面ゴーストと同じ)
+    float dilution = exp2(-2.0 * float(level - 2));
+    float spreadPx = 3.0 * exp2(float(level));
+    vec4 localRect = vec4(bloomTileRectPx(level));
+    vec4 surroundRect = vec4(bloomTileRectPx(level + 2));
     vec3 sum = vec3(0.0);
     for (int j = 0; j < lines; j++) {
         float a = DOF_BLADE_ROTATION + float(j) * TAU / float(spikes);
-        vec2 dir = vec2(cos(a) / aspectRatio, sin(a));
-        for (int t = 0; t < SCREEN_STAR_TAPS; t++) {
-            // 光源の近くほど細かく刻む。重みは光条の裾 (指数減衰) x 刻み幅
-            float x0 = float(t) / float(SCREEN_STAR_TAPS);
-            float x1 = float(t + 1) / float(SCREEN_STAR_TAPS);
-            float r = len * sqr(0.5 * (x0 + x1));
-            float w = exp(-r / (0.3 * len)) * (sqr(x1) - sqr(x0));
+        vec2 dir = vec2(cos(a) / aspectRatio, sin(a)) * len;
+        for (int t = 0; t < taps; t++) {
+            // 重みは光条の裾 (指数減衰) x 刻み幅
+            float x = (float(t) + 0.5) / float(taps);
+            float w = exp(-x / 0.3) / float(taps);
             for (int side = -1; side <= 1; side += 2) {
-                vec2 src = uv - dir * (r * float(side));
+                vec2 src = uv - dir * (x * float(side));
                 if (any(lessThan(src, vec2(0.0))) || any(greaterThan(src, vec2(1.0)))) continue;
-                vec3 local = sampleBloomTileLinear(2, src);
-                vec3 surround = sampleBloomTileLinear(4, src);
-                sum += flareHighlight(max(local - surround, 0.0), exposure, LENS_SCREEN_STAR_THRESHOLD, LENS_SCREEN_STAR_KNEE) * (w * sunMask(src, FLARE_LEVEL2_SPREAD_PX));
+                vec3 local = sampleBloomRectLinear(localRect, src);
+                vec3 surround = sampleBloomRectLinear(surroundRect, src);
+                sum += flareHighlight(max(local - surround, 0.0), exposure, LENS_SCREEN_STAR_THRESHOLD * dilution, LENS_SCREEN_STAR_KNEE * dilution)
+                     * (w * sunMask(src, spreadPx));
             }
         }
     }

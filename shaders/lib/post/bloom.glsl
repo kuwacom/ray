@@ -118,12 +118,15 @@ vec3 sampleFlareTile(vec2 uv) {
     return sampleBSplineClamped(TEX_BLOOM, tileUv, screen, rectMin, rectMax);
 }
 
+// 矩形 rect (bloomTileRectPx) のタイルを双線形で読む。レベルがループの中で定数にならない時は、矩形を外で求めて渡す
+vec3 sampleBloomRectLinear(vec4 rect, vec2 uv) {
+    vec2 p = clamp(rect.xy + uv * rect.zw, rect.xy + 0.5, rect.xy + rect.zw - 0.5);
+    return bloomWithoutLavaGain(textureLod(TEX_BLOOM, p / viewSize(), 0.0));
+}
+
 // レベル level のタイルを双線形で読む (画面フレアのゴースト用。双三次ほどの滑らかさは要らない)
 vec3 sampleBloomTileLinear(int level, vec2 uv) {
-    vec2 screen = viewSize();
-    vec4 rect = vec4(bloomTileRectPx(level));
-    vec2 p = clamp(rect.xy + uv * rect.zw, rect.xy + 0.5, rect.xy + rect.zw - 0.5);
-    return bloomWithoutLavaGain(textureLod(TEX_BLOOM, p / screen, 0.0));
+    return sampleBloomRectLinear(vec4(bloomTileRectPx(level)), uv);
 }
 
 #endif
