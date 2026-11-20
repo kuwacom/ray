@@ -53,6 +53,10 @@ glslang は `RAY_GLSLANG`、PATH、`tools/glslang/bin/glslang.exe` の順に探�
 - マジックナンバーは定数にする。重い機能は `#ifdef` で丸ごと外し、パス単位では `program.*.enabled` で止める
 - 他のシェーダーパックのコードは持ち込まない。手法を参考にしたら CREDITS.md に出典を書く
 
+## コミット
+
+- メッセージは「種類: 件名」 (feat / fix / update / docs / merge / ci など)。小さいものは件名だけ、大きめのものは本文に「何をしたか」を箇条書きで (diff で分かることは書かない)
+
 ## ゲーム内での確認
 
 Minescript 経由で、設定変更・シェーダー再読み込み・撮影・ログ確認を CLI から回せる。手順は [tools/README.md](tools/README.md#ゲーム内で撮影する)
