@@ -190,6 +190,8 @@
 #endif
 #ifdef EXPOSURE_ISO_AUTO
 #endif
+#ifdef EXPOSURE_ISO_AUTO_M
+#endif
 #ifdef EXPOSURE_DR
 #endif
 #ifdef GRADING

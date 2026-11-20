@@ -43,7 +43,7 @@ float cameraSetFNumber() {
  * P・S は composite25 が自動で決めた値 (前のフレーム。DoF は composite25 より前に走る)
  */
 float cameraFNumber() {
-#if defined EXPOSURE_CAMERA_AE && EXPOSURE_MODE != 5
+#if defined EXPOSURE_CAMERA_AE && (EXPOSURE_MODE == 4 || EXPOSURE_MODE == 6)
     float n = frameData.postParams[CAMERA_AE_PARAM].y;
     return n > 0.0 ? n : cameraSetFNumber();
 #else

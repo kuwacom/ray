@@ -342,11 +342,21 @@ CameraExposure cameraAutoExposure(float sceneEv) {
     CameraExposure e;
     e.iso = isoMin;
     e.limits = 0u;
-    #ifdef EXPOSURE_ISO_AUTO
     float isoMax = max(float(EXPOSURE_ISO_AUTO_MAX), isoMin);
+    #ifdef EXPOSURE_ISO_AUTO
     float minShutter = cameraMinShutter();
     #endif
-    #if EXPOSURE_MODE == 4
+    #if EXPOSURE_MODE == 3
+    /*
+     * M + ISO オート: SS と F 値は設定のまま、ISO = 100 x 2^(設定の EV - 場面の EV') で合わせる (露出補正で ISO が動く。Canon・Nikon と同じ)
+     * 範囲は ISO 感度の設定 (下限) から ISO オートの上限まで。端に着いたら ISO が点滅 (Sony)
+     */
+    e.shutter = optShutterSpeed;
+    e.fNumber = cameraSetFNumber();
+    float wanted = EXPOSURE_ISO_REFERENCE * exp2(log2(e.fNumber * e.fNumber / e.shutter) - sceneEv);
+    e.iso = clamp(wanted, isoMin, isoMax);
+    if (wanted < isoMin / CAMERA_LIMIT_TOLERANCE || wanted > isoMax * CAMERA_LIMIT_TOLERANCE) e.limits |= CAMERA_LIMIT_ISO;
+    #elif EXPOSURE_MODE == 4
     // P: F 値と SS を線で決める
     float corner = programCornerEv(n0);
         #ifdef EXPOSURE_ISO_AUTO
@@ -382,8 +392,8 @@ CameraExposure cameraAutoExposure(float sceneEv) {
     e.fNumber = sqrt(e.shutter * exp2(sceneEv + log2(e.iso / EXPOSURE_ISO_REFERENCE)));
         #endif
     // 絞りの無いレンズは n0 = n1 なので、ISO オートが合わせ切れない時は常に点滅
-    if (e.fNumber < n0 / CAMERA_F_TOLERANCE) e.limits |= CAMERA_LIMIT_OPEN;
-    if (e.fNumber > n1 * CAMERA_F_TOLERANCE) e.limits |= CAMERA_LIMIT_CLOSED;
+    if (e.fNumber < n0 / CAMERA_LIMIT_TOLERANCE) e.limits |= CAMERA_LIMIT_OPEN;
+    if (e.fNumber > n1 * CAMERA_LIMIT_TOLERANCE) e.limits |= CAMERA_LIMIT_CLOSED;
     e.fNumber = clamp(e.fNumber, n0, n1);
     #endif
     return e;
@@ -448,31 +458,33 @@ void infoFNumber(float n, int blink) {
     infoTenths(INFO_F_TENTHS[clamp(int(round(6.0 * log2(n))) + 3, 0, 33)], blink);
 }
 
-void infoIso(float iso) {
-    infoPut(CAMERA_INFO_I);
-    infoPut(CAMERA_INFO_S);
-    infoPut(CAMERA_INFO_O);
-    infoInteger(INFO_ISO_STEPS[clamp(int(round(3.0 * log2(iso / 25.0))), 0, 36)], 0);
+void infoIso(float iso, int blink) {
+    infoPut(CAMERA_INFO_I + blink);
+    infoPut(CAMERA_INFO_S + blink);
+    infoPut(CAMERA_INFO_O + blink);
+    infoInteger(INFO_ISO_STEPS[clamp(int(round(3.0 * log2(iso / 25.0))), 0, 36)], blink);
 }
 
 /*
- * 1 = 限界の時に、限界に着いた側 (P は SS と F 値、A は SS、S は F 値) だけを点滅。2 = 常に SS・F 値・ISO を出し、限界の側を点滅
+ * 1 = 限界の時に、限界に着いた側 (P は SS と F 値、A は SS、S は F 値、M + ISO オートは ISO) だけを点滅。2 = 常に SS・F 値・ISO を出し、限界の側を点滅
  */
 void writeCameraInfo(CameraExposure e) {
     infoLength = 0;
     for (int i = 0; i < CAMERA_INFO_CHARS; i++) infoText[i] = 0;
     int blinkShutter = (e.limits & (CAMERA_LIMIT_SLOW | CAMERA_LIMIT_FAST)) != 0u ? CAMERA_INFO_BLINK : 0;
     int blinkF = (e.limits & (CAMERA_LIMIT_OPEN | CAMERA_LIMIT_CLOSED)) != 0u ? CAMERA_INFO_BLINK : 0;
+    int blinkIso = (e.limits & CAMERA_LIMIT_ISO) != 0u ? CAMERA_INFO_BLINK : 0;
         #if EXPOSURE_INFO_MODE == 2
     infoShutter(e.shutter, blinkShutter);
     infoPut(CAMERA_INFO_SPACE);
     infoFNumber(e.fNumber, blinkF);
     infoPut(CAMERA_INFO_SPACE);
-    infoIso(e.iso);
+    infoIso(e.iso, blinkIso);
         #else
     if (blinkShutter != 0) infoShutter(e.shutter, blinkShutter);
     if (blinkShutter != 0 && blinkF != 0) infoPut(CAMERA_INFO_SPACE);
     if (blinkF != 0) infoFNumber(e.fNumber, blinkF);
+    if (blinkIso != 0) infoIso(e.iso, blinkIso);
         #endif
     for (int w = 0; w < CAMERA_INFO_CHARS / CAMERA_INFO_CHARS_PER_WORD; w++) {
         int word = 0;

@@ -107,6 +107,8 @@ VALIDATION_SETS: dict[str, dict[str, str]] = {
     # カメラの自動露出 P (ISO オート・シャッターの反映・アナログのゲイン)、ISO オートなしで絞りの無いレンズ
     "EXPOSURE_CAMERA_P": {"EXPOSURE_MODE": "4", "SHUTTER": "true", "ANALOG": "true"},
     "EXPOSURE_CAMERA_P_FIXED": {"EXPOSURE_MODE": "4", "EXPOSURE_ISO_AUTO": "false", "LENS_PRESET": "10", "EXPOSURE_METERING_MODE": "4"},
+    # M + ISO オート (シャッターの反映とアナログのゲイン)
+    "EXPOSURE_CAMERA_M_ISO_AUTO": {"EXPOSURE_MODE": "3", "EXPOSURE_ISO_AUTO_M": "true", "SHUTTER": "true", "ANALOG": "true"},
     # A と S (S は 1 枚ずつのシャッター、A はアナログ)
     "EXPOSURE_CAMERA_A": {"EXPOSURE_MODE": "5", "ANALOG": "true", "EXPOSURE_METERING_MODE": "1"},
     "EXPOSURE_CAMERA_S": {"EXPOSURE_MODE": "6", "SHUTTER": "true", "SHUTTER_MODE": "1", "EXPOSURE_ISO_AUTO": "false", "EXPOSURE_INFO_MODE": "2"},
