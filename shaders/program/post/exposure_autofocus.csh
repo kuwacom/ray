@@ -903,9 +903,12 @@ void main() {
 #endif
 
 #ifdef EXPOSURE_CAMERA_AE
-    // 補正は SS・F 値・ISO に入っている。Purkinje と局所トーンマップの基準は M と同じく組が中間グレーに写す明るさ
+    /*
+     * 補正は SS・F 値・ISO に入っている。Purkinje と局所トーンマップの基準は M と同じく補正の前の明るさ
+     * (M は補正を exposure にだけ掛けるので、組が写す明るさに補正の分を戻す)
+     */
     const float bias = 1.0;
-    float averageEv = appliedEv;
+    float averageEv = appliedEv + LOOK_EXPOSURE_BIAS;
 #else
     float bias = exp2(LOOK_EXPOSURE_BIAS);
     float averageEv = adaptedEv;
