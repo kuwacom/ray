@@ -87,7 +87,8 @@
 #include "/lib/common/exposure.glsl"
 // END GENERATED includes
 
-layout(local_size_x = 8, local_size_y = 8) in;
+#define REFLECTION_FILTER_GROUP 8
+layout(local_size_x = REFLECTION_FILTER_GROUP, local_size_y = REFLECTION_FILTER_GROUP) in;
 const vec2 workGroupsRender = vec2(0.5, 0.5);
 
 const int REFLECTION_FILTER_RADIUS = 3;       // 半分の解像度のテクセルで (7x7)
@@ -96,64 +97,89 @@ const float REFLECTION_FILTER_SIGMA_MIN = 0.6;
 const float REFLECTION_FILTER_PLANE = 0.02;   // 同じ平面とみなす距離 (ブロック + 視線距離に対する比)
 const float REFLECTION_FILTER_PLANE_REL = 0.01;
 
-// ローブの半角 (度) で重みが半分になる法線の指数。半角は 90 m / (1 + m)、m = 粗さの二乗 (ReBLUR の法線の重み)
-float lobeNormalPower(float roughness) {
-    float m = roughness * roughness;
-    float halfAngle = radians(90.0 * m / (1.0 + m));
-    return log(0.5) / log(max(cos(halfAngle), 1e-3));
-}
+/*
+ * 近傍は 1 グループで共有メモリに 1 回だけ読み、近傍だけで決まる分 (法線の復元、反射を求めた面との一致、明るさの重み) もそこで済ませる
+ * radiance: rgb = 放射 x 明るさの重み 1 / (1 + L)、a = その重み (使えない近傍は 0)。pos: player 空間の位置。normal: テクスチャ法線
+ */
+const int REFLECTION_FILTER_TILE = REFLECTION_FILTER_GROUP + 2 * REFLECTION_FILTER_RADIUS;
+shared vec4 tileRadiance[REFLECTION_FILTER_TILE * REFLECTION_FILTER_TILE];
+shared vec3 tilePos[REFLECTION_FILTER_TILE * REFLECTION_FILTER_TILE];
+shared vec3 tileNormal[REFLECTION_FILTER_TILE * REFLECTION_FILTER_TILE];
 
 void main() {
-    ivec2 low = ivec2(gl_GlobalInvocationID.xy);
     ivec2 lowSize = reflectionLowResSize();
-    if (any(greaterThanEqual(low, lowSize))) return;
     ivec2 region = reflectionRegion(frameCounter);
+    ivec2 offset = lowResOffset(frameCounter);
+    ivec2 screen = ivec2(viewSize());
+    float exposure = getExposure();
+    ivec2 tileBase = ivec2(gl_WorkGroupID.xy) * REFLECTION_FILTER_GROUP - REFLECTION_FILTER_RADIUS;
+    for (int k = int(gl_LocalInvocationIndex); k < REFLECTION_FILTER_TILE * REFLECTION_FILTER_TILE; k += REFLECTION_FILTER_GROUP * REFLECTION_FILTER_GROUP) {
+        ivec2 L = tileBase + ivec2(k % REFLECTION_FILTER_TILE, k / REFLECTION_FILTER_TILE);
+        vec4 r = vec4(0.0);
+        vec3 q = vec3(0.0);
+        vec3 n = vec3(0.0);
+        if (all(greaterThanEqual(L, ivec2(0))) && all(lessThan(L, lowSize))) {
+            vec4 h = imageLoad(reflectionImg, L + region);
+            if (h.a > 0.0) {
+                ivec2 nt = min(L * 2 + offset, screen - 1);
+                float d1 = texelFetch(depthtex1, nt, 0).r;
+                q = viewToPlayer(screenToView(vec3((vec2(nt) + 0.5) / viewSize(), d1)));
+                float lq = length(q);
+                // 反射を求めた面 (距離 h.a) が不透明の面と違う (半透明の面の反射) 近傍は混ぜない
+                if (abs(lq - h.a) < REFLECTION_FILTER_PLANE + lq * REFLECTION_FILTER_PLANE_REL) {
+                    // たまたま明るい物を引いたテクセルが近傍を支配して点に残らないよう、明るさで重みを下げる (c / (1 + L) の平均)
+                    float k1 = 1.0 / (1.0 + luminance(h.rgb) * exposure);
+                    r = vec4(h.rgb * k1, k1);
+                    n = octDecode(texelFetch(colortex2, nt, 0).rg);
+                }
+            }
+        }
+        tileRadiance[k] = r;
+        tilePos[k] = q;
+        tileNormal[k] = n;
+    }
+    memoryBarrierShared();
+    barrier();
+
+    ivec2 low = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(low, lowSize))) return;
     ivec2 outLow = low + reflectionFilteredRegion();
     vec4 center = imageLoad(reflectionImg, low + region);
     if (center.a <= 0.0) {
         imageStore(reflectionImg, outLow, center);
         return;
     }
-    ivec2 offset = lowResOffset(frameCounter);
     ReflectSurface s = getReflectSurface(low * 2 + offset);
-    if (!s.valid || s.translucent || s.perceptualRoughness < MIRROR_ROUGHNESS) {
+    ivec2 local = ivec2(gl_LocalInvocationID.xy) + REFLECTION_FILTER_RADIUS;
+    if (!s.valid || s.translucent || s.perceptualRoughness < MIRROR_ROUGHNESS || tileRadiance[local.y * REFLECTION_FILTER_TILE + local.x].a <= 0.0) {
         imageStore(reflectionImg, outLow, center);
         return;
     }
 
     vec3 P = viewToPlayer(s.viewPos);
-    float dist = length(P);
+    float planeTol = REFLECTION_FILTER_PLANE + length(P) * REFLECTION_FILTER_PLANE_REL;
     float t = saturate((s.perceptualRoughness - MIRROR_ROUGHNESS) / 0.4);
     float sigma = mix(REFLECTION_FILTER_SIGMA_MIN, REFLECTION_FILTER_SIGMA, t);
-    float invTwoSigma2 = 0.5 / (sigma * sigma);
-    float normalPower = lobeNormalPower(s.perceptualRoughness);
-    float planeTol = REFLECTION_FILTER_PLANE + dist * REFLECTION_FILTER_PLANE_REL;
-    float exposure = getExposure();
-    ivec2 screen = ivec2(viewSize());
+    float gaussK = -0.5 / (sigma * sigma * log(2.0));
+    /*
+     * 法線はローブの半角より傾いた近傍を混ぜない (ReBLUR の法線の重み。半角は 90 m / (1 + m) 度、m = 粗さの二乗)
+     * 半角で 0 になる直線の重みにする (pow より安い)
+     */
+    float m = s.perceptualRoughness * s.perceptualRoughness;
+    float cosLobe = cos(radians(90.0 * m / (1.0 + m)));
+    float invLobe = 1.0 / max(1.0 - cosLobe, 1e-4);
 
-    // 明るさで重みを下げて混ぜる (c / (1 + L) の平均)。たまたま明るい物を引いたテクセルが近傍を支配して点に残らない
-    vec3 sum = vec3(0.0);
-    float wsum = 0.0;
+    vec4 sum = vec4(0.0);
     for (int j = -REFLECTION_FILTER_RADIUS; j <= REFLECTION_FILTER_RADIUS; j++) {
         for (int i = -REFLECTION_FILTER_RADIUS; i <= REFLECTION_FILTER_RADIUS; i++) {
-            ivec2 L = low + ivec2(i, j);
-            if (any(lessThan(L, ivec2(0))) || any(greaterThanEqual(L, lowSize))) continue;
-            vec4 r = (i == 0 && j == 0) ? center : imageLoad(reflectionImg, L + region);
-            if (r.a <= 0.0) continue;
-            ivec2 nt = min(L * 2 + offset, screen - 1);
-            float w = exp(-float(i * i + j * j) * invTwoSigma2);
-            if (i != 0 || j != 0) {
-                float d1 = texelFetch(depthtex1, nt, 0).r;
-                vec3 Q = viewToPlayer(screenToView(vec3((vec2(nt) + 0.5) / viewSize(), d1)));
-                // 同じ平面で、反射を求めた面が同じ (半透明の面の反射を混ぜない) 近傍だけ
-                if (abs(dot(Q - P, s.geoNormal)) > planeTol || abs(length(Q) - r.a) > planeTol) continue;
-                w *= pow(saturate(dot(readGBufferNormal(nt), s.normal)), normalPower);
-            }
-            w /= 1.0 + luminance(r.rgb) * exposure;
-            sum += r.rgb * w;
-            wsum += w;
+            int k = (local.y + j) * REFLECTION_FILTER_TILE + local.x + i;
+            vec4 r = tileRadiance[k];
+            float w = exp2(float(i * i + j * j) * gaussK)
+                * saturate((dot(tileNormal[k], s.normal) - cosLobe) * invLobe + float(i == 0 && j == 0))
+                * step(abs(dot(tilePos[k] - P, s.geoNormal)), planeTol);
+            sum += r * w;
         }
     }
-    // 中心は必ず入るので wsum > 0。明るさの重みで割った分を戻す
-    imageStore(reflectionImg, outLow, vec4(sum / wsum, center.a));
+    // 中心は必ず入るので sum.a > 0。明るさの重みで割った分を戻す
+    imageStore(reflectionImg, outLow, vec4(sum.rgb / max(sum.a, 1e-8), center.a));
 }
