@@ -376,7 +376,7 @@ option.FIREFLY_BUSH_BRIGHTNESS.comment=How strongly firefly bushes light their s
 option.EYEBLOSSOM_BRIGHTNESS=Open Eyeblossom Brightness
 option.EYEBLOSSOM_BRIGHTNESS.comment=How brightly open eyeblossoms glow pale orange at night, and how strongly they softly light their surroundings. 0 = no glow.
 option.LAVA_BRIGHTNESS=Lava Brightness
-option.LAVA_BRIGHTNESS.comment=How bright lava itself looks on screen. Higher values shift it from orange toward yellow. Does not change the light it casts. 0 = no extra brightening (darker orange)
+option.LAVA_BRIGHTNESS.comment=How bright lava itself looks on screen. Up to 1 it gets brighter while staying deep orange; above 1 it shifts toward a bright, pale orange, and at 5 it is about as bright as the brightest glow it casts on the rock next to it. Lower values give a darker, deeper orange. Does not change the light it casts. 0 = no extra brightening (darker orange)
 option.LAVA_BLOOM=Lava Bloom
 option.LAVA_BLOOM.comment=Strength of the glow around lava. 0 = same bloom as other objects
 option.LAVA_LIGHT=Lava Light

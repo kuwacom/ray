@@ -23,7 +23,9 @@ const vec3 FIRE_NEUTRAL_SRGB = vec3(1.00, 0.86, 0.72);
 const vec3 FIRE_WARM_SRGB = vec3(1.00, 0.62, 0.30);
 const vec3 SOUL_SRGB = vec3(0.45, 0.85, 1.00);
 const vec3 COPPER_FLAME_SRGB = vec3(0.55, 1.00, 0.65);
-const vec3 LAVA_SRGB = vec3(1.00, 0.45, 0.15);
+// 溶岩の光の色。夜の溶岩の実写では照らされた岩・煙は色相 5-15 度で、溶岩の面 (22 度前後) より赤い
+// 0.45 では AgX を通った照らされた面が面と同じ橙 (色相 15-21 度) に写った。0.27 で 9-13 度
+const vec3 LAVA_SRGB = vec3(1.00, 0.27, 0.10);
 
 // 鉱物ブロックを光源にした時の明るさと光レベル (到達半径は 15 x レベル / 15 ブロック)
 const float DECOR_LIGHT_BRIGHTNESS = 0.5;
