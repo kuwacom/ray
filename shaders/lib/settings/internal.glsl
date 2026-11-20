@@ -94,8 +94,8 @@ const int noiseTextureResolution = 256;
     #define GI_HIT_DIRECT_REUSE 1
 #endif
 
-// 光源の明るさを現実の比にする (lib/common/constants.glsl)。カメラの露出の時だけ効かせる
-#if EXPOSURE_MODE == 3 && defined EXPOSURE_PHYSICAL_LIGHT
+// 光源の明るさを現実の比にする (lib/common/constants.glsl)。カメラの露出 (3 = M、4〜6 = P・A・S) の時だけ効かせる
+#if EXPOSURE_MODE >= 3 && defined EXPOSURE_PHYSICAL_LIGHT
     #define PHYSICAL_LIGHT_ACTIVE 1
 #endif
 

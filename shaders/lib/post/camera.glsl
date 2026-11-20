@@ -11,6 +11,7 @@
 //@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/post/lens_presets.glsl"
 //@include "/lib/post/post_constants.glsl"
+//@include "/lib/post/camera_exposure.glsl"
 
 /*
  * ピントを合わせる距離 (ブロック): composite25 が前フレームに平滑化して書いた値
@@ -26,15 +27,33 @@ float cameraFocalLength() {
 }
 
 /*
- * 露出がカメラの時の F 値。露出の明るさと被写界深度・レンズの効果に同じ値を使い、レンズプリセットの開放 F 値より開かない
+ * 露出がカメラの時の設定の F 値 (M と A)。レンズプリセットの開放 F 値より開かない
  * 絞りの無いレンズは開放 F 値のまま (明るさはシャッター速度と ISO で決める)
  */
-float cameraFNumber() {
+float cameraSetFNumber() {
 #if defined LENS_FIXED_APERTURE
     return LP_F_OPEN;
 #else
     return max(optFNumber, LP_F_OPEN);
 #endif
+}
+
+/*
+ * 露出がカメラの時の F 値。露出の明るさと被写界深度・レンズの効果に同じ値を使う
+ * P・S は composite25 が自動で決めた値 (前のフレーム。DoF は composite25 より前に走る)
+ */
+float cameraFNumber() {
+#if defined EXPOSURE_CAMERA_AE && EXPOSURE_MODE != 5
+    float n = frameData.postParams[CAMERA_AE_PARAM].y;
+    return n > 0.0 ? n : cameraSetFNumber();
+#else
+    return cameraSetFNumber();
+#endif
+}
+
+// 低速限界の「自動」に使う 35mm 判換算の焦点距離 (mm)。中判・大判の実焦点距離のままだと 1/焦点距離 が速すぎる
+float cameraFocalLength35() {
+    return cameraFocalLength() * DOF_SENSOR_HEIGHT_FULL / DOF_SENSOR_HEIGHT;
 }
 
 /*

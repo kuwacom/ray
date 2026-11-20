@@ -57,6 +57,7 @@
 #include "/lib/post/lens_presets.glsl"
 #include "/lib/post/sampling.glsl"
 #include "/lib/post/exposure.glsl"
+#include "/lib/post/camera_exposure.glsl"
 #include "/lib/post/camera.glsl"
 #include "/lib/post/grading.glsl"
 #include "/lib/buffers/slots.glsl"
@@ -187,10 +188,10 @@ uint flareVisibilityTap(uint index) {
 }
 #endif
 
-// 測光の重み。古い方式の自動露出は機材の測光に決め打ち (VHS は中央重点、DV は平均)
-#if EXPOSURE_RESPONSE_MODE == 1
+// 測光の重み。古い方式の自動露出は機材の測光に決め打ち (VHS は中央重点、DV は平均)。カメラの自動露出には古い方式は効かない
+#if defined EXPOSURE_AUTO && EXPOSURE_RESPONSE_MODE == 1
     #define METERING_ACTIVE_MODE 1
-#elif EXPOSURE_RESPONSE_MODE == 2
+#elif defined EXPOSURE_AUTO && EXPOSURE_RESPONSE_MODE == 2
     #define METERING_ACTIVE_MODE 3
 #else
     #define METERING_ACTIVE_MODE EXPOSURE_METERING_MODE
@@ -271,6 +272,86 @@ float exposureCurve(float ev) {
     float boost = EXPOSURE_BRIGHT_BOOST * smoothstep(EXPOSURE_BRIGHT_EV_LOW, EXPOSURE_BRIGHT_EV_HIGH, ev);
     return EXPOSURE_ANCHOR_EV + (ev - EXPOSURE_ANCHOR_EV) * EXPOSURE_CURVE - boost;
 }
+
+#ifdef EXPOSURE_CAMERA_AE
+/*
+ * カメラの自動露出 (P・A・S)。場面の EV (カメラの EV100、ISO 100 換算、露出補正を引いた値) から SS・F 値・ISO を決める
+ * ISO オートの順 (P と A は Canon・Nikon・Sony・Fujifilm の取説で同じ): 下限の ISO で決め、SS が低速限界より遅くなる所から ISO を上げ、
+ * 上限に着いたら低速限界より遅い SS を使う。S は絞りが開放に着いた所から ISO を上げる
+ */
+struct CameraExposure {
+    float shutter;
+    float fNumber;
+    float iso;
+    uint limits;
+};
+
+// 開放 F 値 (レンズプリセット) と最小絞り。絞りの無いレンズは両方とも開放 F 値
+float cameraOpenFNumber() { return LP_F_OPEN; }
+float cameraClosedFNumber() {
+#ifdef LENS_FIXED_APERTURE
+    return LP_F_OPEN;
+#else
+    return max(LENS_F_MAX, LP_F_OPEN);
+#endif
+}
+
+// ISO オートの低速限界 (秒)。0 は自動 = 1 / 焦点距離 (35mm 判換算。Canon の [自動] の定義)
+float cameraMinShutter() {
+    float fixedShutter = EXPOSURE_ISO_AUTO_MIN_SHUTTER;
+    float shutter = fixedShutter > 0.0 ? fixedShutter : 1.0 / max(cameraFocalLength35(), 1.0);
+    return clamp(shutter, CAMERA_SHUTTER_FAST, CAMERA_SHUTTER_SLOW);
+}
+
+// P の線の折れ点 (これより暗いと開放のまま SS だけ)
+float programCornerEv(float n0) {
+    return max(CAMERA_PROGRAM_EV_REF + 4.0 * log2(n0 / CAMERA_PROGRAM_F_REF), log2(n0 * n0 / CAMERA_PROGRAM_CORNER_SHUTTER));
+}
+
+// P の線: 設定の EV (log2(N^2 / t)) -> F 値
+float programFNumber(float ev, float n0, float n1, float corner) {
+    return clamp(n0 * exp2(max(ev - corner, 0.0) * 0.25), n0, n1);
+}
+
+// P の線で SS が t になる設定の EV (programFNumber の逆。開放の水平部、斜線、最小絞りの水平部の順)
+float programEvForShutter(float t, float n0, float n1, float corner) {
+    float open = log2(n0 * n0 / t);
+    if (open <= corner) return open;
+    float ev = 2.0 * open - corner;
+    return ev > corner + 4.0 * log2(n1 / n0) ? log2(n1 * n1 / t) : ev;
+}
+
+CameraExposure cameraAutoExposure(float sceneEv) {
+    float n0 = cameraOpenFNumber();
+    float n1 = cameraClosedFNumber();
+    float isoMin = optExposureIso;
+    CameraExposure e;
+    e.iso = isoMin;
+    e.limits = 0u;
+    #ifdef EXPOSURE_ISO_AUTO
+    float isoMax = max(float(EXPOSURE_ISO_AUTO_MAX), isoMin);
+    float minShutter = cameraMinShutter();
+    #endif
+    float corner = programCornerEv(n0);
+    #ifdef EXPOSURE_ISO_AUTO
+    // 線の上で SS が低速限界になる EV まで、足りない分だけ ISO を上げる
+    e.iso = clamp(EXPOSURE_ISO_REFERENCE * exp2(programEvForShutter(minShutter, n0, n1, corner) - sceneEv), isoMin, isoMax);
+    #endif
+    float ev = sceneEv + log2(e.iso / EXPOSURE_ISO_REFERENCE);
+    e.fNumber = programFNumber(ev, n0, n1, corner);
+    e.shutter = e.fNumber * e.fNumber / exp2(ev);
+    // 線の外: 暗い側は開放のまま 30 秒、明るい側は最小絞りのまま 1/8000 で止まる (Canon は SS と F 値の両方が点滅)
+    if (e.shutter > CAMERA_SHUTTER_SLOW) e.limits |= CAMERA_LIMIT_SLOW | CAMERA_LIMIT_OPEN;
+    if (e.shutter < CAMERA_SHUTTER_FAST) e.limits |= CAMERA_LIMIT_FAST | CAMERA_LIMIT_CLOSED;
+    e.shutter = clamp(e.shutter, CAMERA_SHUTTER_FAST, CAMERA_SHUTTER_SLOW);
+    return e;
+}
+
+// 決めた組が写す明るさ (Ray の EV100)。M と同じ式
+float cameraExposureEv(CameraExposure e) {
+    return log2(e.fNumber * e.fNumber / e.shutter) - log2(e.iso / EXPOSURE_ISO_REFERENCE) - EXPOSURE_CAMERA_EV_OFFSET;
+}
+#endif
 
 #if EXPOSURE_RESPONSE_MODE != 0
 /*
@@ -501,10 +582,10 @@ void main() {
     atomicAdd(sharedFarHidden, farHiddenTap(index));
 #endif
 
-#ifdef EXPOSURE_AUTO
+#if defined EXPOSURE_AUTO || defined EXPOSURE_CAMERA_AE
     vec2 jitter = r2Sequence(frameCounter & 255);
     vec2 screen = viewSize();
-    #ifdef HAS_SKYLIGHT
+    #if defined EXPOSURE_AUTO && defined HAS_SKYLIGHT
         // 灯りの割合は前のフレームの暗い側の測光から決めた明るさで数える (このフレームの暗い側は集計の後でしか分からない)
         float prevDark = frameData.postParams[1].y;
         float lightLum = isnan(prevDark) || isinf(prevDark) ? 1e30 : ev100ToLuminance(prevDark) * exp2(EXPOSURE_NIGHT_LIGHT_EV);
@@ -521,7 +602,7 @@ void main() {
             float l = luminance(sanitizeColor(textureLod(colortex0, corner, 0.0).rgb));
             uint w = uint(meteringWeight(uv) * METERING_WEIGHT_SCALE + 0.5);
             atomicAdd(sharedHistogram[luminanceToHistogramBin(l)], w);
-            #ifdef HAS_SKYLIGHT
+            #if defined EXPOSURE_AUTO && defined HAS_SKYLIGHT
             /*
              * 灯りに照らされた所 = 暗い側より明るく、ライトマップのブロックライトのある所。明るさだけで数えると、
              * 月の照り返しの道 (夜の海) と月明かりの雪の明るい所まで灯りに数え、月夜の持ち上げが外れた
@@ -544,7 +625,30 @@ void main() {
     float dt = clamp(frameTime, 0.0, 0.5);
     bool initialized = frameData.postParams[0].z == EXPOSURE_INIT_MARKER;
 
-#ifndef EXPOSURE_AUTO
+#ifdef EXPOSURE_CAMERA_AE
+    /*
+     * 評価測光は外れ値 (深い影と太陽・灯りの芯) を除いた対数平均、ほかの測光は除かない (実機の平均を見る測光と同じ)
+     * 順応 (EXPOSURE_SPEED_BRIGHT / DARK) は場面の EV に掛け、決める SS・F 値・ISO はそこから毎フレーム出す (ライブビューの AE のように滑らかに動く)
+     */
+    #if METERING_ACTIVE_MODE == 0 || METERING_ACTIVE_MODE == 4
+        const float lowPercent = HISTOGRAM_LOW_PERCENT;
+        const float highPercent = HISTOGRAM_HIGH_PERCENT;
+    #else
+        const float lowPercent = 0.0;
+        const float highPercent = 1.0;
+    #endif
+    bool ok;
+    float logAverage = histogramLogAverage(lowPercent, highPercent, ok);
+    float prevEv = frameData.postParams[0].x;
+    float measuredEv = ok ? luminanceToEv100(exp2(logAverage)) : prevEv;
+    float adaptedEv = adaptEv(prevEv, measuredEv, initialized, dt);
+    // 露出補正は決める組に入れる (画に別に掛けると二重になる)
+    float sceneOffset = EXPOSURE_CAMERA_EV_OFFSET - LOOK_EXPOSURE_BIAS;
+    CameraExposure camera = cameraAutoExposure(adaptedEv + sceneOffset);
+    frameData.postParams[CAMERA_AE_PARAM] = vec4(camera.shutter, camera.fNumber, camera.iso, float(camera.limits));
+    float appliedEv = cameraExposureEv(camera);
+    float targetEv = cameraExposureEv(cameraAutoExposure(measuredEv + sceneOffset));
+#elif !defined EXPOSURE_AUTO
     #ifdef EXPOSURE_CAMERA
     // EV100 = log2(N^2 / t) - log2(ISO / 100)。マニュアルと同じく環境の補正 (夜の持ち上げ・屋内・雨・水中) は掛けない
     float fNumber = cameraFNumber();
@@ -643,10 +747,17 @@ void main() {
     #endif
 #endif
 
+#ifdef EXPOSURE_CAMERA_AE
+    // 補正は SS・F 値・ISO に入っている。Purkinje と局所トーンマップの基準は M と同じく組が中間グレーに写す明るさ
+    const float bias = 1.0;
+    float averageEv = appliedEv;
+#else
     float bias = exp2(LOOK_EXPOSURE_BIAS);
+    float averageEv = adaptedEv;
+#endif
     frameData.exposure = ev100ToExposure(appliedEv) * bias;
     frameData.exposureTarget = ev100ToExposure(targetEv) * bias;
-    frameData.averageLuminance = ev100ToLuminance(adaptedEv);
+    frameData.averageLuminance = ev100ToLuminance(averageEv);
     frameData.postParams[0] = vec4(adaptedEv, measuredEv, EXPOSURE_INIT_MARKER, appliedEv);
 
     frameData.focusDistance = updateFocus(dt);

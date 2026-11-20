@@ -40,6 +40,7 @@
 #include "/lib/post/sampling.glsl"
 #include "/lib/post/exposure.glsl"
 #include "/lib/buffers/frame_data.glsl"
+#include "/lib/post/camera_exposure.glsl"
 #include "/lib/post/camera.glsl"
 #include "/lib/post/grading.glsl"
 #include "/lib/buffers/images.glsl"
@@ -67,7 +68,7 @@ float maxBlurLength() { return MOTION_BLUR_MAX_LENGTH * viewHeight; }
  * シャッター速度の反映: 1 フレームの移動量のうち、シャッターが開いている割合 (シャッター角 360 x t / フレームの長さ)
  * 1 フレームより長いシャッターは 360 度で止め、フレームを溜めて残りの時間を足す (溜めたフレームの間を埋め、速い物がとびとびの像にならない)
  */
-float blurShutterScale() { return min(optShutterSpeed / max(frameTime, SHUTTER_DT_MIN), 1.0); }
+float blurShutterScale() { return min(cameraShutterSpeed() / max(frameTime, SHUTTER_DT_MIN), 1.0); }
 #else
 float blurShutterScale() { return MOTION_BLUR_SHUTTER * MOTION_BLUR_STRENGTH; }
 #endif

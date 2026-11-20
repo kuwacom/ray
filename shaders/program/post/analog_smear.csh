@@ -50,6 +50,7 @@
 #include "/lib/buffers/slots.glsl"
 #include "/lib/post/bloom.glsl"
 #include "/lib/post/lens_presets.glsl"
+#include "/lib/post/camera_exposure.glsl"
 #include "/lib/post/camera.glsl"
 #include "/lib/post/velocity.glsl"
 #include "/lib/post/lens_optics.glsl"

@@ -18,6 +18,7 @@
 //@include "/lib/post/velocity.glsl"
 //@include "/lib/post/lens_optics.glsl"
 //@include "/lib/buffers/frame_data.glsl"
+//@include "/lib/post/camera_exposure.glsl"
 //@include "/lib/common/noise.glsl"
 //@include "/lib/common/math.glsl"
 //@include "/lib/post/sampling.glsl"
@@ -115,7 +116,7 @@ vec3 applyAnalogSmear(vec3 hdr, int column) {
 #endif
 #if AP_SMEAR_SHUTTER_STOPS > 0 && (defined EXPOSURE_CAMERA || defined SHUTTER)
     // シャッター速度が決まっている時は、その蓄積時間で比を決める (1/60 秒で 1。速いほど強く、2^段 倍まで)
-    streak *= exp2(clamp(log2(ANALOG_SMEAR_SHUTTER_REFERENCE / optShutterSpeed), 0.0, float(AP_SMEAR_SHUTTER_STOPS)));
+    streak *= exp2(clamp(log2(ANALOG_SMEAR_SHUTTER_REFERENCE / cameraShutterSpeed()), 0.0, float(AP_SMEAR_SHUTTER_STOPS)));
 #elif AP_SMEAR_SHUTTER_STOPS > 0
     // 露出連動: 比は 1 / 蓄積時間に比例する。明るい場面ほどシャッターが速く、暗い場面 (1/60 秒) より 2^段 倍まで強い
     float bright = saturate((frameData.postParams[0].w - ANALOG_SMEAR_SHUTTER_EV_DARK) / (ANALOG_SMEAR_SHUTTER_EV_DAY - ANALOG_SMEAR_SHUTTER_EV_DARK));
@@ -511,7 +512,7 @@ vec3 applyAnalogRecord(vec2 uv) {
 #ifdef ANALOG_NOISE
     #ifdef EXPOSURE_CAMERA
     // カメラのモードは自動ゲインの代わりに ISO がゲインを決める (基準の感度から上げた分。上限なしで ISO とともに増え続ける)
-    if (ANALOG_NOISE_STRENGTH > 0.0) analogGain = max(optExposureIso / ANALOG_ISO_BASE, 1.0);
+    if (ANALOG_NOISE_STRENGTH > 0.0) analogGain = max(cameraIso() / ANALOG_ISO_BASE, 1.0);
     #else
     // 自動ゲイン: 適用 EV が AP_AGC_EV より暗い分だけ、AP_AGC_MAX 段まで上げる
     if (ANALOG_NOISE_STRENGTH > 0.0) analogGain = exp2(clamp(AP_AGC_EV - frameData.postParams[0].w, 0.0, float(AP_AGC_MAX)));

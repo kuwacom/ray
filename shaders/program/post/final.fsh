@@ -58,6 +58,7 @@
 #include "/lib/post/lens_presets.glsl"
 #include "/lib/post/sampling.glsl"
 #include "/lib/post/exposure.glsl"
+#include "/lib/post/camera_exposure.glsl"
 #include "/lib/post/camera.glsl"
 #include "/lib/post/grading.glsl"
 #include "/lib/buffers/images.glsl"
@@ -363,7 +364,7 @@ void main() {
      */
     #ifdef SHUTTER
     // 長時間露光で溜めている間は掛けない。白飛び分 (colortex8) は今のフレームの点なので、溜めた筋の上に今の位置の点が浮く
-    bool spreadPoints = POINT_SPREAD_GAIN > 0.0 && optShutterSpeed <= frameTime;
+    bool spreadPoints = POINT_SPREAD_GAIN > 0.0 && cameraShutterSpeed() <= frameTime;
     #else
     const bool spreadPoints = POINT_SPREAD_GAIN > 0.0;
     #endif

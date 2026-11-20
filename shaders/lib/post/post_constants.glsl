@@ -18,8 +18,15 @@
     #define EXPOSURE_AUTO
 #endif
 // カメラのモード (F 値・シャッター速度・ISO から EV100 を出す。自動ではない)。露出と被写界深度の F 値を同じにする
-#if EXPOSURE_MODE == 3
+#if EXPOSURE_MODE == 3 || EXPOSURE_MODE == 4
     #define EXPOSURE_CAMERA
+#endif
+/*
+ * カメラの自動露出 (P = 4)。測った明るさから SS・F 値・ISO を実機と同じ考え方で決め、その組で EV100 を出す
+ * ゲーム向けの自動露出 (EXPOSURE_AUTO) の曲線・夜の持ち上げ・屋内の減光は掛けない (実機と同じく中間グレーへ完全に補正する)
+ */
+#if EXPOSURE_MODE == 4
+    #define EXPOSURE_CAMERA_AE
 #endif
 /*
  * カメラの EV100 (実写の露出表の値) から Ray の EV100 (シーン単位の輝度で測った値) を引く量
@@ -30,6 +37,25 @@
  * 約 1.6 段明るく写り、実写の夜景の設定 (EV100 2〜4) より 5〜6 段暗い側の設定で合う
  */
 const float EXPOSURE_CAMERA_EV_OFFSET = 13.0;
+/*
+ * カメラの自動露出の数値。どれもカメラの EV100 (実写の露出表の値) で持ち、Ray の EV への変換は EXPOSURE_CAMERA_EV_OFFSET の 1 か所だけ
+ * P の線 (Nikon D850 の取説のプログラム線図、ISO 100・f/1.4 のレンズ): EV 4 (f/1.4・1/8 s) までは開放のまま SS だけ、その先は
+ * SS と絞りに 1/2 段ずつ。斜線は (F 値, SS) の上で 1 本なので、暗いレンズほど速い SS で斜線に入る (折れ点 = EV_REF + 4 log2(N0 / N_REF))。
+ * f/1.4 より明るいレンズは式だと折れ点が遅い SS になる (f/0.95 で約 1/4 s) ので、折れ点の SS を CORNER_SHUTTER より遅くしない
+ */
+const float CAMERA_PROGRAM_EV_REF = 4.0;
+const float CAMERA_PROGRAM_F_REF = 1.4;
+const float CAMERA_PROGRAM_CORNER_SHUTTER = 0.125;
+// 自動で決める SS の範囲 (秒)。実機の機械シャッターの 1/8000〜30 秒。M と S で選べる SS は設定の範囲 (120 秒まで)
+const float CAMERA_SHUTTER_FAST = 1.0 / 8000.0;
+const float CAMERA_SHUTTER_SLOW = 30.0;
+// FrameData.postParams の、自動で決めた SS・F 値・ISO と限界の印を置く場所 (lib/post/exposure.glsl)
+const int CAMERA_AE_PARAM = 8;
+// 限界の印 (postParams[CAMERA_AE_PARAM].w)。SS が遅い側 / 速い側、絞りが開放 / 最小に着いて、露出が合わない
+const uint CAMERA_LIMIT_SLOW = 1u;
+const uint CAMERA_LIMIT_FAST = 2u;
+const uint CAMERA_LIMIT_OPEN = 4u;
+const uint CAMERA_LIMIT_CLOSED = 8u;
 // DR の補正が働くか (今の方式の自動露出だけ。局所の明るさのタイルもこの時だけ作る)
 #if defined EXPOSURE_DR && defined EXPOSURE_AUTO && EXPOSURE_RESPONSE_MODE == 0
     #define EXPOSURE_DR_ACTIVE
