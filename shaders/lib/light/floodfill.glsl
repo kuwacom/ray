@@ -8,6 +8,7 @@
 
 //@include "/lib/settings.glsl"
 //@include "/lib/common/color.glsl"
+//@include "/lib/common/constants.glsl"
 //@include "/lib/common/uniforms.glsl"
 //@include "/lib/common/voxel_space.glsl"
 //@include "/lib/buffers/images.glsl"
@@ -16,13 +17,25 @@
 
 bool floodWritesA() { return (frameCounter & 1) == 0; }
 
+/*
+ * 格納の単位 (r11f_g11f_b10f)。現実の光の比では灯りが数百分の 1 になり、遠い所が非正規化数の粗い刻みに落ちるので、
+ * 灯りの倍率で割って元と同じ範囲で書き、読む所すべてで掛け戻す
+ */
+#ifdef PHYSICAL_LIGHT_ACTIVE
+vec3 floodFromStore(vec3 v) { return v * PHYSICAL_BLOCKLIGHT; }
+vec3 floodToStore(vec3 v) { return v / PHYSICAL_BLOCKLIGHT; }
+#else
+vec3 floodFromStore(vec3 v) { return v; }
+vec3 floodToStore(vec3 v) { return v; }
+#endif
+
 vec3 sampleFloodRaw(vec3 voxelPos) {
     vec3 uv = voxelPos / vec3(VOXEL_SIZE);
-    return floodWritesA() ? texture(floodSamplerA, uv).rgb : texture(floodSamplerB, uv).rgb;
+    return floodFromStore(floodWritesA() ? texture(floodSamplerA, uv).rgb : texture(floodSamplerB, uv).rgb);
 }
 
 vec3 fetchFlood(ivec3 cell) {
-    return floodWritesA() ? texelFetch(floodSamplerA, cell, 0).rgb : texelFetch(floodSamplerB, cell, 0).rgb;
+    return floodFromStore(floodWritesA() ? texelFetch(floodSamplerA, cell, 0).rgb : texelFetch(floodSamplerB, cell, 0).rgb);
 }
 
 /*
@@ -32,7 +45,7 @@ vec3 fetchFlood(ivec3 cell) {
 vec3 fetchFloodPrevious(ivec3 cell) {
     ivec3 prev = cell + getVoxelFrameOffset();
     if (!isInVoxelVolume(prev)) return vec3(0.0);
-    return floodWritesA() ? texelFetch(floodSamplerB, prev, 0).rgb : texelFetch(floodSamplerA, prev, 0).rgb;
+    return floodFromStore(floodWritesA() ? texelFetch(floodSamplerB, prev, 0).rgb : texelFetch(floodSamplerA, prev, 0).rgb);
 }
 
 /*

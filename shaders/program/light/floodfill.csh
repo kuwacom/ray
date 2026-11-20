@@ -108,7 +108,7 @@ const float LIGHTNING_HEIGHT = 3.0;
 vec3 loadPreviousFlood(ivec3 cell) {
     ivec3 prev = cell + getVoxelFrameOffset();
     if (!isInVoxelVolume(prev)) return vec3(0.0);
-    return floodWritesA() ? imageLoad(floodImgB, prev).rgb : imageLoad(floodImgA, prev).rgb;
+    return floodFromStore(floodWritesA() ? imageLoad(floodImgB, prev).rgb : imageLoad(floodImgA, prev).rgb);
 }
 
 /*
@@ -310,7 +310,8 @@ void main() {
     }
     light = max(light, emission);
 
-    if (floodWritesA()) imageStore(floodImgA, cell, vec4(light, 1.0));
-    else imageStore(floodImgB, cell, vec4(light, 1.0));
+    vec3 stored = floodToStore(light);
+    if (floodWritesA()) imageStore(floodImgA, cell, vec4(stored, 1.0));
+    else imageStore(floodImgB, cell, vec4(stored, 1.0));
 #endif
 }
