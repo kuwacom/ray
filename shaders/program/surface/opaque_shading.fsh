@@ -114,8 +114,10 @@
 
 in vec2 texcoord;
 
-/* RENDERTARGETS: 0 */
+/* RENDERTARGETS: 0,14 */
 layout(location = 0) out vec4 outColor;
+// TEX_WATER_BEHIND (lib/buffers/slots.glsl) を 0 にする。gbuffers_water が重ねる前に、同じ枠の雲 (deferred20 -> 21) を消す
+layout(location = 1) out vec4 outWaterBehind;
 
 const float AO_BLOCKLIGHT_WEIGHT = 0.5;
 // GI が空の光を運ぶ時 (GI_TRACES_SKY): テクスチャ法線の凹凸の戻し方の範囲、GTAO を掛ける割合
@@ -243,6 +245,7 @@ const vec2 BLOCK_SPECULAR_TRACE_ROUGHNESS = vec2(0.4, 0.55);
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
     float depth = texelFetch(depthtex0, texel, 0).r;
+    outWaterBehind = vec4(0.0);
 
     if (depth >= 1.0) {
         vec3 dir = normalize(viewToPlayerDir(screenToView(vec3(texcoord, 1.0))));
