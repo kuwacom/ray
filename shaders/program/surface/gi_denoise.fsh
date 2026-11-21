@@ -17,6 +17,7 @@
 //@include "/lib/common/common.glsl"
 //@include "/lib/common/joint_bilateral.glsl"
 //@include "/lib/common/temporal.glsl"
+//@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/surface/surface.glsl"
 //@include "/lib/post/post.glsl"
 //@include "/lib/buffers/slots.glsl"
@@ -39,6 +40,7 @@
 #include "/lib/common/common.glsl"
 #include "/lib/common/joint_bilateral.glsl"
 #include "/lib/common/temporal.glsl"
+#include "/lib/buffers/frame_data.glsl"
 #include "/lib/common/color.glsl"
 #include "/lib/common/encoding.glsl"
 #include "/lib/common/gbuffer.glsl"
@@ -53,7 +55,6 @@
 #include "/lib/surface/gi.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/common/transforms.glsl"
-#include "/lib/buffers/frame_data.glsl"
 #include "/lib/common/water_waves.glsl"
 #include "/lib/common/water_glitter.glsl"
 #include "/lib/common/water_lod.glsl"
@@ -122,7 +123,7 @@ void reprojectGiHistory(ivec2 texel, float depth, float linZ, ivec2 screen, out 
     history = vec4(0.0);
     info = vec4(0.0);
     vec2 prevUv = getPreviousUv(texcoord, depth);
-    if (reprojectionInside(prevUv)) {
+    if (reprojectionInside(prevUv) && screenHistoryValid()) {
         // 動くもの (速度ベクトルあり) は距離がほぼ変わらないとみなし、静止物は前フレームのカメラで距離を求める
         float expected = linZ;
         if (texelFetch(colortex15, texel, 0).a < 0.5) {
@@ -246,7 +247,7 @@ void main() {
     vec4 history = vec4(0.0);
     vec4 info = vec4(0.0);
     vec2 prevUv = getPreviousUv(texcoord, depth);
-    if (reprojectionInside(prevUv)) {
+    if (reprojectionInside(prevUv) && screenHistoryValid()) {
         // 動くもの (速度ベクトルあり) は距離がほぼ変わらないとみなし、静止物は前フレームのカメラで距離を求める
         float expected = linZ;
         if (texelFetch(colortex15, texel, 0).a < 0.5) {

@@ -143,10 +143,7 @@ void main() {
     int dt = worldTime - int(prevTime);
     bool timeJump = abs(dt) > WORLD_TIME_JUMP && abs(dt) < 24000 - WORLD_TIME_JUMP;
     historyFrames = timeJump ? 0.0 : min(historyFrames + 1.0, 65535.0);
-    // 画面の大きさ。変わったフレームは負にして、画面の大きさの履歴 (雲・VL) を 1 フレーム捨てさせる (skyScreenHistoryValid)
-    vec2 size = viewSize();
-    bool resized = any(notEqual(abs(frameData.skyParams[1].zw), size));
-    frameData.skyParams[1] = vec4(float(worldTime), historyFrames, resized ? -size : size);
+    frameData.skyParams[1] = vec4(float(worldTime), historyFrames, 0.0, 0.0);
     waterMediumStore();
     waterSeaStoreOpen();
 #ifdef WATER_GLITTER

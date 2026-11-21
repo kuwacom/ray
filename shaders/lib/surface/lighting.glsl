@@ -126,7 +126,7 @@ vec3 shadeSecondaryHitGi(vec3 playerPos, vec3 normal, vec3 albedo, float skyLm, 
 const float GI_HISTORY_EDGE = 0.002;
 vec3 giHistoryAtPlayer(vec3 playerPos) {
     vec2 uv = playerToPreviousScreen(playerPos).xy;
-    if (any(lessThan(uv, vec2(GI_HISTORY_EDGE))) || any(greaterThan(uv, vec2(1.0 - GI_HISTORY_EDGE)))) return vec3(-1.0);
+    if (any(lessThan(uv, vec2(GI_HISTORY_EDGE))) || any(greaterThan(uv, vec2(1.0 - GI_HISTORY_EDGE))) || !screenHistoryValid()) return vec3(-1.0);
     return textureLod(TEX_GI_HIST, uv, 0.0).rgb / max(GI_EFFECTIVE_STRENGTH * LK_GI_BOUNCE, 1e-3);
 }
 

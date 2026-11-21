@@ -3,6 +3,7 @@
  * エンティティ光源の蓄積表 (lib/light/entity_light.glsl) もここでクリアする
  * エンティティの三角形 (lib/light/entity_tri.glsl) のカウンタと AABB もここで空にする
  * ビーコンの光線の区間 (FrameData、lib/sky/beacon_beam.glsl) もここで空にする
+ * 画面の大きさの変化を FrameData.screenState に記録する (screenHistoryValid)
  * 花火の光 (lib/light/firework_light.glsl) を前フレームの光る粒から決め、蓄積を空にする
  * light モジュール (lib/light)
  */
@@ -101,6 +102,11 @@ void main() {
     }
 
     if (i == 0u) {
+        // 画面の大きさ。変わったフレームは負にして、画面の大きさの履歴をこのフレームだけ捨てさせる (screenHistoryValid)。begin はどのパスより先に毎フレーム走る
+        vec2 size = viewSize();
+        bool resized = any(notEqual(abs(frameData.screenState.xy), size));
+        frameData.screenState = vec4(resized ? -size : size, 0.0, 0.0);
+
         frameData.lightStats.x = globalLights.count;
         frameData.lightStats.y = globalLights.overflow;
         // エンティティ光源の登録を受け付ける (deferred_a で締め切る)
