@@ -370,7 +370,7 @@ void main() {
             behind += env;
             behindExcess += luminance(sparkleExcess(env, getExposure()));
         }
-#ifdef CLOUD_INTERIOR
+#ifdef CLOUD_INTERIOR_FOG
         // 雲の中の霧: ガラスの向こうの背景には、ガラスから奥の面 (空は無限遠) までの分を先に掛ける。ガラスまでの分は fog_apply が全体に掛ける
         if (isEyeInWater == 0) {
             vec4 backFog = cloudInteriorFog(-V, dist, d1 >= 1.0 ? CLOUD_RAY_FAR : length(floorPlayer));

@@ -40,6 +40,11 @@
 #if CLOUDS >= 2 && CLOUD_INTERIOR_VISIBILITY > 0 && defined HAS_SKY
     #define CLOUD_INTERIOR
 #endif
+// 霧として掛けるのはバニラの形の板だけ。体積の層の中は雲のマーチがカメラの周りを細かく歩くので (cloudStepsSetup)、外から見た雲と同じ
+// 密度と光の積分の続きになる。一様な霧を層の出口まで掛けると、雲の隙間の向こうまで同じ濃さで霞み、入った瞬間から画面全体が一様に白くなった
+#if defined CLOUD_INTERIOR && defined CLOUD_VANILLA_SHAPE
+    #define CLOUD_INTERIOR_FOG
+#endif
 
 const float CLOUD_RAY_FAR = 1e12; // 球との交差が無い方向の距離 (十分遠い値)
 
@@ -350,10 +355,10 @@ float cloudRainBelowDeck() {
 #endif
 }
 
-#ifdef CLOUD_INTERIOR
+#ifdef CLOUD_INTERIOR_FOG
 /*
- * 雲の中の霧: カメラが雲の層の中にいる時、層を出るまでを一様な霧として掛ける (fog_apply)
- * 雲のマーチの消散係数は外から見た雲のための薄い値で、中にいても地面や遠くが透けるので、雲の中の視程はこちらで決める
+ * 雲の中の霧: カメラがバニラの形の板の中にいる時、板を出るまでを一様な霧として掛ける (fog_apply)
+ * 板の柱は面から内側で雲のマーチの消散を弱め切るので (skyParams[7].z)、板の中の視程はこちらで決める
  * 視程 = 3 / 消散係数 (WMO の定義)。濃さ・光・マーチの消散を引いた霧の消散係数は、prepare2 がカメラの位置で求める (frameData.skyParams[4] [5])
  */
 const float CLOUD_INTERIOR_EXTINCTION = 3.0 / float(CLOUD_INTERIOR_VISIBILITY);
@@ -369,22 +374,12 @@ float cloudInteriorPhase(float cosTheta) {
          / mix(phaseHG(0.0, CLOUD_INTERIOR_G), PHASE_ISOTROPIC, CLOUD_INTERIOR_ISO);
 }
 
-// 霧を掛ける長さ (ワールド)。カメラを含む雲の層の出口までの距離。どの層の中でもなければ 0
-// バニラの形の板は、カメラのいる板の上面までと下面までの高さ (prepare2 が frameData.skyParams[7] に書く) から、板を抜ける視線だけ短くなる
+// 霧を掛ける長さ (ワールド)。カメラのいる板の上面までと下面までの高さ (prepare2 が frameData.skyParams[7] に書く) から、板を抜ける視線だけ短くなる
 float cloudInteriorExit(vec3 dir) {
-    float y = cameraPosition.y;
-    #ifdef CLOUD_VANILLA_SHAPE
     vec2 gap = frameData.skyParams[7].xy;
     float exitUp = dir.y > 1e-4 ? gap.x / dir.y : CLOUD_INTERIOR_MAX_LENGTH;
     float exitDown = dir.y < -1e-4 ? gap.y / -dir.y : CLOUD_INTERIOR_MAX_LENGTH;
     return min(min(exitUp, exitDown), CLOUD_INTERIOR_MAX_LENGTH);
-    #else
-    if (y > CLOUD_BASE && y < CLOUD_TOP) return cloudLayerSegment(y, dir.y, CLOUD_BASE, CLOUD_TOP).y;
-    #if CLOUDS == 3
-    if (y > CLOUD_MID_BASE && y < CLOUD_MID_TOP) return cloudLayerSegment(y, dir.y, CLOUD_MID_BASE, CLOUD_MID_TOP).y;
-    #endif
-    return 0.0;
-    #endif
 }
 
 /*
