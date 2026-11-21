@@ -28,6 +28,13 @@ const float BEACON_BEAM_REACH = 3.5;            // 半径のこの倍より軸�
  */
 const float BEACON_BEAM_MIN_SIN = 0.1;
 const float BEACON_BEAM_ERF_SMALL = 1e-3;       // erf の近似で 1 - exp(-y) が float で桁落ちする y の境 (これ未満は y で近似)
+/*
+ * カメラが芯の中 (軸の真上など) にいると、どの向きの視線も芯の中を通り、細い線の明るさが画面全体に広がって白くかすむ
+ * 軸までの水平の距離が INSIDE_RADIUS より近いほど芯を INSIDE_GAIN へ弱め、周りの薄い光にとどめる
+ * (光線の高さの区間の中にいる時だけ。光線は空の上まで伸びるので、ビーコンより上で軸の上にいればいつも中)
+ */
+const float BEACON_BEAM_INSIDE_RADIUS = 0.4;
+const float BEACON_BEAM_INSIDE_GAIN = 0.05;
 const float BEACON_BEAM_PHASE_MAX = 4.0;
 const float BEACON_BEAM_SQRT_PI = 1.7724539;
 /*
@@ -112,6 +119,7 @@ vec3 evalBeaconBeams(vec3 dir, float opaqueDist, float frontDist, float frontAlp
         vec3 T = vec3(pow(fogT, sp / max(fogDist, 1.0)));
         if (sp > frontDist) T *= 1.0 - frontAlpha;
         float core = beaconBeamProfile(b.h2, b.s0, b.s1, b.s2, sinA, BEACON_BEAM_CORE_RADIUS, rCore);
+        if (b.yMin < 0.0 && b.yMax > 0.0) core *= mix(1.0, BEACON_BEAM_INSIDE_GAIN, exp(-dot(b.c, b.c) / sqr(BEACON_BEAM_INSIDE_RADIUS)));
 #if defined HAS_SKY && defined EMISSION_BEACON_SCATTER
         vec3 p = dir * sp;
         vec2 dens = fogDensityAt(p, m);
