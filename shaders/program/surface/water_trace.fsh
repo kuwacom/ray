@@ -12,7 +12,8 @@
  * 合成と別のパスにするのは、光線を辿る処理と影は深度の読みを待つ時間が長く、同時に動くワープの数で速さが決まるため。
  * 合成のシェーダーに入ると、レジスタの数が合成の重い経路 (影・きらめき・光源のトレース) で決まってワープが減り、
  * 水の画素の全部の処理が何倍も遅くなっていた
- * 水でない画素は書かない (合成は水の画素でだけ読む)
+ * 水の奥の半透明の層 (水より先に描かれたガラスなど) も屈折した位置から読み直し、colortex4 を書き直す (refractBehindLayer)
+ * 水でない画素は colortex4 をそのまま写し、colortex14 は合成が読まないので 0
  */
 // このプログラムで書く image (lib/buffers/images.glsl。宣言は 8 個まで)
 #define IMG_GI_RAW
@@ -123,8 +124,28 @@
 #include "/lib/surface/water_self.glsl"
 // END GENERATED includes
 
-/* RENDERTARGETS: 14 */
+/* RENDERTARGETS: 14,4 */
 layout(location = 0) out vec4 outRefraction;
+// 半透明の色 (TEX_TRANSLUCENT) を書き直す。水の画素だけ奥の層を屈折した位置から読み直し、他はそのまま写す
+// (書く colortex は読む側と入れ替わるので、捨てた画素は古い中身になる。合成は全画素で読むため discard しない)
+layout(location = 1) out vec4 outTranslucent;
+
+// 奥の層の不透明度がこれより 1 に近いと、手前の層を割り出す割り算が fp16 の刻みで崩れる (その時は奥がほぼ見えないので手前の a を 0 とみなす)
+const float WATER_BEHIND_MAX_ALPHA = 0.99;
+
+/*
+ * colortex4 = 手前の層 over 奥の層 (TEX_WATER_BEHIND) から手前の層を割り出し、奥の層を屈折した位置の値 (behindRefr) に差し替える
+ * 手前の層は水より後に描かれた物 (雨・パーティクル・WATER_TEXTURE、水中から見た水面の F の覆い)。屈折させずに残す
+ * 奥の層を屈折先の色 (outRefraction) に入れると合成の吸収が水底までの長さで掛かり、浅いガラスまで暗く沈むので、colortex4 の側で入れ替える
+ */
+vec4 refractBehindLayer(vec4 translucent, vec4 behindHere, vec4 behindRefr) {
+    vec4 front = vec4(0.0);
+    if (behindHere.a < WATER_BEHIND_MAX_ALPHA) {
+        front.a = saturate(1.0 - (1.0 - translucent.a) / (1.0 - behindHere.a));
+    }
+    front.rgb = max(translucent.rgb - behindHere.rgb * (1.0 - front.a), 0.0);
+    return front + behindRefr * (1.0 - front.a);
+}
 
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
@@ -134,7 +155,12 @@ void main() {
     vec2 lmT;
     int matT;
     decodeTranslucentData(texelFetch(colortex5, texel, 0), nT, lmT, matT);
-    if (!(d0 < d1 && !isHandDepth(d0) && matT == MAT_WATER)) discard;
+    vec4 translucent = texelFetch(TEX_TRANSLUCENT, texel, 0);
+    outTranslucent = translucent;
+    if (!(d0 < d1 && !isHandDepth(d0) && matT == MAT_WATER)) {
+        outRefraction = vec4(0.0);
+        return;
+    }
     float dither = interleavedGradientNoise(gl_FragCoord.xy, frameCounter);
 
     vec3 surfView = screenToView(vec3(texcoord, d0));
@@ -165,6 +191,9 @@ void main() {
     vec3 behind = vec3(0.0);
     float behindExcess = 0.0;  // 屈折の先の白飛び分の輝度 (ボクセルで辿った水底は持たない)
     bool refrDone = false;  // 方式 D で屈折先の色と経路長が決まった
+    // 奥の半透明の層 (TEX_WATER_BEHIND) を読む位置と重み。ボクセルで辿った屈折先は画面の外なので、画面の像の重みの分だけ
+    vec2 behindUv = texcoord;
+    float behindW = 1.0;
 #if WATER_REFRACTION >= 1
     /*
      * 全反射 (屈折の向きが無い) の画素は合成でフレネルが 1 になり屈折先を使わない。合成はフレネルが 1 の画素の屈折先を
@@ -214,6 +243,8 @@ void main() {
                 behind = mix(vColor, sColor.rgb, wS);
                 behindExcess = behindSparkle(sColor) * wS;
                 pathLen = mix(vPath, sPath, wS);
+                behindUv = sUv;
+                behindW = wS;
                 refrDone = true;
             } else if (sValid) {
                 // ボクセルの範囲外 (遠景): 画面の像は 1 対 1 の対応なので端でも引き伸ばされない
@@ -221,6 +252,7 @@ void main() {
                 behind = sColor.rgb;
                 behindExcess = behindSparkle(sColor);
                 pathLen = sPath;
+                behindUv = sUv;
                 refrDone = true;
             }
             // どちらも無ければ方式 A で写す
@@ -299,7 +331,21 @@ void main() {
         vec4 sColor = hdrFromStore(texture(colortex0, refrUv));
         behind = sColor.rgb;
         behindExcess = behindSparkle(sColor);
+        behindUv = refrUv;
     }
+    /*
+     * 屈折先が水の画素でない (水の手前のガラスの画素) 時は読まない。そこの TEX_WATER_BEHIND には水より後に描かれた手前のガラスも入っていて、
+     * 読むと手前のガラスの写しが水面にずれて出る (水面に乗せたガラスの縁の外にもう 1 つ色の塊が出ていた)
+     */
+    if (behindW > 0.0) {
+        vec3 nB;
+        vec2 lmB;
+        int matB;
+        decodeTranslucentData(texelFetch(colortex5, clamp(ivec2(behindUv * viewSize()), ivec2(0), ivec2(viewSize()) - 1), 0), nB, lmB, matB);
+        if (matB != MAT_WATER) behindW = 0.0;
+    }
+    vec4 behindRefr = behindW > 0.0 ? texture(TEX_WATER_BEHIND, behindUv) * behindW : vec4(0.0);
+    outTranslucent = refractBehindLayer(translucent, texelFetch(TEX_WATER_BEHIND, texel, 0), behindRefr);
 #ifdef WATER_SELF_REFRACTION
     /*
      * 水に入った自分 (lib/surface/water_self.glsl): 屈折した視線を、影のパスで毎フレーム持っている自分の三角形に当てる

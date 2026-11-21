@@ -110,12 +110,12 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 18 | deferred11.vsh/fsh | surface | GI / AO のデノイズ | giRaw, colortex9, colortex10 | colortex9, colortex10 | 画面 | 同上 |
 | 19 | deferred20.vsh/fsh | sky | 体積雲レイマーチ (低解像度 + チェッカーボード) | weather, skyView | colortex14 (左上 1/CLOUD_RES) | 画面 (範囲外は早期終了) | CLOUDS>=2, world0 |
 | 20 | deferred21.vsh/fsh | sky | 雲の時間アップスケール | colortex14, 履歴 | colortex11 | 画面 | 同上 |
-| 21 | deferred30.vsh/fsh | surface | 不透明シェーディング (全モジュールの光を合成) + 空の描画 | G バッファ, colortex6/8/11, SSBO0 | colortex0 | 画面 | 常時 |
-| 22 | gbuffers_water / hand_water / particles_translucent / weather / clouds | surface (weather・clouds は sky) | 半透明の前方シェーディング (clouds は CLOUDS=1 のバニラの雲。deferred の後に描かれるので前方で色を決め、colortex4 だけに書く) | アトラス, 影, flood | colortex4 (乗算済み), colortex5 | 画面 | 常時 |
+| 21 | deferred30.vsh/fsh | surface | 不透明シェーディング (全モジュールの光を合成) + 空の描画 | G バッファ, colortex6/8/11, SSBO0 | colortex0, colortex14 (0。TEX_WATER_BEHIND の初期化) | 画面 | 常時 |
+| 22 | gbuffers_water / hand_water / particles_translucent / weather / clouds | surface (weather・clouds は sky) | 半透明の前方シェーディング (clouds は CLOUDS=1 のバニラの雲。deferred の後に描かれるので前方で色を決め、colortex4 だけに書く) | アトラス, 影, flood | colortex4 (乗算済み), colortex5, colortex14 (gbuffers_water のガラスなど水以外の層だけ。colortex4 と同じブレンド) | 画面 | 常時 |
 | 23 | composite.csh | surface | 反射 (SSR / ラフ / ボクセル補完) | colortex0/2/3/5, voxel | reflectionImg | local 8², 0.5 | REFLECTIONS>0 |
 | 23a | composite_a.csh | surface | 粗い不透明面の反射を同じ平面・ローブの近傍で空間にぼかす (時間蓄積の後、明るさの重み c/(1+L))。鏡面・半透明はそのまま写す | reflectionImg (上の半分), depthtex0/1, colortex2/5 | reflectionImg (下の半分) | local 8², 0.5 | REFLECTIONS>0 |
 | 24 | composite1_a.csh | sky | VL / 高さフォグのレイマーチ (影マップ空間 + floodfill + 雲影) | 影マップ, flood, cloudShadow | colorimg12 (左上 1/VL_RES), fogHistoryImg | local 8², 1/VL_RES | VL |
-| 25 | composite1.vsh/fsh | surface | 水面の光線を辿る部分: 屈折先の色と水の中の経路長 (画面の歩き + ボクセルの屈折、側面の水の厚み)、上向きの水面の太陽の可視率 (PCSS + 雲影)、鏡面の映り込みのフル解像度の SSR (映り込みを散らさない凪の水面だけ)。水の画素だけ書く。合成と分けるのは、光線を辿る処理と影が合成のシェーダーに入ると、合成の重い経路でレジスタの数が決まってワープが減り、水の画素の全部の処理が遅くなるため | colortex0/5, depthtex0/1, voxel, 影マップ | colortex14, blockLightRawImg (太陽の可視率), giRawImg (SSR、REFLECTIONS>0) (image は imageStore で、deferred の用途から composite1 -> 2 の間だけ借りる) | 画面 | 常時 |
+| 25 | composite1.vsh/fsh | surface | 水面の光線を辿る部分: 屈折先の色と水の中の経路長 (画面の歩き + ボクセルの屈折、側面の水の厚み)、上向きの水面の太陽の可視率 (PCSS + 雲影)、鏡面の映り込みのフル解像度の SSR (映り込みを散らさない凪の水面だけ)。水の奥の半透明の層 (colortex14 の TEX_WATER_BEHIND) を屈折した位置から読み直して colortex4 を書き直す (他の画素は写すだけ)。合成と分けるのは、光線を辿る処理と影が合成のシェーダーに入ると、合成の重い経路でレジスタの数が決まってワープが減り、水の画素の全部の処理が遅くなるため | colortex0/4/5/14, depthtex0/1, voxel, 影マップ | colortex14, colortex4, blockLightRawImg (太陽の可視率), giRawImg (SSR、REFLECTIONS>0) (image は imageStore で、deferred の用途から composite1 -> 2 の間だけ借りる) | 画面 | 常時 |
 | 26 | composite2_a.csh | surface | 何もしない compute。Iris が compute の後に出す glMemoryBarrier で、composite1 の fragment の imageStore を composite2 の sampler の読みより前に終わらせる | - | - | (1,1,1) | 常時 |
 | 27 | composite2.vsh/fsh | surface | 半透明合成 (水中吸収・反射・太陽の鏡面・泡、ガラスの透過) | colortex0/4/5/14, blockLightRaw/giRaw (水), reflectionImg | colortex0, colortex14 (r = 半透明の不透明度、composite19 のビーコンの光線が読む) | 画面 | 常時 |
 | 28 | composite12.vsh/fsh | sky | 画面空間の光芒 1/3: 空のマスク (深度 x 雲の透過率 x 光源からの角度) をタップごとに求め、光源へ向かう最短のスパンでぼかす | depthtex2, colortex11 | colortex4 (左上) | 画面 (1/GODRAYS_RES、\scale.*\) | GODRAYS, world0 |
@@ -162,7 +162,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 11 | RGBA16F | sky: 雲 (フル解像度, 時間蓄積。rgb は P 倍) | sky | surface (sky の関数経由), sky | 永続 |
 | 12 | RGBA16F | sky: VL / フォグ (低解像度) rgb 内散乱 (P 倍), a 透過率 | sky | sky | 永続 |
 | 13 | RGBA16F | post: TAA 履歴 (rgb は P 倍) | post | post | 永続 |
-| 14 | RGBA16F | sky: 雲 (低解像度、deferred20 -> 21) rgb 散乱 (P 倍), a 透過率。surface: 水の屈折先の色 (rgb、吸収の前、P 倍) + 水の中の経路長 (a) (composite1 -> 2。水の画素だけ書き、composite2 も水の画素だけ読む)。surface: 半透明の不透明度 (r、composite2 -> composite19。ビーコンの光線が手前の半透明を掛ける。colortex4 は composite2 の後は光芒)。post: ブルームタイル (composite23 -> final、P 倍) (と画面のフレア (P 倍)、LOCAL_TONEMAP > 0 の時は局所トーンマップの 1/32 タイル) | sky, surface, post | sky, surface, post | 毎フレーム |
+| 14 | RGBA16F | sky: 雲 (低解像度、deferred20 -> 21) rgb 散乱 (P 倍), a 透過率。surface: 水の奥の半透明の層 (deferred30 が 0 にし、gbuffers_water がガラスなどを colortex4 と同じブレンドで重ね、composite1 が屈折した位置で読む。colortex4 と同じ絶対値。colortex4 だけでは水より先に描かれた奥の層と後の雨・パーティクルを分けられず、奥のガラスが屈折しなかった。確かめ方: 水の中の色付きガラスを波のある水面越しに見て、水底と同じだけ揺れるか)。surface: 水の屈折先の色 (rgb、吸収の前、P 倍) + 水の中の経路長 (a) (composite1 -> 2。水の画素だけ書き、composite2 も水の画素だけ読む)。surface: 半透明の不透明度 (r、composite2 -> composite19。ビーコンの光線が手前の半透明を掛ける。colortex4 は composite2 の後は光芒)。post: ブルームタイル (composite23 -> final、P 倍) (と画面のフレア (P 倍)、LOCAL_TONEMAP > 0 の時は局所トーンマップの 1/32 タイル) | sky, surface, post | sky, surface, post | 毎フレーム |
 | 15 | RGBA16F | 速度: rg = 前フレーム UV - 今の UV, a = 1 なら有効 (エンティティ・手)。a = 0 の金属の防具の画素だけ rgb = 環境光の鏡面の重み x 1e-4 (gbuffers_entities_translucent -> composite2。双線形で読まれても速度がずれないよう小さくする) | surface (gbuffers, post の関数) | post | 毎フレーム |
 
 - gbuffers では colortex0-3 を読めない (Iris の仕様)
@@ -178,6 +178,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | TEX_GI_AUX | colortex10 | deferred11 (永続) |
 | TEX_SPARKLE_HIST | colortex8 | composite20 (永続) -> final |
 | TEX_CLOUD_LOW | colortex14 | deferred20 -> deferred21 |
+| TEX_WATER_BEHIND | colortex14 | deferred30 -> composite1 |
 | TEX_WATER_REFR | colortex14 | composite1 -> composite2 |
 | TEX_TRANSLUCENT_ALPHA | colortex14 | composite2 -> composite19 |
 | TEX_BLOOM | colortex14 | composite23 -> final |

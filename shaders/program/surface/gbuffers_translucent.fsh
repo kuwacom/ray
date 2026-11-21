@@ -148,6 +148,16 @@ const float ARMOR_GENERATED_NORMAL_SCALE = 0.5;
     layout(location = 0) out vec4 outColor;
     layout(location = 1) out vec4 outData;
     layout(location = 2) out vec4 outVelocity;
+#elif defined GBUF_WATER
+    /*
+     * 14 = TEX_WATER_BEHIND: 半透明の地形 (ガラスなど) の色を colortex4 と同じ既定のブレンドでもう一度重ね、水の面は何も足さない。
+     * 水面の画素では水より先に描かれた奥の層だけが残り、composite1 が colortex4 からそれを外して屈折した向きで読み直す
+     * (colortex4 だけでは水の奥の層と手前の層 (雨・パーティクル) を分けられず、奥のガラスが屈折せずに水の上へまっすぐ重なっていた)
+     */
+    /* RENDERTARGETS: 4,5,14 */
+    layout(location = 0) out vec4 outColor;
+    layout(location = 1) out vec4 outData;
+    layout(location = 2) out vec4 outWaterBehind;
 #else
     /* RENDERTARGETS: 4,5 */
     layout(location = 0) out vec4 outColor;
@@ -383,6 +393,7 @@ void main() {
             float a = 1.0 - (1.0 - outColor.a) * (1.0 - F);
             outColor = vec4(outColor.rgb * (outColor.a / max(a, 1e-4)), a);
         }
+        outWaterBehind = vec4(0.0);
         return;
     }
 #endif
@@ -431,6 +442,9 @@ void main() {
 #endif
 
     outColor = vec4(color, albedo.a);
+#ifdef GBUF_WATER
+    outWaterBehind = outColor;
+#endif
 #ifndef GBUF_PARTICLES_TRANSLUCENT
     outData = encodeTranslucentDataTint(geoNormal, lmcoord, materialId, tintIndex);
 #endif

@@ -24,6 +24,7 @@
 #define TEX_BLOOM         colortex14  // composite23 -> final
 #define TEX_GODRAYS       colortex4   // composite12 -> composite19 (左上 1/GODRAYS_RES、scale.composite12-14)
 #define TEX_SPARKLE_HIST  colortex8   // composite20 (永続) -> final
+#define TEX_WATER_BEHIND  colortex14  // deferred30 -> composite1 (水より先に描かれた半透明の地形の色。deferred30 が 0 にし、gbuffers_water が colortex4 と同じブレンドで重ね、composite1 が屈折した向きで読む)
 #define TEX_WATER_REFR    colortex14  // composite1 -> composite2
 #define TEX_TRANSLUCENT_ALPHA colortex14 // composite2 -> composite19 (r = 半透明の不透明度。ビーコンの光線が手前の半透明を掛ける)
 #define TEX_GI_AUX        colortex10  // deferred11 (永続)
