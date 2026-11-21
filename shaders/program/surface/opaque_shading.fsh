@@ -233,6 +233,12 @@ void directSpecular(Material m, vec3 N, vec3 V, LightSample L, float slopeVar, f
  */
 const vec2 SPARKLE_TEXEL_PX = vec2(0.3, 0.7);  // 1 テクセルの画素数がこの範囲で 0 -> 1
 const float SPARKLE_TEXEL_SIZE = 1.0 / 16.0;
+/*
+ * 隠れた光源の照り返しを光源ごとのトレースで消す誘電体の知覚的ラフネス (x まで全部、y で 0。金属と水たまりは常に)
+ * 推定の地形 (石・土など) は滑らかさ 0.08-0.32 (ラフネス 0.68-0.92) で、照り返しは F0 0.04 の広く暗いローブなので対象外にする
+ * 磨いた面 (MAT_GLOSSY の滑らかさ 0.72-0.87) と宝石 (0.93) は照り返しの芯がはっきり出るので対象
+ */
+const vec2 BLOCK_SPECULAR_TRACE_ROUGHNESS = vec2(0.4, 0.55);
 
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
@@ -321,6 +327,13 @@ void main() {
         color += directLight(m, g.normal, V, H.handOff, puddleVar, 1.0, 1.0, SPECULAR_BLOCK_STRENGTH, specSum);
 #endif
     }
+    /*
+     * 隠れた光源の照り返しを光源ごとのトレースで消すのは、照り返しの目立つ面だけ (粗い誘電体は暗く広がるので共通の比のまま)
+     * 誘電体はラフネスの範囲で重みをなめらかに下げる (2 値だと、テクスチャの中でラフネスが閾値をまたぐ模様で隠れた光源の照り返しが画素ごとに出たり消えたりする)
+     * 鏡面を捨てる植物と、一人称の手 (目の前の小物で、体のボクセルの中から辿る) はトレースしない
+     */
+    float roughWeight = 1.0 - smoothstep(BLOCK_SPECULAR_TRACE_ROUGHNESS.x, BLOCK_SPECULAR_TRACE_ROUGHNESS.y, m.perceptualRoughness);
+    sp.specOcclusion = (plant || hand) ? 0.0 : max(max(m.metalness, roughWeight), puddleWeight);
     SurfaceLights S = gatherSurfaceLights(sp, SL_SUN_NONE, SL_BLOCK_NONE, SL_BLOCK_SPECULAR);
     int blockSpecCount = plant ? 0 : S.blockSpecCount;
     for (int j = 0; j < blockSpecCount; j++) directSpecular(m, g.normal, V, S.blockSpec[j], puddleVar, SPECULAR_BLOCK_STRENGTH, specSum);

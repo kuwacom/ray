@@ -426,7 +426,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 - 半影: 光源半径 (LightDef.shape.w x LIGHT_SOURCE_SIZE) 内でターゲット点を時間的に揺らし (ブルーノイズ)、デノイズと TAA で均す。RV の SDF コーントレースは SDF 構築コストが大きいので採らない
 - 接触影 (LIGHT_CONTACT_SHADOWS): ボクセルに入らない細部 (手・小さいエンティティ・草) を深度バッファのレイマーチで補う
 - 低解像度 (LIGHT_TRACE_RES) + 時空間デノイズ (再投影 + 近傍の平均・分散によるクリップ + エッジ停止の空間フィルタ)。LIGHT_DENOISE=0 で最寄りの 1 サンプルのみ (フィルタなし)、1 で 2x2 + 時間、2 で 4x4 + 時間。動くエンティティは再投影が体の動きに追従しないので、履歴の混ぜる割合を上げ (0.35)、クリップの幅を狭める
-- 鏡面 (LIGHT_SPECULAR): `getBlockLightSpecular()` が着色点のビンから照度の大きい順に最大 4 光源を `LightSample` の配列で surface に渡す (可視率は deferred2 の比を共通に掛ける。水・ガラスは光源ごとにトレースする)。代表 1 光源だと 2 光源の拡散が釣り合う線で照り返しが切れた
+- 鏡面 (LIGHT_SPECULAR): `getBlockLightSpecular()` が着色点のビンから照度の大きい順に最大 4 光源を `LightSample` の配列で surface に渡す (可視率は deferred2 の比を共通に掛ける。水・ガラスは光源ごとにトレースする)。代表 1 光源だと 2 光源の拡散が釣り合う線で照り返しが切れた。共通の比は光源全体の 1 つの値なので、それだけを光源ごとの照り返しに掛けると、見える光源がある所で壁の陰の光源も金属に映る (エメラルドが緑の四角で映った)。LIGHT_SPECULAR_OCCLUSION (既定 ON) では、金属・つやのある面 (知覚的ラフネス 0.4 まで、0.55 で 0。推定の地形は 0.68 以上で照り返しが暗く広いので対象外)・水たまりで、`getBlockLightSpecularOccluded()` が光源ごとにトレースして隠れた光源を消し、見える光源には比を掛けたままにする。比 0.9〜0.98 でトレースの結果を共通の比だけの結果へ混ぜて戻し、0.98 以上はトレースしない。本数は最大 LIGHT_SPECULAR_COUNT、歩数は光源までの距離 (LIGHT_TRACE_STEPS で止まる)。光源の中心へ 1 本で揺らさないので、見える / 隠れるの境は硬い影になる。確かめ方は、金属の上から角の先の発光ブロックが直接見えない配置で映り込みが消えるか
 
 ### 手持ち光源
 
@@ -533,6 +533,7 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | LIGHT_EMISSION_MASK_MODE | 0 | 0 | 0 | 0 | 0 | 0 | **1** | **2** | **2** | **2** |
 | LIGHT_TRANSLUCENT_TINT | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
 | LIGHT_SPECULAR | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
+| LIGHT_SPECULAR_OCCLUSION | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
 | LIGHT_DENOISE | 2 | **1** | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 |
 | LIGHT_ENTITY_OCCLUSION | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |
 | LIGHT_PLAYER_OCCLUSION | ON | **OFF** | ON | ON | ON | ON | ON | ON | ON | ON |

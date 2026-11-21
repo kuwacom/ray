@@ -58,6 +58,12 @@ const uint SL_BLOCK_SPECULAR_TRACED = 1u << 9; // 鏡面の光源を 1 つずつ
 const vec2 SHADOW_FALLBACK_SKYLIGHT = vec2(0.8, 0.97);
 // GI が空の光を運ぶ時 (GI_TRACES_SKY): ボクセル体積の判定で面から浮かせる量
 const float GI_VOLUME_TEST_OFFSET = 0.1;
+/*
+ * SL_BLOCK_SPECULAR (LIGHT_SPECULAR_OCCLUSION): colortex7 の比で、光源ごとのトレースの結果を混ぜる重みを x -> y で 1 -> 0 に下げる
+ * y 以上はトレースしない (全部の光源が見えている画面の大半で重さを足さない)。境で照り返しが跳ばないよう間を混ぜる
+ * 比は拡散の照度の重みで、鏡面は視線との向きで決まるので、比が y 以上でも向きの合う隠れた光源の照り返しは残りうる
+ */
+const vec2 BLOCK_SPECULAR_TRACE_VIS = vec2(0.9, 0.98);
 // 太陽の可視率の上限 (CAVE_LEAK_PREVENTION)。スカイライトが 0 段なら 0、2 段以上なら 1
 // 空が無い所に太陽は届かないので、上のチャンクのメッシュが描かれず影マップに穴が空いても、洞窟の奥には射さない
 // 影マップの外の推定 (SHADOW_FALLBACK_SKYLIGHT) は 0.8 未満で 0 なので、手には重ねて掛からない
@@ -109,6 +115,8 @@ struct SurfacePoint {
     bool caustics;
     // SL_BLOCK_SPECULAR_TRACED を集めるか。装備の金属だけが実行時に決めるので、caustics と同じく点の値で渡す
     bool blockSpecular;
+    // SL_BLOCK_SPECULAR で隠れた光源の照り返しを光源ごとのトレースで消す重み [0,1] (つやのある面ほど 1。deferred30 が決める)
+    float specOcclusion;
     // 法線を上向きに固定した植物 (isUpNormalPlant)。SL_HAND の影の始点と画面空間の影を植物用にする (点の値)
     bool plant;
 };
@@ -129,6 +137,7 @@ SurfacePoint surfacePoint(vec3 playerPos, vec3 normal) {
     p.hand = false;
     p.caustics = true;
     p.blockSpecular = true;
+    p.specOcclusion = 0.0;
     p.plant = false;
     return p;
 }
@@ -228,6 +237,48 @@ void gatherBlockTracedLights(SurfacePoint p, bool specular, bool bins, inout Sur
     if (bins) L.block = forwardEntityBlockLight(p.playerPos, p.geoNormal, p.lightmap.x, direct, bounce);
 }
 
+#if defined LIGHT_SPECULAR && defined LIGHT_SHADOWS && defined LIGHT_SPECULAR_OCCLUSION
+/*
+ * 不透明面の鏡面の光 (getBlockLightSpecular と同じ選び方) に、隠れた光源を光源ごとのトレースで消す分を混ぜる
+ * colortex7 の比は光源全体の 1 つの値なので、それだけを掛けると、見える光源がある所では壁の陰の光源の照り返しも比のぶん残る
+ * (壁の陰のエメラルドが金属の上面に緑の四角で映った)。見える光源には今までどおり比を掛ける (デノイズした半影の柔らかさと明るさを変えない)
+ * トレースは光源の中心へ 1 本で揺らさないので、見える / 隠れるの境は光源ごとの硬い影になる。本数は最大 LIGHT_SPECULAR_COUNT、
+ * 1 本の歩数は光源までの距離で決まり (到達半径 15 で 45 セル前後)、LIGHT_TRACE_STEPS で止まる
+ * 確かめ方: 金属のブロックの上から、角の先の発光ブロック (エメラルド・グロウストーン) が直接見えない配置で四角が映らないか
+ */
+int getBlockLightSpecularOccluded(SurfacePoint p, out LightSample s[BLOCKLIGHT_SPECULAR_LIGHTS]) {
+    for (int j = 0; j < BLOCKLIGHT_SPECULAR_LIGHTS; j++) s[j] = noLight();
+    vec3 fromVoxel = playerToVoxel(p.playerPos + p.geoNormal * TRACE_NORMAL_OFFSET);
+    if (!isInVoxelVolume(fromVoxel)) return 0;
+    int bin = lightBinIndex(ivec3(fromVoxel));
+    uint n = lightBinCount(bin);
+    int topIdx[BLOCKLIGHT_SPECULAR_LIGHTS];
+    selectBlockSpecularLights(bin, n, fromVoxel, p.geoNormal, topIdx);
+    float sharedVis = blockSpecularSharedVisibility(p.texel);
+    vec3 voxelPos = playerToVoxel(p.playerPos);
+    float scale = sharedVis * floodCoverage(p.playerPos);
+    int count = 0;
+    for (int j = 0; j < BLOCKLIGHT_SPECULAR_LIGHTS; j++) {
+        if (topIdx[j] < 0) break;
+        s[j] = blockSpecularSample(lightBinLight(bin, uint(topIdx[j])), voxelPos, scale);
+        count++;
+    }
+    // ビンの光源が 1 つなら比がその光源の可視率なのでトレースしない (LIGHT_SPECULAR_COUNT = 1 でもビンに別の光源があればトレースする)
+    float traceWeight = p.specOcclusion * (1.0 - smoothstep(BLOCK_SPECULAR_TRACE_VIS.x, BLOCK_SPECULAR_TRACE_VIS.y, sharedVis));
+    if (traceWeight <= 0.0 || scale <= 0.0 || n < 2u) return count;
+    // 半影の揺らぎとエンティティの遮蔽は使わない (gatherBlockTracedLights と同じ)。トレースを呼ぶ所は 1 つにして、回数は実行時の値にする (展開させない)
+    uint flags = blockLightTraceFlags() & ~(TRACE_ENTITIES | TRACE_PLAYER);
+    for (int t = 0; t < count; t++) {
+        int slot = 0;
+        for (int j = 0; j < BLOCKLIGHT_SPECULAR_LIGHTS; j++) if (j == t) slot = topIdx[j];
+        vec3 w = blockLightShadow(traceVisibility(fromVoxel, lightBinLight(bin, uint(slot)).posRadius.xyz, flags, 0.5, 0.0, 0.0));
+        vec3 k = mix(vec3(1.0), w, traceWeight);
+        for (int j = 0; j < BLOCKLIGHT_SPECULAR_LIGHTS; j++) if (j == t) s[j].irradiance *= k;
+    }
+    return count;
+}
+#endif
+
 SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, uint terms) {
     SurfaceLights L;
     L.celestial = (terms & SL_CELESTIAL) != 0u ? getCelestialLight() : noLight();
@@ -299,7 +350,13 @@ SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, ui
     if ((terms & SL_BLOCK_SPECULAR_TRACED) != 0u || tracedBins) {
         gatherBlockTracedLights(p, (terms & SL_BLOCK_SPECULAR_TRACED) != 0u && p.blockSpecular, tracedBins, L);
     }
-    if ((terms & SL_BLOCK_SPECULAR) != 0u) L.blockSpecCount = getBlockLightSpecular(p.texel, p.playerPos, p.geoNormal, L.blockSpec);
+    if ((terms & SL_BLOCK_SPECULAR) != 0u) {
+#if defined LIGHT_SPECULAR && defined LIGHT_SHADOWS && defined LIGHT_SPECULAR_OCCLUSION
+        L.blockSpecCount = getBlockLightSpecularOccluded(p, L.blockSpec);
+#else
+        L.blockSpecCount = getBlockLightSpecular(p.texel, p.playerPos, p.geoNormal, L.blockSpec);
+#endif
+    }
 
     if (blockMode == SL_BLOCK_OPAQUE) {
         L.block = getBlockLightOpaque(p.texel, p.playerPos, p.geoNormal, p.normal, p.lightmap.x);
