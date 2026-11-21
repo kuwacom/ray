@@ -316,6 +316,9 @@ vec2 vanillaCloudSegment(float y0, float dy, float bottom, float envelope, float
 }
 #endif
 
+// 体積の層の中の視線で、雲のマーチが細かく歩く手前の長さ (ブロック。cloud_march の cloudStepsSetup と、cloud_upscale の再投影の距離が使う)
+const float CLOUD_NEAR_LENGTH = 256.0;
+
 // 最初に通る雲の層の区間 (半透明の手前の分を見積もる基準)
 vec2 cloudPrimarySegment(float y0, float dy) {
 #ifdef CLOUD_VANILLA_SHAPE

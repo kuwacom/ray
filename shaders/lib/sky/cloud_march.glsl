@@ -44,7 +44,6 @@ void cloudAccumFinish(inout CloudAccum acc, vec3 sums, CloudContext ctx, vec3 di
  * (層の中の横向きの視線は数千ブロックあり、等間隔では歩幅が数十ブロックになって、カメラの周りの雲が粗く透ける。
  * 細かく歩けば雲の中の見通しも外から見た雲と同じ密度と光の積分で決まり、縁で薄く芯で濃くなる)
  */
-const float CLOUD_NEAR_LENGTH = 256.0; // ブロック
 const float CLOUD_NEAR_SHARE = 0.3;
 struct CloudSteps {
     float nearEnd;  // 細かく歩く区間の終わり (ワールド)。層の外なら seg.x
