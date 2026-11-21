@@ -35,6 +35,7 @@
 //@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/buffers/images.glsl"
 //@include "/lib/sky/cloud_styles.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 
 // カメラが雲の層の中にいる時の霧 (雲の中の視程の設定が 0 でなければ)
 #if CLOUDS >= 2 && CLOUD_INTERIOR_VISIBILITY > 0 && defined HAS_SKY
@@ -280,7 +281,7 @@ ivec2 cloudLowResSize() { return (ivec2(viewWidth, viewHeight) + CLOUD_RES - 1) 
  */
 vec4 getCloudLayer(ivec2 texel) {
 #if CLOUDS >= 2 && defined HAS_SKY
-    return texelFetch(colortex11, texel, 0);
+    return hdrFromStore(texelFetch(colortex11, texel, 0));
 #else
     return vec4(0.0, 0.0, 0.0, 1.0);
 #endif

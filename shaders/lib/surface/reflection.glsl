@@ -25,6 +25,7 @@
 //@include "/lib/surface/gi.glsl"
 //@include "/lib/surface/lighting.glsl"
 //@include "/lib/surface/screen_trace.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 
 // これより粗い面は SSR を飛ばさず空のフォールバックだけ (ほぼ拡散なので見た目が変わらない)
 const float SSR_MAX_ROUGHNESS = 0.75;
@@ -127,7 +128,7 @@ vec3 skyPixelReflection(vec3 R, float skyLm, vec3 lut) {
     if (textureLod(depthtex0, edgeUv, 0.0).r < 1.0) return lut;
     vec3 edgeDir = normalize(viewToPlayerDir(screenToView(vec3(edgeUv, 1.0))));
     vec3 edgeLut = skyReflectionFallback(edgeDir, skyLm, 0.0);
-    vec3 sky = textureLod(colortex0, edgeUv, 0.0).rgb * skylightCurve(skyLm);
+    vec3 sky = hdrFromStore(textureLod(colortex0, edgeUv, 0.0).rgb) * skylightCurve(skyLm);
     // 太陽円盤は水面の太陽の鏡面 (sunSpecular) が別に描くので、雲の明るさまでで頭を抑える
     float lumRatio = luminance(sky) / max(luminance(edgeLut), 1e-6 * PHYSICAL_DARKEST);
     if (lumRatio > SKY_REFLECTION_MAX_RATIO) {
@@ -198,7 +199,7 @@ vec4 traceReflectionHit(vec3 viewPos, vec3 playerPos, vec3 Ng, vec3 R, float dis
 }
 
 // 鏡面の当たった画素の放射輝度 (上限は掛けない。REFLECTION_MAX_EXPOSED)
-vec3 reflectionHitRadiance(vec2 uv) { return max(textureLod(colortex0, uv, 0.0).rgb, 0.0); }
+vec3 reflectionHitRadiance(vec2 uv) { return max(hdrFromStore(textureLod(colortex0, uv, 0.0).rgb), 0.0); }
 
 ivec2 reflectionLowResSize() { return ivec2(viewSize()) / 2; }
 ivec2 reflectionRegion(int frame) { return (frame & 1) == 0 ? ivec2(0) : ivec2(reflectionLowResSize().x, 0); }

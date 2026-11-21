@@ -51,6 +51,7 @@
 #include "/lib/post/lens_flare.glsl"
 #include "/lib/post/lens.glsl"
 #include "/lib/post/post_internal.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/post/local_tonemap.glsl"
 // END GENERATED includes
 

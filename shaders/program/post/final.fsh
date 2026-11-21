@@ -28,6 +28,7 @@
 //@include "/lib/surface/gi.glsl"
 //@include "/lib/post/analog.glsl"
 //@include "/lib/post/camera_info.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -73,6 +74,7 @@
 #include "/lib/post/lens.glsl"
 #include "/lib/post/post_internal.glsl"
 #include "/lib/post/color_grade.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/post/local_tonemap.glsl"
 #include "/lib/ids/block_ids.glsl"
 #include "/lib/ids/entity_ids.glsl"
@@ -124,15 +126,15 @@ vec3 debugView(ivec2 texel, vec3 color) {
     return linearToSrgb(tonemap(sampleFloodfillVolume(playerPos - normalize(playerPos) * 0.5)));
 #elif DEBUG_VIEW == 6
     // GI/AO なしでは colortex9 が書かれないので、枠を直接読まず定数を返す口を通す
-    vec4 gi = getIndirectLight(texel);
+    vec4 gi = hdrFromStore(getIndirectLight(texel));
     return linearToSrgb(tonemap(gi.rgb)) * gi.a;
 #elif DEBUG_VIEW == 7
     // 雲の散乱光に露出を掛けて見る (掛けないと夜や薄明では真っ黒になる)
-    return linearToSrgb(tonemap(texelFetch(colortex11, texel, 0).rgb * getExposure()));
+    return linearToSrgb(tonemap(hdrFromStore(texelFetch(colortex11, texel, 0).rgb) * getExposure()));
 #elif DEBUG_VIEW == 8
-    return linearToSrgb(tonemap(texelFetch(colortex12, texel, 0).rgb));
+    return linearToSrgb(tonemap(hdrFromStore(texelFetch(colortex12, texel, 0).rgb)));
 #elif DEBUG_VIEW == 9
-    return linearToSrgb(tonemap(texture(skyViewSampler, texcoord).rgb));
+    return linearToSrgb(tonemap(hdrFromStore(texture(skyViewSampler, texcoord).rgb)));
 #elif DEBUG_VIEW == 10
     // 目の高さのボクセル断面 (固体=白, エンティティ=赤, 光源=黄)
     ivec2 xz = ivec2(texcoord * vec2(VOXEL_SIZE.xz));
@@ -182,7 +184,7 @@ vec3 applyLookLut(vec3 c) {
 #endif
 
 vec3 fetchScene(ivec2 p) {
-    return sanitizeColor(texelFetch(colortex0, clamp(p, ivec2(0), ivec2(viewSize()) - 1), 0).rgb);
+    return sanitizeColor(hdrFromStore(texelFetch(colortex0, clamp(p, ivec2(0), ivec2(viewSize()) - 1), 0).rgb));
 }
 
 // CAS の知覚空間で白 (露出後 1) に当たる値。近傍にこれを超える点があれば暗い側へのはみ出しを止める
@@ -337,15 +339,15 @@ void main() {
 #endif
     vec2 uvFlare = flareOutput ? uv : uvL;
 
-    vec3 center = distort && !LENS_WARP_TAA ? sanitizeColor(sampleCatmullRom(colortex0, uvL, viewSize())) : fetchScene(texel);
+    vec3 center = distort && !LENS_WARP_TAA ? sanitizeColor(hdrFromStore(sampleCatmullRom(colortex0, uvL, viewSize()))) : fetchScene(texel);
     vec3 hdr = center;
 
     // レンズ: 倍率色収差 (波長ごとに倍率が違い、画面の隅ほど縁が虹色にずれる)
 #ifdef LENS_CHROMATIC
     #if defined LENS_DISTORTION && LENS_PROJECTION == 1
-    if (LP_CA != 0.0) hdr = LENS_WARP_TAA ? lensChromaticSample(colortex0, uv, LP_CA) : lensChromaticProjected(colortex0, uv, LP_CA);
+    if (LP_CA != 0.0) hdr = hdrFromStore(LENS_WARP_TAA ? lensChromaticSample(colortex0, uv, LP_CA) : lensChromaticProjected(colortex0, uv, LP_CA));
     #else
-    if (LP_CA != 0.0) hdr = lensChromaticSample(colortex0, uvL, LP_CA);
+    if (LP_CA != 0.0) hdr = hdrFromStore(lensChromaticSample(colortex0, uvL, LP_CA));
     #endif
 #endif
     hdr = max(hdr + casDelta(texelL, center, exposure), 0.0);
@@ -400,7 +402,7 @@ void main() {
              * (ピントの前後で中心だけ地まで引かれ、周りが光って中心が黒・緑・紫の 1 画素に抜けた)
              */
             vec3 given = (spreadAmount + coreAmount) * spreadCore;
-            vec3 remain = max(hdr - textureLod(colortex13, uvL, 0.0).rgb, 0.0);
+            vec3 remain = max(hdr - hdrFromStore(textureLod(colortex13, uvL, 0.0).rgb), 0.0);
             hdr += spreadAmount * spreadTail / float(POINT_SPREAD_LEVELS) + coreAmount * coreBlur - min(given, remain);
         }
     }
@@ -410,12 +412,19 @@ void main() {
 #ifdef BLOOM
     BloomBands bands;
     vec3 bloom = sampleBloom(uvL, bands);
+    // タイルは P 倍の colortex0 から作ったまま (composite24 の画面のフレアも同じ単位で閾値を掛ける)
+    bloom = hdrFromStore(bloom);
+    bands.narrow = hdrFromStore(bands.narrow);
+    bands.mid = hdrFromStore(bands.mid);
+    bands.wide = hdrFromStore(bands.wide);
+    bands.widest = hdrFromStore(bands.widest);
+    bands.lava = hdrFromStore(vec3(bands.lava)).x;
     #ifdef LENS_SOFT_FOCUS
         // 球面収差: ピントが合っていても低い周波数の滲みが乗る (開放ほど強い)
         hdr = mix(hdr, bands.narrow, saturate(LP_SOFT_FOCUS * LENS_SOFT_FOCUS_AMOUNT * lensApertureFactor() * GLOW_GAIN));
         #ifdef LENS_SOFT_HALO_TABLE
             // 処方の球面収差のハロー (FA 28 Soft など)。半径と割合は F 値で変わり、絞ると消える
-            vec4 softHalo = lensSoftHalo(uvL);
+            vec4 softHalo = hdrFromStore(lensSoftHalo(uvL));
             hdr = mix(hdr, softHalo.rgb, saturate(softHalo.a * LENS_SOFT_HALO_GAIN * GLOW_GAIN));
         #endif
     #endif
@@ -454,7 +463,7 @@ void main() {
     #endif
     #if defined LENS_SCREEN_FLARE && defined LENS_FLARE
         // 明るい画素のゴーストと横ストリーク (composite24)
-        hdr += sampleFlareTile(uvL);
+        hdr += hdrFromStore(sampleFlareTile(uvL));
     #endif
 #endif
 

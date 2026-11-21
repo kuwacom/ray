@@ -25,6 +25,7 @@
 //@include "/lib/surface/screen_trace.glsl"
 //@include "/lib/surface/lighting.glsl"
 //@include "/lib/buffers/slots.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -74,6 +75,7 @@
 #include "/lib/common/celestial_shape.glsl"
 #include "/lib/sky/celestial.glsl"
 #include "/lib/sky/cloud_styles.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/sky/sky_color.glsl"
 #include "/lib/sky/fog_template.glsl"
@@ -387,5 +389,5 @@ void main() {
 #endif
     gi *= GI_EFFECTIVE_STRENGTH;
 
-    imageStore(STORE_GI_RAW, low, vec4(max(gi, 0.0), ao));
+    imageStore(STORE_GI_RAW, low, vec4(hdrToStore(max(gi, 0.0)), ao));
 }

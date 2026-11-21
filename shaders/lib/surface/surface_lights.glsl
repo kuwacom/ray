@@ -27,6 +27,7 @@
 //@include "/lib/sky/sky_color.glsl"
 //@include "/lib/surface/gi.glsl"
 //@include "/lib/surface/sun_shadow.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 
 // 太陽の影の取り方 (どれか 1 つ)
 // 影マップの外の扱い: SHADOW_MAP_FALLBACK だけスカイライトで日向を推定する。半透明の面と 2 次ヒットは軽さのため 1 (日向) にするので、
@@ -296,7 +297,7 @@ SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, ui
     L.giSky = 0.0;
     L.blockSpecCount = 0;
 
-    if ((terms & SL_GI) != 0u) L.indirect = getIndirectLight(p.texel);
+    if ((terms & SL_GI) != 0u) L.indirect = hdrFromStore(getIndirectLight(p.texel));
 
     // 影の濃さ (SUN_SHADOW_STRENGTH / MOON_SHADOW_STRENGTH) は影マップ・接触影・POM の可視率だけに掛け、雲影は対象外
     float shadowStrength = celestialShadowStrength();

@@ -12,6 +12,7 @@
 //@include "/lib/common/common.glsl"
 //@include "/lib/post/post_internal.glsl"
 //@include "/lib/buffers/shutter.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -54,6 +55,7 @@
 #include "/lib/post/lens.glsl"
 #include "/lib/post/post_internal.glsl"
 #include "/lib/buffers/shutter.glsl"
+#include "/lib/common/pre_exposure.glsl"
 // END GENERATED includes
 
 in vec2 texcoord;
@@ -110,10 +112,13 @@ vec4 accumulateShutter(ivec2 texel, vec4 color, bool hand) {
     #if SHUTTER_MODE == 1
     // 1 枚ずつ: 露光を終えたフレームで撮れた絵を移し、次の露光ができるまでそれを出す (最初の 1 枚までは途中経過)
     if ((flags & SHUTTER_FLAG_COMPLETE) != 0u) {
-        shutterShown.shown[index] = uvec2(packHalf2x16(accum.rg), packHalf2x16(accum.ba));
+        // 撮れた絵も fp16 なので P を掛けて持つ。出す間に P が変わっても、撮れた時の P (composite21_a が置く) で戻す
+        vec3 stored = hdrToStore(accum.rgb);
+        shutterShown.shown[index] = uvec2(packHalf2x16(stored.rg), packHalf2x16(vec2(stored.b, accum.a)));
     } else if ((flags & SHUTTER_FLAG_SHOWN) != 0u) {
         uvec2 shown = shutterShown.shown[index];
         accum = vec4(unpackHalf2x16(shown.x), unpackHalf2x16(shown.y));
+        accum.rgb = hdrFromStoreShutter(accum.rgb);
     }
     #endif
     return hand ? color : accum;
@@ -122,14 +127,14 @@ vec4 accumulateShutter(ivec2 texel, vec4 color, bool hand) {
 
 // 出力を書く。シャッター速度の反映の時は溜めた絵にする
 #ifdef SHUTTER
-#define WRITE_OUTPUT(color, hand) outColor = accumulateShutter(texel, color, hand)
+#define WRITE_OUTPUT(color, hand) outColor = hdrToStore(accumulateShutter(texel, color, hand))
 #else
-#define WRITE_OUTPUT(color, hand) outColor = color
+#define WRITE_OUTPUT(color, hand) outColor = hdrToStore(color)
 #endif
 
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
-    vec4 centerRaw = texelFetch(colortex0, texel, 0);
+    vec4 centerRaw = hdrFromStore(texelFetch(colortex0, texel, 0));
     vec2 uv = (vec2(texel) + 0.5) * texelSize();
     // 歪曲・魚眼を TAA で組み立てた時は colortex0 が出力の座標なので、深度は元画像の位置で読む (lib/post/lens.glsl)
     float depthX = texelFetch(depthtex0, LENS_WARP_TAA ? postSourceTexel(uv) : texel, 0).r;
@@ -190,7 +195,7 @@ void main() {
                 + cylinder(dist, speedY) * cylinder(dist, speedX) * 2.0;
         if (handY) w = 0.0;
 
-        sum += sanitizeColor(textureLod(colortex0, uvY, 0.0).rgb) * w;
+        sum += sanitizeColor(hdrFromStore(textureLod(colortex0, uvY, 0.0).rgb)) * w;
         wSum += w;
     }
 

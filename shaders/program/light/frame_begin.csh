@@ -20,6 +20,7 @@
 #ifdef FIREWORK_LIGHT
     //@include "/lib/light/firework_light.glsl"
 #endif
+//@include "/lib/common/pre_exposure.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -74,6 +75,7 @@
     #include "/lib/buffers/firework_light.glsl"
     #include "/lib/light/firework_light.glsl"
 #endif
+#include "/lib/common/pre_exposure.glsl"
 // END GENERATED includes
 
 layout(local_size_x = 256) in;
@@ -115,6 +117,12 @@ void main() {
 #ifdef FIREWORK_LIGHT
         // 前フレームの光る粒から花火の光を決める (今フレームの粒は gbuffers_particles_translucent が溜める)
         updateFireworkLight();
+#endif
+#ifdef PRE_EXPOSURE_ACTIVE
+        // 1 フレームの中で変えないよう、どのパスより前のここで決める。前のフレームの P は履歴を戻すのに使う
+        float preNow = choosePreExposure(frameData.exposure);
+        float prePrev = frameData.postParams[PRE_EXPOSURE_PARAM].x;
+        frameData.postParams[PRE_EXPOSURE_PARAM].xy = vec2(preNow, prePrev > 0.0 ? prePrev : preNow);
 #endif
     }
 }

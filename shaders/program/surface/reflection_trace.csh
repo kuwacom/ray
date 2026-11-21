@@ -21,6 +21,7 @@
 //@include "/lib/surface/lighting.glsl"
 //@include "/lib/surface/reflection.glsl"
 //@include "/lib/common/exposure.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -71,6 +72,7 @@
 #include "/lib/common/celestial_shape.glsl"
 #include "/lib/sky/celestial.glsl"
 #include "/lib/sky/cloud_styles.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/sky/sky_color.glsl"
 #include "/lib/sky/fog_template.glsl"
@@ -247,7 +249,7 @@ void main() {
             found = found || v.a > 0.5;
         }
 #endif
-        if (edge > 0.0) radiance = mix(radiance, textureLod(colortex0, hit.xy, 0.0).rgb, edge);
+        if (edge > 0.0) radiance = mix(radiance, hdrFromStore(textureLod(colortex0, hit.xy, 0.0).rgb), edge);
         // 何にも当たらず空へ抜けた鏡面の反射は、同じ方向の空の画素 (雲込み) を映す。空は無限遠なので面の位置によらず
         // カメラから見た R 方向の画素と同じ。LUT の空 (雲なし) のままだと、昼の水面の遠くが一様な水色の帯になり
         // 雲の映り込みが無かった

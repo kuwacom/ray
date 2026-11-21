@@ -22,6 +22,7 @@
 //@include "/lib/sky/celestial.glsl"
 //@include "/lib/sky/clouds.glsl"
 //@include "/lib/sky/sh.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 
 // 月光の色。物理的には太陽光とほぼ同じだが、夜の視覚 (プルキンエ効果) に寄せて青に振る
 const vec3 MOON_TINT = vec3(0.72, 0.84, 1.0);
@@ -306,7 +307,7 @@ vec3 getSkyRadiance(vec3 dir) {
     vec3 sunDir = getSunDir();
     #if ATMOSPHERE_MODE == 1
         float cosAzimuth = dot(skySafeNormalize(dir.xz), skySafeNormalize(sunDir.xz));
-        vec3 radiance = texture(skyViewSampler, atmoSkyViewUv(atmoViewerRadius(), dir.y, cosAzimuth)).rgb;
+        vec3 radiance = hdrFromStore(texture(skyViewSampler, atmoSkyViewUv(atmoViewerRadius(), dir.y, cosAzimuth)).rgb);
     #else
         vec3 d = normalize(vec3(dir.x, max(dir.y, 0.0), dir.z));
         vec3 radiance = atmoAnalyticSkyForLight(d, sunDir) * getSunIlluminanceTOA() + atmoAnalyticSkyForLight(d, -sunDir) * getMoonIlluminanceTOA();

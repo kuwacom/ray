@@ -20,6 +20,7 @@
 //@include "/lib/common/color.glsl"
 //@include "/lib/post/lens_optics.glsl"
 //@include "/lib/post/analog_presets.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -55,6 +56,7 @@
 #include "/lib/post/velocity.glsl"
 #include "/lib/post/lens_optics.glsl"
 #include "/lib/post/analog_presets.glsl"
+#include "/lib/common/pre_exposure.glsl"
 // END GENERATED includes
 
 // グループは 8 列 x 32 行のスレッド。1024 グループで 8192 列 (ANALOG_SMEAR_COLUMNS_ALLOC) を覆う
@@ -80,7 +82,7 @@ void main() {
     if (inside) {
         for (int y = ly; y < size.y; y += ANALOG_SMEAR_GROUP_ROWS) {
             // NaN / Inf の 1 画素が列の平均を汚さないように入口で止める
-            vec3 c = sanitizeColor(texelFetch(colortex0, ivec2(x, y), 0).rgb);
+            vec3 c = sanitizeColor(hdrFromStore(texelFetch(colortex0, ivec2(x, y), 0).rgb));
             // 灯りの倍率は機材の値に、機材によらず効く強さを掛けたもの
             const float lightGain = AP_SMEAR_LIGHT_GAIN * ANALOG_SMEAR_LIGHT_STRENGTH;
             if (lightGain > 0.0) {

@@ -12,6 +12,8 @@
  * FrameData.postParams[7]: シャッター速度の反映の状態 (composite21_a が書く)。x = このフレームを溜める重み, y = 今の露光で溜めた秒 (1 枚ずつ),
  *                         z = 溜め始めた時の画面の幅, w = 印 (SHUTTER_FLAG_*) + 8 x 画面の高さ
  * FrameData.postParams[8]: カメラの自動露出 (P・A・S) が決めた値 (composite25 が書く)。x = SS (秒), y = F 値, z = ISO, w = 限界の印 (CAMERA_LIMIT_*)
+ * FrameData.postParams[9..10]: カメラの情報の文字 (lib/post/camera_info.glsl)
+ * FrameData.postParams[11]: HDR のバッファの pre-exposure (begin が書く。lib/common/pre_exposure.glsl)。x = 今のフレーム, y = 前のフレーム, z = 1 枚ずつのシャッターの撮れた絵 (composite21_a が書く)
  */
 #ifndef POST_EXPOSURE_GLSL
 #define POST_EXPOSURE_GLSL

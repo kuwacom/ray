@@ -166,6 +166,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 15 | RGBA16F | 速度: rg = 前フレーム UV - 今の UV, a = 1 なら有効 (エンティティ・手)。a = 0 の金属の防具の画素だけ rgb = 環境光の鏡面の重み x 1e-4 (gbuffers_entities_translucent -> composite2。双線形で読まれても速度がずれないよう小さくする) | surface (gbuffers, post の関数) | post | 毎フレーム |
 
 - gbuffers では colortex0-3 を読めない (Iris の仕様)
+- pre-exposure (`lib/common/pre_exposure.glsl`、現実の光の比 ON の時だけ): 次の rgb は露出に近い 2 の冪 P を掛けて持つ。colortex0 (deferred30 から後。空テクスチャの gbuffers が書く値は絶対のまま)、9 (GI)、11 (雲)、12 と fogHistoryImg (VL)、13 (TAA 履歴)、14 の雲の低解像度・水の屈折先・ブルームタイルと画面のフレア (局所トーンマップのタイルは絶対の log2)、giRawImg の GI の用途、skyViewImg、シャッターの撮れた絵 (SSBO 8)。読む所は `hdrFromStore` (前のフレームの履歴は `hdrFromStorePrev`)、書く所は `hdrToStore` を通す。通さないと夜は数千倍ずれる。ブロックライト (6 / 7 と生値の image)・反射・半透明の色 (4)・白飛び分 (8) は絶対のまま
 - 4, 8〜10, 14 は `lib/buffers/slots.glsl` の論理名 (`TEX_*`、用途ごとの区間付き) で読む。番号を変えるときは slots.glsl と RENDERTARGETS の数字を一緒に直す (`tools/check_slots.py` が直接書きと区間の外の読み書きを調べる。区間は validate_shaders.py --full でも見る)。Iris 1.10.4 以前と Oculus は 16 枚までなので colortex16 以上は使わない (validate_shaders.py がローダーごとに落とす。最新の Iris は 32 枚)
 `slots.glsl` の論理名 (正本は slots.glsl。区間は Iris のプログラム名で、永続は前フレームの値を読む)
 

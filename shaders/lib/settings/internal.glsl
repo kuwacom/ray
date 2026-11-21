@@ -99,6 +99,14 @@ const int noiseTextureResolution = 256;
     #define PHYSICAL_LIGHT_ACTIVE 1
 #endif
 
+/*
+ * HDR のバッファを露出に近い倍率を掛けて持つ (lib/common/pre_exposure.glsl)。現実の光の比は暗い所を fp16 の非正規化数まで下げ、
+ * 高い感度・長い SS で持ち上げると刻みが段になるので、その時だけ効かせる
+ */
+#ifdef PHYSICAL_LIGHT_ACTIVE
+    #define PRE_EXPOSURE_ACTIVE 1
+#endif
+
 // 水に入った自分を、屈折した視線を自分の三角形に当てて描く (water_trace.fsh)。自分の三角形と水の屈折の両方が要る
 #if defined ENTITY_TRI_OCCLUSION && defined LIGHT_PLAYER_OCCLUSION && WATER_REFRACTION >= 1
     #define WATER_SELF_REFRACTION 1

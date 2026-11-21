@@ -74,6 +74,7 @@
 #include "/lib/light/blocklight.glsl"
 #include "/lib/common/phase.glsl"
 #include "/lib/sky/cloud_styles.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/common/celestial_shape.glsl"
 #include "/lib/sky/atmosphere.glsl"
