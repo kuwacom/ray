@@ -1,5 +1,5 @@
 /*
- * prepare1 (毎フレーム): SkyView LUT (192x108) を skyViewImg に作る
+ * prepare (毎フレーム): SkyView LUT (192x108) を skyViewImg に作る。空の SH (prepare1) より先に走る
  * 視点高度から上半球の空の放射を、太陽と月 (対蹠点) の 2 光源で積分する。単位は FrameData と同じ相対照度系
  * sky モジュール (lib/sky)
  */

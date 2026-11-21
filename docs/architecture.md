@@ -98,8 +98,8 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 6 | shadow.vsh/gsh/fsh | light | 専用のプログラムが無いジオメトリの受け皿 (本体共通, `PROGRAM_SHADOW_FALLBACK`)。地形用の処理は地形だけ。shadow_entities の無い Iris (1.8 未満、Oculus) では全ジオメトリが来るので、GS で renderStage を見て 7・8 と同じ処理をする (`FX_SHADOW_NON_TERRAIN`)。新しい Iris ではリードなどだけが来て、GS は素通し | renderStage | 5・7・8 と同じ | 同上 | 常時 |
 | 7 | shadow_entities.vsh/gsh/fsh | light | エンティティのボクセル化 (GS で表面サンプル)・エンティティ光源登録・影マップ | entityId, currentRenderedItemId | voxelEntityImg, voxelEmitImg, SSBO2, 影マップ | 同上 | shadowEntities |
 | 8 | shadow_block.vsh/gsh/fsh | light | ブロックエンティティ版 (本体共通, `PROGRAM_SHADOW_BLOCK`) | blockEntityId | voxelEntityImg, 影マップ | 同上 | shadowBlockEntities |
-| 9 | prepare.csh | sky | 太陽・月の直達照度、空の SH (全モジュールが使う光の色) | skyView / 解析式 | SSBO0 sun/moon/shadowLight/skySH | (1,1,1) | 常時 |
-| 10 | prepare1.csh | sky | SkyView LUT | transmittance, multiScatter | skyViewImg 192x108 | local 8x4, (24,27,1) | ATMOSPHERE_MODE=1, world0 |
+| 9 | prepare.csh | sky | SkyView LUT | transmittance, multiScatter | skyViewImg 192x108 | local 8x4, (24,27,1) | ATMOSPHERE_MODE=1, world0 |
+| 10 | prepare1.csh | sky | 太陽・月の直達照度、空の SH (全モジュールが使う光の色)。SH は同じフレームの SkyView LUT から (前のフレームの LUT を読むと pre-exposure の P が変わるフレームで 1 段跳ぶ) | skyView / 解析式 | SSBO0 sun/moon/shadowLight/skySH | (1,1,1) | 常時 |
 | 11 | prepare2.csh | sky | 雲の天気マップ (バニラの形は柱の表) と雲影マップ、カメラの位置の雲の中の霧と雨の空の置き換え (FrameData) | - | cloudWeatherImg, cloudShadowImg 512² | local 16², (32,32,1) | CLOUDS>=2, world0 |
 | 12 | gbuffers_* (不透明) | surface (空/雲は sky) | G バッファ書き込み、TAA ジッター、エンティティ光源登録 (light の関数)。能力の無いローダーでは gbuffers が次も扱う: MC 26.1 未満の花火の火花 (不透明のパーティクルで来るので発光と花火の光をここで足す、`FX_SPARKS_IN_PARTICLES`)、Oculus の雷 (`FX_LIGHTNING_IN_ENTITIES`)、Iris 1.8 未満の自分の判定 (`FX_SELF_BY_DISTANCE`) | アトラス | colortex1,2,3,15 (手・エンティティ・ブロックエンティティ・パーティクルは深度テストを通った画素で colortex4,5 を空にして、先に描かれた半透明 (額縁の地図など) を消す。エンティティとブロックエンティティは a = 1 で消し (ブロックエンティティは renderStage がブロックエンティティの描画だけ。ピストンで動く半透明ブロックは消さない)、電気の渦の層 (deferred の後に描かれる帯電したクリーパー・ウィザーの防壁。テクスチャ行列が単位行列でないことで見分ける) だけ a = 0 で colortex4 へ加算する) / voxelEmitImg, SSBO2 | 画面 | 常時 |
 | 13 | deferred.csh | light | floodfill 1 ステップ伝搬 + ブロック光源・エンティティ光源をグローバルリストへ | voxelBlock/Emit, flood(前) | flood(今), SSBO2 | local 8³, VOXEL_SIZE/8 | 常時 |
@@ -224,7 +224,7 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 | IMG_VOXEL_ENTITY | voxelEntityImg | shadow_entities.gsh / shadow_block.gsh |
 | IMG_VOXEL_EMIT | voxelEmitImg | shadow_entities.gsh / shadow_block.gsh, surface/gbuffers_solid.vsh (GBUF_ENTITIES), deferred.csh |
 | IMG_FLOOD | floodImgA + floodImgB | deferred.csh |
-| IMG_SKY_TRANSMITTANCE / IMG_SKY_MULTISCATTER / IMG_SKY_VIEW | 大気 LUT | setup1 / setup2 / prepare1 |
+| IMG_SKY_TRANSMITTANCE / IMG_SKY_MULTISCATTER / IMG_SKY_VIEW | 大気 LUT | setup1 / setup2 / prepare |
 | IMG_CLOUD_SHADOW + IMG_CLOUD_WEATHER | 雲 | prepare2 |
 | IMG_BLOCKLIGHT_RAW + IMG_BLOCKLIGHT_AUX | ブロックライト | deferred1 |
 | IMG_GI_RAW / IMG_REFLECTION | GI / 反射 | deferred10 / composite.csh |

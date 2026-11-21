@@ -256,7 +256,7 @@ vec3 rsmIndirect(vec3 playerPos, vec3 normal, float rotation) {
  * 何にも当たらなかったレイの放射
  * 下向きは遠くの地面 (deferred30 が空の SH から引いた灰色の地面) を見たとみなす。画面の外へ出た SSGI のレイや、
  * 崖の上・空中の足場から届かないボクセルのレイで、地面の照り返しが丸ごと消えないように
- * 上向きは方向ごとの空の色 (GI_TRACES_SKY。SH と同じ強さ・彩度の調整)。混ぜ方は prepare の SH と同じ (地平線から 0.1 で地面に切り替わる)
+ * 上向きは方向ごとの空の色 (GI_TRACES_SKY。SH と同じ強さ・彩度の調整)。混ぜ方は prepare1 の SH と同じ (地平線から 0.1 で地面に切り替わる)
  * gate: 空の光に掛ける絞り (ボクセルは giVoxelSkyGate、SSGI は画面外の遮蔽が分からないのでスカイライトの曲線のまま)
  */
 vec3 giGroundRadiance(float gate) {

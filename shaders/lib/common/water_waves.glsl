@@ -116,10 +116,10 @@ vec3 waterKindMix(vec3 sea, vec3 lake, vec3 river) {
 }
 
 /*
- * 混ぜた水の性質は prepare (sun_sky_light.csh) が毎フレーム 1 回求めて frameData.surfaceParams に置き、各パスは読むだけにする
+ * 混ぜた水の性質は prepare1 (sun_sky_light.csh) が毎フレーム 1 回求めて frameData.surfaceParams に置き、各パスは読むだけにする
  * 並び: [4] = (吸収 rgb, 波頭の尖り), [5] = (散乱 rgb, 映り込みの散らし)。吸収と散乱は WATER_FOG_DENSITY 込み
  * 読む所ごとに混ぜる式を入れると、大きいパス (composite2) がドライバの関数の展開の上限を超えて、展開しない呼び出しとローカルメモリの
- * 配列で組まれ、フレームが 1.5 倍に重くなった。prepare より前の shadow パスは 1 フレーム前の値を読む (重みは数秒かけて動くので差は出ない)
+ * 配列で組まれ、フレームが 1.5 倍に重くなった。prepare1 より前の shadow パスは 1 フレーム前の値を読む (重みは数秒かけて動くので差は出ない)
  */
 const int WATER_MEDIUM_SLOT = 4;
 
@@ -244,7 +244,7 @@ WaterSea waterSeaStateEval(float skyLm) {
 
 /*
  * 開けた水面 (スカイライト WATER_SHELTER_SKYLM.y 以上) の海の状態は uniform だけで決まる。スペクトルは超越関数が多く、
- * 水の画素ごと (水底のコースティクスでは 1 画素に数回) に解くと重いので、prepare (sun_sky_light.csh) が毎フレーム 1 回
+ * 水の画素ごと (水底のコースティクスでは 1 画素に数回) に解くと重いので、prepare1 (sun_sky_light.csh) が毎フレーム 1 回
  * 解いて frameData.surfaceParams に置く。並び: 層の傾き WATER_LAYERS 個, 表面張力波の傾き, 風速, 高さの RMS
  */
 float waterSeaPacked(int k) { return frameData.surfaceParams[k >> 2][k & 3]; }

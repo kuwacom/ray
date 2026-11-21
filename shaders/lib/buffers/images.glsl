@@ -50,7 +50,7 @@ layout(rgba16f) uniform image2D skyMultiScatterImg;    // 32x32 (setup2)
 #endif
 uniform sampler2D skyMultiScatterSampler;
 #ifdef IMG_SKY_VIEW
-layout(rgba16f) uniform image2D skyViewImg;            // 192x108 (prepare1, 毎フレーム)
+layout(rgba16f) uniform image2D skyViewImg;            // 192x108 (prepare, 毎フレーム)
 #endif
 uniform sampler2D skyViewSampler;
 #ifdef IMG_CLOUD_SHADOW

@@ -57,7 +57,7 @@ const float CLOUD_RAY_FAR = 1e12; // 球との交差が無い方向の距離 (�
     const float CLOUD_R_DEPTH = 290.0;
 #endif
 const float CLOUD_R_TOP = CLOUD_R_BASE + CLOUD_R_DEPTH;
-// prepare.csh (雲の高度での光源の高さ) が参照する CLOUDS=2 の層 (参照空間の m)
+// prepare1.csh (雲の高度での光源の高さ) が参照する CLOUDS=2 の層 (参照空間の m)
 const float CLOUD2D_ALTITUDE = CLOUD_R_BASE;
 const float CLOUD2D_THICKNESS = CLOUD_R_DEPTH;
 // 高さテンプレートがカスタムの時は、中層・上層・積乱雲の頂をワールド y のスライダーで決める (0 は現実の比率のまま)。
