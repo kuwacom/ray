@@ -322,8 +322,21 @@ vec2 vanillaCloudSegment(float y0, float dy, float bottom, float envelope, float
 }
 #endif
 
-// 体積の層の中の視線で、雲のマーチが細かく歩く手前の長さ (ブロック。cloud_march の cloudStepsSetup と、cloud_upscale の再投影の距離が使う)
-const float CLOUD_NEAR_LENGTH = 256.0;
+/*
+ * 体積の層の中の視線で、雲のマーチが細かく歩く手前の長さ (ブロック) と、そこに使う歩数の割合の下限
+ * (cloud_march の cloudStepsSetup と、cloud_upscale の再投影の距離が使う)
+ * 雲の中では手前の密度のある歩ごとに光の積分をするので、雲の中にいる間だけ重くなる。品質の低い段は手前を短く、割合を小さくする
+ */
+#if CLOUD_QUALITY == 0
+    const float CLOUD_NEAR_LENGTH = 128.0;
+    const float CLOUD_NEAR_SHARE = 0.15;
+#elif CLOUD_QUALITY == 1
+    const float CLOUD_NEAR_LENGTH = 192.0;
+    const float CLOUD_NEAR_SHARE = 0.2;
+#else
+    const float CLOUD_NEAR_LENGTH = 256.0;
+    const float CLOUD_NEAR_SHARE = 0.3;
+#endif
 
 // 最初に通る雲の層の区間 (半透明の手前の分を見積もる基準)
 vec2 cloudPrimarySegment(float y0, float dy) {
