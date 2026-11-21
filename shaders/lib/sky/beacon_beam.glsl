@@ -82,7 +82,8 @@ float beaconBeamProfile(float h2, float s0, float s1, float s2, float sinA, floa
  */
 vec3 evalBeaconBeams(vec3 dir, float opaqueDist, float frontDist, float frontAlpha, float fogTransmittance, float fogDist, ivec2 texel) {
     vec3 sum = vec3(0.0);
-    float a = max(dot(dir.xz, dir.xz), BEACON_BEAM_MIN_SIN2);
+    float a2 = dot(dir.xz, dir.xz);
+    float a = max(a2, BEACON_BEAM_MIN_SIN2);
     float sinA = sqrt(a);
     float pixel = skyPixelAngle() * BEACON_BEAM_MIN_PIXELS;
     float fogT = max(fogTransmittance, 1e-4);
@@ -106,7 +107,9 @@ vec3 evalBeaconBeams(vec3 dir, float opaqueDist, float frontDist, float frontAlp
         vec2 c = vec2(frameData.beaconBeamCell[i]) - cameraPosition.xz + 0.5;
         float s0 = dot(dir.xz, c) / a;
         // 最短距離は外積で求める (|c|^2 - s0^2 a の引き算は、視線が軸に沿う時に大きな数どうしの差になる)
-        float h2 = sqr(c.x * dir.z - c.y * dir.x) / a;
+        // 真上・真下ちょうどの視線は水平の向きが無く、軸までの距離はカメラの水平の距離そのもの
+        // (分母だけ下限で押さえると h2 が縮み、軸から離れていても中心の 1 画素に光線が出る)
+        float h2 = a2 > BEACON_BEAM_MIN_SIN2 ? sqr(c.x * dir.z - c.y * dir.x) / a2 : dot(c, c);
 
         // 光線の区間の高さと、奥の面までで視線を切る
         float yMin = float(frameData.beaconBeamYMin[i]) - cameraPosition.y;
