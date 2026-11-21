@@ -248,7 +248,7 @@ float facingFireMask(vec3 albedoSrgb) {
  * ジャック・オ・ランタンの顔以外の面の発光。中の火がカボチャの皮を透けて淡く光る
  * 皮の色 (アルベド) を一様に光らせる。明るい画素だけの推定 (estimateEmission) のままでは皮の筋の模様が光の模様になる
  */
-const float JACK_O_LANTERN_SHELL_EMISSION = 0.05;
+const float JACK_O_LANTERN_SHELL_EMISSION = 0.03;
 
 // facing: 前面の向き (0 北 1 東 2 南 3 西。lib/ids/id_decode.glsl blockLightFacing)。shell: 前面以外の面の発光
 float facingLightEmission(float emission, vec3 albedoSrgb, vec3 geoNormal, int facing, float shell) {
