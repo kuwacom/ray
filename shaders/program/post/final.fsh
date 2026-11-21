@@ -65,6 +65,7 @@
 #include "/lib/post/grading.glsl"
 #include "/lib/buffers/images.glsl"
 #include "/lib/buffers/slots.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/post/bloom.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/post/lens_optics.glsl"
@@ -74,7 +75,6 @@
 #include "/lib/post/lens.glsl"
 #include "/lib/post/post_internal.glsl"
 #include "/lib/post/color_grade.glsl"
-#include "/lib/common/pre_exposure.glsl"
 #include "/lib/post/local_tonemap.glsl"
 #include "/lib/ids/block_ids.glsl"
 #include "/lib/ids/entity_ids.glsl"
@@ -412,19 +412,12 @@ void main() {
 #ifdef BLOOM
     BloomBands bands;
     vec3 bloom = sampleBloom(uvL, bands);
-    // タイルは P 倍の colortex0 から作ったまま (composite24 の画面のフレアも同じ単位で閾値を掛ける)
-    bloom = hdrFromStore(bloom);
-    bands.narrow = hdrFromStore(bands.narrow);
-    bands.mid = hdrFromStore(bands.mid);
-    bands.wide = hdrFromStore(bands.wide);
-    bands.widest = hdrFromStore(bands.widest);
-    bands.lava = hdrFromStore(vec3(bands.lava)).x;
     #ifdef LENS_SOFT_FOCUS
         // 球面収差: ピントが合っていても低い周波数の滲みが乗る (開放ほど強い)
         hdr = mix(hdr, bands.narrow, saturate(LP_SOFT_FOCUS * LENS_SOFT_FOCUS_AMOUNT * lensApertureFactor() * GLOW_GAIN));
         #ifdef LENS_SOFT_HALO_TABLE
             // 処方の球面収差のハロー (FA 28 Soft など)。半径と割合は F 値で変わり、絞ると消える
-            vec4 softHalo = hdrFromStore(lensSoftHalo(uvL));
+            vec4 softHalo = lensSoftHalo(uvL);
             hdr = mix(hdr, softHalo.rgb, saturate(softHalo.a * LENS_SOFT_HALO_GAIN * GLOW_GAIN));
         #endif
     #endif
@@ -463,7 +456,7 @@ void main() {
     #endif
     #if defined LENS_SCREEN_FLARE && defined LENS_FLARE
         // 明るい画素のゴーストと横ストリーク (composite24)
-        hdr += hdrFromStore(sampleFlareTile(uvL));
+        hdr += sampleFlareTile(uvL);
     #endif
 #endif
 

@@ -52,6 +52,7 @@
 #include "/lib/post/grading.glsl"
 #include "/lib/buffers/images.glsl"
 #include "/lib/buffers/slots.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/post/bloom.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/post/lens_optics.glsl"
@@ -60,7 +61,6 @@
 #include "/lib/post/lens_flare.glsl"
 #include "/lib/post/lens.glsl"
 #include "/lib/post/post_internal.glsl"
-#include "/lib/common/pre_exposure.glsl"
 // END GENERATED includes
 
 const bool colortex0MipmapEnabled = true;

@@ -49,6 +49,7 @@
 #include "/lib/post/post_constants.glsl"
 #include "/lib/buffers/images.glsl"
 #include "/lib/buffers/slots.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/post/bloom.glsl"
 #include "/lib/post/lens_presets.glsl"
 #include "/lib/post/camera_exposure.glsl"
@@ -56,7 +57,6 @@
 #include "/lib/post/velocity.glsl"
 #include "/lib/post/lens_optics.glsl"
 #include "/lib/post/analog_presets.glsl"
-#include "/lib/common/pre_exposure.glsl"
 // END GENERATED includes
 
 // グループは 8 列 x 32 行のスレッド。1024 グループで 8192 列 (ANALOG_SMEAR_COLUMNS_ALLOC) を覆う
