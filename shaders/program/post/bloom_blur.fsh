@@ -138,6 +138,8 @@ const float SCREEN_STAR_K_MAX = 1.5;   // これより強く絞っても幅は�
 const float SCREEN_STAR_CENTER_PER_K = 0.6;
 // 両脇を読む明るさの下限 (この画素の周りの明るさ + 閾値 x この値)
 const float SCREEN_STAR_SHAPE_MIN = 1.0;
+// ゲートの上で、絞りの強さを 0 から上げ切るまでの幅 (閾値の比)
+const float SCREEN_STAR_SHAPE_RAMP = 3.0;
 
 float screenStarSharpen(float width) {
     float k = width < 1.0 ? SCREEN_STAR_NARROW_GAIN * (1.0 - width) / max(width - SCREEN_STAR_WIDTH_FLOOR, 1e-3)
@@ -163,6 +165,7 @@ vec3 screenStars(vec2 uv, float exposure, float fNumber) {
     float spreadPx = 3.0 * exp2(float(level));
     vec4 localRect = vec4(bloomTileRectPx(level));
     vec4 surroundRect = vec4(bloomTileRectPx(level + 2));
+    float shapeRampInv = 1.0 / (SCREEN_STAR_SHAPE_RAMP * LENS_SCREEN_STAR_THRESHOLD * dilution);
     float shapeMin = SCREEN_STAR_SHAPED ? SCREEN_STAR_SHAPE_MIN * LENS_SCREEN_STAR_THRESHOLD * dilution + luminance(sampleBloomRectLinear(surroundRect, uv)) * exposure : 0.0;
     vec3 sum = vec3(0.0);
     for (int j = 0; j < lines; j++) {
@@ -177,6 +180,7 @@ vec3 screenStars(vec2 uv, float exposure, float fNumber) {
             float w = exp(-x / 0.3) / float(taps);
             // 先端の細り: 光源からの距離 (光条の長さ比) に比例して太さを絞る (太陽・月の光条と同じ)
             float k = SCREEN_STAR_SHAPED ? screenStarSharpen(LENS_STARBURST_WIDTH * (1.0 - LENS_STARBURST_TAPER * x)) : 0.0;
+            float centerNorm = 1.0 / (1.0 + SCREEN_STAR_CENTER_PER_K * k);
             for (int side = -1; side <= 1; side += 2) {
                 vec2 src = uv - dir * (x * float(side));
                 if (any(lessThan(src, vec2(0.0))) || any(greaterThan(src, vec2(1.0)))) continue;
@@ -186,12 +190,18 @@ vec3 screenStars(vec2 uv, float exposure, float fNumber) {
                  * 両脇は、周りより閾値以上明るいタップだけで読む (重さの大半はタップの数なので、暗い所を飛ばして増えた分を抑える。
                  * 毎回読むと 1070・720p で +0.8 ms)。飛ばした所の寄与はおおむねニーの下 (明るさ^2 / 4 閾値) で、明るい筋の中心よりずっと小さい
                  * 周りの明るさはこの画素の分を使う。タップの分 (surround) を待って分岐すると読み込みの待ちを隠せず、それだけで +0.1 ms
+                 * 境で元の値から絞った値へ跳ぶと、露出や輝点の明滅で光条の尾が段になって明滅するので、ゲートの上の閾値 3 つ分 (SCREEN_STAR_SHAPE_RAMP) で絞りの強さを 0 からなめらかに上げる
+                 * (読む範囲はゲートより上のままなので重さは変わらない)
                  */
-                if (SCREEN_STAR_SHAPED && luminance(center.rgb) * exposure > shapeMin) {
+                // 溶岩の倍率を外した輝度 (a が輝度以下なら bloomWithoutLavaGain の輝度は 輝度 - a x (倍率 - 1) / 倍率。割り算を待たずに分岐できる)
+                float lum = (luminance(center.rgb) - center.a * ((LAVA_BLOOM_GAIN - 1.0) / LAVA_BLOOM_GAIN)) * exposure;
+                if (SCREEN_STAR_SHAPED && lum > shapeMin) {
+                    // 絞りの強さをゲートの上で 0 から上げる (g = 0 で元の値そのもの)。割り戻しも g で混ぜ、g ごとの割り算を避ける (割り算にすると +0.1 ms)
+                    float g = saturate((lum - shapeMin) * shapeRampInv);
+                    g *= g * (3.0 - 2.0 * g);
                     // 溶岩の倍率は混ぜた後に 1 回だけ外す (色の比は線形の混合でほぼ保たれる)
-                    vec4 c = center * (1.0 + 2.0 * k)
-                           - (sampleBloomRectLinear4(localRect, src + across) + sampleBloomRectLinear4(localRect, src - across)) * k;
-                    local = bloomWithoutLavaGain(max(c, 0.0)) / (1.0 + SCREEN_STAR_CENTER_PER_K * k);
+                    vec4 c = center + (center * 2.0 - sampleBloomRectLinear4(localRect, src + across) - sampleBloomRectLinear4(localRect, src - across)) * (k * g);
+                    local = bloomWithoutLavaGain(max(c, 0.0)) * mix(1.0, centerNorm, g);
                 }
                 vec3 surround = sampleBloomRectLinear(surroundRect, src);
                 sum += flareHighlight(max(local - surround, 0.0), exposure, LENS_SCREEN_STAR_THRESHOLD * dilution, LENS_SCREEN_STAR_KNEE * dilution)
