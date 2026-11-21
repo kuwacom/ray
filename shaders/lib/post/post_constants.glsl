@@ -327,6 +327,17 @@ const float SHUTTER_DT_MAX = 0.1;
  * w = 印 + RANGE x 画面の高さ (高さ 2^21 まで float で厳密)。印は w の下位 3 ビット
  */
 const float SHUTTER_FLAG_RANGE = 8.0;
+/*
+ * 1 枚ずつの溜め直し (再読み込み・画面の大きさの変更) の後、最初の露光を始めるまでの待ち。待ちの間は今のフレームを出す
+ * 再読み込みの最初のフレームは P・A の SS がまだ決まっておらず設定の SS で露光するので、短い SS ではそのフレーム (地形の読み込み前で、
+ * 雲と TAA の履歴も揃っていない絵) が 1 枚目として出る。測光はその絵を測って SS を長く (上限の 30 秒まで) 決め、正しい 1 枚まで
+ * その長い露光を待った。MIN 秒たち、自動露出の順応が今の測光に SETTLE EV まで追いついたら始める (遅くとも MAX 秒)
+ * 1 フレームで進む待ちは STEP 秒までにして、フレームの遅い時もフレームの数で揃うのを待つ
+ */
+const float SHUTTER_WARMUP_MIN = 1.0;
+const float SHUTTER_WARMUP_MAX = 10.0;
+const float SHUTTER_WARMUP_SETTLE = 0.25;
+const float SHUTTER_WARMUP_STEP = 1.0 / 30.0;
 const int SHUTTER_PARAM = 7;
 const uint SHUTTER_FLAG_COMPLETE = 1u;
 const uint SHUTTER_FLAG_SHOWN = 2u;
