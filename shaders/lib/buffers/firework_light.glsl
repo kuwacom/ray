@@ -1,7 +1,7 @@
 /*
  * SSBO binding 5: 花火の一時的な光 (light, lib/light/firework_light.glsl)
  * 光るパーティクル (gbuffers_particles_translucent の頂点) が位置と色を acc に足し、次のフレームの begin が
- * 平均の位置と色から点光源 1 つにまとめて posRadius / intensity に置き、acc を空にする。deferred30 と composite19 が読む
+ * 平均の位置と色から点光源 1 つにまとめて posRadius / intensity に置き、acc を空にする。deferred30・composite2・composite19 が読む
  * 確保: 64 バイト (shaders.properties の bufferObject.5)
  * 既定は readonly。書くプログラム (begin・gbuffers_particles_translucent) は include の前に SSBO_FIREWORK_LIGHT_WRITE を定義する
  */

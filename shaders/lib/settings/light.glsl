@@ -63,7 +63,7 @@
 #define GLOWING_ENTITY_LIGHTS // 発光エンティティ (ブレイズ・グロウイカ等)
 #define CHARGED_CREEPER_LIGHT // 帯電したクリーパーとウィザーの防壁の電気の渦が周りを照らす
 #define CHARGED_CREEPER_LIGHT_BRIGHTNESS 1.0 // [0.25 0.5 0.75 1.0 1.5 2.0] 電気の渦が周りを照らす光の強さ (見た目の明るさは変わらない)
-#define FIREWORK_LIGHT // 花火の爆発が空の見える地面・壁と、空気 (霧・煙) を色付きで照らす
+#define FIREWORK_LIGHT // 花火の爆発が空の見える地面・壁と、空気 (霧・煙) を色付きで照らし、水面・ガラス・濡れた地面に映る
 #define FIREWORK_LIGHT_STRENGTH 1.0 // [0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0] 花火の爆発が周りを照らす光の強さ
 #define GENERIC_LIGHT // MOD などの ID の無い発光ブロックを、発光レベルから光源にする
 #define GENERIC_LIGHT_BRIGHTNESS 1.0 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0] ID の無い発光ブロックが周りを照らす光の強さ (0 で周りを照らさない)

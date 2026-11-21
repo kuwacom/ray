@@ -397,7 +397,7 @@ option.FIREWORK_GLOW_STRENGTH.comment=Brightness of glowing particles. Higher = 
 option.FIREWORK_TWINKLE_STRENGTH=Firework Twinkle
 option.FIREWORK_TWINKLE_STRENGTH.comment=Brightness flicker of glowing particles. Nearby sparks twinkle slightly out of step. 0 = steady
 option.FIREWORK_LIGHT=Firework Light
-option.FIREWORK_LIGHT.comment=When a firework bursts, it lights the ground and walls under the open sky and the surrounding air (fog, smoke) in its color. No shadows. Low cost
+option.FIREWORK_LIGHT.comment=When a firework bursts, it lights the ground and walls under the open sky and the surrounding air (fog, smoke) in its color, and shows on water, glass and wet ground. No shadows. Low cost
 option.FIREWORK_LIGHT_STRENGTH=Firework Light Strength
 option.FIREWORK_LIGHT_STRENGTH.comment=Strength of the light fireworks cast on their surroundings. Does not change the brightness of the sparks
 option.GENERIC_LIGHT=Unlisted Emissive Block Light
