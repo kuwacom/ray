@@ -900,6 +900,10 @@ option.LENS_SCREEN_FLARE=Bright Pixel Flare
 option.LENS_SCREEN_FLARE.comment=Ghosts and horizontal streaks from bright pixels such as torches and lava (needs Bloom)
 option.LENS_STARBURST=Starburst
 option.LENS_STARBURST.comment=Diffraction rays from the aperture blades. Even blade counts give that many rays, odd counts twice as many
+option.LENS_STARBURST_WIDTH=Starburst Width
+option.LENS_STARBURST_WIDTH.comment=Width of the sun / moon starburst rays. 1.0 = the previous width. The brightness along the center of each ray and the ray length stay the same. Too thin (0.6 or less) turns the rays into hair-thin lines and the whole starburst looks dimmer. Too wide (1.25 or more) fills the gaps between rays and blurs the star shape. Rays from bright pixels (torches, glints on water) keep their width, which is set by the coarse bloom tile
+option.LENS_STARBURST_TAPER=Starburst Tip Sharpness
+option.LENS_STARBURST_TAPER.comment=How much the sun / moon starburst rays narrow toward the tip. 0.0 = same width from root to tip (as before), 0.5 = half width at the tip. The width and brightness at the root and the ray length stay about the same. Too sharp (0.8 or more) makes the outer part a thin line that seems to break off, and the rays look shorter
 option.LENS_HALO=Halo
 option.LENS_HALO.comment=Rainbow ring around the image center
 option.LENS_DIRT=Lens Dirt

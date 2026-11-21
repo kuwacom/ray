@@ -34,6 +34,8 @@
 #define LENS_GHOSTS // 内面反射のゴースト (レンズ設計から計算)
 #define LENS_SCREEN_FLARE // 明るい画素のゴーストと横ストリーク (ブルームが必要)
 #define LENS_STARBURST // 絞りの回折による光条
+#define LENS_STARBURST_WIDTH 0.85 // [0.5 0.6 0.7 0.75 0.8 0.85 0.9 0.95 1.0 1.1 1.25 1.5] 太陽・月の光条の太さの倍率 (1.0 = 以前の太さ)
+#define LENS_STARBURST_TAPER 0.4 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9] 太陽・月の光条が先端にかけて細くなる割合 (0.0 = 一定の太さで以前と同じ、0.9 = 先端で 1 割の太さ)
 //#define LENS_HALO
 #define LENS_DIRT // レンズの汚れ
 #define LENS_VEILING_GLARE // ベーリンググレア (フレアによるコントラスト低下)

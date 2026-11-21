@@ -900,6 +900,10 @@ option.LENS_SCREEN_FLARE=明るい画素のフレア
 option.LENS_SCREEN_FLARE.comment=たいまつ・溶岩などの明るい画素からもゴーストと横ストリークを出す (ブルームが必要)
 option.LENS_STARBURST=光条 (スターバースト)
 option.LENS_STARBURST.comment=絞り羽根の回折による光条。偶数枚は枚数本、奇数枚は 2 倍の本数。絞るほど長い
+option.LENS_STARBURST_WIDTH=光条の太さ
+option.LENS_STARBURST_WIDTH.comment=太陽・月の光条の筋の横幅の倍率。1.0 = 以前の太さ。筋の中心の明るさと長さは変わらない。細くしすぎると (0.6 以下) 筋が髪の毛のような線になり、光条全体が暗く見える。太くすると (1.25 以上) 隣の光条との間が埋まり、星形がぼやける。明るい画素 (たいまつ・水面の輝点) の光条の太さはブルームのタイルの粗さで決まるので変わらない
+option.LENS_STARBURST_TAPER=光条の先端の鋭さ
+option.LENS_STARBURST_TAPER.comment=太陽・月の光条が先端にかけて細くなる割合。0.0 = 根元から先まで同じ太さ (以前と同じ)、0.5 = 先端で半分の太さ。根元の太さと明るさ、光条の長さはほぼ変わらない。鋭くしすぎると (0.8 以上) 先のほうが細い線になって途中で途切れたように見え、光条が短く見える
 option.LENS_HALO=ハロー
 option.LENS_HALO.comment=画面中心を囲む虹色のリング
 option.LENS_DIRT=レンズの汚れ

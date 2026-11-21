@@ -215,6 +215,12 @@ vec3 lensStarburst(vec2 d, float airyTan) {
     const float period = TAU / spikes;
     float phi = mod(atan(d.y, d.x) - DOF_BLADE_ROTATION, period);
     float local = min(phi, period - phi) / (period * 0.5);
+    /*
+     * 太さ: 光条の中心からの角度を縮めて引く。中心の線の上の値はそのままなので、根元の明るさと長さは変わらない
+     * 先端の細り: 半径に比例して太さを絞り、先端を尖らせる (WIDTH 1.0・TAPER 0.0 で以前と同じ)
+     * 光条の間の中点より外は端の値 (中点の値) が続くので、細くしても光条の間に段差は出ない
+     */
+    local /= LENS_STARBURST_WIDTH * (1.0 - LENS_STARBURST_TAPER * (r / LENS_STAR_R_MAX));
 #else
     float local = 0.0;
 #endif
