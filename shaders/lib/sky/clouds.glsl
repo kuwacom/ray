@@ -417,6 +417,14 @@ vec4 cloudFrontPart(vec4 clouds, vec3 dir, float frontDist, float backDist) {
     return vec4(clouds.rgb * s, t);
 }
 
+// 雲の全体 clouds から手前の分 front (cloudFrontPart) を除いた奥の分。全体 = 手前の上に奥を重ねたもの (rgb = 手前 + 手前の透過率 x 奥)
+// 手前がほぼ不透明なら奥は見えないので、割り算で散乱が膨らまない (fp16 で溢れない) よう分母に下限を置く
+const float CLOUD_BACK_MIN_FRONT_T = 0.01;
+vec4 cloudBackPart(vec4 clouds, vec4 front) {
+    float frontT = max(front.a, CLOUD_BACK_MIN_FRONT_T);
+    return vec4(max(clouds.rgb - front.rgb, 0.0) / frontT, saturate(clouds.a / frontT));
+}
+
 /*
  * 雲影マップは雲の下面の面の座標 (ワールド xz) に固定した環状のタイルで、テクセル (i, j) は i, j を 512 で割った余りが同じ面上の点を持つ。
  * カメラが動いても同じ点は同じテクセルに残るので、履歴を再投影せずにそのまま積み重ねられる (窓の端で新しく窓に入る列だけが入れ替わる)

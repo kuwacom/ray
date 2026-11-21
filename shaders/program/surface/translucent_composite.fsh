@@ -370,6 +370,16 @@ void main() {
             behind += env;
             behindExcess += luminance(sparkleExcess(env, getExposure()));
         }
+#if CLOUDS >= 2 && defined HAS_SKY
+        // ガラスの向こうの地形の手前の雲: fog_apply はガラスまでの分 (cloudFrontPart) だけを掛けるので、ガラスから地形までの残りをここで掛ける
+        // (掛けないと、雲の中や雲の上から窓越しに見た地形が雲に霞まない)
+        if (d1 < 1.0 && isEyeInWater == 0 && cameraPosition.y > cloudLowestBase()) {
+            vec4 clouds = getCloudLayer(texel);
+            vec4 back = cloudBackPart(clouds, cloudFrontPart(clouds, -V, dist, length(floorPlayer)));
+            behind = behind * back.a + back.rgb;
+            behindExcess *= back.a;
+        }
+#endif
 #ifdef CLOUD_INTERIOR_FOG
         // 雲の中の霧: ガラスの向こうの背景には、ガラスから奥の面 (空は無限遠) までの分を先に掛ける。ガラスまでの分は fog_apply が全体に掛ける
         if (isEyeInWater == 0) {
