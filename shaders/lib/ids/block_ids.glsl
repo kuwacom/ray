@@ -5,10 +5,12 @@
  * 番号帯
  *   1        : 未登録の固体 (mc_Entity.x = -1 をボクセルではこれに置き換える)
  *   10-19    : マテリアルのヒント付き固体 (完全遮蔽)
+ *   20-35    : 彩釉テラコッタ (完全遮蔽。扱いは BLOCK_GLOSSY と同じ)
  *   100-129  : 遮蔽しない植物・小物
  *   130-178  : 染めた小物 (カーペット・旗・火のないロウソク。扱いは BLOCK_NON_OCCLUDING と同じ)
  *   200-299  : 半透明 (透過色テーブル index = id - 200)
  *   300-399  : 部分形状 (形状テーブル index = id - 300)
+ *   400-432  : 染めたブロックエンティティ (ベッド・シュルカーボックス。blockEntityId でだけ来る)
  *   1001-1255: 光源 (光源インデックス = id - 1000, lib/ids/light_ids.glsl)
  *   1257-1895: 向きのある光源の東・南・西 (id - 1000 = 256 x 向き + 光源インデックス)
  *   2000-4095: 色の付いた固体 (完全遮蔽。上の帯に無いブロックを平均の色ごとにまとめたもの。色は lib/ids/block_albedo.glsl)
@@ -30,6 +32,9 @@ const int BLOCK_DECOR_DIAMOND = 15;
 const int BLOCK_DECOR_GOLD = 16;
 const int BLOCK_DECOR_REDSTONE = 17;
 const int BLOCK_DECOR_AMETHYST = 18; // アメジストブロック・芽生えたアメジスト
+// 20-35: 彩釉テラコッタ。質感・遮蔽は BLOCK_GLOSSY と同じで、反射率の設定 (ALBEDO_GLAZED_STRENGTH) を掛けるために分ける
+const int BLOCK_GLAZED_TERRACOTTA = 20;   // 20-35 (色の順は BLOCK_STAINED_GLASS と同じ)
+const int BLOCK_GLAZED_LAST = 35;
 
 const int BLOCK_PLANT_SHORT = 100;      // 草・花・苗木 (根元固定で揺れる)
 const int BLOCK_PLANT_TALL_LOWER = 101; // 2 ブロックの植物の下半分
@@ -62,7 +67,7 @@ const int BLOCK_STAINED_GLASS_PANE = 230; // 230-245 (同順)
 const int BLOCK_SLAB_BOTTOM = 300;
 const int BLOCK_SLAB_TOP = 301;
 const int BLOCK_PANEL_OPEN_FIRST = 302; // 302-305 = 開いたドア・トラップドア (厚さ 3/16 の縦の板が北・東・南・西の側)
-const int BLOCK_LOW = 307;              // ベッド・石切台等の背の低いブロック
+const int BLOCK_LOW = 307;              // 石切台等の背の低いブロック
 const int BLOCK_SNOW_LAYER = 308;       // 積もった雪 1 層 (高さ 1/8)
 const int BLOCK_SNOW_LAYER_2 = 310;     // 310-316 = 積もった雪 2-8 層 (層の数 = ID - 308)
 const int BLOCK_SNOW_LAYER_8 = 316;
@@ -75,6 +80,11 @@ const int BLOCK_STAIRS_INNER_FIRST = 384; // 384-391 = 階段の内角 (上下 x
 const int BLOCK_STAIRS_INNER_LAST = 391;
 const int BLOCK_PANEL_CLOSED_FIRST = 392; // 392-397 = 閉じたドア (板が北・東・南・西の側) と閉じたトラップドア (下・上)
 const int BLOCK_PANEL_CLOSED_LAST = 397;
+
+// 400-432: 染めたブロックエンティティ (地形の面を持たず、blockEntityId でだけ来る)。反射率の設定 (ALBEDO_*_STRENGTH) を掛けるために分ける
+const int BLOCK_BED = 400;                // 400-415 ベッド (色の順は BLOCK_STAINED_GLASS と同じ)
+const int BLOCK_SHULKER_BOX = 416;        // 染めていないシュルカーボックス。417-432 は色付き (同順)
+const int BLOCK_DYED_ENTITY_LAST = 432;
 
 const int BLOCK_LIGHT_BASE = 1000;      // 1001-1255 が光源 (光源インデックス = id - 1000)
 const int BLOCK_LIGHT_FACING_STRIDE = 256; // 向きのある光源は 1000 + 256 x 向き (1 東 2 南 3 西) + 光源インデックス
@@ -95,7 +105,7 @@ const int METAL_GATE_GEM = 8;
 // 色の付いた固体 (2000 番台) の種類。0 = その他 (種類の混ざった ID も 0)
 const int COLOR_KIND_CONCRETE = 1; // コンクリート・コンクリートパウダー
 const int COLOR_KIND_WOOL = 2; // 羊毛
-const int COLOR_KIND_TERRACOTTA = 3; // テラコッタ (彩釉テラコッタは BLOCK_GLOSSY の行にある)
+const int COLOR_KIND_TERRACOTTA = 3; // テラコッタ (彩釉テラコッタは BLOCK_GLAZED_TERRACOTTA)
 const uint BLOCK_COLOR_KINDS[23] = uint[23](
     0x00536181u, 0x0C024001u, 0x00820000u, 0x35003010u, 0x08C00070u, 0x00104000u, 0x00000014u, 0x20000003u,
     0x0030200Cu, 0x00008000u, 0x00040000u, 0x00004100u, 0x0000C010u, 0x00D00000u, 0xC0300020u, 0x0003E040u,

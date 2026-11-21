@@ -13,10 +13,12 @@
 
 const uint BLOCK_ALBEDO_DEFAULT = 0x959595u;
 
-const uint BLOCK_ALBEDO_0[19] = uint[19](
+const uint BLOCK_ALBEDO_0[36] = uint[36](
     0x959595u, 0x959595u, 0x959595u, 0x959595u, 0x959595u, 0x959595u, 0x959595u, 0x959595u,
     0x959595u, 0x959595u, 0x6F898Eu, 0x9F98A2u, 0xFEFEF9u, 0x8D451Fu, 0x63CE39u, 0xE5EE71u,
-    0x45D3F7u, 0x051AB6u, 0xC1698Du
+    0x45D3F7u, 0x051AB6u, 0xC1698Du, 0x959595u, 0xD7DBD5u, 0x7F9AC1u, 0xC170D2u, 0xD5B481u,
+    0x71C6EDu, 0x4FC8B1u, 0xB79EECu, 0x64625Bu, 0xAEACA0u, 0x88824Fu, 0xA53376u, 0x994D32u,
+    0x606E8Au, 0x64957Fu, 0x3B43B8u, 0x242159u
 );
 const uint BLOCK_ALBEDO_100[79] = uint[79](
     0x6C8789u, 0x60736Fu, 0x60736Fu, 0x27644Cu, 0x58676Eu, 0x2A7267u, 0x728296u, 0xEBEAE6u,
@@ -120,7 +122,7 @@ int blockAlbedoBaseId(int id) {
 uint blockAlbedoPacked(int id) {
     id = blockAlbedoBaseId(id);
     if (id >= BLOCK_COLOR_FIRST) return id - BLOCK_COLOR_FIRST < 356 ? BLOCK_ALBEDO_COLORED[id - BLOCK_COLOR_FIRST] : BLOCK_ALBEDO_DEFAULT;
-    if (id >= 0 && id <= 18) return BLOCK_ALBEDO_0[id - 0];
+    if (id >= 0 && id <= 35) return BLOCK_ALBEDO_0[id - 0];
     if (id >= 100 && id <= 178) return BLOCK_ALBEDO_100[id - 100];
     if (id >= 200 && id <= 245) return BLOCK_ALBEDO_200[id - 200];
     if (id >= 300 && id <= 397) return BLOCK_ALBEDO_300[id - 300];

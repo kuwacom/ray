@@ -323,12 +323,14 @@ option.AUTO_METAL_PARTS=部分金属
 option.AUTO_METAL_PARTS.comment=一部だけ金属のブロック (レール・鉄格子・鎖・ランタンの枠・ホッパー・大釜・銅のドア) と、金属の道具・防具の金属の部分だけを、金属ブロックのように光らせる。木や炎は金属にしない。PBR の specular テクスチャがあるものには使わない
 option.ALBEDO_CONCRETE_STRENGTH=コンクリートの反射率
 option.ALBEDO_CONCRETE_STRENGTH.comment=コンクリートとコンクリートパウダーの色の明るさ。上げると見た目も照り返しも、色の濃さを保ったまま明るくなり、塗料のような強い照り返しになる。1 = バニラのテクスチャの色
-option.ALBEDO_WOOL_STRENGTH=羊毛・カーペットの反射率
-option.ALBEDO_WOOL_STRENGTH.comment=羊毛とカーペットの色の明るさ。上げると見た目も照り返しも、色の濃さを保ったまま明るくなる。1 = バニラのテクスチャの色
+option.ALBEDO_WOOL_STRENGTH=羊毛・カーペット・ベッドの反射率
+option.ALBEDO_WOOL_STRENGTH.comment=羊毛とカーペットとベッド (枕と木の枠を含むベッド全体) の色の明るさ。上げると見た目も照り返しも、色の濃さを保ったまま明るくなる。1 = バニラのテクスチャの色
 option.ALBEDO_TERRACOTTA_STRENGTH=テラコッタの反射率
-option.ALBEDO_TERRACOTTA_STRENGTH.comment=テラコッタ (彩釉テラコッタを除く) の色の明るさ。上げると見た目も照り返しも、色の濃さを保ったまま明るくなる。1 = バニラのテクスチャの色
-option.ALBEDO_DYED_STRENGTH=旗・ロウソクの反射率
-option.ALBEDO_DYED_STRENGTH.comment=旗と、火の付いていないロウソクの色の明るさ。上げると見た目も照り返しも、色の濃さを保ったまま明るくなる。1 = バニラのテクスチャの色
+option.ALBEDO_TERRACOTTA_STRENGTH.comment=テラコッタ (彩釉テラコッタは別の設定) の色の明るさ。上げると見た目も照り返しも、色の濃さを保ったまま明るくなる。1 = バニラのテクスチャの色
+option.ALBEDO_GLAZED_STRENGTH=彩釉テラコッタの反射率
+option.ALBEDO_GLAZED_STRENGTH.comment=彩釉テラコッタの色の明るさ。上げると見た目も照り返しも明るくなる。模様の明るい所が先に止まるので、同じ値でも無地のテラコッタより明るくなりにくく、上げるほど模様が薄くなる。1 = バニラのテクスチャの色
+option.ALBEDO_DYED_STRENGTH=旗・ロウソク・シュルカーボックスの反射率
+option.ALBEDO_DYED_STRENGTH.comment=旗と、火の付いていないロウソクと、シュルカーボックスの色の明るさ。上げると見た目も照り返しも、色の濃さを保ったまま明るくなる。1 = バニラのテクスチャの色
 option.POM=視差オクルージョンマッピング
 option.POM_DEPTH=POM の深さ
 option.POM_SAMPLES=POM のサンプル数

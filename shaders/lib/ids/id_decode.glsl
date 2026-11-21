@@ -71,11 +71,12 @@ float decorSaturation(int decorIndex) {
 const float COLOR_ALBEDO_MAX = 0.9;
 // 全部 1 倍の時は呼ぶ側も色の変換 (sRGB と線形の往復) を省いて、8bit の色を 1 段も動かさない
 const bool COLOR_ALBEDO_ACTIVE = ALBEDO_CONCRETE_STRENGTH != 1.0 || ALBEDO_WOOL_STRENGTH != 1.0 || ALBEDO_TERRACOTTA_STRENGTH != 1.0
-                               || ALBEDO_DYED_STRENGTH != 1.0;
+                               || ALBEDO_DYED_STRENGTH != 1.0 || ALBEDO_GLAZED_STRENGTH != 1.0;
 
-// 反射率の設定の対象になりうる ID (2000 番台の色の付いた固体と、130-178 の染めた小物)
+// 反射率の設定の対象になりうる ID (2000 番台の色の付いた固体、20-35 の彩釉テラコッタ、130-178 の染めた小物、400-432 の染めたブロックエンティティ)
 bool isColorAlbedoBlock(int blockId) {
-    return blockId >= BLOCK_COLOR_FIRST || (blockId >= BLOCK_CARPET && blockId <= BLOCK_DYED_LAST);
+    return blockId >= BLOCK_COLOR_FIRST || (blockId >= BLOCK_GLAZED_TERRACOTTA && blockId <= BLOCK_GLAZED_LAST)
+        || (blockId >= BLOCK_CARPET && blockId <= BLOCK_DYED_LAST) || (blockId >= BLOCK_BED && blockId <= BLOCK_DYED_ENTITY_LAST);
 }
 
 float colorBlockAlbedoStrength(int blockId) {
@@ -87,6 +88,10 @@ float colorBlockAlbedoStrength(int blockId) {
     }
     if (blockId >= BLOCK_CARPET && blockId < BLOCK_BANNER) return ALBEDO_WOOL_STRENGTH;
     if (blockId >= BLOCK_BANNER && blockId <= BLOCK_DYED_LAST) return ALBEDO_DYED_STRENGTH;
+    if (blockId >= BLOCK_GLAZED_TERRACOTTA && blockId <= BLOCK_GLAZED_LAST) return ALBEDO_GLAZED_STRENGTH;
+    // ベッドは掛け布団が羊毛 (レシピも羊毛) なので羊毛の設定、シュルカーボックスは旗・ロウソクと同じ染めた物の設定
+    if (blockId >= BLOCK_BED && blockId < BLOCK_SHULKER_BOX) return ALBEDO_WOOL_STRENGTH;
+    if (blockId >= BLOCK_SHULKER_BOX && blockId <= BLOCK_DYED_ENTITY_LAST) return ALBEDO_DYED_STRENGTH;
     return 1.0;
 }
 
@@ -157,7 +162,7 @@ bool isPlantBlock(int blockId) { return blockId >= 100 && blockId < 130; }
 int blockIdToMaterial(int blockId) {
     if (blockId <= 0) return MAT_TERRAIN;
     if (blockId == BLOCK_METAL) return MAT_METAL;
-    if (blockId == BLOCK_GLOSSY) return MAT_GLOSSY;
+    if (blockId == BLOCK_GLOSSY || (blockId >= BLOCK_GLAZED_TERRACOTTA && blockId <= BLOCK_GLAZED_LAST)) return MAT_GLOSSY;
     // 鉱物ブロックは光源扱いでも元の質感のまま (発光は gbuffers の estimateEmission で足す)
     if (isDecorativeBlock(blockId)) {
         if (blockId == BLOCK_DECOR_GOLD) return MAT_METAL;
