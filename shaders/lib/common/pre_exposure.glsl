@@ -1,13 +1,14 @@
 /*
- * HDR のバッファの pre-exposure (Lagarde & de Rousiers 2014 の Frostbite、UE の PreExposure と同じ考え)
+ * HDR のバッファの pre-exposure (Lagarde & de Rousiers 2014 の Frostbite と同じ考え)
  * シーンの値は絶対の単位のまま計算し、fp16 のバッファに書く時だけ倍率 P を掛け、読む時に割って戻す
  * 現実の光の比 (PRE_EXPOSURE_ACTIVE) では夜の地面が 1e-6 前後、新月の最低限の光が 1e-7 前後で、fp16 の正規化数の下限 (6.1e-5) を
  * 下回り、非正規化数の刻み (6e-8) に露出 (夜 1 万〜新月の高感度 100 万倍) を掛けた段が画面に出た
  * P は前のフレームの露出の 2 の冪 (掛けても割っても丸めが出ない) で、1 フレームの中では変えない (begin が決める)。
  * 前のフレームに書いた履歴は、その時の P (preExposurePrev) で戻すので、P が変わっても履歴の明るさはずれない
  * OFF では恒等 (main と同じ機械語)
- * 守ること: 対象のバッファ (docs/architecture.md のバッファの表で「P 倍」のもの) を読む・書く所は必ずこの関数を通す。
- * 通し忘れると P (夜は数千倍) だけ明るさが狂うので、新しい読み手を足す時は ON の夜で確かめる
+ * 守ること: 対象のバッファ (docs/architecture.md の colortex と image の表で「P 倍」と書いたもの) を読む・書く所は必ずこの関数を通す。
+ * 書くパスより前に読む (前のフレームの値) なら hdrFromStorePrev。通し忘れると P (夜は数千倍) だけ明るさが狂う。
+ * 読みの通し忘れは tools/check_slots.py (validate_shaders.py の静的チェック) が見つける。書きは見ないので、新しい書き手は ON の夜で確かめる
  */
 #ifndef COMMON_PRE_EXPOSURE_GLSL
 #define COMMON_PRE_EXPOSURE_GLSL

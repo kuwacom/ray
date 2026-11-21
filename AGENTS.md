@@ -35,7 +35,8 @@ glslang は `RAY_GLSLANG`、PATH、`tools/glslang/bin/glslang.exe` の順に探�
 - `/* RENDERTARGETS: 0,1,2 */` の `,` の後に空白を入れない (Iris が数として読めず失敗する)
 - `iris_`・`irisMain`・`moj_import` で始まる識別子は使わない (Iris の内部用で、読み込みが失敗する)
 - GLSL の予約語 (`packed`・`sample`・`input`・`filter`・`common` など) を変数名に使わない。glslang は通すが実機のドライバで読み込みが失敗する (一覧は docs/shader-guidelines.md の移植性)。`gl_compile_check.py` で確かめる
-- 光の量を絶対の小さな値 (`1e-6` など) で割る・比べるときは `PHYSICAL_DARKEST` を掛ける。現実の光の比 (EXPOSURE_PHYSICAL_LIGHT) は光を 2^-8 以下にするので、固定の下限だと暗い夜に比が潰れる。暗い値を持つ所 (夜空・最低限の光・floodfill) は fp16 / r11f の非正規化数の刻みにも注意する (floodfill は `floodToStore` で範囲をそろえた。シーンの HDR の fp16 のバッファは `hdrToStore` / `hdrFromStore` の pre-exposure で持つ。対象は docs/architecture.md の colortex の表の下)
+- 光の量を絶対の小さな値 (`1e-6` など) で割る・比べるときは `PHYSICAL_DARKEST` を掛ける。現実の光の比 (EXPOSURE_PHYSICAL_LIGHT) は光を 2^-8 以下にするので、固定の下限だと暗い夜に比が潰れる。暗い値を持つ所 (夜空・最低限の光・floodfill) は fp16 / r11f の非正規化数の刻みにも注意する (floodfill は `floodToStore` で範囲をそろえた)
+- シーンの HDR の fp16 のバッファ (docs/architecture.md の表で「P 倍」) は pre-exposure で持つ (`lib/common/pre_exposure.glsl`)。書く所は `hdrToStore`、読む所は `hdrFromStore`、書くパスより前に読む (前のフレームの値) なら `hdrFromStorePrev`。読みの通し忘れは `tools/check_slots.py` (validate_shaders.py) が見つける。新しい書き手は現実の光の比 ON の夜で確かめる
 - ローダーの版で分けるときは、`tools/capabilities.py` の表に能力 (`CAP_*`) と機能 (`FX_*`) を足して `uv run tools/gen_capabilities.py` で生成し、本体は `FX_*` だけを見る (`//@include "/lib/settings/capabilities.glsl"`)。`MC_VERSION` / `IRIS_VERSION` / `MAX_COLOR_BUFFERS` を生成物の外に書くと validate_shaders.py が落とす
 - 古い Iris (1.7) と Oculus でも読めるように書く。新しく使う colortex は 0〜15、`bufferObject` の添字は 8 まで、image の pixel type は Iris 1.7 の列挙にあるもの。validate_shaders.py がローダーごとに検査する (colortex16 以上は失敗)。時間で分け合う colortex は lib/buffers/slots.glsl の論理名と区間で使う
 - カスタム image (`image.*`) は Iris の上限 16 個をすべて使っている。足すときは既存のものを分け合うか、colortex か SSBO で代える
