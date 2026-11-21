@@ -13,6 +13,7 @@
 //@include "/lib/common/dimension.glsl"
 //@include "/lib/common/look_presets.glsl"
 //@include "/lib/common/math.glsl"
+//@include "/lib/common/polarizer.glsl"
 //@include "/lib/common/shading_types.glsl"
 //@include "/lib/common/transforms.glsl"
 //@include "/lib/common/uniforms.glsl"
@@ -388,6 +389,11 @@ vec3 renderSky(vec3 dir, vec3 vanillaSky) {
     float r = atmoViewerRadius();
     // 地平線より下は描画距離の外の霞んだ地面にして、虚空が明るく見えないようにする
     sky = skyBelowHorizon(dir, sky);
+    #ifdef CAMERA_PL
+    // PL フィルター: 大気の散乱光だけ (太陽・月の円盤と星は偏光しない。雲は deferred30 がこの後に重ねる)。夜は月が同じ模様を作る
+    vec3 polarizerLight = getSunDir().y > POLARIZER_SUN_MIN_Y ? getSunDir() : getMoonDir();
+    sky *= polarizerSky(dir, polarizerLight, skyOvercast());
+    #endif
 
     vec3 viewT = atmoTransmittanceToLight(r, dir.y) * (1.0 - 0.95 * skyOvercast());
     #if SUN_MOON_STYLE >= 1
