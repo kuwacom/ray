@@ -21,6 +21,7 @@
 //@include "/lib/surface/surface.glsl"
 //@include "/lib/post/post.glsl"
 //@include "/lib/buffers/slots.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/buffers/images.glsl"
 #include "/lib/settings/look.glsl"
@@ -70,6 +71,7 @@
 #include "/lib/post/velocity.glsl"
 #include "/lib/post/tonemap.glsl"
 #include "/lib/post/post.glsl"
+#include "/lib/common/pre_exposure.glsl"
 // END GENERATED includes
 
 in vec2 texcoord;
@@ -141,7 +143,7 @@ void reprojectGiHistory(ivec2 texel, float depth, float linZ, ivec2 screen, out 
             vec4 hi = texelFetch(TEX_GI_AUX, p, 0);
             vec2 bw = mix(1.0 - f, f, vec2(o));
             float w = bw.x * bw.y * (hi.r > 0.0 && abs(hi.g - expected) < tol ? 1.0 : 0.0);
-            history += texelFetch(TEX_GI_HIST, p, 0) * w;
+            history += hdrFromStorePrev(texelFetch(TEX_GI_HIST, p, 0)) * w;
             info += hi * w;
             hw += w;
         }
@@ -203,7 +205,7 @@ void main() {
             ivec2 P = min(L * scale + offset, screen - 1);
             float dP = texelFetch(depthtex1, P, 0).r;
             if (dP >= 1.0 || isHandDepth(dP)) continue;
-            vec4 raw = texelFetch(TEX_GI_RAW, L, 0);
+            vec4 raw = hdrFromStore(texelFetch(TEX_GI_RAW, L, 0));
             float wDepth = bilateralDepthWeight(linearizeDepth(dP), linZ, linZ * GI_DEPTH_SIGMA + 0.05);
             float wNormal = bilateralNormalWeight(normal, readGeoNormal(P), GI_NORMAL_POWER);
             float wSpatial = exp(-float(dx * dx + dy * dy) / float(GI_FILTER_RADIUS * GI_FILTER_RADIUS + 1));
@@ -224,7 +226,7 @@ void main() {
                 ivec2 P = min(L * scale + offset, screen - 1);
                 float dP = texelFetch(depthtex1, P, 0).r;
                 if (dP >= 1.0 || isHandDepth(dP)) continue;
-                vec4 raw = texelFetch(TEX_GI_RAW, L, 0);
+                vec4 raw = hdrFromStore(texelFetch(TEX_GI_RAW, L, 0));
                 float wDepth = bilateralDepthWeight(linearizeDepth(dP), linZ, linZ * GI_DEPTH_SIGMA + 0.05);
                 float wNormal = bilateralNormalWeight(normal, readGeoNormal(P), GI_NORMAL_POWER);
                 // 距離は外側のタップの間隔 (2) を 1 とする単位で、外側と同じ形の重み
@@ -238,7 +240,7 @@ void main() {
         }
     }
 #endif
-    vec4 mean = wsum > 0.0 ? sum / wsum : texelFetch(TEX_GI_RAW, clamp(center, ivec2(0), lowSize - 1), 0);
+    vec4 mean = wsum > 0.0 ? sum / wsum : hdrFromStore(texelFetch(TEX_GI_RAW, clamp(center, ivec2(0), lowSize - 1), 0));
     vec4 result = mean;
 
 #if GI_DENOISE >= 1
@@ -265,7 +267,7 @@ void main() {
             vec4 hi = texelFetch(TEX_GI_AUX, p, 0);
             vec2 bw = mix(1.0 - f, f, vec2(o));
             float w = bw.x * bw.y * (hi.r > 0.0 && abs(hi.g - expected) < tol ? 1.0 : 0.0);
-            history += texelFetch(TEX_GI_HIST, p, 0) * w;
+            history += hdrFromStorePrev(texelFetch(TEX_GI_HIST, p, 0)) * w;
             info += hi * w;
             hw += w;
         }
@@ -304,5 +306,5 @@ void main() {
     outHistoryInfo = info;
 #endif
 
-    outHistory = result;
+    outHistory = hdrToStore(result);
 }

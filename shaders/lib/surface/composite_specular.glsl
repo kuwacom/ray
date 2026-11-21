@@ -10,6 +10,7 @@
 //@include "/lib/common/gbuffer.glsl"
 //@include "/lib/common/math.glsl"
 //@include "/lib/common/noise.glsl"
+//@include "/lib/common/polarizer.glsl"
 //@include "/lib/common/samplers.glsl"
 //@include "/lib/common/shading_types.glsl"
 //@include "/lib/common/transforms.glsl"
@@ -72,6 +73,10 @@ vec3 opaqueEnvSpecular(ivec2 texel, float depth) {
     }
     // 照度を集めるのではなく、環境光の鏡面の遮蔽に AO だけ読む
     float ao = g.ao * getIndirectLight(texel).a;
+#ifdef CAMERA_PL
+    // PL フィルター: 誘電体の映り込みだけ (反射率の高い金属の反射はほとんど偏光しない)
+    refl *= mix(polarizerReflection(V, g.normal, polarizerF0ToEta(m.f0.g)), 1.0, m.metalness);
+#endif
     return refl * envSpecularWeight(m, NoV) * specularOcclusion(NoV, ao, m.roughness);
 }
 
@@ -96,7 +101,12 @@ vec3 dielectricSpecular(vec3 N, vec3 V, float f0, float roughness, LightSample L
     g.f0 = f0;
     g.smoothness = 1.0 - sqrt(roughness);
     g.albedo = vec3(0.0);
+#ifdef CAMERA_PL
+    // PL フィルター: 照り返しの偏光 (水・ガラスの太陽と灯り)
+    return evalDirectSpecular(decodeMaterial(g), N, V, L, discScale, gain, gaussian) * polarizerSpecular(V, L.direction, polarizerF0ToEta(f0));
+#else
     return evalDirectSpecular(decodeMaterial(g), N, V, L, discScale, gain, gaussian);
+#endif
 }
 
 /*

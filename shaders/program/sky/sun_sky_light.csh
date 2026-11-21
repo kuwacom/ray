@@ -1,8 +1,8 @@
 /*
- * prepare (毎フレーム): 太陽・月の直達照度と空の SH を FrameData に書く
+ * prepare1 (毎フレーム): 太陽・月の直達照度と空の SH を FrameData に書く
  * シーン全体 (地形・雲・フォグ) が同じ光の色を使うための唯一の計算場所
- * 照度は透過率 LUT (ATMOSPHERE_MODE=0 は解析近似) で大気を通した値。空の SH は前フレームの SkyView LUT から
- * (prepare1 がこの後で今フレームの LUT を作るため 1 フレーム遅れるが、空の変化は遅いので問題にならない)
+ * 照度は透過率 LUT (ATMOSPHERE_MODE=0 は解析近似) で大気を通した値。空の SH は prepare が作った今フレームの SkyView LUT から
+ * (前のフレームの LUT は前のフレームの pre-exposure の P で書かれているので、P が変わるフレームで SH が 1 段跳んだ)
  *
  * skyParams の使い方 (sky モジュールの自由領域)
  *   [0] rgb = 雲の高度での光源照度, a = +1 なら光源は太陽 / -1 なら月
@@ -59,8 +59,10 @@
 #include "/lib/common/celestial_shape.glsl"
 #include "/lib/sky/celestial.glsl"
 #include "/lib/common/look_presets.glsl"
+#include "/lib/common/polarizer.glsl"
 #include "/lib/common/frame_offset.glsl"
 #include "/lib/sky/cloud_styles.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/sky/sky_color.glsl"
 #include "/lib/sky/fog_template.glsl"

@@ -13,6 +13,7 @@
 //@include "/lib/post/post_constants.glsl"
 //@include "/lib/post/sampling.glsl"
 //@include "/lib/buffers/slots.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 
 // xy = タイルの左下 (ピクセル), zw = タイルの大きさ (ピクセル)
 ivec4 bloomTileRectPx(int level) {
@@ -95,8 +96,13 @@ vec3 sampleBloom(vec2 uv, out BloomBands bands) {
         if (level >= 4) bands.wide += c * (1.0 / float(BLOOM_LEVELS - 3));
         if (level >= 6) bands.widest += c * (1.0 / float(BLOOM_LEVELS - 5));
     }
-    bands.lava /= wSum;
-    return sum / wSum;
+    // タイルは P 倍の colortex0 から作ったまま持つ (composite24 の画面のフレアも同じ単位で閾値を掛ける)。読み口のここで戻す
+    bands.narrow = hdrFromStore(bands.narrow);
+    bands.mid = hdrFromStore(bands.mid);
+    bands.wide = hdrFromStore(bands.wide);
+    bands.widest = hdrFromStore(bands.widest);
+    bands.lava = hdrFromStore(vec3(bands.lava / wSum)).x;
+    return hdrFromStore(sum / wSum);
 }
 
 /*
@@ -115,7 +121,7 @@ vec3 sampleFlareTile(vec2 uv) {
     vec2 tileUv = (rect.xy + uv * rect.zw) / screen;
     vec2 rectMin = (rect.xy + 0.5) / screen;
     vec2 rectMax = (rect.xy + rect.zw - 0.5) / screen;
-    return sampleBSplineClamped(TEX_BLOOM, tileUv, screen, rectMin, rectMax);
+    return hdrFromStore(sampleBSplineClamped(TEX_BLOOM, tileUv, screen, rectMin, rectMax));
 }
 
 // 矩形 rect (bloomTileRectPx) のタイルを双線形で読む。レベルがループの中で定数にならない時は、矩形を外で求めて渡す

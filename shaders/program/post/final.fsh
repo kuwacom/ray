@@ -28,6 +28,7 @@
 //@include "/lib/surface/gi.glsl"
 //@include "/lib/post/analog.glsl"
 //@include "/lib/post/camera_info.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -64,6 +65,7 @@
 #include "/lib/post/grading.glsl"
 #include "/lib/buffers/images.glsl"
 #include "/lib/buffers/slots.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/post/bloom.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/post/lens_optics.glsl"
@@ -124,21 +126,24 @@ vec3 debugView(ivec2 texel, vec3 color) {
     return linearToSrgb(tonemap(sampleFloodfillVolume(playerPos - normalize(playerPos) * 0.5)));
 #elif DEBUG_VIEW == 6
     // GI/AO なしでは colortex9 が書かれないので、枠を直接読まず定数を返す口を通す
-    vec4 gi = getIndirectLight(texel);
+    vec4 gi = hdrFromStore(getIndirectLight(texel));
     return linearToSrgb(tonemap(gi.rgb)) * gi.a;
 #elif DEBUG_VIEW == 7
     // 雲の散乱光に露出を掛けて見る (掛けないと夜や薄明では真っ黒になる)
-    return linearToSrgb(tonemap(texelFetch(colortex11, texel, 0).rgb * getExposure()));
+    return linearToSrgb(tonemap(hdrFromStore(texelFetch(colortex11, texel, 0).rgb) * getExposure()));
 #elif DEBUG_VIEW == 8
-    return linearToSrgb(tonemap(texelFetch(colortex12, texel, 0).rgb));
+    return linearToSrgb(tonemap(hdrFromStore(texelFetch(colortex12, texel, 0).rgb)));
 #elif DEBUG_VIEW == 9
-    return linearToSrgb(tonemap(texture(skyViewSampler, texcoord).rgb));
+    return linearToSrgb(tonemap(hdrFromStore(texture(skyViewSampler, texcoord).rgb)));
 #elif DEBUG_VIEW == 10
     // 目の高さのボクセル断面 (固体=白, エンティティ=赤, 光源=黄)
     ivec2 xz = ivec2(texcoord * vec2(VOXEL_SIZE.xz));
     ivec3 cell = ivec3(xz.x, VOXEL_HALF.y, xz.y);
-    int id = unpackVoxelBlockId(readVoxelBlock(cell));
+    uint voxel = readVoxelBlock(cell);
+    int id = unpackVoxelBlockId(voxel);
     bool ent = readVoxelEntity(cell) != 0u;
+    // 光源=黄, ID の無い発光ブロックの光源 (GENERIC_LIGHT)=橙
+    if (isGenericLightVoxel(voxel)) return vec3(1.0, 0.5, 0.1);
     return ent ? vec3(1.0, 0.2, 0.2) : (getBlockLightIndex(id) != 0 ? vec3(1.0, 0.9, 0.2) : vec3(id != 0 ? 0.8 : 0.05));
 #elif DEBUG_VIEW == 11
     // 最終的に TAA・モーションブラーが使う速度 (ピクセル単位, 1 px で 0.25)。b は colortex15 (エンティティ・手) の有効フラグ
@@ -182,7 +187,7 @@ vec3 applyLookLut(vec3 c) {
 #endif
 
 vec3 fetchScene(ivec2 p) {
-    return sanitizeColor(texelFetch(colortex0, clamp(p, ivec2(0), ivec2(viewSize()) - 1), 0).rgb);
+    return sanitizeColor(hdrFromStore(texelFetch(colortex0, clamp(p, ivec2(0), ivec2(viewSize()) - 1), 0).rgb));
 }
 
 // CAS の知覚空間で白 (露出後 1) に当たる値。近傍にこれを超える点があれば暗い側へのはみ出しを止める
@@ -265,6 +270,14 @@ float lavaToneMask(ivec2 texel) {
 }
 
 const float OUTPUT_LEVELS = 255.0;  // 8bit 出力の最大値
+/*
+ * 8bit 出力のバンディング対策。2 つの独立なブルーノイズの和の三角分布 (幅 +-1 LSB)
+ * 一様の 1 LSB は雑音の強さが値によって変わり (段の境だけざらつき、段の真ん中では消える)、緩い階調に段の名残が残る
+ */
+float outputDither(ivec2 texel) {
+    vec2 n = blueNoise(texel).rg;
+    return (n.x + n.y - 1.0) / OUTPUT_LEVELS;
+}
 
 #if defined ANALOG && !defined FINAL_DEVELOP_PASS
 // アナログの記録の段。colortex0 は composite27 (現像) が書いた表示値
@@ -286,8 +299,7 @@ void main() {
     color = applyCameraInfo(color, gl_FragCoord.xy);
 #endif
     color = debugView(texel, color);
-    // 8bit 出力のバンディング対策
-    color += (interleavedGradientNoise(gl_FragCoord.xy, frameCounter) - 0.5) / OUTPUT_LEVELS;
+    color += outputDither(texel);
     outColor = vec4(color, 1.0);
 }
 #else
@@ -337,15 +349,15 @@ void main() {
 #endif
     vec2 uvFlare = flareOutput ? uv : uvL;
 
-    vec3 center = distort && !LENS_WARP_TAA ? sanitizeColor(sampleCatmullRom(colortex0, uvL, viewSize())) : fetchScene(texel);
+    vec3 center = distort && !LENS_WARP_TAA ? sanitizeColor(hdrFromStore(sampleCatmullRom(colortex0, uvL, viewSize()))) : fetchScene(texel);
     vec3 hdr = center;
 
     // レンズ: 倍率色収差 (波長ごとに倍率が違い、画面の隅ほど縁が虹色にずれる)
 #ifdef LENS_CHROMATIC
     #if defined LENS_DISTORTION && LENS_PROJECTION == 1
-    if (LP_CA != 0.0) hdr = LENS_WARP_TAA ? lensChromaticSample(colortex0, uv, LP_CA) : lensChromaticProjected(colortex0, uv, LP_CA);
+    if (LP_CA != 0.0) hdr = hdrFromStore(LENS_WARP_TAA ? lensChromaticSample(colortex0, uv, LP_CA) : lensChromaticProjected(colortex0, uv, LP_CA));
     #else
-    if (LP_CA != 0.0) hdr = lensChromaticSample(colortex0, uvL, LP_CA);
+    if (LP_CA != 0.0) hdr = hdrFromStore(lensChromaticSample(colortex0, uvL, LP_CA));
     #endif
 #endif
     hdr = max(hdr + casDelta(texelL, center, exposure), 0.0);
@@ -400,7 +412,7 @@ void main() {
              * (ピントの前後で中心だけ地まで引かれ、周りが光って中心が黒・緑・紫の 1 画素に抜けた)
              */
             vec3 given = (spreadAmount + coreAmount) * spreadCore;
-            vec3 remain = max(hdr - textureLod(colortex13, uvL, 0.0).rgb, 0.0);
+            vec3 remain = max(hdr - hdrFromStore(textureLod(colortex13, uvL, 0.0).rgb), 0.0);
             hdr += spreadAmount * spreadTail / float(POINT_SPREAD_LEVELS) + coreAmount * coreBlur - min(given, remain);
         }
     }
@@ -589,8 +601,7 @@ void main() {
     color = applyCameraInfo(color, gl_FragCoord.xy);
 #endif
     color = debugView(texel, color);
-    // 8bit 出力のバンディング対策
-    color += (interleavedGradientNoise(gl_FragCoord.xy, frameCounter) - 0.5) / OUTPUT_LEVELS;
+    color += outputDither(texel);
     outColor = vec4(color, 1.0);
 #endif
 }

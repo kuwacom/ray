@@ -12,6 +12,8 @@
 //@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/post/post_internal.glsl"
 //@include "/lib/buffers/slots.glsl"
+//@include "/lib/common/pre_exposure.glsl"
+//@include "/lib/sky/beacon_beam_shape.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -47,6 +49,7 @@
 #include "/lib/post/grading.glsl"
 #include "/lib/buffers/images.glsl"
 #include "/lib/buffers/slots.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/post/bloom.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/post/lens_optics.glsl"
@@ -55,6 +58,7 @@
 #include "/lib/post/lens_flare.glsl"
 #include "/lib/post/lens.glsl"
 #include "/lib/post/post_internal.glsl"
+#include "/lib/sky/beacon_beam_shape.glsl"
 // END GENERATED includes
 
 in vec2 texcoord;
@@ -130,7 +134,7 @@ vec3 gatherSparkle(vec2 pos, ivec2 maxTexel) {
     vec3 sparkle = vec3(0.0);
     for (int i = 0; i < 4; i++) {
         ivec2 o = ivec2(i & 1, i >> 1);
-        vec4 s = texelFetch(colortex0, clamp(b0 + o, ivec2(0), maxTexel), 0);
+        vec4 s = hdrFromStore(texelFetch(colortex0, clamp(b0 + o, ivec2(0), maxTexel), 0));
         float w = (o.x == 1 ? bf.x : 1.0 - bf.x) * (o.y == 1 ? bf.y : 1.0 - bf.y);
         sparkle += sanitizeColor(s.rgb) * sparkleShare(s.a) * w;
     }
@@ -153,8 +157,8 @@ void writeTaaOutput(vec3 result, vec3 sparkleNow, vec3 sparkleMax, vec2 prevUv, 
 #endif
     vec3 color = result + sparkle;
     float share = saturate(luminance(sparkle) / max(luminance(color), 1e-6));
-    outColor = vec4(color, rawA < 0.0 ? rawA : share);
-    outHistory = vec4(result, historyDist);
+    outColor = vec4(hdrToStore(color), rawA < 0.0 ? rawA : share);
+    outHistory = vec4(hdrToStore(result), historyDist);
 }
 
 // colortex13.a に書く「このピクセルの距離」
@@ -244,7 +248,7 @@ TaaNeighborhood taaNeighborhood(ivec2 center, ivec2 maxTexel, float exposure, fl
     for (int y = -1; y <= 1; y++) {
         for (int x = -1; x <= 1; x++) {
             ivec2 p = clamp(center + ivec2(x, y), ivec2(0), maxTexel);
-            vec4 s = texelFetch(colortex0, p, 0);
+            vec4 s = hdrFromStore(texelFetch(colortex0, p, 0));
             vec3 sc = sanitizeColor(s.rgb);
             nb.sparkleMax = max(nb.sparkleMax, sc * sparkleShare(s.a));
             vec3 c = rgbToYCoCg(taaCompress(sc * (1.0 - sparkleShare(s.a)), exposure));
@@ -303,14 +307,14 @@ void taaWarped() {
     float distOut = length(pos - (vec2(nearest) + 0.5)) * magnify;
     float nearWeight = exp(-LENS_WARP_TAA_KERNEL * distOut * distOut);
 
-    vec4 nearRaw = texelFetch(colortex0, nearest, 0);
+    vec4 nearRaw = hdrFromStore(texelFetch(colortex0, nearest, 0));
     vec3 nearColor = sanitizeColor(nearRaw.rgb) * (1.0 - sparkleShare(nearRaw.a));
     float centerDepth = texelFetch(depthtex0, nearest, 0).r;
 
     // 1 フレームの補間 (final で引き伸ばす方式と同じ Catmull-Rom)。白飛び分は双線形で別に取り出す
     vec2 posUv = pos * texelSize();
     vec3 sparkle = gatherSparkle(pos, maxTexel);
-    vec3 smoothColor = max(sanitizeColor(sampleCatmullRom(colortex0, posUv, viewSize())) - sparkle, 0.0);
+    vec3 smoothColor = max(sanitizeColor(hdrFromStore(sampleCatmullRom(colortex0, posUv, viewSize()))) - sparkle, 0.0);
 
     // 一番近い元の画素の周りの統計と、最も手前の深度 (元画像の座標。歪曲なしの TAA と同じ)
     TaaNeighborhood nb = taaNeighborhood(nearest, maxTexel, exposure, centerDepth);
@@ -337,7 +341,7 @@ void taaWarped() {
         float expCenter = expectedPreviousDistance(nearestUv - jitter, centerDepth, tolCenter);
         float expClosest = expectedPreviousDistance(closestUv - jitter, closestDepth, tolClosest);
         valid = taaHistoryValid(prevUv, maxTexel, expCenter, tolCenter, expClosest, tolClosest);
-        history = sanitizeColor(sampleCatmullRom(colortex13, prevUv, viewSize()));
+        history = sanitizeColor(hdrFromStorePrev(sampleCatmullRom(colortex13, prevUv, viewSize())));
     }
 
     vec3 resultYcc;
@@ -367,7 +371,7 @@ void main() {
     vec2 unjitteredUv = uv - taaJitterUv();
     float exposure = getExposure();
 
-    vec4 centerRaw = texelFetch(colortex0, texel, 0);
+    vec4 centerRaw = hdrFromStore(texelFetch(colortex0, texel, 0));
     vec3 centerColor = sanitizeColor(centerRaw.rgb);
     vec3 centerSparkle = centerColor * sparkleShare(centerRaw.a);
     centerColor -= centerSparkle;
@@ -384,17 +388,33 @@ void main() {
 
     vec2 closestUv = uv + vec2(nb.closestOffset) * texelSize();
     vec2 prevUv = uv + (getPreviousUv(closestUv, closestDepth) - closestUv);
+    // ビーコンの光線は深度を持たないので、芯の写る画素は奥の面ではなく光線の見える点で再投影する (lib/sky/beacon_beam_shape.glsl)
+    // 履歴の距離は奥の面のものなので、その画素はディスオクルージョンの判定をしない
+    bool beamPixel = false;
+    if (hasBeaconBeams()) {
+        float depthOpaque = texelFetch(depthtex1, texel, 0).r;
+        float opaqueDist = depthOpaque >= 1.0 ? BEACON_BEAM_FAR : length(screenToPlayer(vec3(unjitteredUv, fixHandDepth(depthOpaque))));
+        vec3 dir = normalize(viewToPlayerDir(screenToView(vec3(unjitteredUv, 1.0))));
+        float pixel = 2.0 / (viewHeight * gbufferProjection[1][1]) * BEACON_BEAM_MIN_PIXELS;
+        vec3 beamPoint;
+        if (beaconBeamCorePoint(dir, opaqueDist, pixel, beamPoint)) {
+            prevUv = uv + (playerToPreviousScreen(beamPoint).xy - unjitteredUv);
+            beamPixel = true;
+        }
+    }
     float motionPx = length((prevUv - uv) * viewSize());
 
     bool valid = reprojectionInside(prevUv) && screenHistoryValid();
 
     vec3 history = vec3(0.0);
     if (valid) {
-        float tolCenter, tolClosest;
-        float expCenter = expectedPreviousDistance(unjitteredUv, centerDepth, tolCenter);
-        float expClosest = expectedPreviousDistance(closestUv - taaJitterUv(), closestDepth, tolClosest);
-        valid = taaHistoryValid(prevUv, maxTexel, expCenter, tolCenter, expClosest, tolClosest);
-        history = sanitizeColor(sampleCatmullRom(colortex13, prevUv, viewSize()));
+        if (!beamPixel) {
+            float tolCenter, tolClosest;
+            float expCenter = expectedPreviousDistance(unjitteredUv, centerDepth, tolCenter);
+            float expClosest = expectedPreviousDistance(closestUv - taaJitterUv(), closestDepth, tolClosest);
+            valid = taaHistoryValid(prevUv, maxTexel, expCenter, tolCenter, expClosest, tolClosest);
+        }
+        history = sanitizeColor(hdrFromStorePrev(sampleCatmullRom(colortex13, prevUv, viewSize())));
     }
 
     vec3 resultYcc;

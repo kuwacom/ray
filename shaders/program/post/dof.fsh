@@ -15,6 +15,7 @@
 //@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/ids/material_ids.glsl"
 //@include "/lib/post/post_internal.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -51,6 +52,7 @@
 #include "/lib/post/grading.glsl"
 #include "/lib/buffers/images.glsl"
 #include "/lib/buffers/slots.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/post/bloom.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/post/lens_optics.glsl"
@@ -238,8 +240,9 @@ void main() {
      * radius だけ大きくなり被写体までミップでぼけてしまう
      */
     float centerFiltered = saturate(max(coc03.r, max(coc03.g, coc03.b)) / (DOF_MAX_RADIUS * viewHeight) - 1.0);
-    vec3 bgSum = sanitizeColor(centerRaw.rgb);
-    if (centerFiltered > 0.0) bgSum = mix(bgSum, sanitizeColor(textureLod(colortex0, uv, lod).rgb), centerFiltered);
+    // ぼかさずに返す所は P 倍のまま書き戻すので、戻すのは混ぜる値だけ
+    vec3 bgSum = sanitizeColor(hdrFromStore(centerRaw.rgb));
+    if (centerFiltered > 0.0) bgSum = mix(bgSum, sanitizeColor(hdrFromStore(textureLod(colortex0, uv, lod).rgb)), centerFiltered);
 #if defined LENS_AXIAL_CA && defined SPECULAR_SPARKLE && defined TAA
     /*
      * 白飛び分 (TAA の後の a = 白飛び分の割合) は軸上色収差で色ごとに広げない (緑のボケ半径で全部の色を集める)
@@ -305,7 +308,7 @@ void main() {
         float cocSignedS = clamp(circleOfConfusion(distS, focus) * cocMag + cocBias, -maxRadius, maxRadius);
         float cocS = abs(cocSignedS);
         vec3 cocS3 = abs(cocSignedS + lca);
-        vec4 rawS = textureLod(colortex0, uvS, lod);
+        vec4 rawS = hdrFromStore(textureLod(colortex0, uvS, lod));
         vec3 colorS = sanitizeColor(rawS.rgb);
         /*
          * 球面収差: ボケの縁が明るい (正) / 中心が明るい (負)。円板全体の平均の重みは 1 のまま
@@ -349,5 +352,5 @@ void main() {
         vec3 alpha = saturate(nearWeight / max(expected, 1.0));
         result = mix(result, nearSum / max(nearWeight, vec3(1e-4)), alpha);
     }
-    outColor = vec4(result, centerRaw.a);
+    outColor = vec4(hdrToStore(result), centerRaw.a);
 }

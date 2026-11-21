@@ -15,6 +15,7 @@
 //@include "/lib/surface/surface.glsl"
 //@include "/lib/light/light.glsl"
 //@include "/lib/sky/volumetrics.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -43,8 +44,10 @@
 #include "/lib/common/noise.glsl"
 #include "/lib/sky/celestial.glsl"
 #include "/lib/common/look_presets.glsl"
+#include "/lib/common/polarizer.glsl"
 #include "/lib/common/frame_offset.glsl"
 #include "/lib/sky/cloud_styles.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/sky/sky_color.glsl"
 #include "/lib/sky/fog_template.glsl"
@@ -118,7 +121,7 @@ shared vec4 sharedFog[8][8];
 vec4 sampleFogHistory(vec2 prevLowPos) {
     vec2 maxPos = vec2(vlLowResSize()) - 1.0;
     vec2 uv = (clamp(prevLowPos, vec2(0.0), maxPos) + 0.5) / viewSize();
-    return vlWritesColortex12() ? texture(fogHistorySampler, uv) : texture(colortex12, uv);
+    return hdrFromStorePrev(vlWritesColortex12() ? texture(fogHistorySampler, uv) : texture(colortex12, uv));
 }
 
 void main() {
@@ -192,6 +195,7 @@ void main() {
         result = mix(history, raw, VL_HISTORY_BLEND);
     }
 
+    result = hdrToStore(result);
     if (vlWritesColortex12()) imageStore(colorimg12, lowTexel, result);
     else imageStore(fogHistoryImg, lowTexel, result);
 }

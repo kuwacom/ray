@@ -230,6 +230,44 @@ def direct_use_problems(shaders: Path, slots: list[Slot]) -> list[str]:
     return problems
 
 
+# pre-exposure (lib/common/pre_exposure.glsl) で P 倍に持つバッファを読む呼び。hdrFromStore / hdrFromStorePrev を通さない行を探す
+PRE_EXPOSED_READ_RE = re.compile(
+    r"\b(?:texelFetch|texture|textureLod|sampleCatmullRom|sampleBSplineClamped4?)\(\s*"
+    r"(colortex0|colortex9|colortex11|colortex12|colortex13|skyViewSampler|fogHistorySampler|giRawSampler"
+    r"|TEX_GI_HIST|TEX_GI_RAW|TEX_GI|TEX_CLOUD_LOW|TEX_WATER_REFR|TEX_BLOOM)\b")
+ALPHA_ONLY_RE = re.compile(r"\)\s*\.a\b")
+# 戻さずに読んでよい所 (ファイル, 行に含まれる文字列): 理由
+PRE_EXPOSED_RAW_OK = {
+    ("lib/post/analog.glsl", "(colortex0"): "ANALOG の記録の段は composite27 が書いた表示値を読む",
+    ("program/post/final.fsh", "vec3 color = texelFetch(colortex0, texel, 0).rgb"): "同上",
+    ("program/surface/opaque_shading.fsh", "renderSky(dir, texelFetch(colortex0"): "空の gbuffers が書いた絶対の値",
+    ("program/post/dof.fsh", "vec4 centerRaw = texelFetch(colortex0"): "ぼかさない所は P 倍のまま書き戻す (混ぜる所で戻す)",
+    ("program/post/bloom_down.fsh", "(colortex0"): "ブルームタイルは P 倍のまま作る",
+    ("program/post/bloom_blur.fsh", "(TEX_BLOOM"): "同上 (画面のフレアは露出を P で割って閾値をそろえる)",
+    ("lib/post/bloom.glsl", "(TEX_BLOOM"): "sampleBloom・sampleFlareTile が戻す。bloom_blur は P 倍のまま読む",
+    ("lib/post/local_tonemap.glsl", "(TEX_BLOOM"): "局所トーンマップのタイルは絶対の log2",
+    ("lib/surface/gi.glsl", "(TEX_GI"): "getIndirectLight の呼び手が戻す",
+}
+
+
+def pre_exposure_problems(shaders: Path) -> list[str]:
+    problems = []
+    for f in sorted(shaders.rglob("*")):
+        if f.suffix not in EXTS:
+            continue
+        rel = f.relative_to(shaders).as_posix()
+        for i, ln in enumerate(strip_comments(f.read_text(encoding="utf-8")).splitlines(), 1):
+            if not PRE_EXPOSED_READ_RE.search(ln) or "hdrFromStore" in ln:
+                continue
+            if ALPHA_ONLY_RE.search(ln) and ".rgb" not in ln:
+                continue
+            if any(rel == r and s in ln for r, s in PRE_EXPOSED_RAW_OK):
+                continue
+            problems.append(f"{rel}:{i}: pre-exposure の P 倍のバッファを hdrFromStore / hdrFromStorePrev を通さずに読んでいる "
+                            "(lib/common/pre_exposure.glsl。わざとなら tools/check_slots.py の PRE_EXPOSED_RAW_OK に足す)")
+    return problems
+
+
 def check(shaders: Path = SHADERS) -> list[str]:
     """
     ### check
@@ -242,7 +280,7 @@ def check(shaders: Path = SHADERS) -> list[str]:
     if not slots:
         return problems
     spans, p = intervals(slots, program_kinds(shaders))
-    return problems + p + overlap_problems(slots, spans) + direct_use_problems(shaders, slots)
+    return problems + p + overlap_problems(slots, spans) + direct_use_problems(shaders, slots) + pre_exposure_problems(shaders)
 
 
 # 区間の検査 (glslang)

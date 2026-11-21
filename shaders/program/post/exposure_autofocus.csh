@@ -22,6 +22,7 @@
 //@include "/lib/post/post_internal.glsl"
 //@include "/lib/sky/sky_color.glsl"
 //@include "/lib/post/camera_info.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -62,6 +63,7 @@
 #include "/lib/post/camera.glsl"
 #include "/lib/post/grading.glsl"
 #include "/lib/buffers/slots.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/post/bloom.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/post/lens_optics.glsl"
@@ -69,6 +71,7 @@
 #include "/lib/post/lens_flare.glsl"
 #include "/lib/post/lens.glsl"
 #include "/lib/post/post_internal.glsl"
+#include "/lib/common/polarizer.glsl"
 #include "/lib/common/phase.glsl"
 #include "/lib/sky/atmosphere.glsl"
 #include "/lib/sky/celestial.glsl"
@@ -178,7 +181,7 @@ uint flareVisibilityTap(uint index) {
         if (skyLum > 1e-6 * PHYSICAL_DARKEST) {
             // 歪曲・魚眼を TAA で組み立てた時は colortex0 が出力の座標なので、光源の出力の位置で読む
             vec2 colorUv = LENS_WARP_TAA ? lensForwardUv(clamped) : clamped;
-            float l = luminance(sanitizeColor(textureLod(colortex0, colorUv, 0.0).rgb));
+            float l = luminance(sanitizeColor(hdrFromStore(textureLod(colortex0, colorUv, 0.0).rgb)));
 #if SUN_MOON_STYLE >= 1
             // 夜の円盤は白飛びさせるために明るく描いてある。フレアの見え具合は円盤を白飛びさせる前の明るさで比べる
             if (frameData.shadowLightIrradiance.a <= 0.5) l /= moonSkyDiscBoost(getSunDir().y);
@@ -744,7 +747,7 @@ void main() {
             if (isHandDepth(texelFetch(depthtex0, LENS_WARP_TAA ? postSourceTexel(uv) : p, 0).r)) continue;
             // テクセルの角で双線形サンプルすると 2x2 の平均が 1 回で取れる
             vec2 corner = vec2(max(p, ivec2(1))) / screen;
-            float l = luminance(sanitizeColor(textureLod(colortex0, corner, 0.0).rgb));
+            float l = luminance(sanitizeColor(hdrFromStore(textureLod(colortex0, corner, 0.0).rgb)));
             uint w = uint(meteringWeight(uv) * METERING_WEIGHT_SCALE + 0.5);
             atomicAdd(sharedHistogram[luminanceToHistogramBin(l)], w);
             #if defined EXPOSURE_AUTO && defined HAS_SKYLIGHT
@@ -797,6 +800,10 @@ void main() {
     float adaptedEv = adaptCameraEv(prevEv, measuredEv, initialized, dt);
     // 露出補正は決める組に入れる (画に別に掛けると二重になる)
     float sceneOffset = EXPOSURE_CAMERA_EV_OFFSET - LOOK_EXPOSURE_BIAS;
+    #ifdef CAMERA_FILTER
+    // 実機と同じくフィルター越しに測る (減光の分だけ SS・F 値・ISO で明るく撮る。ND で SS が延び、ISO オートと限界の表示もそのまま効く)
+    sceneOffset -= CAMERA_FILTER_STOPS;
+    #endif
     CameraExposure camera = cameraAutoExposure(adaptedEv + sceneOffset);
     frameData.postParams[CAMERA_AE_PARAM] = vec4(camera.shutter, camera.fNumber, camera.iso, float(camera.limits));
     #if EXPOSURE_INFO_MODE > 0
@@ -804,6 +811,11 @@ void main() {
     #endif
     float appliedEv = cameraExposureEv(camera);
     float targetEv = cameraExposureEv(cameraAutoExposure(measuredEv + sceneOffset));
+    #ifdef CAMERA_FILTER
+    // 組が写す明るさはフィルターの後の光に対してなので、場面の輝度に対してはフィルターの段数だけ暗い側
+    appliedEv += CAMERA_FILTER_STOPS;
+    targetEv += CAMERA_FILTER_STOPS;
+    #endif
 #elif !defined EXPOSURE_AUTO
     #ifdef EXPOSURE_CAMERA
     // EV100 = log2(N^2 / t) - log2(ISO / 100)。マニュアルと同じく環境の補正 (夜の持ち上げ・屋内・雨・水中) は掛けない
@@ -811,6 +823,10 @@ void main() {
     float measuredEv = log2(fNumber * fNumber / optShutterSpeed) - log2(optExposureIso / EXPOSURE_ISO_REFERENCE) - EXPOSURE_CAMERA_EV_OFFSET;
     #else
     float measuredEv = EXPOSURE_MANUAL_EV;
+    #endif
+    #ifdef CAMERA_FILTER
+    // M とマニュアルはフィルターの段数だけ暗く写る
+    measuredEv += CAMERA_FILTER_STOPS;
     #endif
     float adaptedEv = measuredEv;
     float appliedEv = measuredEv;

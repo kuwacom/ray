@@ -18,6 +18,20 @@ int blockIdToVoxelId(int blockId) {
     return (blockId <= 0 || blockId > 4095) ? BLOCK_SOLID : blockId;
 }
 
+/*
+ * ID の無い (BLOCK_SOLID の) ブロックを、発光レベル (at_midBlock.w) で光源として扱うか (GENERIC_LIGHT)
+ * 表にある ID (> 1) は対象にしない。明るい色ではなく発光レベルだけで決めるので、雪や白いブロックは光らない
+ * レベル 1 (バニラの終端の枠など) は光源にしない。弱すぎて光だまりにならず、光源の数だけ増える
+ */
+const int GENERIC_LIGHT_MIN_LEVEL = 2;
+bool isGenericEmitter(int voxelId, int emissionLevel) {
+#ifdef GENERIC_LIGHT
+    return voxelId == BLOCK_SOLID && emissionLevel >= GENERIC_LIGHT_MIN_LEVEL;
+#else
+    return false;
+#endif
+}
+
 // mc_Entity.x の流れる水を水に戻す (流れる水の ID はボクセルの印 VOXEL_WATER_FLOWING にだけ使う)
 int terrainBlockId(int blockId) { return blockId == BLOCK_WATER_FLOWING ? BLOCK_WATER : blockId; }
 
@@ -163,6 +177,12 @@ int getBlockLightIndex(int blockId) {
 // 向きのある光源ブロックの前面の向き (0 北 1 東 2 南 3 西)。LIGHT_FLAG_FACING の光源にだけ使う
 int blockLightFacing(int blockId) {
     return max(blockId - BLOCK_LIGHT_BASE, 0) >> 8;
+}
+
+// 向きの番号 (blockLightFacing) の前面の外向きの単位ベクトル。向きと面の対応はここだけに書き、使う所はこれと比べる
+vec3 facingDirection(int facing) {
+    const vec3 DIRS[4] = vec3[4](vec3(0.0, 0.0, -1.0), vec3(1.0, 0.0, 0.0), vec3(0.0, 0.0, 1.0), vec3(-1.0, 0.0, 0.0));
+    return DIRS[facing & 3];
 }
 
 // 一部だけ金属のブロック・アイテムの ID は、元の ID + 金属の判定の番号 x METAL_GATE_STRIDE (番号 0 = 金属なし)

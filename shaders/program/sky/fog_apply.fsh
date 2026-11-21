@@ -17,6 +17,7 @@
 //@include "/lib/common/jitter.glsl"
 //@include "/lib/light/light.glsl"
 //@include "/lib/buffers/slots.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 #ifdef FIREWORK_LIGHT
     //@include "/lib/light/firework_light.glsl"
 #endif
@@ -55,8 +56,10 @@
 #include "/lib/common/celestial_shape.glsl"
 #include "/lib/sky/celestial.glsl"
 #include "/lib/common/look_presets.glsl"
+#include "/lib/common/polarizer.glsl"
 #include "/lib/common/frame_offset.glsl"
 #include "/lib/sky/cloud_styles.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/sky/sky_color.glsl"
 #include "/lib/sky/fog_template.glsl"
@@ -67,6 +70,7 @@
 #include "/lib/buffers/slots.glsl"
 #include "/lib/sky/godrays.glsl"
 #include "/lib/common/exposure.glsl"
+#include "/lib/sky/beacon_beam_shape.glsl"
 #include "/lib/sky/beacon_beam.glsl"
 #include "/lib/common/jitter.glsl"
 #include "/lib/buffers/light_bins.glsl"
@@ -119,7 +123,7 @@ const float WATER_FOG_INSCATTER = 0.5;
 
 vec4 fetchVolumetrics(ivec2 lowTexel) {
     lowTexel = clamp(lowTexel, ivec2(0), vlLowResSize() - 1);
-    return vlWritesColortex12() ? texelFetch(colortex12, lowTexel, 0) : texelFetch(fogHistorySampler, lowTexel, 0);
+    return hdrFromStore(vlWritesColortex12() ? texelFetch(colortex12, lowTexel, 0) : texelFetch(fogHistorySampler, lowTexel, 0));
 }
 
 // 深度を見たバイリニア (低解像度の 4 点のうち、深度の近い点だけを使う)
@@ -195,7 +199,7 @@ vec3 handLightGlow(vec3 dir, float dist, vec3 scatterCoeff, bool inWater) {
 
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
-    vec4 sceneIn = texelFetch(colortex0, texel, 0);
+    vec4 sceneIn = hdrFromStore(texelFetch(colortex0, texel, 0));
     vec3 color = sceneIn.rgb;
     /*
      * 鏡面の白飛び分 (composite2 / deferred30 が a = 1 + 輝度の割合で書く)。TAA (composite20) が近傍の箱で潰さず後から足すので、
@@ -342,5 +346,5 @@ void main() {
     }
 
     float share = saturate(sparkle / max(luminance(color), 1e-6));
-    outColor = vec4(color, lavaGlow ? -share : (share > 0.0 ? 1.0 + share : 0.0));
+    outColor = vec4(hdrToStore(color), lavaGlow ? -share : (share > 0.0 ? 1.0 + share : 0.0));
 }

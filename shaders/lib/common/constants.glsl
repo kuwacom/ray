@@ -22,8 +22,10 @@ const float EPS = 1e-5;
  * 夜 (EXPOSURE_PHYSICAL_NIGHT、既定 -8.5 段)
  *   MOON: 月の直射と月が照らす空。満月の照り返しは白い床で約 90 lx、実際は 0.05-0.3 lx
  *   NIGHT_SKY (夜の 8/8.5 倍の段、既定 -8): 星・天の川・大気光・夜空の底。夜空の底は約 0.25 cd/m2、実際の暗い夜空は約 1 mcd/m2
- *   MIN_AMBIENT (夜の 12/8.5 倍の段、既定 -12): 洞窟と新月の夜の最低限の光。約 33 lx、実際の新月の晴れた夜は約 0.002 lx
- *   夜を 0 にすると 3 つとも元の明るさ。夜空と最低限の光は既定より下げない (掛けた後の値が fp16 の非正規化数の数段で、さらに下げると 0 になる)
+ *   MIN_AMBIENT (夜の 16/8.5 倍の段、既定 -16): 洞窟と新月の夜の最低限の光。掛ける前は約 33 lx、掛けた後は約 0.0005 lx。
+ *   実際の星明かりは約 0.001 lx (空の光が地面を照らす分を足して合う)。-12 段 (0.008 lx) では、新月に f/2.8 20 秒 ISO 6400 で撮った雪の地面が
+ *   実写 (空とほぼ同じ明るさ) より 4.6 段明るく、空より 3 段明るかった
+ *   夜を 0 にすると 3 つとも元の明るさ。夜空と最低限の光は既定より下げない (下げても実写より暗くなるだけで、使い道が無い)
  * 灯り (EXPOSURE_PHYSICAL_BLOCKLIGHT、既定 -8.5 段)
  *   BLOCKLIGHT: ブロック・手持ち・エンティティ・溶岩・雷・花火の照らす光と、発光の面が GI で照らす光、暗視。
  *   たいまつから 1 ブロックの白い床で約 3800 lx (掛けた後は約 11 lx)。灯油ランタン (8-82 lm) の 1 m は 0.6-6.5 lx、60 W の電球 (800 lm) は約 64 lx
@@ -36,8 +38,8 @@ const float EPS = 1e-5;
 #ifdef PHYSICAL_LIGHT_ACTIVE
 const float PHYSICAL_NIGHT_SKY_SLOPE = 8.0 / 8.5;
 const float PHYSICAL_NIGHT_SKY_MIN_STOPS = -8.0;
-const float PHYSICAL_MIN_AMBIENT_SLOPE = 12.0 / 8.5;
-const float PHYSICAL_MIN_AMBIENT_MIN_STOPS = -12.0;
+const float PHYSICAL_MIN_AMBIENT_SLOPE = 16.0 / 8.5;
+const float PHYSICAL_MIN_AMBIENT_MIN_STOPS = -16.0;
 const float PHYSICAL_MOON = exp2(EXPOSURE_PHYSICAL_NIGHT);
 const float PHYSICAL_NIGHT_SKY = exp2(max(EXPOSURE_PHYSICAL_NIGHT * PHYSICAL_NIGHT_SKY_SLOPE, PHYSICAL_NIGHT_SKY_MIN_STOPS));
 const float PHYSICAL_MIN_AMBIENT = exp2(max(EXPOSURE_PHYSICAL_NIGHT * PHYSICAL_MIN_AMBIENT_SLOPE, PHYSICAL_MIN_AMBIENT_MIN_STOPS));

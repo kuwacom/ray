@@ -14,12 +14,14 @@
  */
 //@include "/lib/common/common.glsl"
 //@include "/lib/common/exposure.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 //@include "/lib/common/jitter.glsl"
 //@include "/lib/common/specular_sparkle.glsl"
 //@include "/lib/surface/surface.glsl"
 //@include "/lib/sky/sky.glsl"
 //@include "/lib/light/light.glsl"
 //@include "/lib/surface/surface_lights.glsl"
+//@include "/lib/common/polarizer.glsl"
 #ifdef FIREWORK_LIGHT
     //@include "/lib/light/firework_light.glsl"
 #endif
@@ -41,6 +43,7 @@
 #include "/lib/common/common.glsl"
 #include "/lib/buffers/frame_data.glsl"
 #include "/lib/common/exposure.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/common/jitter.glsl"
 #include "/lib/common/color.glsl"
 #include "/lib/common/specular_sparkle.glsl"
@@ -74,6 +77,7 @@
 #include "/lib/sky/atmosphere.glsl"
 #include "/lib/common/celestial_shape.glsl"
 #include "/lib/sky/celestial.glsl"
+#include "/lib/common/polarizer.glsl"
 #include "/lib/sky/cloud_styles.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/sky/sky_color.glsl"
@@ -114,8 +118,10 @@
 
 in vec2 texcoord;
 
-/* RENDERTARGETS: 0 */
+/* RENDERTARGETS: 0,14 */
 layout(location = 0) out vec4 outColor;
+// TEX_WATER_BEHIND (lib/buffers/slots.glsl) を 0 にする。gbuffers_water が重ねる前に、同じ枠の雲 (deferred20 -> 21) を消す
+layout(location = 1) out vec4 outWaterBehind;
 
 const float AO_BLOCKLIGHT_WEIGHT = 0.5;
 // GI が空の光を運ぶ時 (GI_TRACES_SKY): テクスチャ法線の凹凸の戻し方の範囲、GTAO を掛ける割合
@@ -185,9 +191,15 @@ float emissionGain(vec3 playerPos, vec3 geoNormal, int materialId, bool hand) {
         for (int i = 0; i < 2; i++) {
             ivec3 cell = ivec3(floor(playerToVoxel(playerPos + geoNormal * (i == 0 ? -EMISSION_KIND_INSET : EMISSION_KIND_INSET))));
             if (!isInVoxelVolume(cell)) break;
-            int light = getBlockLightIndex(fetchVoxelBlockId(cell));
+            uint voxel = fetchVoxelBlockData(cell);
+            int light = getBlockLightIndex(unpackVoxelBlockId(voxel));
             if (light != LIGHT_NONE) {
                 flags = getLightDef(light).info.x;
+                break;
+            }
+            // ID の無い発光ブロックは面全体が光る光源と同じ倍率 (点の倍率では明るい画素が白く飛ぶ)
+            if (isGenericLightVoxel(voxel)) {
+                flags = LIGHT_FLAG_OCCLUDES;
                 break;
             }
         }
@@ -203,6 +215,13 @@ vec3 lavaRadiance(vec3 albedo) {
     return albedo / lum * (pattern * LAVA_LUMINANCE * limit);
 }
 
+#ifdef CAMERA_PL
+// PL フィルター: 照り返しの偏光 (葉・濡れた面・つやのある面の照り返しが減り、下の色が見える)。金属の分は掛けない
+float polarizerSpecularMaterial(Material m, vec3 V, vec3 L) {
+    return mix(polarizerSpecular(V, L, polarizerF0ToEta(m.f0.g)), 1.0, m.metalness);
+}
+#endif
+
 /*
  * 直接光 1 つ。拡散を返し、鏡面は specSum に足す (白飛び分は集めた鏡面の合計から求める)
  * slopeVar > 0 (水たまり): 鏡面の粗さを傾きの分散の分だけ広げる (雨粒の跳ねと画素より細かい波紋)
@@ -216,6 +235,9 @@ vec3 directLight(Material m, vec3 N, vec3 V, LightSample L, float slopeVar, floa
         rough.roughness = sqrt(sqr(m.roughness) + slopeVar);
         spec = evalDirectSpecular(rough, N, V, L, discScale);
     }
+#ifdef CAMERA_PL
+    spec *= polarizerSpecularMaterial(m, V, L.direction);
+#endif
     specSum += spec * (specVis * strength);
     return diffuse;
 }
@@ -223,6 +245,9 @@ vec3 directLight(Material m, vec3 N, vec3 V, LightSample L, float slopeVar, floa
 void directSpecular(Material m, vec3 N, vec3 V, LightSample L, float slopeVar, float strength, inout vec3 specSum) {
     Material rough = m;
     rough.roughness = sqrt(sqr(m.roughness) + slopeVar);
+#ifdef CAMERA_PL
+    strength *= polarizerSpecularMaterial(m, V, L.direction);
+#endif
     specSum += evalDirectSpecular(rough, N, V, L) * strength;
 }
 
@@ -243,12 +268,13 @@ const vec2 BLOCK_SPECULAR_TRACE_ROUGHNESS = vec2(0.4, 0.55);
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
     float depth = texelFetch(depthtex0, texel, 0).r;
+    outWaterBehind = vec4(0.0);
 
     if (depth >= 1.0) {
         vec3 dir = normalize(viewToPlayerDir(screenToView(vec3(texcoord, 1.0))));
         vec3 sky = renderSky(dir, texelFetch(colortex0, texel, 0).rgb);
         vec4 clouds = getCloudLayer(texel);
-        outColor = vec4(sky * clouds.a + clouds.rgb, 1.0);
+        outColor = vec4(hdrToStore(sky * clouds.a + clouds.rgb), 1.0);
         return;
     }
 
@@ -366,8 +392,14 @@ void main() {
     }
     vec3 ambient = skyAmbient + blockLight + indirectLight + minAmbientIrradiance() * ao;
 #ifdef FIREWORK_LIGHT
-    // 花火の爆発の光 (lib/light/firework_light.glsl)。遮蔽はスカイライトの近似なので、ほかの環境光と同じく AO を掛ける
-    if (hasFireworkLight()) ambient += evalFireworkIrradiance(playerPos, g.normal, g.lightmap.y) * ao;
+    // 花火の爆発の光 (lib/light/firework_light.glsl)。拡散と鏡面 (濡れた地面・金属の照り返し)
+    // 遮蔽はスカイライトの近似なので、ほかの環境光と同じく AO を掛ける
+    if (hasFireworkLight()) {
+        LightSample firework = evalFireworkLight(playerPos, g.lightmap.y);
+        firework.irradiance *= ao;
+        if (plant) color += evalDiffuseIrradiance(m, firework.irradiance * PLANT_LIGHT_NDOTL);
+        else color += directLight(m, g.normal, V, firework, puddleVar, 1.0, 1.0, SPECULAR_BLOCK_STRENGTH, specSum);
+    }
 #endif
     color += evalDiffuseIrradiance(m, ambient);
 
@@ -383,5 +415,5 @@ void main() {
     if (!hand) sparkle += luminance(sparkleExcess(glow, getExposure()));
 #endif
     // 鏡面の白飛び分を a = 1 + 割合で composite2 -> composite19 -> composite20 (TAA の後に足す) へ渡す
-    outColor = vec4(color, 1.0 + saturate(sparkle / max(luminance(color), 1e-6)));
+    outColor = vec4(hdrToStore(color), 1.0 + saturate(sparkle / max(luminance(color), 1e-6)));
 }

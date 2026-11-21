@@ -12,6 +12,7 @@
 //@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/post/post_constants.glsl"
 //@include "/lib/post/camera_exposure.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/common/uniforms.glsl"
 #include "/lib/buffers/frame_data.glsl"
@@ -27,6 +28,7 @@
 #include "/lib/common/look_presets.glsl"
 #include "/lib/post/post_constants.glsl"
 #include "/lib/post/camera_exposure.glsl"
+#include "/lib/common/pre_exposure.glsl"
 // END GENERATED includes
 
 layout(local_size_x = 1, local_size_y = 1) in;
@@ -48,6 +50,10 @@ void main() {
     if (exposed >= t) {
         flags |= SHUTTER_FLAG_COMPLETE | SHUTTER_FLAG_SHOWN;
         exposed = 0.0;
+    #ifdef PRE_EXPOSURE_ACTIVE
+        // composite21 がこのフレームに撮れた絵を P 倍で書く
+        frameData.postParams[PRE_EXPOSURE_PARAM].z = preExposure();
+    #endif
     }
     frameData.postParams[SHUTTER_PARAM] = vec4(weight, exposed, 0.0, float(flags));
 #else

@@ -13,7 +13,7 @@
     #define SSBO_FRAME_DATA_ACCESS readonly
 #endif
 
-const int FRAME_POST_PARAMS = 11;
+const int FRAME_POST_PARAMS = 12;
 // 1 フレームに描くビーコンの光線の区間 (柱の位置と色ごと) の上限。超えた分は描かない
 const int BEACON_BEAM_MAX = 8;
 layout(std430, binding = 0) SSBO_FRAME_DATA_ACCESS buffer FrameDataBuffer {
@@ -26,7 +26,7 @@ layout(std430, binding = 0) SSBO_FRAME_DATA_ACCESS buffer FrameDataBuffer {
     // 画面 (begin で書く): xy = 画面の大きさ (変わったフレームだけ負)。screenHistoryValid が読む
     vec4 screenState;
 
-    // sky (prepare で書く)
+    // sky (prepare1 で書く)
     vec4 sunIrradiance;          // rgb = 地表での太陽直達照度 (大気透過込み), a = 太陽高度の sin
     vec4 moonIrradiance;         // rgb = 地表での月直達照度, a = 月高度の sin
     vec4 shadowLightIrradiance;  // rgb = 影を落とす側 (昼は太陽 / 夜は月) の直達照度, a = 1 なら太陽
@@ -36,8 +36,8 @@ layout(std430, binding = 0) SSBO_FRAME_DATA_ACCESS buffer FrameDataBuffer {
     // light (begin / deferred_a で書く。handLights は下)
     uvec4 lightStats;            // x = 前フレームの光源数, y = 溢れ数, z = エンティティ光源の登録締め切りフラグ (light), w = 前フレームに距離で間引いた数
 
-    // surface の自由領域 ([0..2] は prepare が書く開けた水面の海の状態。lib/common/water_waves.glsl。[3] は prepare が書くきらめきのフレームの長さ。lib/common/water_glitter.glsl。
-    // [4..5] は prepare が書く海・湖・川を混ぜた水の吸収・散乱・波頭の尖り・映り込みの散らし。lib/common/water_waves.glsl)
+    // surface の自由領域 ([0..2] は prepare1 が書く開けた水面の海の状態。lib/common/water_waves.glsl。[3] は prepare1 が書くきらめきのフレームの長さ。lib/common/water_glitter.glsl。
+    // [4..5] は prepare1 が書く海・湖・川を混ぜた水の吸収・散乱・波頭の尖り・映り込みの散らし。lib/common/water_waves.glsl)
     vec4 surfaceParams[6];
 
     // light (deferred_a で書く): 手持ち光源の画素によらない値。手 h (0 = 利き手, 1 = オフハンド) ごとに 3 つ。lib/light/hand_light.glsl の handLightAt

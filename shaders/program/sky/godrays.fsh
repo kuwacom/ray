@@ -35,6 +35,7 @@
 #include "/lib/common/phase.glsl"
 #include "/lib/buffers/images.glsl"
 #include "/lib/sky/cloud_styles.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/buffers/slots.glsl"
 #include "/lib/sky/godrays.glsl"

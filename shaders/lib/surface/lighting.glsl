@@ -40,6 +40,7 @@
 //@include "/lib/sky/clouds.glsl"
 //@include "/lib/sky/sky_color.glsl"
 //@include "/lib/buffers/slots.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 
 /*
  * ボクセルのヒット面の色が画面に無い時は、ブロックの平均の色の表 (lib/ids/block_albedo.glsl) を使う
@@ -127,7 +128,7 @@ const float GI_HISTORY_EDGE = 0.002;
 vec3 giHistoryAtPlayer(vec3 playerPos) {
     vec2 uv = playerToPreviousScreen(playerPos).xy;
     if (any(lessThan(uv, vec2(GI_HISTORY_EDGE))) || any(greaterThan(uv, vec2(1.0 - GI_HISTORY_EDGE))) || !screenHistoryValid()) return vec3(-1.0);
-    return textureLod(TEX_GI_HIST, uv, 0.0).rgb / max(GI_EFFECTIVE_STRENGTH * LK_GI_BOUNCE, 1e-3);
+    return hdrFromStorePrev(textureLod(TEX_GI_HIST, uv, 0.0).rgb) / max(GI_EFFECTIVE_STRENGTH * LK_GI_BOUNCE, 1e-3);
 }
 
 /*
@@ -265,8 +266,10 @@ float secondaryHitEmission(float emission, int voxelId, int materialId) {
 const float VOXEL_HIT_INSET = 0.05;
 float screenHitEmission(GBufferData h, vec3 hitPlayer) {
     if (h.emission <= 0.0) return 0.0;
-    int voxelId = unpackVoxelBlockId(readVoxelBlock(ivec3(floor(playerToVoxel(hitPlayer - h.geoNormal * VOXEL_HIT_INSET)))));
-    return secondaryHitEmission(h.emission, voxelId, h.materialId);
+    uint voxelData = readVoxelBlock(ivec3(floor(playerToVoxel(hitPlayer - h.geoNormal * VOXEL_HIT_INSET))));
+    // ID の無い発光ブロック (GENERIC_LIGHT) も登録した光源と同じ。直接光と floodfill が数えているので GI の発光に足さない
+    if (isGenericLightVoxel(voxelData)) return 0.0;
+    return secondaryHitEmission(h.emission, unpackVoxelBlockId(voxelData), h.materialId);
 }
 
 // 画面に映らないボクセルのヒットで分かる登録外の発光は溶岩だけ (G バッファの推定値 0.12-0.3 の中ほど)
@@ -395,7 +398,7 @@ bool findVoxelBorrowPoint(vec3 hitPlayer, vec3 hitNormal, int hitBlock, bool thr
 bool voxelBorrowColor(ivec2 qt, vec3 Ehit, vec3 Eq, out vec3 color) {
     color = vec3(0.0);
     if (luminance(Eq) <= 1e-6 * PHYSICAL_DARKEST) return false;
-    color = texelFetch(colortex0, qt, 0).rgb * clamp(luminance(Ehit) / luminance(Eq), VOXEL_BORROW_RATIO_CLAMP.x, VOXEL_BORROW_RATIO_CLAMP.y);
+    color = hdrFromStore(texelFetch(colortex0, qt, 0).rgb) * clamp(luminance(Ehit) / luminance(Eq), VOXEL_BORROW_RATIO_CLAMP.x, VOXEL_BORROW_RATIO_CLAMP.y);
     return true;
 }
 
@@ -435,7 +438,7 @@ vec4 traceVoxelRadiance(vec3 originPlayer, vec3 dir, float maxDist, float skyLm,
     ivec2 t;
     vec3 scenePlayer;
     if (voxelHitOnScreen(hitPlayer, hitNormal, t, scenePlayer)) {
-        if (useSceneColor) return vec4(texelFetch(colortex0, t, 0).rgb, 1.0);
+        if (useSceneColor) return vec4(hdrFromStore(texelFetch(colortex0, t, 0).rgb), 1.0);
         albedo = srgbToLinear(texelFetch(colortex1, t, 0).rgb);
         // 空の光は当たった面のスカイライトで絞る (着色点のスカイライトだと、明るい屋外から洞窟の奥の壁に当たったレイが空に照らされる)。
         // 画面外の当たりは分からないので着色点の値のまま
@@ -447,6 +450,7 @@ vec4 traceVoxelRadiance(vec3 originPlayer, vec3 dir, float maxDist, float skyLm,
         if (all(equal(ivec3(floor(playerToVoxel(scenePlayer) - hitNormal * VOXEL_HIT_INSET)), hitCell))) {
             emission = unpack2x8(texelFetch(colortex3, t, 0).g).y;
             hitMaterial = readMaterialId(t);
+            if (isGenericLightVoxel(readVoxelBlock(hitCell))) emission = 0.0;
         }
     }
     // useSceneColor = false は GI (多重反射込み)、true は反射

@@ -110,7 +110,13 @@ void main() {
         // at_midBlock が来ない環境 (Sodium なし) では発光が 0 なので、従来どおり水を書く
         bool waterloggedLight = blockId == BLOCK_WATER && at_midBlock.w > 0.5;
         float emission = rawBlockId == BLOCK_WATER_FLOWING ? float(VOXEL_WATER_FLOWING) : at_midBlock.w;
-        if (!waterloggedLight) voxelizeTerrainVertex(playerPos, at_midBlock.xyz / 64.0, blockId, emission);
+        int voxelBlockId = blockId;
+#ifdef GENERIC_LIGHT_TEST
+        // 検証用: 登録済みの発光ブロックを ID の無いブロックとして書き、汎用の光源の経路だけで光らせる (溶岩は流体の扱いが別)
+        int testLight = getBlockLightIndex(blockId);
+        if (testLight != LIGHT_NONE && testLight != LIGHT_LAVA) voxelBlockId = BLOCK_SOLID;
+#endif
+        if (!waterloggedLight) voxelizeTerrainVertex(playerPos, at_midBlock.xyz / 64.0, voxelBlockId, emission);
     }
 #ifdef PROGRAM_SHADOW_FALLBACK
     vPlayerPos = playerPos;

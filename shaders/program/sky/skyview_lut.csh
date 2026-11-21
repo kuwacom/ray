@@ -1,5 +1,5 @@
 /*
- * prepare1 (毎フレーム): SkyView LUT (192x108) を skyViewImg に作る
+ * prepare (毎フレーム): SkyView LUT (192x108) を skyViewImg に作る。空の SH (prepare1) より先に走る
  * 視点高度から上半球の空の放射を、太陽と月 (対蹠点) の 2 光源で積分する。単位は FrameData と同じ相対照度系
  * sky モジュール (lib/sky)
  */
@@ -7,6 +7,7 @@
 #define IMG_SKY_VIEW
 //@include "/lib/common/common.glsl"
 //@include "/lib/sky/sky.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -34,8 +35,10 @@
 #include "/lib/common/noise.glsl"
 #include "/lib/sky/celestial.glsl"
 #include "/lib/common/look_presets.glsl"
+#include "/lib/common/polarizer.glsl"
 #include "/lib/common/frame_offset.glsl"
 #include "/lib/sky/cloud_styles.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/sky/sky_color.glsl"
 #include "/lib/sky/fog_template.glsl"
@@ -72,5 +75,5 @@ void main() {
 
     vec3 transmittance;
     vec3 radiance = atmoIntegrateScattering(vec3(0.0, r, 0.0), dir, sunDir, getSunIlluminanceTOA(), -sunDir, getMoonIlluminanceTOA(), steps, transmittance);
-    imageStore(skyViewImg, texel, vec4(radiance, 1.0));
+    imageStore(skyViewImg, texel, vec4(hdrToStore(radiance), 1.0));
 }

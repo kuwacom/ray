@@ -26,6 +26,11 @@
 //@include "/lib/common/specular_sparkle.glsl"
 //@include "/lib/common/jitter.glsl"
 //@include "/lib/buffers/slots.glsl"
+//@include "/lib/common/polarizer.glsl"
+//@include "/lib/common/pre_exposure.glsl"
+#ifdef FIREWORK_LIGHT
+    //@include "/lib/light/firework_light.glsl"
+#endif
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -75,7 +80,9 @@
 #include "/lib/sky/atmosphere.glsl"
 #include "/lib/common/celestial_shape.glsl"
 #include "/lib/sky/celestial.glsl"
+#include "/lib/common/polarizer.glsl"
 #include "/lib/sky/cloud_styles.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/sky/sky_color.glsl"
 #include "/lib/sky/fog_template.glsl"
@@ -115,6 +122,10 @@
 #include "/lib/surface/water_shading.glsl"
 #include "/lib/common/specular_sparkle.glsl"
 #include "/lib/common/jitter.glsl"
+#ifdef FIREWORK_LIGHT
+    #include "/lib/buffers/firework_light.glsl"
+    #include "/lib/light/firework_light.glsl"
+#endif
 // END GENERATED includes
 
 /* RENDERTARGETS: 0,14 */
@@ -128,9 +139,37 @@ const float ICE_IOR = 1.31;
 const float THICK_TRANSLUCENT_REFRACTION = 0.02; // 氷・スライムの屈折の UV オフセット
 const float GLASS_TINT_STRENGTH = 0.65;        // 透過色の濃さ (1 で tints 表そのまま)
 
+#ifdef FIREWORK_LIGHT
+/*
+ * 水面に映る火花 (rgb = 乗算済みの色, a = 覆い)。火花は colortex4 にだけ描かれ、反射を辿る composite / composite1 の時点の
+ * colortex0 に居ないので SSR には映らない。反射の向きの先を花火の光までの距離に置いて画面へ投げ、その画素の火花を読む
+ * (無限遠の空として画面の同じ向きを読むと、カメラの高さ / 花火までの距離の分だけ像が上下にずれる)
+ * colortex5 にデータを書かない粒の画素だけを読む (水・ガラスの画素を読むと水面が二重に映る)。雨・バニラの雲も colortex4 に
+ * データ無しで描かれるので、深度が花火の球の厚み (FIREWORK_SPARK_DEPTH_RANGE) の中の画素だけにする
+ */
+const float FIREWORK_SPARK_DEPTH_RANGE = 24.0;
+
+vec4 fireworkSparkReflection(vec3 surfPlayer, vec3 R) {
+    vec3 q = surfPlayer + R * distance(fireworkLight.posRadius.xyz, surfPlayer);
+    vec3 qView = playerToView(q);
+    if (qView.z >= 0.0) return vec4(0.0);
+    vec2 uv = viewToScreen(qView).xy;
+    if (any(lessThan(uv, vec2(0.0))) || any(greaterThanEqual(uv, vec2(1.0)))) return vec4(0.0);
+    ivec2 t = ivec2(uv * viewSize());
+    vec3 n;
+    vec2 lm;
+    int mat;
+    decodeTranslucentData(texelFetch(colortex5, t, 0), n, lm, mat);
+    if (mat != MAT_NONE) return vec4(0.0);
+    float d = texelFetch(depthtex0, t, 0).r;
+    if (d >= 1.0 || abs(length(screenToView(vec3(uv, d))) - length(fireworkLight.posRadius.xyz)) > FIREWORK_SPARK_DEPTH_RANGE) return vec4(0.0);
+    return max(texelFetch(TEX_TRANSLUCENT, t, 0), 0.0);
+}
+#endif
+
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
-    vec4 sceneIn = texelFetch(colortex0, texel, 0);
+    vec4 sceneIn = hdrFromStore(texelFetch(colortex0, texel, 0));
     vec3 scene = sceneIn.rgb;
     vec4 translucent = texelFetch(TEX_TRANSLUCENT, texel, 0);
     outTranslucentAlpha = vec4(translucent.a, 0.0, 0.0, 0.0);
@@ -170,7 +209,7 @@ void main() {
             result += armorEnv;
             sparkle += luminance(sparkleExcess(armorEnv, getExposure()));
         }
-        outColor = vec4(result, 1.0 + saturate(sparkle / max(luminance(result), 1e-6)));
+        outColor = vec4(hdrToStore(result), 1.0 + saturate(sparkle / max(luminance(result), 1e-6)));
         return;
     }
 
@@ -199,6 +238,15 @@ void main() {
     if (matT != MAT_WATER || isEyeInWater != 1) lights = gatherSurfaceLights(lp, SL_SUN_NONE, SL_BLOCK_NONE, SL_HAND | SL_BLOCK_SPECULAR_TRACED);
     // 水の floodfill だけ別に足す (ガラスは使わない)
     if (matT == MAT_WATER && isEyeInWater != 1) lights.block = gatherSurfaceLights(lp, SL_SUN_NONE, SL_BLOCK_FORWARD, 0u).block;
+#ifdef FIREWORK_LIGHT
+    // 花火の爆発の光 (lib/light/firework_light.glsl): 鏡面と、水の内散乱 (照度は floodfill に足す)
+    LightSample firework = noLight();
+    bool fireworkLit = hasFireworkLight() && (matT != MAT_WATER || isEyeInWater != 1);
+    if (fireworkLit) {
+        firework = evalFireworkLight(surfPlayer, lmT.y);
+        if (matT == MAT_WATER) lights.block += firework.irradiance * saturate(dot(lightN, firework.direction));
+    }
+#endif
 
     if (matT == MAT_WATER) {
         bool below = isEyeInWater == 1;
@@ -236,7 +284,7 @@ void main() {
         float behindExcess = 0.0;
         float pathLen = WATER_SKY_PATH;
         if (F < 1.0) {
-            vec4 refr = texelFetch(TEX_WATER_REFR, texel, 0);
+            vec4 refr = hdrFromStore(texelFetch(TEX_WATER_REFR, texel, 0));
             behind = refr.rgb;
             pathLen = refr.a;
             behindExcess = texelFetch(TEX_WATER_SUNVIS, texel, 0).a;
@@ -262,6 +310,10 @@ void main() {
         vec3 R0 = R;
         R = waterRoughReflectDir(R, roughVar);
         vec3 refl;
+        vec4 sparks = vec4(0.0);
+#ifdef FIREWORK_LIGHT
+        if (fireworkLit && !below && !side) sparks = fireworkSparkReflection(surfPlayer, R);
+#endif
 #if REFLECTIONS > 0
         float skyWeight;
         vec4 rs = sampleWaterReflection(texel, dist, skyWeight);
@@ -272,11 +324,18 @@ void main() {
         } else {
             refl = fallback;
         }
+        // 火花は空の映り込みの手前、物の映り込みの奥
+        refl = refl * (1.0 - sparks.a) + sparks.rgb;
         // 物の映り込みのフル解像度の SSR は composite1 (water_trace.fsh) が辿った当たり (rgb = 色 x 重み, a = 重み)
         vec4 mirror = texelFetch(TEX_WATER_MIRROR, texel, 0);
         refl = refl * (1.0 - mirror.a) + mirror.rgb;
 #else
         refl = below ? vec3(0.0) : skyReflectionFallback(R, lmT.y, 0.0);
+        refl = refl * (1.0 - sparks.a) + sparks.rgb;
+#endif
+#ifdef CAMERA_PL
+        // PL フィルター: 映り込みはフレネルと同じ角で偏光する (ブルースター角 53° 付近で消える)
+        refl *= polarizerReflection(V, N, eta);
 #endif
         color = behind * (1.0 - F) + refl * F;
         sparkleLum = behindExcess * (1.0 - F);
@@ -324,6 +383,10 @@ void main() {
 #endif
             // 上面の照り返しは傾きの分布をガウスにする (海面の傾きの分布。WATER_GLITTER の点も同じ分布から置く)。側面は落ちる水の乱れの裾を残す
             vec3 spec = refl * F + sunSpecular(N, V, WATER_F0, sunAlpha, sunSpecVis, glitter, !side) + localLightSpecular(lights, N, V, WATER_F0, lightAlpha, !side);
+#ifdef FIREWORK_LIGHT
+            // 灯りと同じ粗さ (画素より細かい波と露光の間の法線の揺れ) で、波の法線に沿って縦に伸びた光の柱になる
+            if (fireworkLit) spec += dielectricSpecular(N, V, WATER_F0, lightAlpha, firework, 1.0, 1.0, !side) * SPECULAR_BLOCK_STRENGTH;
+#endif
             color = behind * (1.0 - F) + spec;
             sparkleLum += luminance(sparkleExcess(spec, getExposure()));
 
@@ -363,7 +426,7 @@ void main() {
             if (validRefraction(tuv, d0)) refrUv = tuv;
         }
 #endif
-        vec4 behindRaw = texture(colortex0, refrUv);
+        vec4 behindRaw = hdrFromStore(texture(colortex0, refrUv));
         vec3 behind = behindRaw.rgb;
         float behindExcess = behindSparkle(behindRaw);
         if (d1 < 1.0) {
@@ -397,18 +460,24 @@ void main() {
         vec3 R = reflect(-V, N);
         vec3 refl = reflectionAt(texel, dist, R, lmT.y, roughness, vec3(0.0));
         if (roughness < MIRROR_ROUGHNESS) refl = mirrorReflection(refl, surfView, surfPlayer, N, R, dist, false, false, dither);
+#ifdef CAMERA_PL
+        refl *= polarizerReflection(V, N, ior);
+#endif
         vec3 glassSunVis = surfaceSunVisibility(surfPlayer, N, lmT.y, dither) * getCloudSunDiscVisibility();
         float glassAlpha = max(roughness * roughness, MIN_ROUGHNESS);
         // 前方で照らした拡散 (translucent.rgb) は鏡面で反射する F の分を除く (太陽の鏡面を足すので、その分だけ明るくならないように)
         vec3 spec = refl * F + sunSpecular(N, V, GLASS_F0, glassAlpha, glassSunVis) + localLightSpecular(lights, N, V, GLASS_F0, glassAlpha, false);
+#ifdef FIREWORK_LIGHT
+        if (fireworkLit) spec += dielectricSpecular(N, V, GLASS_F0, glassAlpha, firework, 1.0, 1.0, false) * SPECULAR_BLOCK_STRENGTH;
+#endif
         color = behind * transmit * (1.0 - F) + translucent.rgb * (1.0 - F) + spec;
         float glassSparkle = luminance(sparkleExcess(spec, getExposure())) + behindExcess * luminance(transmit) * (1.0 - F);
-        outColor = vec4(color, 1.0 + saturate(glassSparkle / max(luminance(color), 1e-6)));
+        outColor = vec4(hdrToStore(color), 1.0 + saturate(glassSparkle / max(luminance(color), 1e-6)));
         return;
     }
 
     // 水の上に重なった物 (WATER_TEXTURE の水テクスチャ・パーティクル・雨) を重ねる
     vec3 result = color * (1.0 - translucent.a) + translucent.rgb;
     float sparkleShare = saturate(sparkleLum * (1.0 - translucent.a) / max(luminance(result), 1e-6));
-    outColor = vec4(result, 1.0 + sparkleShare);
+    outColor = vec4(hdrToStore(result), 1.0 + sparkleShare);
 }

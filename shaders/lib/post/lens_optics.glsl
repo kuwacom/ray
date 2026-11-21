@@ -19,6 +19,7 @@
 //@include "/lib/post/post_constants.glsl"
 //@include "/lib/post/sampling.glsl"
 //@include "/lib/post/velocity.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 
 const float LENS_REF_WAVELENGTH = 550.0;  // nm
 const float LENS_CA_WAVELENGTH_RANGE = 140.0;
@@ -342,7 +343,7 @@ vec4 lensSoftHalo(vec2 uv) {
     int l0 = int(floor(level));
     int l1 = min(l0 + 1, BLOOM_LEVELS);
     vec3 c = mix(sampleBloomTile(l0, uv), sampleBloomTile(l1, uv), level - float(l0));
-    return vec4(c, share);
+    return vec4(hdrFromStore(c), share);
 }
 #endif
 

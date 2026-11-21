@@ -22,6 +22,9 @@ uint packVoxelBlock(int voxelId, int emission) {
 }
 int unpackVoxelEmission(uint v) { return int(v >> 12u); }
 
+// ボクセルのセルが、ID の無い発光ブロックの光源か (floodfill が種と光源リストに登録し、GI の発光には足さない)
+bool isGenericLightVoxel(uint v) { return isGenericEmitter(unpackVoxelBlockId(v), unpackVoxelEmission(v)); }
+
 uint readVoxelBlock(ivec3 cell) {
     if (!isInVoxelVolume(cell)) return 0u;
     return texelFetch(voxelBlockSampler, cell, 0).r;

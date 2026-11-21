@@ -116,6 +116,7 @@ uniform float optLocalTonemapStrength; // LOCAL_TONEMAP x 0.05
 uniform float optShutterSpeed;   // SHUTTER_SPEED (秒)
 uniform float optExposureIso;    // EXPOSURE_ISO
 uniform float optFNumber;        // DOF_F_NUMBER
+uniform float optCameraPlRotation; // CAMERA_PL_ROTATION (度)
 uniform float thunderStrength;
 uniform vec4 lightningBoltPosition;
 uniform int worldTime;

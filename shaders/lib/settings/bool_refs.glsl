@@ -66,6 +66,10 @@
 #endif
 #ifdef FIREWORK_LIGHT
 #endif
+#ifdef GENERIC_LIGHT
+#endif
+#ifdef GENERIC_LIGHT_TEST
+#endif
 #ifdef SHADOW_COLORED
 #endif
 #ifdef ENTITY_SHADOWS
@@ -193,6 +197,8 @@
 #ifdef EXPOSURE_ISO_AUTO
 #endif
 #ifdef EXPOSURE_ISO_AUTO_M
+#endif
+#ifdef CAMERA_PL
 #endif
 #ifdef EXPOSURE_DR
 #endif

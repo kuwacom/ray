@@ -28,6 +28,14 @@ def load_defaults() -> dict:
     }
 
 
+def option_warning(defaults: dict, key: str, value: str) -> str | None:
+    if key not in defaults:
+        return f"警告: {key} は lib/settings/ に見つからない"
+    if defaults[key][1] and value not in defaults[key][1]:
+        return f"警告: {key}={value} は選択肢 {defaults[key][1]} に無い"
+    return None
+
+
 def read_options(path: Path) -> tuple[list[str], dict]:
     header, values = [], {}
     if path.exists():
@@ -80,10 +88,9 @@ def main() -> None:
             if "=" not in item:
                 raise SystemExit(f"KEY=VALUE で指定する: {item}")
             k, v = (s.strip() for s in item.split("=", 1))
-            if k not in defaults:
-                print(f"警告: {k} は lib/settings/ に見つからない", file=sys.stderr)
-            elif defaults[k][1] and v not in defaults[k][1]:
-                print(f"警告: {k}={v} は選択肢 {defaults[k][1]} に無い", file=sys.stderr)
+            warning = option_warning(defaults, k, v)
+            if warning:
+                print(warning, file=sys.stderr)
             values[k] = v
     write_options(path, header, values)
     for k in args.items:

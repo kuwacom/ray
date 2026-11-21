@@ -188,6 +188,7 @@ floodfill の柔らかい光なので影は付かず、ほとんど重くなり�
 | ヒカリゴケの光 (`GLOW_LICHEN_LIGHT`) / 強さ (`GLOW_LICHEN_BRIGHTNESS`) | ON / 0.45 | OFF にすると光って見えるだけになる |
 | ホタルの茂みの光の強さ (`FIREFLY_BUSH_BRIGHTNESS`) | 0.25 | 上げるほど遠くまで明るい |
 | 開いたアイブロッサムの明るさ (`EYEBLOSSOM_BRIGHTNESS`) | 1.0 | 0 で光らない |
+| ID の無い発光ブロックの光 (`GENERIC_LIGHT`) / 強さ (`GENERIC_LIGHT_BRIGHTNESS`) / 色 (`GENERIC_LIGHT_COLOR`) | ON / 1.0 / 炎 | MOD などの登録の無い発光ブロックを、発光レベル (2 以上) から光源にする。色は 1 色で、ブロックごとの色は出ない。登録済みのブロックは変わらない |
 
 溶岩・ビーコンの光線・花火
 
@@ -200,7 +201,23 @@ floodfill の柔らかい光なので影は付かず、ほとんど重くなり�
 | ビーコンの光線のにじみ (`EMISSION_BEACON_SCATTER_STRENGTH`) | 1.0 | 霧・もや・雨の中でビームの周りがにじむ強さ |
 | 花火の輝き (`FIREWORK_GLOW`) | ON | 火花などの光るパーティクルを色を保って明るくする |
 | 花火の輝きの明るさ / 瞬き (`FIREWORK_GLOW_STRENGTH` / `FIREWORK_TWINKLE_STRENGTH`) | 1.0 / 0.3 | 瞬きは 0 で揺らがない |
-| 花火の光 (`FIREWORK_LIGHT`) / 強さ (`FIREWORK_LIGHT_STRENGTH`) | ON / 1.0 | 開いた瞬間に周りを花火の色で照らす、影は付かず軽い |
+| 花火の光 (`FIREWORK_LIGHT`) / 強さ (`FIREWORK_LIGHT_STRENGTH`) | ON / 1.0 | 開いた瞬間に周りを花火の色で照らし、水面に光の柱が映る、影は付かず軽い |
+
+## 光の計算の流れ
+
+光源シャドウが ON のときの、1 フレームの中の流れです  
+詳しい設計は [../architecture.md](../architecture.md) の「ブロックライト」にあります
+
+| 手順 | 内容 | 関係する設定 |
+|---|---|---|
+| ボクセル化 | 地形を 1 ブロック 1 セルで書き込む、エンティティはモデルの三角形を書き (収まらない分は 0.5 ブロック単位の占有ビット)、光るエンティティは光源として登録する | `VOXEL_VOLUME`、`LIGHT_ENTITY_TRIANGLES` |
+| floodfill | 光の色を 6 近傍へ 1 フレームに 1 ステップずつ広げて、間接光のもとにする | `FLOODFILL` |
+| 光源の振り分け | すべての光源を 8x8x8 ブロックのライトビンに振り分ける | `LIGHT_MAX_COUNT`、`LIGHT_BIN_LIGHTS` |
+| トレース | ピクセルごとに、所属するビンの光源を明るさで重み付けする、1 ピクセルあたりの光源数を N として、上位 N-1 個は必ずトレースし、残りから 1 個を明るさに比例した確率で選んでトレースする、選ばれなかった光源にも平均すると正しく影が付く、半影は光源の大きさの範囲で時間方向に揺らして作る | `LIGHT_TRACE_COUNT`、`LIGHT_SOURCE_SIZE` |
+| ノイズ除去 | 再投影と近傍クランプ、エッジを保つ空間フィルタでならす | `LIGHT_DENOISE` |
+| 合成 | 直接光、floodfill (間接光)、手持ち光源、鏡面反射をまとめて照らす | `FLOODFILL_STRENGTH` |
+
+手持ち光源は二重に足されないよう floodfill には入れず、ピクセルごとに直接計算します
 
 ## まだできないこと
 

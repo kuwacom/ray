@@ -16,7 +16,7 @@ Open an [issue](../../issues/new/choose) with "Bug report". For visual problems,
 
 These are the criteria once pull requests are accepted. I consider merging a change when it passes these two checks
 
-- Look: with the default look (Natural) and the "High" quality preset, nothing looks broken. Intended changes are explained with before and after screenshots
+- Look: with the default look (Vivid) and the "High" quality preset, nothing looks broken. Intended changes are explained with before and after screenshots
 - Performance: with default settings, it does not get noticeably heavier. Heavy features should be switchable in settings and limited to the higher presets
 
 In the PR description, include before and after screenshots, and the frame time with the GPU, resolution, and preset. You can match your shots to fixed scenes by following [tools/README.md](tools/README.md#ゲーム内で撮影する) (in Japanese)
