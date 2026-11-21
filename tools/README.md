@@ -146,7 +146,7 @@ uv run tools/pass_preview.py my_pass.fsh --size 1920x1080 --u rainStrength=1 --f
 
 ## ルックの LUT
 
-LUT は表示の色 (トーンマップと sRGB エンコードの後) から表示の色への写像で、final が CDL の前に掛けます。形式と設定の番号は [README の「ルック」](../README.md#lut)
+LUT は表示の色 (トーンマップと sRGB エンコードの後) から表示の色への写像で、final が CDL の前に掛けます。形式と設定の番号は [docs/guides/profiles.md の「LUT」](../docs/guides/profiles.md#lut)
 
 ```powershell
 uv run tools/gen_look_lut.py all                                         # 同梱の LUT を作り直す
