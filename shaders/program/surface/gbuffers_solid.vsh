@@ -133,6 +133,10 @@ out vec4 tangentPlayer;
 out vec2 tileMid;
 out vec2 tileHalf;
 flat out int blockId;
+#if defined GBUF_TERRAIN && defined GENERIC_LIGHT
+    // ID の無い発光ブロック (光源は floodfill 側で判定) か。見た目の発光を明るい画素に掛ける
+    flat out int genericGlow;
+#endif
 #ifdef GBUF_ENTITIES
     flat out int swirlLayer;
 #endif
@@ -156,6 +160,9 @@ void main() {
 
 #ifdef GBUF_TERRAIN
     blockId = terrainBlockId(int(round(mc_Entity.x)));
+#ifdef GENERIC_LIGHT
+    genericGlow = isGenericEmitter(blockIdToVoxelId(blockId), int(at_midBlock.w + 0.5)) ? 1 : 0;
+#endif
     /*
      * Iris 1.11 + Sodium 0.9 (26.1) では、頂点バッファの mid UV (u * 32768 の整数を float にした値) を Iris が
      * uvec2 として読み直すため、float のビット列を 1/32768 倍した巨大な値 (~3.6e4) が来る (実機で確認)。

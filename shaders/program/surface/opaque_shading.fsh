@@ -187,9 +187,15 @@ float emissionGain(vec3 playerPos, vec3 geoNormal, int materialId, bool hand) {
         for (int i = 0; i < 2; i++) {
             ivec3 cell = ivec3(floor(playerToVoxel(playerPos + geoNormal * (i == 0 ? -EMISSION_KIND_INSET : EMISSION_KIND_INSET))));
             if (!isInVoxelVolume(cell)) break;
-            int light = getBlockLightIndex(fetchVoxelBlockId(cell));
+            uint voxel = fetchVoxelBlockData(cell);
+            int light = getBlockLightIndex(unpackVoxelBlockId(voxel));
             if (light != LIGHT_NONE) {
                 flags = getLightDef(light).info.x;
+                break;
+            }
+            // ID の無い発光ブロックは面全体が光る光源と同じ倍率 (点の倍率では明るい画素が白く飛ぶ)
+            if (isGenericLightVoxel(voxel)) {
+                flags = LIGHT_FLAG_OCCLUDES;
                 break;
             }
         }
