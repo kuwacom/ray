@@ -15,12 +15,10 @@
 //@include "/lib/sky/celestial.glsl"
 //@include "/lib/sky/clouds.glsl"
 //@include "/lib/sky/fog.glsl"
+//@include "/lib/sky/beacon_beam_shape.glsl"
 
-const float BEACON_BEAM_FAR = 1e6;              // 奥に何も無い (空) 視線の距離
-const float BEACON_BEAM_CORE_RADIUS = 0.12;     // 芯のガウスの半径 (ブロック)。バニラの内側の光線 (半径 0.2) と同じくらいの太さに見える
 const float BEACON_BEAM_HALO_RADIUS = 1.5;      // にじみのガウスの半径 (ブロック)
 const float BEACON_BEAM_REACH = 3.5;            // 半径のこの倍より軸から離れた視線は寄与なしとして飛ばす (exp(-12))
-const float BEACON_BEAM_MIN_PIXELS = 0.75;      // 芯の半径の下限 (画素)。遠くの細い線が画素の間で途切れてちらつかないよう、光の量を保って太らせる
 /*
  * 視線が軸に沿うほど通る長さ (1 / sin) と前方散乱の位相で明るくなるが、見下ろした光線の根元が白い大きな塊になったので、
  * 通る長さ (横から見た値に対する倍率 1 / sin) と位相の比 (横から見た値に対する) に上限を置く
@@ -29,7 +27,6 @@ const float BEACON_BEAM_MIN_PIXELS = 0.75;      // 芯の半径の下限 (画素
  * 確かめ方: 軸から数ブロック横の高い所 (高さ 80 など) から真下を見て、光線が根元のビーコンまで途切れずに届くこと
  */
 const float BEACON_BEAM_MIN_SIN = 0.1;
-const float BEACON_BEAM_MIN_SIN2 = 1e-12;       // 真上・真下の視線で 0 で割らないための水平成分の 2 乗の下限
 const float BEACON_BEAM_ERF_SMALL = 1e-3;       // erf の近似で 1 - exp(-y) が float で桁落ちする y の境 (これ未満は y で近似)
 const float BEACON_BEAM_PHASE_MAX = 4.0;
 const float BEACON_BEAM_SQRT_PI = 1.7724539;
@@ -48,8 +45,6 @@ const float BEACON_BEAM_HALO_SHARE = 0.4;       // にじみの光の量 (芯に
  */
 const float BEACON_BEAM_GAIN = 10.0;
 const float BEACON_BEAM_EXPOSURE_ADAPT = 0.85;
-
-bool hasBeaconBeams() { return frameData.beaconBeamKey[0] != 0u; }
 
 // erf の近似 (Winitzki 2008。誤差 1e-3 程度)
 float beaconBeamErf(float x) {
@@ -82,9 +77,7 @@ float beaconBeamProfile(float h2, float s0, float s1, float s2, float sinA, floa
  */
 vec3 evalBeaconBeams(vec3 dir, float opaqueDist, float frontDist, float frontAlpha, float fogTransmittance, float fogDist, ivec2 texel) {
     vec3 sum = vec3(0.0);
-    float a2 = dot(dir.xz, dir.xz);
-    float a = max(a2, BEACON_BEAM_MIN_SIN2);
-    float sinA = sqrt(a);
+    float sinA = sqrt(max(dot(dir.xz, dir.xz), BEACON_BEAM_MIN_SIN2));
     float pixel = skyPixelAngle() * BEACON_BEAM_MIN_PIXELS;
     float fogT = max(fogTransmittance, 1e-4);
 #if defined HAS_SKY && defined EMISSION_BEACON_SCATTER
@@ -104,49 +97,27 @@ vec3 evalBeaconBeams(vec3 dir, float opaqueDist, float frontDist, float frontAlp
 #endif
     for (int i = 0; i < BEACON_BEAM_MAX; i++) {
         if (frameData.beaconBeamKey[i] == 0u) break;
-        vec2 c = vec2(frameData.beaconBeamCell[i]) - cameraPosition.xz + 0.5;
-        float s0 = dot(dir.xz, c) / a;
-        // 最短距離は外積で求める (|c|^2 - s0^2 a の引き算は、視線が軸に沿う時に大きな数どうしの差になる)
-        // 真上・真下ちょうどの視線は水平の向きが無く、軸までの距離はカメラの水平の距離そのもの
-        // (分母だけ下限で押さえると h2 が縮み、軸から離れていても中心の 1 画素に光線が出る)
-        float h2 = a2 > BEACON_BEAM_MIN_SIN2 ? sqr(c.x * dir.z - c.y * dir.x) / a2 : dot(c, c);
-
-        // 光線の区間の高さと、奥の面までで視線を切る
-        float yMin = float(frameData.beaconBeamYMin[i]) - cameraPosition.y;
-        float yMax = float(frameData.beaconBeamYMax[i]) - cameraPosition.y;
-        float s1 = 0.0;
-        float s2 = opaqueDist;
-        if (abs(dir.y) > 1e-5) {
-            float ta = yMin / dir.y;
-            float tb = yMax / dir.y;
-            s1 = max(s1, min(ta, tb));
-            s2 = min(s2, max(ta, tb));
-        } else if (yMin > 0.0 || yMax < 0.0) {
-            continue;
-        }
-        if (s2 <= s1) continue;
-
-        // 光線の見える点 (視線が軸に最も近づく点)
-        float sp = clamp(s0, s1, s2);
-        // 画素の幅は見える点の距離で決める (s0 は視線が軸に沿うほど区間の外の遠くへ行き、芯が太り過ぎる)
-        float rCore = max(BEACON_BEAM_CORE_RADIUS, pixel * sp);
+        BeaconBeamSpan b;
+        if (!beaconBeamSpan(i, dir, opaqueDist, b)) continue;
+        float rCore = beaconBeamCoreRadius(b, pixel);
 #if defined HAS_SKY && defined EMISSION_BEACON_SCATTER
         float rHalo = max(BEACON_BEAM_HALO_RADIUS, rCore);
 #else
         float rHalo = rCore;
 #endif
-        if (h2 > sqr(BEACON_BEAM_REACH * rHalo)) continue;
+        if (b.h2 > sqr(BEACON_BEAM_REACH * rHalo)) continue;
 
         // 見える点までの媒質で弱める
+        float sp = b.sp;
         vec3 T = vec3(pow(fogT, sp / max(fogDist, 1.0)));
         if (sp > frontDist) T *= 1.0 - frontAlpha;
-        float core = beaconBeamProfile(h2, s0, s1, s2, sinA, BEACON_BEAM_CORE_RADIUS, rCore);
+        float core = beaconBeamProfile(b.h2, b.s0, b.s1, b.s2, sinA, BEACON_BEAM_CORE_RADIUS, rCore);
 #if defined HAS_SKY && defined EMISSION_BEACON_SCATTER
         vec3 p = dir * sp;
         vec2 dens = fogDensityAt(p, m);
         float medium = min((dens.x * phaseHaze + (dens.y + rainSigma) * phaseDroplet), BEACON_BEAM_SCATTER_MAX);
         // 光の量を芯と同じにそろえ、割合は HALO_SHARE で決める
-        float halo = beaconBeamProfile(h2, s0, s1, s2, sinA, BEACON_BEAM_CORE_RADIUS, rHalo);
+        float halo = beaconBeamProfile(b.h2, b.s0, b.s1, b.s2, sinA, BEACON_BEAM_CORE_RADIUS, rHalo);
         float amount = core * (BEACON_BEAM_AIR_SCATTER * phaseAir + medium) + halo * medium * (BEACON_BEAM_HALO_SHARE * EMISSION_BEACON_SCATTER_STRENGTH);
         T *= exp(-fogAerialExtinction(cameraPosition.y, cameraPosition.y + p.y) * fogScenicDistance(sp, invD) * outdoor);
     #if CLOUDS >= 2
