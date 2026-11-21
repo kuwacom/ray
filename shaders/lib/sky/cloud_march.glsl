@@ -119,7 +119,9 @@ CloudAccum cloudMarchLow(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, 
         float upperT = cloudUpperTransmittance(ctx, rel, altitude, lightDir);
         vec3 inscatter = cloudInscatter(l, extinction, odLight, odNear, odSky, sqr(1.0 - h), upperT, cloudHeight);
 
-        float stepT = exp(-extinction * dt * cloudRefStretch(dir, CLOUD_KH, slope));
+        // 芯の奥は実物の芯ほど濃くする (CLOUD_DEEP_GAIN)。厚い雲の向こうの地面や空が透けない
+        float deepGain = mix(CLOUD_DEEP_GAIN, 1.0, smoothstep(CLOUD_DEEP_T.x, CLOUD_DEEP_T.y, acc.transmittance));
+        float stepT = exp(-extinction * deepGain * dt * cloudRefStretch(dir, CLOUD_KH, slope));
         float weight = acc.transmittance * (1.0 - stepT);
         acc.scattering += inscatter * CLOUD_ALBEDO * weight;
         sums += vec3(tRef, altitude, 1.0) * weight;
