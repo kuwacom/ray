@@ -1,7 +1,7 @@
 /*
  * 空・太陽・月 (sky モジュール)
  * 他モジュールに公開する関数のシグネチャは固定
- * 空の放射は SkyView LUT (prepare1, Hillaire 2020) から、ATMOSPHERE_MODE=0 では解析近似から
+ * 空の放射は SkyView LUT (prepare, Hillaire 2020) から、ATMOSPHERE_MODE=0 では解析近似から
  */
 #ifndef SKY_SKY_COLOR_GLSL
 #define SKY_SKY_COLOR_GLSL
@@ -23,6 +23,7 @@
 //@include "/lib/sky/celestial.glsl"
 //@include "/lib/sky/clouds.glsl"
 //@include "/lib/sky/sh.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 
 // 月光の色。物理的には太陽光とほぼ同じだが、夜の視覚 (プルキンエ効果) に寄せて青に振る
 const vec3 MOON_TINT = vec3(0.72, 0.84, 1.0);
@@ -41,7 +42,7 @@ const vec3 SKY_NIGHT_FLOOR = vec3(0.55, 0.75, 1.0) * (3e-5 * PHYSICAL_NIGHT_SKY)
 /*
  * 空の色の彩度 (LUT の値に掛ける見た目の調整)
  * そのままだと AgX を通した昼の天頂が灰青、夕方の太陽まわりが白っぽい桃色に寄った
- * iterationT も大気の色を錐体空間の行列で盛っている。環境光 (SH) 側は prepare.csh で別に彩度を落とす
+ * iterationT も大気の色を錐体空間の行列で盛っている。環境光 (SH) 側は prepare1.csh で別に彩度を落とす
  */
 #define SKY_COLOR_SATURATION float(1.25 * LK_SKY_SAT)
 // 描画距離の外の地面 (skyBelowHorizon)
@@ -156,7 +157,7 @@ float moonPhaseFactor() {
 vec3 getMoonIlluminanceFull() { return MOON_ILLUMINANCE * MOON_BRIGHTNESS * MOON_TINT; }
 vec3 getMoonIlluminanceTOA() { return getMoonIlluminanceFull() * moonPhaseFactor(); }
 
-// 地表での太陽直達照度 (大気透過込み)。prepare が FrameData に書いた値
+// 地表での太陽直達照度 (大気透過込み)。prepare1 が FrameData に書いた値
 vec3 getSunIrradiance() { return frameData.sunIrradiance.rgb; }
 vec3 getMoonIrradiance() { return frameData.moonIrradiance.rgb; }
 
@@ -210,20 +211,20 @@ float moonDielectricSpecularGain(float metalness) {
 vec3 getSkyIrradiance(vec3 n) { return shEvalIrradiance(n); }
 
 /*
- * 空の SH の下半球 (地面の照り返し)。prepare が平らで一様な灰色の地面 (反射率 SH_GROUND_ALBEDO) として SH に入れている
+ * 空の SH の下半球 (地面の照り返し)。prepare1 が平らで一様な灰色の地面 (反射率 SH_GROUND_ALBEDO) として SH に入れている
  * 一様な下半球からの照度は L1 までで表せて、法線 n の面では E (1 - n.y) / 2 (L2 の係数は 0)
  * GI (RSM / SSGI / ボクセル RT) は近くの地面の照り返しを実際の色で足すので、受け取り側でこの分を SH から引く。
  * 引かないと二重に数えたうえ、反射率 0.2 x SH_SKY_GAIN = 0.34 の灰色が草の照り返し (草の上面の反射率は輝度 0.13) を埋めて、
  * 草地に立つ白い柱の側面の照度の 5 割近くがこの灰色になり、緑が乗らない
  */
 const float SH_GROUND_ALBEDO = 0.2;
-// 輝度を保ったまま SH の彩度を落とす割合と、SH 全体の強さ (理由は prepare.csh)
+// 輝度を保ったまま SH の彩度を落とす割合と、SH 全体の強さ (理由は prepare1.csh)
 #define SH_SKY_SATURATION LOOK_SKY_AMBIENT_SATURATION
 const float SH_SKY_GAIN_BASE = 1.7;
 /*
  * ルックの空の環境光の強さ (LK_SKY_AMBIENT) は SH 全体に掛ける (日陰・GI のレイが運ぶ空の光・水・半透明が揃って変わる)
  * 空そのものの描画は変えないので、SH を空の明るさとして使う所 (霧の内散乱・粗い反射の空・フレアの可視判定) は
- * SH_LOOK_UNDO を掛けて戻す。雲の陰の空の光は prepare が SH_SKY_GAIN_BASE で別に作る
+ * SH_LOOK_UNDO を掛けて戻す。雲の陰の空の光は prepare1 が SH_SKY_GAIN_BASE で別に作る
  */
 #define SH_SKY_GAIN float(SH_SKY_GAIN_BASE * LK_SKY_AMBIENT)
 #define SH_LOOK_UNDO float(1.0 / LK_SKY_AMBIENT)
@@ -233,7 +234,7 @@ vec3 shSkyGrade(vec3 c) {
     return mix(vec3(luminance(c)), c, SH_SKY_SATURATION);
 }
 
-// 地面が受ける光 (太陽・月の直達 + 真上の空) x 反射率。prepare は SH を作る前、ここの shEvalIrradiance は前フレームの SH
+// 地面が受ける光 (太陽・月の直達 + 真上の空) x 反射率。prepare1 は SH を作る前、ここの shEvalIrradiance は前フレームの SH
 vec3 skyGroundIrradianceRaw() {
 #ifdef HAS_SKY
     return (getSunIrradiance() * max(getSunDir().y, 0.0) + getMoonIrradiance() * max(getMoonDir().y, 0.0)
@@ -256,7 +257,7 @@ float getCaveFactor() {
 }
 
 /*
- * 太陽の方向の遠い霧の光り方を、目の周りの太陽の見え方 (prepare が影マップから求める) で抑える割合。影マップの範囲より遠い区間用
+ * 太陽の方向の遠い霧の光り方を、目の周りの太陽の見え方 (prepare1 が影マップから求める) で抑える割合。影マップの範囲より遠い区間用
  * 屋外 (スカイライト 9 以上) と画面空間の判定だけでは、山の陰や洞窟の口でも遠い霧が太陽の色で光る
  * 太陽から外れた方向 (cos -0.17 = 100 度より外) は抑えず、遠景のもやを残す
  */
@@ -307,7 +308,7 @@ vec3 getSkyRadiance(vec3 dir) {
     vec3 sunDir = getSunDir();
     #if ATMOSPHERE_MODE == 1
         float cosAzimuth = dot(skySafeNormalize(dir.xz), skySafeNormalize(sunDir.xz));
-        vec3 radiance = texture(skyViewSampler, atmoSkyViewUv(atmoViewerRadius(), dir.y, cosAzimuth)).rgb;
+        vec3 radiance = hdrFromStore(texture(skyViewSampler, atmoSkyViewUv(atmoViewerRadius(), dir.y, cosAzimuth)).rgb);
     #else
         vec3 d = normalize(vec3(dir.x, max(dir.y, 0.0), dir.z));
         vec3 radiance = atmoAnalyticSkyForLight(d, sunDir) * getSunIlluminanceTOA() + atmoAnalyticSkyForLight(d, -sunDir) * getMoonIlluminanceTOA();

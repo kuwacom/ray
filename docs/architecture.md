@@ -98,8 +98,8 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 6 | shadow.vsh/gsh/fsh | light | 専用のプログラムが無いジオメトリの受け皿 (本体共通, `PROGRAM_SHADOW_FALLBACK`)。地形用の処理は地形だけ。shadow_entities の無い Iris (1.8 未満、Oculus) では全ジオメトリが来るので、GS で renderStage を見て 7・8 と同じ処理をする (`FX_SHADOW_NON_TERRAIN`)。新しい Iris ではリードなどだけが来て、GS は素通し | renderStage | 5・7・8 と同じ | 同上 | 常時 |
 | 7 | shadow_entities.vsh/gsh/fsh | light | エンティティのボクセル化 (GS で表面サンプル)・エンティティ光源登録・影マップ | entityId, currentRenderedItemId | voxelEntityImg, voxelEmitImg, SSBO2, 影マップ | 同上 | shadowEntities |
 | 8 | shadow_block.vsh/gsh/fsh | light | ブロックエンティティ版 (本体共通, `PROGRAM_SHADOW_BLOCK`) | blockEntityId | voxelEntityImg, 影マップ | 同上 | shadowBlockEntities |
-| 9 | prepare.csh | sky | 太陽・月の直達照度、空の SH (全モジュールが使う光の色) | skyView / 解析式 | SSBO0 sun/moon/shadowLight/skySH | (1,1,1) | 常時 |
-| 10 | prepare1.csh | sky | SkyView LUT | transmittance, multiScatter | skyViewImg 192x108 | local 8x4, (24,27,1) | ATMOSPHERE_MODE=1, world0 |
+| 9 | prepare.csh | sky | SkyView LUT | transmittance, multiScatter | skyViewImg 192x108 | local 8x4, (24,27,1) | ATMOSPHERE_MODE=1, world0 |
+| 10 | prepare1.csh | sky | 太陽・月の直達照度、空の SH (全モジュールが使う光の色)。SH は同じフレームの SkyView LUT から (前のフレームの LUT を読むと pre-exposure の P が変わるフレームで 1 段跳ぶ) | skyView / 解析式 | SSBO0 sun/moon/shadowLight/skySH | (1,1,1) | 常時 |
 | 11 | prepare2.csh | sky | 雲の天気マップ (バニラの形は柱の表) と雲影マップ、カメラの位置の雲の中の霧と雨の空の置き換え (FrameData) | - | cloudWeatherImg, cloudShadowImg 512² | local 16², (32,32,1) | CLOUDS>=2, world0 |
 | 12 | gbuffers_* (不透明) | surface (空/雲は sky) | G バッファ書き込み、TAA ジッター、エンティティ光源登録 (light の関数)。能力の無いローダーでは gbuffers が次も扱う: MC 26.1 未満の花火の火花 (不透明のパーティクルで来るので発光と花火の光をここで足す、`FX_SPARKS_IN_PARTICLES`)、Oculus の雷 (`FX_LIGHTNING_IN_ENTITIES`)、Iris 1.8 未満の自分の判定 (`FX_SELF_BY_DISTANCE`) | アトラス | colortex1,2,3,15 (手・エンティティ・ブロックエンティティ・パーティクルは深度テストを通った画素で colortex4,5 を空にして、先に描かれた半透明 (額縁の地図など) を消す。エンティティとブロックエンティティは a = 1 で消し (ブロックエンティティは renderStage がブロックエンティティの描画だけ。ピストンで動く半透明ブロックは消さない)、電気の渦の層 (deferred の後に描かれる帯電したクリーパー・ウィザーの防壁。テクスチャ行列が単位行列でないことで見分ける) だけ a = 0 で colortex4 へ加算する) / voxelEmitImg, SSBO2 | 画面 | 常時 |
 | 13 | deferred.csh | light | floodfill 1 ステップ伝搬 + ブロック光源・エンティティ光源をグローバルリストへ | voxelBlock/Emit, flood(前) | flood(今), SSBO2 | local 8³, VOXEL_SIZE/8 | 常時 |
@@ -148,7 +148,7 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 
 | buf | フォーマット | 内容 | 書く | 読む | クリア |
 |---|---|---|---|---|---|
-| 0 | RGBA16F | シーン HDR。空テクスチャ (skybasic/skytextured) -> deferred30 -> composite* -> final。ANALOG の時は composite27 が表示値 (0-1) で書き、final がミップで読む | sky(空), surface, sky, post | 全 | 毎フレーム |
+| 0 | RGBA16F | シーン HDR (P 倍。deferred30 から後)。空テクスチャ (skybasic/skytextured) -> deferred30 -> composite* -> final。ANALOG の時は composite27 が表示値 (0-1) で書き、final がミップで読む | sky(空), surface, sky, post | 全 | 毎フレーム |
 | 1 | RGBA8 | G: rgb アルベド (sRGB エンコード), a マテリアル ID | surface (gbuffers) | 全 | 毎フレーム |
 | 2 | RGBA16 | G: rg テクスチャ法線 (oct), b 幾何法線 (oct 8+8), a ライトマップ (8+8) | surface | 全 | 毎フレーム |
 | 3 | RGBA16 | G: r smoothness+f0, g sss+emission, b ao+wetness, a 予備 | surface | 全 | 毎フレーム |
@@ -157,15 +157,16 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | 6 | RGBA16F | light: ブロックライト直接光 (拡散照度, デノイズ済み) | light (deferred2) | surface (light の関数経由) | 毎フレーム |
 | 7 | RGBA16F | light: ブロックライト履歴 | light | light | 永続 |
 | 8 | RGBA16F | post: 鏡面の白飛び分の履歴 (rgb = 露出前の線形, a 予備)。SPECULAR_SPARKLE の時だけ composite20 が読み書きし、final がミップで読んで点像の芯と裾を作る (LENS_POINT_SPREAD_STRENGTH) | post | post | 永続 |
-| 9 | RGBA16F | surface: rgb 間接光照度, a AO。deferred11 の出力が次のフレームの GI の履歴を兼ねる | surface (deferred11) | surface, post(debug) | 永続 |
+| 9 | RGBA16F | surface: rgb 間接光照度 (P 倍), a AO。deferred11 の出力が次のフレームの GI の履歴を兼ねる | surface (deferred11) | surface, post(debug) | 永続 |
 | 10 | RGBA16F | surface: GI 履歴の付属。r = 履歴の長さ (フレーム、0 = 無効), g = 視線距離 (再投影の遮蔽判定), b / a = 速い履歴の輝度の平均・分散 (変化の検出)。GI_DENOISE >= 1 の時だけ | surface (deferred11) | surface | 永続 |
-| 11 | RGBA16F | sky: 雲 (フル解像度, 時間蓄積) | sky | surface (sky の関数経由), sky | 永続 |
-| 12 | RGBA16F | sky: VL / フォグ (低解像度) rgb 内散乱, a 透過率 | sky | sky | 永続 |
-| 13 | RGBA16F | post: TAA 履歴 | post | post | 永続 |
-| 14 | RGBA16F | sky: 雲 (低解像度、deferred20 -> 21) rgb 散乱, a 透過率。surface: 水の屈折先の色 (rgb、吸収の前) + 水の中の経路長 (a) (composite1 -> 2。水の画素だけ書き、composite2 も水の画素だけ読む)。surface: 半透明の不透明度 (r、composite2 -> composite19。ビーコンの光線が手前の半透明を掛ける。colortex4 は composite2 の後は光芒)。post: ブルームタイル (composite23 -> final) (と画面のフレア、LOCAL_TONEMAP > 0 の時は局所トーンマップの 1/32 タイル) | sky, surface, post | sky, surface, post | 毎フレーム |
+| 11 | RGBA16F | sky: 雲 (フル解像度, 時間蓄積。rgb は P 倍) | sky | surface (sky の関数経由), sky | 永続 |
+| 12 | RGBA16F | sky: VL / フォグ (低解像度) rgb 内散乱 (P 倍), a 透過率 | sky | sky | 永続 |
+| 13 | RGBA16F | post: TAA 履歴 (rgb は P 倍) | post | post | 永続 |
+| 14 | RGBA16F | sky: 雲 (低解像度、deferred20 -> 21) rgb 散乱 (P 倍), a 透過率。surface: 水の屈折先の色 (rgb、吸収の前、P 倍) + 水の中の経路長 (a) (composite1 -> 2。水の画素だけ書き、composite2 も水の画素だけ読む)。surface: 半透明の不透明度 (r、composite2 -> composite19。ビーコンの光線が手前の半透明を掛ける。colortex4 は composite2 の後は光芒)。post: ブルームタイル (composite23 -> final、P 倍) (と画面のフレア (P 倍)、LOCAL_TONEMAP > 0 の時は局所トーンマップの 1/32 タイル) | sky, surface, post | sky, surface, post | 毎フレーム |
 | 15 | RGBA16F | 速度: rg = 前フレーム UV - 今の UV, a = 1 なら有効 (エンティティ・手)。a = 0 の金属の防具の画素だけ rgb = 環境光の鏡面の重み x 1e-4 (gbuffers_entities_translucent -> composite2。双線形で読まれても速度がずれないよう小さくする) | surface (gbuffers, post の関数) | post | 毎フレーム |
 
 - gbuffers では colortex0-3 を読めない (Iris の仕様)
+- pre-exposure (`lib/common/pre_exposure.glsl`、現実の光の比 ON の時だけ): 表で「P 倍」と書いた rgb は露出に近い 2 の冪 P を掛けて持つ。colortex0 (deferred30 から後。空テクスチャの gbuffers が書く値は絶対のまま)、9 (GI)、11 (雲)、12 と fogHistoryImg (VL)、13 (TAA 履歴)、14 の雲の低解像度・水の屈折先・ブルームタイルと画面のフレア (局所トーンマップのタイルは絶対の log2)、giRawImg の GI の用途、skyViewImg、シャッターの撮れた絵 (SSBO 8)。読む所は `hdrFromStore`、書く所は `hdrToStore` を通す。書くパスより前に読む所 (前のフレームの値。履歴や、LUT を作る前に読むパス) は `hdrFromStorePrev`。通さないと夜は数千倍ずれる (読みの通し忘れは `tools/check_slots.py` が見つける)。ANALOG の現像 (composite27) が colortex0 に書く表示値は絶対のまま。ブロックライト (6 / 7 と生値の image)・反射・半透明の色 (4)・白飛び分 (8) は絶対のまま
 - 4, 8〜10, 14 は `lib/buffers/slots.glsl` の論理名 (`TEX_*`、用途ごとの区間付き) で読む。番号を変えるときは slots.glsl と RENDERTARGETS の数字を一緒に直す (`tools/check_slots.py` が直接書きと区間の外の読み書きを調べる。区間は validate_shaders.py --full でも見る)。Iris 1.10.4 以前と Oculus は 16 枚までなので colortex16 以上は使わない (validate_shaders.py がローダーごとに落とす。最新の Iris は 32 枚)
 `slots.glsl` の論理名 (正本は slots.glsl。区間は Iris のプログラム名で、永続は前フレームの値を読む)
 
@@ -197,14 +198,14 @@ Iris の実行順 (setup -> begin -> shadow -> shadowcomp -> prepare -> gbuffers
 | floodImgA / B (floodSamplerA / B) | R11F_G11F_B10F | VOXEL_SIZE | 永続 | light | floodfill ピンポン (偶数フレームは A に書く) |
 | skyTransmittanceImg | RGBA16F | 256x64 | 永続 | sky | 透過率 LUT |
 | skyMultiScatterImg | RGBA16F | 32x32 | 永続 | sky | 多重散乱 LUT |
-| skyViewImg | RGBA16F | 192x108 | 永続 | sky | SkyView LUT (毎フレーム更新) |
+| skyViewImg | RGBA16F | 192x108 | 永続 | sky | SkyView LUT (毎フレーム更新、P 倍) |
 | cloudShadowImg | R16F | 512x512 | 永続 | sky | 雲影マップ |
 | cloudWeatherImg | RGBA8 | 512x512 | 永続 | sky | 天気マップ (r 低層の被覆, g 低層の雲種, b 中層の被覆, a 上層の被覆。被覆は 1/1.4 倍して格納)。バニラの形 (CLOUD_VANILLA_SHAPE) のときは天気図を使わず、バニラの雲のマス (clouds.png の 1 画素) ごとの柱の表 (r 柱の頭の高さ (ブロック。0 は雲のないマス), a 4x4 マスの区画に雲があるか) |
 | blockLightRawImg | RGBA16F | 画面 1.0 | 永続 | light, surface | deferred1 -> 2: トレース生値: rgb 影あり照度 S, a 視線方向の距離 (左上 1/LIGHT_TRACE_RES を使用)。composite1 -> 2: 水の画素だけ、上向きの水面の太陽の可視率 (影の PCSS + 雲影、rgb。内散乱・泡・波頭の透過光と太陽の照り返しに使う), a = 水の屈折先の白飛び分の輝度 (屈折先の deferred30 の a から) |
 | blockLightAuxImg | RGBA16F | 画面 1.0 | 永続 | light | rgb 同じ光源選択での影なし照度 U, a 寄与最大の光源インデックス (鏡面用) |
-| giRawImg | RGBA16F | 画面 1.0 | 永続 | surface | deferred10 -> 11: GI / AO 生値。composite1 -> 2: 水の画素のうち映り込みを散らさない凪の水面だけ、鏡面の映り込みのフル解像度の SSR (rgb = 当たりの色 x 画面端の重み, a = 重み、外れは 0)、REFLECTIONS > 0 |
+| giRawImg | RGBA16F | 画面 1.0 | 永続 | surface | deferred10 -> 11: GI / AO 生値 (rgb は P 倍)。composite1 -> 2: 水の画素のうち映り込みを散らさない凪の水面だけ、鏡面の映り込みのフル解像度の SSR (rgb = 当たりの色 x 画面端の重み, a = 重み、外れは 0)、REFLECTIONS > 0 |
 | reflectionImg | RGBA16F | 画面 1.0 | 永続 | surface | 反射。上の半分は半分の解像度の 2 面 (偶奇のフレームで交互、時間蓄積の履歴)、下の半分の左は空間でぼかした結果 |
-| fogHistoryImg | RGBA16F | 画面 1.0 | 永続 | sky | VL の時間蓄積 |
+| fogHistoryImg | RGBA16F | 画面 1.0 | 永続 | sky | VL の時間蓄積 (rgb は P 倍) |
 | debugImg | RGBA16F | 画面 1.0 | 毎フレーム | 全員 | デバッグ出力。IMG_DEBUG を定義したプログラムが書き、DEBUG_VIEW=12 で表示 (現在書いているプログラムはない) |
 
 VOXEL_SIZE = VOXEL_VOLUME に応じて 128x64x128 / 192x96x192 / 256x128x256 / 384x128x384。
@@ -223,7 +224,7 @@ image を使うライブラリ関数も同じマクロで囲む (`voxelizeTerrai
 | IMG_VOXEL_ENTITY | voxelEntityImg | shadow_entities.gsh / shadow_block.gsh |
 | IMG_VOXEL_EMIT | voxelEmitImg | shadow_entities.gsh / shadow_block.gsh, surface/gbuffers_solid.vsh (GBUF_ENTITIES), deferred.csh |
 | IMG_FLOOD | floodImgA + floodImgB | deferred.csh |
-| IMG_SKY_TRANSMITTANCE / IMG_SKY_MULTISCATTER / IMG_SKY_VIEW | 大気 LUT | setup1 / setup2 / prepare1 |
+| IMG_SKY_TRANSMITTANCE / IMG_SKY_MULTISCATTER / IMG_SKY_VIEW | 大気 LUT | setup1 / setup2 / prepare |
 | IMG_CLOUD_SHADOW + IMG_CLOUD_WEATHER | 雲 | prepare2 |
 | IMG_BLOCKLIGHT_RAW + IMG_BLOCKLIGHT_AUX | ブロックライト | deferred1 |
 | IMG_GI_RAW / IMG_REFLECTION | GI / 反射 | deferred10 / composite.csh |

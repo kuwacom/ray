@@ -27,6 +27,7 @@
 //@include "/lib/sky/sky_color.glsl"
 //@include "/lib/surface/gi.glsl"
 //@include "/lib/surface/sun_shadow.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 
 // 太陽の影の取り方 (どれか 1 つ)
 // 影マップの外の扱い: SHADOW_MAP_FALLBACK だけスカイライトで日向を推定する。半透明の面と 2 次ヒットは軽さのため 1 (日向) にするので、
@@ -79,7 +80,7 @@ float sunSkylightGate(float skyLm) {
 
 /*
  * 一人称の手の太陽の可視率。手は影マップ上で自分の体の影の中にあるので、手の位置では影を引かない
- * スカイライトには向きが無く、軒下・壁や木の陰・縦穴でも 14〜15 になるので、目から光源側の影マップの判定 (prepare の
+ * スカイライトには向きが無く、軒下・壁や木の陰・縦穴でも 14〜15 になるので、目から光源側の影マップの判定 (prepare1 の
  * sun_sky_light.csh) の小さいほうを使う。スカイライトは、影マップの深さの範囲より上の地形に覆われた洞窟を暗くするために残す
  */
 float handSunVisibility(float skylightFallback) {
@@ -296,7 +297,7 @@ SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, ui
     L.giSky = 0.0;
     L.blockSpecCount = 0;
 
-    if ((terms & SL_GI) != 0u) L.indirect = getIndirectLight(p.texel);
+    if ((terms & SL_GI) != 0u) L.indirect = hdrFromStore(getIndirectLight(p.texel));
 
     // 影の濃さ (SUN_SHADOW_STRENGTH / MOON_SHADOW_STRENGTH) は影マップ・接触影・POM の可視率だけに掛け、雲影は対象外
     float shadowStrength = celestialShadowStrength();

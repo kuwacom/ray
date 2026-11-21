@@ -30,6 +30,7 @@
 //@include "/lib/light/entity_tri.glsl"
 //@include "/lib/light/hand_light.glsl"
 //@include "/lib/buffers/slots.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -80,6 +81,7 @@
 #include "/lib/sky/celestial.glsl"
 #include "/lib/common/polarizer.glsl"
 #include "/lib/sky/cloud_styles.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/sky/sky_color.glsl"
 #include "/lib/sky/fog_template.glsl"
@@ -208,14 +210,14 @@ void main() {
             vec3 vColor = vec3(0.0);
             float vPath = WATER_SKY_PATH;
             if (wS < 1.0 && waterRefractVoxel(surfPlayer, refrDir, floorPlayer, d1, lmT.y, vColor, vPath)) {
-                vec4 sColor = wS > 0.0 ? texture(colortex0, sUv) : vec4(0.0);
+                vec4 sColor = wS > 0.0 ? hdrFromStore(texture(colortex0, sUv)) : vec4(0.0);
                 behind = mix(vColor, sColor.rgb, wS);
                 behindExcess = behindSparkle(sColor) * wS;
                 pathLen = mix(vPath, sPath, wS);
                 refrDone = true;
             } else if (sValid) {
                 // ボクセルの範囲外 (遠景): 画面の像は 1 対 1 の対応なので端でも引き伸ばされない
-                vec4 sColor = texture(colortex0, sUv);
+                vec4 sColor = hdrFromStore(texture(colortex0, sUv));
                 behind = sColor.rgb;
                 behindExcess = behindSparkle(sColor);
                 pathLen = sPath;
@@ -294,7 +296,7 @@ void main() {
     }
 #endif
     if (!refrDone) {
-        vec4 sColor = texture(colortex0, refrUv);
+        vec4 sColor = hdrFromStore(texture(colortex0, refrUv));
         behind = sColor.rgb;
         behindExcess = behindSparkle(sColor);
     }
@@ -342,7 +344,7 @@ void main() {
         pathLen = selfT;
     }
 #endif
-    outRefraction = vec4(behind, pathLen);
+    outRefraction = vec4(hdrToStore(behind), pathLen);
 
     /*
      * 上から見た上向きの水面の太陽の可視率 (影の PCSS + 雲影)。PCSS も影マップの読みを待つ処理なので、合成ではなくここで求める

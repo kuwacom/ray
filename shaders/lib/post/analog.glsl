@@ -22,6 +22,7 @@
 //@include "/lib/common/noise.glsl"
 //@include "/lib/common/math.glsl"
 //@include "/lib/post/sampling.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 
 #ifdef ANALOG
 // Rec.709 の OETF とその逆 (ニーと、記録の段で表示値の近似の線形と行き来する所で使う。ニーが無い時も同じ式で近似)
@@ -84,8 +85,8 @@ vec3 applyAnalogBlooming(vec3 hdr, vec2 uv, float exposure) {
     for (int i = 1; i <= ANALOG_BLOOMING_TAPS; i++) {
         vec2 offset = vec2(0.0, spacing * float(i));
         // 中心の画素 (fetchScene) と同じく NaN / Inf を止める (1 画素の Inf が上下へ広がらないように)
-        vec3 up = max(sanitizeColor(textureLod(colortex0, uv + offset, 0.0).rgb) * exposure - saturation, 0.0);
-        vec3 down = max(sanitizeColor(textureLod(colortex0, uv - offset, 0.0).rgb) * exposure - saturation, 0.0);
+        vec3 up = max(sanitizeColor(hdrFromStore(textureLod(colortex0, uv + offset, 0.0).rgb)) * exposure - saturation, 0.0);
+        vec3 down = max(sanitizeColor(hdrFromStore(textureLod(colortex0, uv - offset, 0.0).rgb)) * exposure - saturation, 0.0);
         // 三角の重み: 近いタップほど重く、和は片側で 1/2
         float w = (1.0 - (float(i) - 0.5) / float(ANALOG_BLOOMING_TAPS)) / float(ANALOG_BLOOMING_TAPS);
         overflow += w * (up + down);

@@ -53,6 +53,7 @@
 #include "/lib/common/polarizer.glsl"
 #include "/lib/common/frame_offset.glsl"
 #include "/lib/sky/cloud_styles.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/sky/sky_color.glsl"
 #include "/lib/sky/fog_template.glsl"
@@ -454,7 +455,7 @@ void main() {
     }
     current /= float(CLOUD_SHADOW_SAMPLES);
     float history = imageLoad(cloudShadowImg, texel).r;
-    // 履歴の無効: 再読み込み・時刻の飛び (prepare の履歴フレーム数) とテレポート
+    // 履歴の無効: 再読み込み・時刻の飛び (prepare1 の履歴フレーム数) とテレポート
     bool reset = frameData.skyParams[1].y < 1.5 || distance(cameraPosition, previousCameraPosition) > CLOUD_SHADOW_RESET_DISTANCE || any(notEqual(plane, planePrev)) || isnan(history) || isinf(history);
     float shadow = reset ? current : mix(history, current, CLOUD_SHADOW_BLEND);
     imageStore(cloudShadowImg, texel, vec4(saturate(shadow), 0.0, 0.0, 1.0));

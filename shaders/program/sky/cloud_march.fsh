@@ -7,6 +7,7 @@
 //@include "/lib/common/common.glsl"
 //@include "/lib/sky/sky.glsl"
 //@include "/lib/sky/cloud_volume.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -37,6 +38,7 @@
 #include "/lib/common/polarizer.glsl"
 #include "/lib/common/frame_offset.glsl"
 #include "/lib/sky/cloud_styles.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/sky/sky_color.glsl"
 #include "/lib/sky/fog_template.glsl"
@@ -90,7 +92,7 @@ void main() {
 
     // r = 視線方向, g = 光方向のマーチの開始位置 (独立なチャンネルで相関の縞を避ける)
     vec2 dither = blueNoise(sampleTexel).rg;
-    outClouds = renderClouds(dir, maxDist, dither);
+    outClouds = hdrToStore(renderClouds(dir, maxDist, dither));
 #else
     outClouds = vec4(0.0, 0.0, 0.0, 1.0);
 #endif

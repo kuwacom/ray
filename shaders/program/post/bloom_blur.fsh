@@ -10,6 +10,7 @@
 //@include "/lib/post/post_internal.glsl"
 //@include "/lib/post/local_tonemap.glsl"
 //@include "/lib/buffers/slots.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -44,6 +45,7 @@
 #include "/lib/post/grading.glsl"
 #include "/lib/buffers/images.glsl"
 #include "/lib/buffers/slots.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/post/bloom.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/post/lens_optics.glsl"
@@ -214,7 +216,8 @@ vec3 screenStars(vec2 uv, float exposure, float fNumber) {
 #endif
 
 vec3 screenFlare(vec2 uv) {
-    float exposure = getExposure();
+    // タイルは P 倍の colortex0 から作ったまま読むので、閾値に掛ける露出もそろえる (出力のフレアも P 倍で、final が戻す)
+    float exposure = getExposure() / preExposure();
     vec2 yTan = uvToTan(uv);
     float fNumber = lensFNumber();
     float rEp = 0.5 / fNumber;

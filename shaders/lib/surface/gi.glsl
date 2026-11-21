@@ -122,7 +122,7 @@ const float RSM_SKYLIGHT_MAX = 0.6;
  */
 float skylightCurve(float lm) {
 #ifndef HAS_SKYLIGHT
-    // ネザー・エンドはスカイライトが常に 0 なので、掛けると環境光 (prepare の一様な SH) が全部消えて真っ黒になる
+    // ネザー・エンドはスカイライトが常に 0 なので、掛けると環境光 (prepare1 の一様な SH) が全部消えて真っ黒になる
     // バニラのディメンションの環境光と同じく、場所によらず一様に当てる
     return 1.0;
 #else

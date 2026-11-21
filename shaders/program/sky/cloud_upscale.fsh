@@ -10,6 +10,7 @@
 //@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/sky/sky.glsl"
 //@include "/lib/buffers/slots.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -41,6 +42,7 @@
 #include "/lib/common/polarizer.glsl"
 #include "/lib/common/frame_offset.glsl"
 #include "/lib/sky/cloud_styles.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/sky/sky_color.glsl"
 #include "/lib/sky/fog_template.glsl"
@@ -69,7 +71,7 @@ const float CLOUD_CLAMP_EXPAND = CLOUD_RES == 1 ? 1.0 : 0.5;
 const vec4 CLOUD_CLAMP_PAD = vec4(vec3(1e-4), 0.01);
 
 vec4 fetchLowRes(ivec2 q) {
-    return texelFetch(TEX_CLOUD_LOW, clamp(q, ivec2(0), cloudLowResSize() - 1), 0);
+    return hdrFromStore(texelFetch(TEX_CLOUD_LOW, clamp(q, ivec2(0), cloudLowResSize() - 1), 0));
 }
 
 // 雲の再投影距離。層を通らない (雲の無い) 方向は無限遠として回転だけで戻す
@@ -132,12 +134,12 @@ void main() {
         vec2 prevUv = cloudPreviousUv(dir);
         bool valid = reprojectionInside(prevUv) && frameData.skyParams[1].y > 1.5;
         if (valid) {
-            vec4 history = texture(colortex11, prevUv);
+            vec4 history = hdrFromStorePrev(texture(colortex11, prevUv));
             history = clamp(history, lo - pad, hi + pad);
             current = mix(history, current, exact ? CLOUD_BLEND_EXACT : CLOUD_BLEND_INTERPOLATED);
         }
     #endif
-    outClouds = vec4(max(current.rgb, 0.0), saturate(current.a));
+    outClouds = vec4(hdrToStore(max(current.rgb, 0.0)), saturate(current.a));
 #else
     outClouds = vec4(0.0, 0.0, 0.0, 1.0);
 #endif

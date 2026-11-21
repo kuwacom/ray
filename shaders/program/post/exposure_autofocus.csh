@@ -22,6 +22,7 @@
 //@include "/lib/post/post_internal.glsl"
 //@include "/lib/sky/sky_color.glsl"
 //@include "/lib/post/camera_info.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -62,6 +63,7 @@
 #include "/lib/post/camera.glsl"
 #include "/lib/post/grading.glsl"
 #include "/lib/buffers/slots.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/post/bloom.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/post/lens_optics.glsl"
@@ -179,7 +181,7 @@ uint flareVisibilityTap(uint index) {
         if (skyLum > 1e-6 * PHYSICAL_DARKEST) {
             // 歪曲・魚眼を TAA で組み立てた時は colortex0 が出力の座標なので、光源の出力の位置で読む
             vec2 colorUv = LENS_WARP_TAA ? lensForwardUv(clamped) : clamped;
-            float l = luminance(sanitizeColor(textureLod(colortex0, colorUv, 0.0).rgb));
+            float l = luminance(sanitizeColor(hdrFromStore(textureLod(colortex0, colorUv, 0.0).rgb)));
 #if SUN_MOON_STYLE >= 1
             // 夜の円盤は白飛びさせるために明るく描いてある。フレアの見え具合は円盤を白飛びさせる前の明るさで比べる
             if (frameData.shadowLightIrradiance.a <= 0.5) l /= moonSkyDiscBoost(getSunDir().y);
@@ -745,7 +747,7 @@ void main() {
             if (isHandDepth(texelFetch(depthtex0, LENS_WARP_TAA ? postSourceTexel(uv) : p, 0).r)) continue;
             // テクセルの角で双線形サンプルすると 2x2 の平均が 1 回で取れる
             vec2 corner = vec2(max(p, ivec2(1))) / screen;
-            float l = luminance(sanitizeColor(textureLod(colortex0, corner, 0.0).rgb));
+            float l = luminance(sanitizeColor(hdrFromStore(textureLod(colortex0, corner, 0.0).rgb)));
             uint w = uint(meteringWeight(uv) * METERING_WEIGHT_SCALE + 0.5);
             atomicAdd(sharedHistogram[luminanceToHistogramBin(l)], w);
             #if defined EXPOSURE_AUTO && defined HAS_SKYLIGHT

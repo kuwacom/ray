@@ -35,6 +35,7 @@
 //@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/buffers/images.glsl"
 //@include "/lib/sky/cloud_styles.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 
 // カメラが雲の層の中にいる時の霧 (雲の中の視程の設定が 0 でなければ)
 #if CLOUDS >= 2 && CLOUD_INTERIOR_VISIBILITY > 0 && defined HAS_SKY
@@ -56,7 +57,7 @@ const float CLOUD_RAY_FAR = 1e12; // 球との交差が無い方向の距離 (�
     const float CLOUD_R_DEPTH = 290.0;
 #endif
 const float CLOUD_R_TOP = CLOUD_R_BASE + CLOUD_R_DEPTH;
-// prepare.csh (雲の高度での光源の高さ) が参照する CLOUDS=2 の層 (参照空間の m)
+// prepare1.csh (雲の高度での光源の高さ) が参照する CLOUDS=2 の層 (参照空間の m)
 const float CLOUD2D_ALTITUDE = CLOUD_R_BASE;
 const float CLOUD2D_THICKNESS = CLOUD_R_DEPTH;
 // 高さテンプレートがカスタムの時は、中層・上層・積乱雲の頂をワールド y のスライダーで決める (0 は現実の比率のまま)。
@@ -280,7 +281,7 @@ ivec2 cloudLowResSize() { return (ivec2(viewWidth, viewHeight) + CLOUD_RES - 1) 
  */
 vec4 getCloudLayer(ivec2 texel) {
 #if CLOUDS >= 2 && defined HAS_SKY
-    return texelFetch(colortex11, texel, 0);
+    return hdrFromStore(texelFetch(colortex11, texel, 0));
 #else
     return vec4(0.0, 0.0, 0.0, 1.0);
 #endif

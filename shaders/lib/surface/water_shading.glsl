@@ -31,6 +31,7 @@
 //@include "/lib/surface/lighting.glsl"
 //@include "/lib/surface/reflection.glsl"
 //@include "/lib/surface/surface_lights.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 
 const float WATER_REFRACT_MAX_DISTANCE = 8.0;  // 屈折先を探す最大距離 (ブロック)
 const int WATER_REFRACT_STEPS = 16;
@@ -137,7 +138,7 @@ bool waterRefractVoxel(vec3 surfPlayer, vec3 dir, vec3 floorPlayer, float d1, fl
     ivec2 hitTexel;
     vec3 hitScene;
     if (voxelHitOnScreen(hitPlayer, hitNormal, hitTexel, hitScene)) {
-        screenColor = texelFetch(colortex0, hitTexel, 0).rgb;
+        screenColor = hdrFromStore(texelFetch(colortex0, hitTexel, 0).rgb);
         wS = waterRefractScreenWeight(texcoord, (vec2(hitTexel) + 0.5) / viewSize());
     }
     if (wS >= 1.0) {
@@ -205,7 +206,7 @@ bool waterRefractVoxel(vec3 surfPlayer, vec3 dir, vec3 floorPlayer, float d1, fl
             vec2 uv = clamp(texcoord + off * r, vec2(0.0), vec2(1.0));
             float dk = texture(depthtex1, uv).r;
             if (dk >= 1.0 || isHandDepth(dk) || distance(screenToPlayer(vec3(uv, dk)), floorPlayer) > matchDist) continue;
-            sum += texture(colortex0, uv).rgb;
+            sum += hdrFromStore(texture(colortex0, uv).rgb);
             n += 1.0;
         }
         if (n > 0.0 && luminance(Efloor) > 1e-6 * PHYSICAL_DARKEST) {

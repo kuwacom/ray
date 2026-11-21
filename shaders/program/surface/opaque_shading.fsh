@@ -14,6 +14,7 @@
  */
 //@include "/lib/common/common.glsl"
 //@include "/lib/common/exposure.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 //@include "/lib/common/jitter.glsl"
 //@include "/lib/common/specular_sparkle.glsl"
 //@include "/lib/surface/surface.glsl"
@@ -42,6 +43,7 @@
 #include "/lib/common/common.glsl"
 #include "/lib/buffers/frame_data.glsl"
 #include "/lib/common/exposure.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/common/jitter.glsl"
 #include "/lib/common/color.glsl"
 #include "/lib/common/specular_sparkle.glsl"
@@ -263,7 +265,7 @@ void main() {
         vec3 dir = normalize(viewToPlayerDir(screenToView(vec3(texcoord, 1.0))));
         vec3 sky = renderSky(dir, texelFetch(colortex0, texel, 0).rgb);
         vec4 clouds = getCloudLayer(texel);
-        outColor = vec4(sky * clouds.a + clouds.rgb, 1.0);
+        outColor = vec4(hdrToStore(sky * clouds.a + clouds.rgb), 1.0);
         return;
     }
 
@@ -398,5 +400,5 @@ void main() {
     if (!hand) sparkle += luminance(sparkleExcess(glow, getExposure()));
 #endif
     // 鏡面の白飛び分を a = 1 + 割合で composite2 -> composite19 -> composite20 (TAA の後に足す) へ渡す
-    outColor = vec4(color, 1.0 + saturate(sparkle / max(luminance(color), 1e-6)));
+    outColor = vec4(hdrToStore(color), 1.0 + saturate(sparkle / max(luminance(color), 1e-6)));
 }

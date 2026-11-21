@@ -51,7 +51,7 @@ CloudLighting cloudLightingSetup(vec3 viewDir, float rain) {
     // 雲が雨雲へ変わる空 (雷雨) は雲の濃さで暗くなるので、直達光は絞らない
     l.lightIrradiance *= 1.0 - CLOUD_RAIN_SUN_DIMMING * rain * (1.0 - cloudRainReshape());
 #endif
-    vec3 skyUp = frameData.skyParams[2].rgb; // 彩度を落とす前の真上の空の照度 (prepare.csh)
+    vec3 skyUp = frameData.skyParams[2].rgb; // 彩度を落とす前の真上の空の照度 (prepare1.csh)
     // 雷は雲の中を一瞬照らす。夜の露出のまま空一面が白飛びしないよう、月夜の地面の数倍の明るさに留める
     // (4.0 では月光の数百倍になり、雲の覆う空が真っ白で降雪が黒い点に見える)
     float lightning = lightningBoltPosition.w > 0.5 ? 1.0 : 0.0;

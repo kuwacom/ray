@@ -27,6 +27,7 @@
 //@include "/lib/common/jitter.glsl"
 //@include "/lib/buffers/slots.glsl"
 //@include "/lib/common/polarizer.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -78,6 +79,7 @@
 #include "/lib/sky/celestial.glsl"
 #include "/lib/common/polarizer.glsl"
 #include "/lib/sky/cloud_styles.glsl"
+#include "/lib/common/pre_exposure.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/sky/sky_color.glsl"
 #include "/lib/sky/fog_template.glsl"
@@ -132,7 +134,7 @@ const float GLASS_TINT_STRENGTH = 0.65;        // 透過色の濃さ (1 で tint
 
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
-    vec4 sceneIn = texelFetch(colortex0, texel, 0);
+    vec4 sceneIn = hdrFromStore(texelFetch(colortex0, texel, 0));
     vec3 scene = sceneIn.rgb;
     vec4 translucent = texelFetch(TEX_TRANSLUCENT, texel, 0);
     outTranslucentAlpha = vec4(translucent.a, 0.0, 0.0, 0.0);
@@ -172,7 +174,7 @@ void main() {
             result += armorEnv;
             sparkle += luminance(sparkleExcess(armorEnv, getExposure()));
         }
-        outColor = vec4(result, 1.0 + saturate(sparkle / max(luminance(result), 1e-6)));
+        outColor = vec4(hdrToStore(result), 1.0 + saturate(sparkle / max(luminance(result), 1e-6)));
         return;
     }
 
@@ -238,7 +240,7 @@ void main() {
         float behindExcess = 0.0;
         float pathLen = WATER_SKY_PATH;
         if (F < 1.0) {
-            vec4 refr = texelFetch(TEX_WATER_REFR, texel, 0);
+            vec4 refr = hdrFromStore(texelFetch(TEX_WATER_REFR, texel, 0));
             behind = refr.rgb;
             pathLen = refr.a;
             behindExcess = texelFetch(TEX_WATER_SUNVIS, texel, 0).a;
@@ -369,7 +371,7 @@ void main() {
             if (validRefraction(tuv, d0)) refrUv = tuv;
         }
 #endif
-        vec4 behindRaw = texture(colortex0, refrUv);
+        vec4 behindRaw = hdrFromStore(texture(colortex0, refrUv));
         vec3 behind = behindRaw.rgb;
         float behindExcess = behindSparkle(behindRaw);
         if (d1 < 1.0) {
@@ -402,12 +404,12 @@ void main() {
         vec3 spec = refl * F + sunSpecular(N, V, GLASS_F0, glassAlpha, glassSunVis) + localLightSpecular(lights, N, V, GLASS_F0, glassAlpha, false);
         color = behind * transmit * (1.0 - F) + translucent.rgb * (1.0 - F) + spec;
         float glassSparkle = luminance(sparkleExcess(spec, getExposure())) + behindExcess * luminance(transmit) * (1.0 - F);
-        outColor = vec4(color, 1.0 + saturate(glassSparkle / max(luminance(color), 1e-6)));
+        outColor = vec4(hdrToStore(color), 1.0 + saturate(glassSparkle / max(luminance(color), 1e-6)));
         return;
     }
 
     // 水の上に重なった物 (WATER_TEXTURE の水テクスチャ・パーティクル・雨) を重ねる
     vec3 result = color * (1.0 - translucent.a) + translucent.rgb;
     float sparkleShare = saturate(sparkleLum * (1.0 - translucent.a) / max(luminance(result), 1e-6));
-    outColor = vec4(result, 1.0 + sparkleShare);
+    outColor = vec4(hdrToStore(result), 1.0 + sparkleShare);
 }

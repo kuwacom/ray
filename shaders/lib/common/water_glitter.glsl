@@ -135,7 +135,7 @@ const float GLINT_BRIDGE_WIDTH = 0.8;       // 横長の核の縦の半径 (子�
 const float GLINT_X_MAX = 30.0;
 /*
  * 点の寿命の下限 (フレーム)。TAA が 1 つの点を積めるよう、物理の寿命 (数十 ms) が短くても数フレームは残す
- * フレームの長さは prepare が平滑化して半オクターブの段に丸めた値 (waterGlintFrameStep)。生の frameTime はフレームごとに揺れ、
+ * フレームの長さは prepare1 が平滑化して半オクターブの段に丸めた値 (waterGlintFrameStep)。生の frameTime はフレームごとに揺れ、
  * 時刻 / 寿命 の床関数が毎フレーム跳んで全部の点が振り直されるため
  */
 const float GLINT_MIN_FRAMES = 3.0;

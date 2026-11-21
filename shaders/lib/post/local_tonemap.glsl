@@ -20,6 +20,7 @@
 //@include "/lib/post/post_constants.glsl"
 //@include "/lib/post/sampling.glsl"
 //@include "/lib/buffers/slots.glsl"
+//@include "/lib/common/pre_exposure.glsl"
 
 // タイルの縮小 (1 / 2^n)。窓の大きさがこれで決まる (ぼかしと双三次の拡大で 3〜4 テクセル)
 const int LOCAL_TONEMAP_TILE_SHIFT = 5;
@@ -60,7 +61,7 @@ vec2 sampleLocalTonemapSource(sampler2D source, vec2 uv) {
     for (int y = 0; y < LOCAL_TONEMAP_TAPS; y++) {
         for (int x = 0; x < LOCAL_TONEMAP_TAPS; x++) {
             vec2 p = clamp(uv + (vec2(x, y) - 0.5 * float(LOCAL_TONEMAP_TAPS - 1)) * tapStep, vec2(0.0), vec2(1.0));
-            float l = log2(max(luminance(sanitizeColor(textureLod(source, p, LOCAL_TONEMAP_TAP_LOD).rgb)), LOCAL_TONEMAP_LUM_MIN));
+            float l = log2(max(luminance(sanitizeColor(hdrFromStore(textureLod(source, p, LOCAL_TONEMAP_TAP_LOD).rgb))), LOCAL_TONEMAP_LUM_MIN));
             sum += vec2(l, l * l);
         }
     }
