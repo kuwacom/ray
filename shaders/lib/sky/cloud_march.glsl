@@ -56,13 +56,14 @@ CloudSteps cloudStepsSetup(vec2 seg, int steps) {
     CloudSteps s = CloudSteps(seg.x, 0, 0.0, 0.0);
     if (seg.x <= 0.0) {
         s.nearEnd = min(seg.y, CLOUD_NEAR_LENGTH);
-        s.nearSteps = s.nearEnd >= seg.y ? steps : max(int(float(steps) * CLOUD_NEAR_SHARE), 1);
+        // 手前の区間が視線の大部分なら歩数もその割合で振る (二択にすると、層の出口や地形が CLOUD_NEAR_LENGTH の所で歩幅が数倍跳び、空と地面に輪が出た)
+        s.nearSteps = max(int(float(steps) * clamp(s.nearEnd / seg.y, CLOUD_NEAR_SHARE, 1.0)), 1);
         s.nearDs = sqrt(s.nearEnd) / float(s.nearSteps);
     }
     s.dt = (seg.y - s.nearEnd) / float(max(steps - s.nearSteps, 1));
     return s;
 }
-// i 歩目の位置 (ワールドの距離) と、その歩幅 dt
+// i 歩目の位置 (ワールドの距離) と、その歩幅 dt。手前の区間のジッターは平方根の空間で一様 (距離では区間の近い側に寄るが、歩幅の和は区間に一致する。cloudMarchShaft と同じ)
 float cloudStepAt(CloudSteps s, int i, float dither, out float dt) {
     if (i < s.nearSteps) {
         float s0 = s.nearDs * float(i);
