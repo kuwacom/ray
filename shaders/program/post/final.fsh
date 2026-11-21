@@ -267,6 +267,14 @@ float lavaToneMask(ivec2 texel) {
 }
 
 const float OUTPUT_LEVELS = 255.0;  // 8bit 出力の最大値
+/*
+ * 8bit 出力のバンディング対策。2 つの独立なブルーノイズの和の三角分布 (幅 +-1 LSB)
+ * 一様の 1 LSB は雑音の強さが値によって変わり (段の境だけざらつき、段の真ん中では消える)、緩い階調に段の名残が残る
+ */
+float outputDither(ivec2 texel) {
+    vec2 n = blueNoise(texel).rg;
+    return (n.x + n.y - 1.0) / OUTPUT_LEVELS;
+}
 
 #if defined ANALOG && !defined FINAL_DEVELOP_PASS
 // アナログの記録の段。colortex0 は composite27 (現像) が書いた表示値
@@ -288,8 +296,7 @@ void main() {
     color = applyCameraInfo(color, gl_FragCoord.xy);
 #endif
     color = debugView(texel, color);
-    // 8bit 出力のバンディング対策
-    color += (interleavedGradientNoise(gl_FragCoord.xy, frameCounter) - 0.5) / OUTPUT_LEVELS;
+    color += outputDither(texel);
     outColor = vec4(color, 1.0);
 }
 #else
@@ -591,8 +598,7 @@ void main() {
     color = applyCameraInfo(color, gl_FragCoord.xy);
 #endif
     color = debugView(texel, color);
-    // 8bit 出力のバンディング対策
-    color += (interleavedGradientNoise(gl_FragCoord.xy, frameCounter) - 0.5) / OUTPUT_LEVELS;
+    color += outputDither(texel);
     outColor = vec4(color, 1.0);
 #endif
 }
