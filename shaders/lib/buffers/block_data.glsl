@@ -52,6 +52,7 @@ layout(std430, binding = 1) SSBO_BLOCK_DATA_ACCESS buffer BlockDataBuffer {
     uint initialized;
     /*
      * ボクセル ID ごとの平均の色 (sRGB 8bit を R | G << 8 | B << 16, lib/ids/block_albedo.glsl)
+     * 反射率の強さが 1 でない時だけ、色付きの固体の << 24 に平均の最大成分を入れる (colorBlockMeanMax。テラコッタの倍率に使う)
      * 生成した定数配列を floodfill の全セルから直接引くと EXTREME で 37 -> 22 FPS に落ちた (この SSBO に移して 41 FPS)。
      * 動的な添字の定数配列がスレッドごとのローカルメモリに展開されたとみられる
      */
