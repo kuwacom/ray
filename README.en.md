@@ -28,15 +28,19 @@ The look is currently tuned toward a natural style
 
 The light of torches and lanterns is ray traced after turning the world around the camera into voxels, casting shadows that follow the shape of whatever blocks it  
 Not only blocks but also players and mobs block light, so when you walk with a torch, your own shadow and the mobs' shadows fall on the walls  
-Held light sources, dropped torches, burning mobs, and light arrows or fireballs are treated as light sources in the same way
+Held light sources, dropped torches, burning mobs, and light arrows or fireballs are treated as light sources in the same way  
+Voxel lighting is carried out properly all the way to the edge of the world
 
-The scene under the water surface is refracted and distorted  
+The water surface sparkles with reflections, and the scene below it is refracted  
 Underwater light shafts shine in, and the glow around light sources turns turquoise in shallow water and deep blue in deep water
 
 Instead of just adding bokeh and bloom, the post-processing runs a physical lens simulation that reproduces how real lenses render  
 Presets range from old lenses such as the Helios 44-2 and Sonnar, to ultra-wide Hologon and Flektogon lenses, and fisheyes  
 12 of the presets are calculated from the prescriptions of embodiments listed in patents  
-Ghost color and shape, distortion, vignetting, bokeh shape, and chromatic aberration all change per lens
+Ghost color and shape, distortion, vignetting, bokeh shape, and chromatic aberration all change per lens  
+It also has the same exposure modes as a real camera, plus manual exposure, so long exposures and panning shots are possible too
+
+And with the analog filter, you can recreate an analog-noise look modeled on real equipment
 
 > [!WARNING]
 > This is still an alpha version
