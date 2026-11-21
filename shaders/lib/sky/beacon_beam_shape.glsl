@@ -1,6 +1,9 @@
 /*
  * ビーコンの光線の形 (縦の円柱) と視線の位置関係 (sky モジュール)
- * 光線を描く composite19 (lib/sky/beacon_beam.glsl) が使う
+ * 光線を描く composite19 (lib/sky/beacon_beam.glsl) と、光線の画素を光線の点で再投影する TAA (composite20) が使う
+ * 光線は深度を書かないので、TAA が奥の地形・空の動きで履歴を読むと、高い所から動きながら見た時に
+ * 光線と奥の視差の分 (1 フレームに 1 画素ほど) 履歴がずれ、細い光線が速さに応じて半分ほどに暗くなってちらついた
+ * 確かめ方: 高い所 (高さ 200 など) から光線を横切るように動きながら連写し、止まった時と光線の明るさが同じこと
  */
 #ifndef SKY_BEACON_BEAM_SHAPE_GLSL
 #define SKY_BEACON_BEAM_SHAPE_GLSL
@@ -63,5 +66,30 @@ bool beaconBeamSpan(int i, vec3 dir, float opaqueDist, out BeaconBeamSpan b) {
 // 芯の半径 (画素に合わせて太らせた分を含む)。pixel: 1 画素の角度 x BEACON_BEAM_MIN_PIXELS
 // 画素の幅は見える点の距離で決める (s0 は視線が軸に沿うほど区間の外の遠くへ行き、芯が太り過ぎる)
 float beaconBeamCoreRadius(BeaconBeamSpan b, float pixel) { return max(BEACON_BEAM_CORE_RADIUS, pixel * b.sp); }
+
+// 芯の半径のこの倍まで軸に近い視線を、光線の写る画素として TAA で光線の点から再投影する
+const float BEACON_BEAM_TAA_REACH = 2.0;
+
+/*
+ * 視線 dir に光線の芯が写っていれば、その見える点 (player 空間) を point に返す。重なる時は芯の半径に対して軸に近い方
+ * にじみは広く淡いので、奥の動きで読んでもずれが目立たない
+ */
+bool beaconBeamCorePoint(vec3 dir, float opaqueDist, float pixel, out vec3 point) {
+    float best = sqr(BEACON_BEAM_TAA_REACH);
+    bool found = false;
+    point = vec3(0.0);
+    for (int i = 0; i < BEACON_BEAM_MAX; i++) {
+        if (frameData.beaconBeamKey[i] == 0u) break;
+        BeaconBeamSpan b;
+        if (!beaconBeamSpan(i, dir, opaqueDist, b)) continue;
+        float q = b.h2 / sqr(beaconBeamCoreRadius(b, pixel));
+        if (q < best) {
+            best = q;
+            point = dir * b.sp;
+            found = true;
+        }
+    }
+    return found;
+}
 
 #endif
