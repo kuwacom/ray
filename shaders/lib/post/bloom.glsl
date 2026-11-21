@@ -119,10 +119,13 @@ vec3 sampleFlareTile(vec2 uv) {
 }
 
 // 矩形 rect (bloomTileRectPx) のタイルを双線形で読む。レベルがループの中で定数にならない時は、矩形を外で求めて渡す
-vec3 sampleBloomRectLinear(vec4 rect, vec2 uv) {
+vec4 sampleBloomRectLinear4(vec4 rect, vec2 uv) {
     vec2 p = clamp(rect.xy + uv * rect.zw, rect.xy + 0.5, rect.xy + rect.zw - 0.5);
-    return bloomWithoutLavaGain(textureLod(TEX_BLOOM, p / viewSize(), 0.0));
+    return textureLod(TEX_BLOOM, p / viewSize(), 0.0);
 }
+
+// 溶岩の倍率を外した色 (4 の付く方は外す前の rgba。混ぜてから 1 回だけ外す時に使う)
+vec3 sampleBloomRectLinear(vec4 rect, vec2 uv) { return bloomWithoutLavaGain(sampleBloomRectLinear4(rect, uv)); }
 
 // レベル level のタイルを双線形で読む (画面フレアのゴースト用。双三次ほどの滑らかさは要らない)
 vec3 sampleBloomTileLinear(int level, vec2 uv) {
