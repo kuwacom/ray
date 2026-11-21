@@ -32,7 +32,7 @@ const int BLOCK_DECOR_DIAMOND = 15;
 const int BLOCK_DECOR_GOLD = 16;
 const int BLOCK_DECOR_REDSTONE = 17;
 const int BLOCK_DECOR_AMETHYST = 18; // アメジストブロック・芽生えたアメジスト
-// 20-35: 彩釉テラコッタ。質感・遮蔽は BLOCK_GLOSSY と同じで、反射率の設定 (ALBEDO_GLAZED_STRENGTH) を掛けるために分ける
+// 20-35: 彩釉テラコッタ。質感・遮蔽は BLOCK_GLOSSY と同じで、反射率の設定 (ALBEDO_TERRACOTTA_STRENGTH) を掛けるために分ける
 const int BLOCK_GLAZED_TERRACOTTA = 20;   // 20-35 (色の順は BLOCK_STAINED_GLASS と同じ)
 const int BLOCK_GLAZED_LAST = 35;
 

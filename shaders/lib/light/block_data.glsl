@@ -25,6 +25,13 @@ uint getShapeCoveredFaces(int voxelId) {
 vec3 getBlockAlbedo(int voxelId) {
     return srgbToLinear(unpackUnorm4x8(blockData.albedo[voxelId & (ALBEDO_TABLE_SIZE - 1)]).rgb);
 }
+/*
+ * ブロックの平均の色 (線形、反射率の設定を掛ける前) の最大成分。テラコッタの反射率 (lib/ids/id_decode.glsl applyPatternAlbedo) が使う
+ * 反射率の設定が有効な時だけ setup_tables.csh が albedo の a に sRGB で入れる (rgb は設定を掛けた後の色になるため)
+ */
+float colorBlockMeanMax(int blockId) {
+    return srgbToLinear(vec3(unpackUnorm4x8(blockData.albedo[blockId & (ALBEDO_TABLE_SIZE - 1)]).a)).x;
+}
 // 面の向きが分かる時 (レイの当たり)。上向きの面は上面の色 (草ブロックは全体の平均だと側面の土で茶色になる)
 vec3 getBlockAlbedo(int voxelId, vec3 faceNormal) {
     int i = voxelId & (ALBEDO_TABLE_SIZE - 1);

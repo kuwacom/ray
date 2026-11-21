@@ -7,6 +7,7 @@
 
 //@include "/lib/settings.glsl"
 //@include "/lib/common/math.glsl"
+//@include "/lib/common/color.glsl"
 //@include "/lib/ids/block_ids.glsl"
 //@include "/lib/ids/entity_ids.glsl"
 //@include "/lib/ids/light_ids.glsl"
@@ -71,7 +72,7 @@ float decorSaturation(int decorIndex) {
 const float COLOR_ALBEDO_MAX = 0.9;
 // 全部 1 倍の時は呼ぶ側も色の変換 (sRGB と線形の往復) を省いて、8bit の色を 1 段も動かさない
 const bool COLOR_ALBEDO_ACTIVE = ALBEDO_CONCRETE_STRENGTH != 1.0 || ALBEDO_WOOL_STRENGTH != 1.0 || ALBEDO_TERRACOTTA_STRENGTH != 1.0
-                               || ALBEDO_DYED_STRENGTH != 1.0 || ALBEDO_GLAZED_STRENGTH != 1.0;
+                               || ALBEDO_DYED_STRENGTH != 1.0;
 
 // 反射率の設定の対象になりうる ID (2000 番台の色の付いた固体、20-35 の彩釉テラコッタ、130-178 の染めた小物、400-432 の染めたブロックエンティティ)
 bool isColorAlbedoBlock(int blockId) {
@@ -88,17 +89,61 @@ float colorBlockAlbedoStrength(int blockId) {
     }
     if (blockId >= BLOCK_CARPET && blockId < BLOCK_BANNER) return ALBEDO_WOOL_STRENGTH;
     if (blockId >= BLOCK_BANNER && blockId <= BLOCK_DYED_LAST) return ALBEDO_DYED_STRENGTH;
-    if (blockId >= BLOCK_GLAZED_TERRACOTTA && blockId <= BLOCK_GLAZED_LAST) return ALBEDO_GLAZED_STRENGTH;
+    if (blockId >= BLOCK_GLAZED_TERRACOTTA && blockId <= BLOCK_GLAZED_LAST) return ALBEDO_TERRACOTTA_STRENGTH;
     // ベッドは掛け布団が羊毛 (レシピも羊毛) なので羊毛の設定、シュルカーボックスは旗・ロウソクと同じ染めた物の設定
     if (blockId >= BLOCK_BED && blockId < BLOCK_SHULKER_BOX) return ALBEDO_WOOL_STRENGTH;
     if (blockId >= BLOCK_SHULKER_BOX && blockId <= BLOCK_DYED_ENTITY_LAST) return ALBEDO_DYED_STRENGTH;
     return 1.0;
 }
 
-vec3 applyColorBlockAlbedo(int blockId, vec3 albedo) {
+/*
+ * テラコッタ (無地と彩釉) は、ブロックの平均の色 (ボクセルの色の表) から決めた倍率をブロック全体に同じだけ掛ける
+ * 画素ごとに上限で止めると、彩釉の模様の明るい所が先に止まって暗い所だけ明るくなり、模様が薄まった (2.0 で輝度の変動係数 0.77 倍)
+ * 平均の最大成分を COLOR_ALBEDO_PATTERN_TARGET まで上げる倍率に抑え、使い切れなかった倍率は彩度で足す。明るい画素は肩でなめらかに上限へ寄せる
+ * 1.21.1 のテクスチャで 2.0 の時、彩釉の模様の変動係数 0.98 倍、色の濃さ (max - min) の伸びは無地のテラコッタの 0.82 倍 (画素ごとは 0.77 倍 / 0.86 倍)
+ * ベッド・シュルカーボックスなどのブロックエンティティは平均の色の表を持たない (地形の面が無い) ので、画素ごとのまま
+ */
+const float COLOR_ALBEDO_PATTERN_TARGET = 0.6;
+const float COLOR_ALBEDO_PATTERN_KNEE = 0.75;
+const float COLOR_ALBEDO_PATTERN_SAT_MAX = 2.0;
+
+// 平均の色に対する比を保って掛けるブロック (テラコッタの設定の対象)
+bool isPatternAlbedoBlock(int blockId) {
+    return (blockId >= BLOCK_GLAZED_TERRACOTTA && blockId <= BLOCK_GLAZED_LAST)
+        || (blockId >= BLOCK_COLOR_FIRST && blockColorKind(blockId) == COLOR_KIND_TERRACOTTA);
+}
+
+vec3 applyPatternAlbedo(vec3 albedo, float s, float meanMax) {
+    if (s <= 1.0) return albedo * s;
+    float kb = clamp(COLOR_ALBEDO_PATTERN_TARGET / max(meanMax, 1e-4), 1.0, s);
+    vec3 b = albedo * kb;
+    float mx = maxOf(b);
+    if (mx > COLOR_ALBEDO_PATTERN_KNEE) {
+        const float w = COLOR_ALBEDO_MAX - COLOR_ALBEDO_PATTERN_KNEE;
+        float y = COLOR_ALBEDO_PATTERN_KNEE + w * (1.0 - exp(-(mx - COLOR_ALBEDO_PATTERN_KNEE) / w));
+        // もともと上限を超える画素は元より暗くしない
+        b *= max(y / mx, 1.0 / kb);
+    }
+    // 明るさで使い切れなかった倍率を彩度で。各成分が [0, COLOR_ALBEDO_MAX] に収まる所まで (白い画素は白のまま)
+    float l = luminance(b);
+    vec3 c = b - l;
+    float t = min(s / kb, COLOR_ALBEDO_PATTERN_SAT_MAX);
+    for (int i = 0; i < 3; i++) {
+        if (c[i] > 1e-5) t = min(t, max((COLOR_ALBEDO_MAX - l) / c[i], 1.0));
+        else if (c[i] < -1e-5) t = min(t, max(-l / c[i], 1.0));
+    }
+    return l + c * t;
+}
+
+/*
+ * meanMax: ブロックの平均の色 (線形) の最大成分。テラコッタだけが使う (lib/light/block_data.glsl colorBlockMeanMax)
+ * 他は画素ごとの倍率 (一番大きい成分が COLOR_ALBEDO_MAX に着いた所で止める)
+ */
+vec3 applyColorBlockAlbedo(int blockId, vec3 albedo, float meanMax) {
     if (!COLOR_ALBEDO_ACTIVE || !isColorAlbedoBlock(blockId)) return albedo;
     float s = colorBlockAlbedoStrength(blockId);
     if (s == 1.0) return albedo;
+    if (isPatternAlbedoBlock(blockId)) return applyPatternAlbedo(albedo, s, meanMax);
     float k = s < 1.0 ? s : max(1.0, min(s, COLOR_ALBEDO_MAX / max(maxOf(albedo), 1e-4)));
     return albedo * k;
 }
@@ -189,7 +234,7 @@ int blockIdToMaterial(int blockId) {
 
 /*
  * アイテム・ブロックエンティティの質感の推定に使うマテリアル ID
- * ブロックのアイテムは Iris が block.properties の ID を渡す (item.properties は見ない) ので、鉄・金のブロックなどはブロックと同じ金属・光沢にする
+ * ブロックのアイテムは Iris が block.properties の ID を currentRenderedItemId に渡す (item.properties は見ない。その間の blockEntityId は 1) ので、鉄・金のブロックなどはブロックと同じ金属・光沢にする
  * 植物・発光などはブロックの形や光り方に結び付いた分類なので、手に持った物にはふつうのブロックの推定を使う
  */
 int itemEstimateMaterial(int itemId) {

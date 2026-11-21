@@ -46,7 +46,7 @@ void main() {
     // RSM の VPL の色。ブロックエンティティ (旗・ベッド・シュルカーボックス) にも G バッファと同じ反射率 (ALBEDO_*_STRENGTH) を掛ける
     // エンティティを描く間の blockEntityId は 0 なので掛からない
     if (COLOR_ALBEDO_ACTIVE && isBlockEntityDraw(blockEntityId)) {
-        albedo.rgb = linearToSrgb(applyColorBlockAlbedo(stripMetalGate(blockEntityId), srgbToLinear(albedo.rgb)));
+        albedo.rgb = linearToSrgb(applyColorBlockAlbedo(stripMetalGate(blockEntityId), srgbToLinear(albedo.rgb), 0.0));
     }
     outColor = vec4(albedo.rgb, 1.0);
     outNormal = vec4(octEncode(normalize(normalPlayer)), 1.0, 0.0);

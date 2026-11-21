@@ -372,7 +372,7 @@ BLOCK_CONSTS: list[tuple] = [
     ("const", 0, "BLOCK_DECOR_GOLD", 16, "", True),
     ("const", 0, "BLOCK_DECOR_REDSTONE", 17, "", True),
     ("const", 0, "BLOCK_DECOR_AMETHYST", 18, "アメジストブロック・芽生えたアメジスト", True),
-    ("raw", "// 20-35: 彩釉テラコッタ。質感・遮蔽は BLOCK_GLOSSY と同じで、反射率の設定 (ALBEDO_GLAZED_STRENGTH) を掛けるために分ける"),
+    ("raw", "// 20-35: 彩釉テラコッタ。質感・遮蔽は BLOCK_GLOSSY と同じで、反射率の設定 (ALBEDO_TERRACOTTA_STRENGTH) を掛けるために分ける"),
     ("const", 42, "BLOCK_GLAZED_TERRACOTTA", 20, "20-35 (色の順は BLOCK_STAINED_GLASS と同じ)", True),
     ("const", 42, "BLOCK_GLAZED_LAST", 35, "", True),
     ("raw", ""),

@@ -95,8 +95,12 @@ void main() {
         uint albedoUp = blockAlbedoTopPacked(j);
         // 色の付いた固体の反射率 (ALBEDO_*_STRENGTH)。G バッファと同じ色にして、画面外の GI の当たりと floodfill の壁の照り返しもそろえる
         if (COLOR_ALBEDO_ACTIVE && isColorAlbedoBlock(j)) {
-            albedo = packUnorm4x8(vec4(linearToSrgb(applyColorBlockAlbedo(j, srgbToLinear(unpackUnorm4x8(albedo).rgb))), 0.0));
-            albedoUp = packUnorm4x8(vec4(linearToSrgb(applyColorBlockAlbedo(j, srgbToLinear(unpackUnorm4x8(albedoUp).rgb))), 0.0));
+            vec3 mean = srgbToLinear(unpackUnorm4x8(albedo).rgb);
+            vec3 meanUp = srgbToLinear(unpackUnorm4x8(albedoUp).rgb);
+            // a に掛ける前の平均の最大成分を残す (G バッファと RSM のテラコッタが同じ倍率を引く、colorBlockMeanMax)
+            float meanMax = maxOf(mean);
+            albedo = packUnorm4x8(vec4(linearToSrgb(applyColorBlockAlbedo(j, mean, meanMax)), linearToSrgb(vec3(meanMax)).x));
+            albedoUp = packUnorm4x8(vec4(linearToSrgb(applyColorBlockAlbedo(j, meanUp, meanMax)), 0.0));
         }
         blockData.albedo[j] = albedo;
         blockData.albedoUp[j] = albedoUp;
