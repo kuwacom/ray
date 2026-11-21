@@ -12,6 +12,7 @@
 //@include "/lib/post/post_internal.glsl"
 //@include "/lib/buffers/slots.glsl"
 //@include "/lib/common/pre_exposure.glsl"
+//@include "/lib/sky/beacon_beam_shape.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -56,6 +57,7 @@
 #include "/lib/post/lens_flare.glsl"
 #include "/lib/post/lens.glsl"
 #include "/lib/post/post_internal.glsl"
+#include "/lib/sky/beacon_beam_shape.glsl"
 // END GENERATED includes
 
 in vec2 texcoord;
@@ -385,16 +387,32 @@ void main() {
 
     vec2 closestUv = uv + vec2(nb.closestOffset) * texelSize();
     vec2 prevUv = uv + (getPreviousUv(closestUv, closestDepth) - closestUv);
+    // ビーコンの光線は深度を持たないので、芯の写る画素は奥の面ではなく光線の見える点で再投影する (lib/sky/beacon_beam_shape.glsl)
+    // 履歴の距離は奥の面のものなので、その画素はディスオクルージョンの判定をしない
+    bool beamPixel = false;
+    if (hasBeaconBeams()) {
+        float depthOpaque = texelFetch(depthtex1, texel, 0).r;
+        float opaqueDist = depthOpaque >= 1.0 ? BEACON_BEAM_FAR : length(screenToPlayer(vec3(unjitteredUv, fixHandDepth(depthOpaque))));
+        vec3 dir = normalize(viewToPlayerDir(screenToView(vec3(unjitteredUv, 1.0))));
+        float pixel = 2.0 / (viewHeight * gbufferProjection[1][1]) * BEACON_BEAM_MIN_PIXELS;
+        vec3 beamPoint;
+        if (beaconBeamCorePoint(dir, opaqueDist, pixel, beamPoint)) {
+            prevUv = uv + (playerToPreviousScreen(beamPoint).xy - unjitteredUv);
+            beamPixel = true;
+        }
+    }
     float motionPx = length((prevUv - uv) * viewSize());
 
     bool valid = reprojectionInside(prevUv);
 
     vec3 history = vec3(0.0);
     if (valid) {
-        float tolCenter, tolClosest;
-        float expCenter = expectedPreviousDistance(unjitteredUv, centerDepth, tolCenter);
-        float expClosest = expectedPreviousDistance(closestUv - taaJitterUv(), closestDepth, tolClosest);
-        valid = taaHistoryValid(prevUv, maxTexel, expCenter, tolCenter, expClosest, tolClosest);
+        if (!beamPixel) {
+            float tolCenter, tolClosest;
+            float expCenter = expectedPreviousDistance(unjitteredUv, centerDepth, tolCenter);
+            float expClosest = expectedPreviousDistance(closestUv - taaJitterUv(), closestDepth, tolClosest);
+            valid = taaHistoryValid(prevUv, maxTexel, expCenter, tolCenter, expClosest, tolClosest);
+        }
         history = sanitizeColor(hdrFromStorePrev(sampleCatmullRom(colortex13, prevUv, viewSize())));
     }
 

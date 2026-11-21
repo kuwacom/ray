@@ -70,6 +70,7 @@
 #include "/lib/buffers/slots.glsl"
 #include "/lib/sky/godrays.glsl"
 #include "/lib/common/exposure.glsl"
+#include "/lib/sky/beacon_beam_shape.glsl"
 #include "/lib/sky/beacon_beam.glsl"
 #include "/lib/common/jitter.glsl"
 #include "/lib/buffers/light_bins.glsl"
