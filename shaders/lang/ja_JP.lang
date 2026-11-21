@@ -168,6 +168,8 @@ option.LIGHT_TRANSLUCENT_TINT.comment=色付きガラスを通った光に色が
 option.LIGHT_TRANSLUCENT_TINT_SATURATION=色ガラスを通るブロックライトの色
 option.LIGHT_TRANSLUCENT_TINT_SATURATION.comment=色付きガラスなど水以外の半透明 (氷・スライム・ハチミツも) を通るブロックライトの色の濃さ。明るさはほぼ変わらない。0 = 色なし (暗くなるだけ)、1 = ガラスの色
 option.LIGHT_SPECULAR=ブロックライトの鏡面反射
+option.LIGHT_SPECULAR_OCCLUSION=光源のつやの遮り
+option.LIGHT_SPECULAR_OCCLUSION.comment=金属などに隠れた光源が映らないようにする。つやのある面が多いと少し重い
 option.LIGHT_DENOISE=ノイズ除去
 value.LIGHT_DENOISE.0=なし
 value.LIGHT_DENOISE.1=時間

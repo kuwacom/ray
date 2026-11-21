@@ -38,6 +38,7 @@
 #define LIGHT_TRANSLUCENT_TINT // 色ガラス越しの光の色付け
 #define LIGHT_TRANSLUCENT_TINT_SATURATION 1.5 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0] 色付きガラスなど水以外の半透明を通るブロックライト (floodfill と光源の影) の色の濃さ (輝度を保つ) 0=色なし
 #define LIGHT_SPECULAR // ブロックライトの鏡面反射
+#define LIGHT_SPECULAR_OCCLUSION // 光源のつやの遮り: 金属などのつやのある面で、壁に隠れた光源の鏡面反射を光源ごとのトレースで消す
 #define LIGHT_DENOISE 2 // [0 1 2] 0=なし 1=時間 2=時間+空間
 #define LIGHT_ENTITY_OCCLUSION // エンティティがブロックライトを遮る
 #define LIGHT_PLAYER_OCCLUSION // プレイヤーがブロックライトを遮る

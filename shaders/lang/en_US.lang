@@ -168,6 +168,8 @@ option.LIGHT_TRANSLUCENT_TINT.comment=Light passing through stained glass is col
 option.LIGHT_TRANSLUCENT_TINT_SATURATION=Stained Glass Block Light Color
 option.LIGHT_TRANSLUCENT_TINT_SATURATION.comment=Color strength of block light passing through stained glass and other see-through blocks except water (ice, slime, honey). Brightness stays about the same. 0 = no color (the light only dims), 1 = the glass color.
 option.LIGHT_SPECULAR=Block Light Specular
+option.LIGHT_SPECULAR_OCCLUSION=Specular Light Occlusion
+option.LIGHT_SPECULAR_OCCLUSION.comment=Keeps lights hidden behind walls from showing up in metal and other shiny surfaces. Slightly heavier when many shiny surfaces are on screen.
 option.LIGHT_DENOISE=Light Denoiser
 value.LIGHT_DENOISE.0=Off
 value.LIGHT_DENOISE.1=Temporal

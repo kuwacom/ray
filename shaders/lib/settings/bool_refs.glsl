@@ -38,6 +38,8 @@
 #endif
 #ifdef LIGHT_SPECULAR
 #endif
+#ifdef LIGHT_SPECULAR_OCCLUSION
+#endif
 #ifdef LIGHT_ENTITY_OCCLUSION
 #endif
 #ifdef LIGHT_PLAYER_OCCLUSION

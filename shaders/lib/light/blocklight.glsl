@@ -106,7 +106,7 @@ const int BLOCKLIGHT_SPECULAR_LIGHTS = LIGHT_SPECULAR_COUNT;
  * 光源ごとの可視率は無いので、deferred2 の可視率 (colortex7, トレースした光源全体の比) を共通に掛ける。
  * 体積の端ではフォールバックと同じ割合で弱める
  * 共通の比だけだと、見える光源がある所では隠れた光源の照り返しも残る (壁の陰のエメラルドが金属に緑の四角で映った)。
- * つやのある面で比が 0 と 1 の間の時は、surface_lights.glsl の gatherSurfaceLights が光源ごとにトレースして隠れた光源を消す
+ * LIGHT_SPECULAR_OCCLUSION では、つやのある面で比が 1 未満の時に surface_lights.glsl の getBlockLightSpecularOccluded が光源ごとにトレースして隠れた光源を消す
  * colortex7 は不透明面の可視率なので、水・ガラスなど半透明の面は光源ごとにトレースして可視率を出す
  * (lib/surface/surface_lights.glsl の gatherBlockTracedLights。選び方と LightSample はここの関数を使う)
  */
