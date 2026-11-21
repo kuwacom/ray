@@ -73,6 +73,7 @@
 #include "/lib/sky/atmosphere.glsl"
 #include "/lib/common/celestial_shape.glsl"
 #include "/lib/sky/celestial.glsl"
+#include "/lib/common/polarizer.glsl"
 #include "/lib/sky/cloud_styles.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/sky/sky_color.glsl"

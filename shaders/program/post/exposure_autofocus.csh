@@ -69,6 +69,7 @@
 #include "/lib/post/lens_flare.glsl"
 #include "/lib/post/lens.glsl"
 #include "/lib/post/post_internal.glsl"
+#include "/lib/common/polarizer.glsl"
 #include "/lib/common/phase.glsl"
 #include "/lib/sky/atmosphere.glsl"
 #include "/lib/sky/celestial.glsl"
@@ -797,6 +798,10 @@ void main() {
     float adaptedEv = adaptCameraEv(prevEv, measuredEv, initialized, dt);
     // 露出補正は決める組に入れる (画に別に掛けると二重になる)
     float sceneOffset = EXPOSURE_CAMERA_EV_OFFSET - LOOK_EXPOSURE_BIAS;
+    #ifdef CAMERA_FILTER
+    // 実機と同じくフィルター越しに測る (減光の分だけ SS・F 値・ISO で明るく撮る。ND で SS が延び、ISO オートと限界の表示もそのまま効く)
+    sceneOffset -= CAMERA_FILTER_STOPS;
+    #endif
     CameraExposure camera = cameraAutoExposure(adaptedEv + sceneOffset);
     frameData.postParams[CAMERA_AE_PARAM] = vec4(camera.shutter, camera.fNumber, camera.iso, float(camera.limits));
     #if EXPOSURE_INFO_MODE > 0
@@ -804,6 +809,11 @@ void main() {
     #endif
     float appliedEv = cameraExposureEv(camera);
     float targetEv = cameraExposureEv(cameraAutoExposure(measuredEv + sceneOffset));
+    #ifdef CAMERA_FILTER
+    // 組が写す明るさはフィルターの後の光に対してなので、場面の輝度に対してはフィルターの段数だけ暗い側
+    appliedEv += CAMERA_FILTER_STOPS;
+    targetEv += CAMERA_FILTER_STOPS;
+    #endif
 #elif !defined EXPOSURE_AUTO
     #ifdef EXPOSURE_CAMERA
     // EV100 = log2(N^2 / t) - log2(ISO / 100)。マニュアルと同じく環境の補正 (夜の持ち上げ・屋内・雨・水中) は掛けない
@@ -811,6 +821,10 @@ void main() {
     float measuredEv = log2(fNumber * fNumber / optShutterSpeed) - log2(optExposureIso / EXPOSURE_ISO_REFERENCE) - EXPOSURE_CAMERA_EV_OFFSET;
     #else
     float measuredEv = EXPOSURE_MANUAL_EV;
+    #endif
+    #ifdef CAMERA_FILTER
+    // M とマニュアルはフィルターの段数だけ暗く写る
+    measuredEv += CAMERA_FILTER_STOPS;
     #endif
     float adaptedEv = measuredEv;
     float appliedEv = measuredEv;

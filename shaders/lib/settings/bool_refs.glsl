@@ -194,6 +194,8 @@
 #endif
 #ifdef EXPOSURE_ISO_AUTO_M
 #endif
+#ifdef CAMERA_PL
+#endif
 #ifdef EXPOSURE_DR
 #endif
 #ifdef GRADING

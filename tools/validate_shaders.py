@@ -112,6 +112,15 @@ VALIDATION_SETS: dict[str, dict[str, str]] = {
     # A と S (S は 1 枚ずつのシャッター、A はアナログ)
     "EXPOSURE_CAMERA_A": {"EXPOSURE_MODE": "5", "ANALOG": "true", "EXPOSURE_METERING_MODE": "1"},
     "EXPOSURE_CAMERA_S": {"EXPOSURE_MODE": "6", "SHUTTER": "true", "SHUTTER_MODE": "1", "EXPOSURE_ISO_AUTO": "false", "EXPOSURE_INFO_MODE": "2"},
+    # レンズの前のフィルター: ゲーム向けの露出で PL の見た目だけ、M で ND と PL、A で ND とシャッターの反映
+    "CAMERA_PL": {"CAMERA_PL": "true"},
+    "CAMERA_FILTER_M": {"EXPOSURE_MODE": "3", "CAMERA_ND": "10", "CAMERA_PL": "true"},
+    "CAMERA_FILTER_A": {"EXPOSURE_MODE": "5", "CAMERA_ND": "6", "SHUTTER": "true"},
+    # M + ISO オートで ND、反射なしと太陽月のテクスチャで PL、マニュアルで PL (理想の偏光子の 1 段)
+    "CAMERA_FILTER_M_ISO_AUTO": {"EXPOSURE_MODE": "3", "EXPOSURE_ISO_AUTO_M": "true", "CAMERA_ND": "10"},
+    "CAMERA_PL_NO_REFLECTIONS": {"CAMERA_PL": "true", "REFLECTIONS": "0"},
+    "CAMERA_PL_SUN_TEXTURE": {"CAMERA_PL": "true", "SUN_MOON_STYLE": "0"},
+    "CAMERA_PL_MANUAL": {"CAMERA_PL": "true", "EXPOSURE_MODE": "0"},
     # シャッター速度の反映 (モーションブラーを切っても composite21 が走る)
     "SHUTTER": {"SHUTTER": "true", "MOTION_BLUR": "false"},
     # 1 枚ずつ (SSBO 8 も確保する) とカメラの露出・アナログ

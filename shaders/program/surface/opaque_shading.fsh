@@ -20,6 +20,7 @@
 //@include "/lib/sky/sky.glsl"
 //@include "/lib/light/light.glsl"
 //@include "/lib/surface/surface_lights.glsl"
+//@include "/lib/common/polarizer.glsl"
 #ifdef FIREWORK_LIGHT
     //@include "/lib/light/firework_light.glsl"
 #endif
@@ -74,6 +75,7 @@
 #include "/lib/sky/atmosphere.glsl"
 #include "/lib/common/celestial_shape.glsl"
 #include "/lib/sky/celestial.glsl"
+#include "/lib/common/polarizer.glsl"
 #include "/lib/sky/cloud_styles.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/sky/sky_color.glsl"
@@ -203,6 +205,13 @@ vec3 lavaRadiance(vec3 albedo) {
     return albedo / lum * (pattern * LAVA_LUMINANCE * limit);
 }
 
+#ifdef CAMERA_PL
+// PL フィルター: 照り返しの偏光 (葉・濡れた面・つやのある面の照り返しが減り、下の色が見える)。金属の分は掛けない
+float polarizerSpecularMaterial(Material m, vec3 V, vec3 L) {
+    return mix(polarizerSpecular(V, L, polarizerF0ToEta(m.f0.g)), 1.0, m.metalness);
+}
+#endif
+
 /*
  * 直接光 1 つ。拡散を返し、鏡面は specSum に足す (白飛び分は集めた鏡面の合計から求める)
  * slopeVar > 0 (水たまり): 鏡面の粗さを傾きの分散の分だけ広げる (雨粒の跳ねと画素より細かい波紋)
@@ -216,6 +225,9 @@ vec3 directLight(Material m, vec3 N, vec3 V, LightSample L, float slopeVar, floa
         rough.roughness = sqrt(sqr(m.roughness) + slopeVar);
         spec = evalDirectSpecular(rough, N, V, L, discScale);
     }
+#ifdef CAMERA_PL
+    spec *= polarizerSpecularMaterial(m, V, L.direction);
+#endif
     specSum += spec * (specVis * strength);
     return diffuse;
 }
@@ -223,6 +235,9 @@ vec3 directLight(Material m, vec3 N, vec3 V, LightSample L, float slopeVar, floa
 void directSpecular(Material m, vec3 N, vec3 V, LightSample L, float slopeVar, float strength, inout vec3 specSum) {
     Material rough = m;
     rough.roughness = sqrt(sqr(m.roughness) + slopeVar);
+#ifdef CAMERA_PL
+    strength *= polarizerSpecularMaterial(m, V, L.direction);
+#endif
     specSum += evalDirectSpecular(rough, N, V, L) * strength;
 }
 

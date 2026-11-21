@@ -26,6 +26,7 @@
 //@include "/lib/common/specular_sparkle.glsl"
 //@include "/lib/common/jitter.glsl"
 //@include "/lib/buffers/slots.glsl"
+//@include "/lib/common/polarizer.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -75,6 +76,7 @@
 #include "/lib/sky/atmosphere.glsl"
 #include "/lib/common/celestial_shape.glsl"
 #include "/lib/sky/celestial.glsl"
+#include "/lib/common/polarizer.glsl"
 #include "/lib/sky/cloud_styles.glsl"
 #include "/lib/sky/clouds.glsl"
 #include "/lib/sky/sky_color.glsl"
@@ -278,6 +280,10 @@ void main() {
 #else
         refl = below ? vec3(0.0) : skyReflectionFallback(R, lmT.y, 0.0);
 #endif
+#ifdef CAMERA_PL
+        // PL フィルター: 映り込みはフレネルと同じ角で偏光する (ブルースター角 53° 付近で消える)
+        refl *= polarizerReflection(V, N, eta);
+#endif
         color = behind * (1.0 - F) + refl * F;
         sparkleLum = behindExcess * (1.0 - F);
         if (below) {
@@ -387,6 +393,9 @@ void main() {
         vec3 R = reflect(-V, N);
         vec3 refl = reflectionAt(texel, dist, R, lmT.y, roughness, vec3(0.0));
         if (roughness < MIRROR_ROUGHNESS) refl = mirrorReflection(refl, surfView, surfPlayer, N, R, dist, false, false, dither);
+#ifdef CAMERA_PL
+        refl *= polarizerReflection(V, N, ior);
+#endif
         vec3 glassSunVis = surfaceSunVisibility(surfPlayer, N, lmT.y, dither) * getCloudSunDiscVisibility();
         float glassAlpha = max(roughness * roughness, MIN_ROUGHNESS);
         // 前方で照らした拡散 (translucent.rgb) は鏡面で反射する F の分を除く (太陽の鏡面を足すので、その分だけ明るくならないように)
