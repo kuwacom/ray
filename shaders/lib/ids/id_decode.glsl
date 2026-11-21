@@ -165,6 +165,12 @@ int blockLightFacing(int blockId) {
     return max(blockId - BLOCK_LIGHT_BASE, 0) >> 8;
 }
 
+// 向きの番号 (blockLightFacing) の前面の外向きの単位ベクトル。向きと面の対応はここだけに書き、使う所はこれと比べる
+vec3 facingDirection(int facing) {
+    const vec3 DIRS[4] = vec3[4](vec3(0.0, 0.0, -1.0), vec3(1.0, 0.0, 0.0), vec3(0.0, 0.0, 1.0), vec3(-1.0, 0.0, 0.0));
+    return DIRS[facing & 3];
+}
+
 // 一部だけ金属のブロック・アイテムの ID は、元の ID + 金属の判定の番号 x METAL_GATE_STRIDE (番号 0 = 金属なし)
 // 表に無いアイテム・ブロックエンティティの ID (-1) は、エンティティの頂点属性では判定の番号が範囲外になる大きな値で来る (16 bit の符号なしの 65535 と見られる)
 // 範囲外は金属なしにする (パン・本・チェスト・ベッドが丸ごと金属になっていた)

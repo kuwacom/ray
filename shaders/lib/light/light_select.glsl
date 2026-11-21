@@ -185,10 +185,9 @@ float quadFormFactor(vec3 q[4], vec3 n) {
  */
 const int LIGHT_FACE_FRONT = 3;
 
-// 水平の面 (axis, side) の外向きの向き (0 北 = -z、1 東 = +x、2 南 = +z、3 西 = -x)。上下の面は -1
-int lightFaceFacing(int axis, float side) {
-    if (axis == 1) return -1;
-    return axis == 2 ? (side > 0.0 ? 2 : 0) : (side > 0.0 ? 1 : 3);
+// 面 (axis, side) が向きの番号 facing の前面か (向きと面の対応は lib/ids/id_decode.glsl facingDirection)
+bool isLightFrontFace(int axis, float side, int facing) {
+    return facingDirection(facing)[axis] * side > 0.5;
 }
 
 /*
@@ -324,7 +323,7 @@ float lightBoxFormFactors(vec3 voxelPos, vec3 boxCenter, vec3 n, int light, bool
         float side = rel[axis] >= 0.0 ? 1.0 : -1.0;
         // 着色点が面の平面の外側にある時だけ見える
         if (abs(rel[axis]) <= 0.5) continue;
-        if (facing >= 0 && lightFaceFacing(axis, side) != facing) continue;
+        if (facing >= 0 && !isLightFrontFace(axis, side, facing)) continue;
         ivec3 nb = cell;
         nb[axis] += int(side);
         if (isVoxelOpaque(fetchVoxelBlockId(nb))) continue;

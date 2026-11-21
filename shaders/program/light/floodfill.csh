@@ -203,12 +203,13 @@ bool isEntityLightRepresentative(ivec3 cell, uint key) {
 /*
  * 向きのある光源 (点灯したかまど・ジャック・オ・ランタン) は、火の光が出る前面 (炉の口・顔) 以外の面をふさぐ
  * 光源のセルから 6 方向へ一様に広げると、光源自身の横・上・裏の面と裏の床まで口の前と同じに照らされ、ブロック全体が光って見えた
- * 向きの番号 (0 北 1 東 2 南 3 西) から、前面の面の番号 (0 +x 1 -x 2 +y 3 -y 4 +z 5 -z。floodfill の隣の順) へ
+ * 面の番号は floodfill の隣の順 (0 +x 1 -x 2 +y 3 -y 4 +z 5 -z)。前面は水平なので x か z
  */
 uint facingLightCoveredFaces(int voxelId) {
     if (!isFacingLight(getBlockLightIndex(voxelId))) return 0u;
-    const uint FRONT_FACE[4] = uint[4](5u, 0u, 4u, 1u);
-    return 63u & ~(1u << FRONT_FACE[blockLightFacing(voxelId) & 3]);
+    vec3 front = facingDirection(blockLightFacing(voxelId));
+    uint face = (front.x != 0.0 ? 0u : 4u) + (front.x + front.z > 0.0 ? 0u : 1u);
+    return 63u & ~(1u << face);
 }
 
 // 塊に属するセルの頂点位置の平均 (蓄積表に無いセルはセル中心で代用)

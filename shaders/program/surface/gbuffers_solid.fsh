@@ -252,8 +252,7 @@ const float JACK_O_LANTERN_SHELL_EMISSION = 0.05;
 
 // facing: 前面の向き (0 北 1 東 2 南 3 西。lib/ids/id_decode.glsl blockLightFacing)。shell: 前面以外の面の発光
 float facingLightEmission(float emission, vec3 albedoSrgb, vec3 geoNormal, int facing, float shell) {
-    const vec3 FRONT[4] = vec3[4](vec3(0.0, 0.0, -1.0), vec3(1.0, 0.0, 0.0), vec3(0.0, 0.0, 1.0), vec3(-1.0, 0.0, 0.0));
-    return dot(geoNormal, FRONT[facing & 3]) > 0.5 ? emission * facingFireMask(albedoSrgb) : shell;
+    return dot(geoNormal, facingDirection(facing)) > 0.5 ? emission * facingFireMask(albedoSrgb) : shell;
 }
 
 // スプライト内で UV を折り返す (POM でスプライトの外を読まないため)
