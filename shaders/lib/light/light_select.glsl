@@ -433,9 +433,13 @@ vec3 evalLightIrradiance(LightInstance L, vec3 voxelPos, vec3 n, vec3 gateNormal
     float dist = length(toL);
     if (dist >= L.posRadius.w) return vec3(0.0);
     vec3 dir = toL / max(dist, EPS);
-    float radius = L.colorSize.a;
+    float radius = lightSourceSize(L);
     float gate = sphereLightNdotL(gateNormal, dir, dist, radius);
     if (gate <= 0.0) return vec3(0.0);
+    // 片面の光源 (かまど) は口の前の半空間だけ。L は値渡しなので、放射に掛けると下の全ての項 (箱の広がりを含む) に掛かる
+    float oneSided = lightOneSidedGate(L, voxelPos);
+    if (oneSided <= 0.0) return vec3(0.0);
+    L.colorSize.rgb *= oneSided;
     // かすめ角ではテクスチャ法線の NdotL が幾何法線の何倍にも振れ、テクセルごとの明暗が強くなりすぎる
     // TAA のジッターでピクセルがテクセルの境界をまたぐたびに値が飛び、床が細かくちらついた。幾何法線の NdotL に寄せる
     float ndl = mix(gate, sphereLightNdotL(n, dir, dist, radius), smoothstep(0.0, LIGHT_NORMAL_GRAZING, gate));
@@ -474,7 +478,7 @@ vec3 evalLightIrradiance(LightInstance L, vec3 voxelPos, vec3 n, vec3 gateNormal
 bool lightBoxSpreadReaches(LightInstance L, vec3 voxelPos, vec3 gateNormal) {
     vec3 toL = L.posRadius.xyz - voxelPos;
     float dist = length(toL);
-    return dist < L.posRadius.w && sphereLightNdotL(gateNormal, toL / max(dist, EPS), dist, L.colorSize.a) > 0.0;
+    return dist < L.posRadius.w && sphereLightNdotL(gateNormal, toL / max(dist, EPS), dist, lightSourceSize(L)) > 0.0;
 }
 
 /*
@@ -579,7 +583,7 @@ vec3 sumBinLightsDeferred(vec3 voxelPos, vec3 normal, vec3 geoNormal, bool plant
         float scale = plant ? plantLightNormal(L, voxelPos, ln, lg) : 1.0;
         sum += evalLightIrradiance(L, voxelPos, ln, lg, true, false) * scale;
         vec3 far = evalLightIrradiance(L, voxelPos, geoNormal, geoNormal, false);
-        if (L.colorSize.a > LAVA_LIGHT_SIZE_MIN && maxOf(far) > 0.0 && isLavaLight(L)) far *= LAVA_GI_DIRECT_GAIN;
+        if (lightSourceSize(L) > LAVA_LIGHT_SIZE_MIN && maxOf(far) > 0.0 && isLavaLight(L)) far *= LAVA_GI_DIRECT_GAIN;
         giFar += far;
     }
     return sum;
@@ -600,7 +604,7 @@ vec3 sumBinLightsUnshadowed(vec3 voxelPos, vec3 normal, vec3 geoNormal) {
 
 // 光源サイズ由来の半影を作るための終点の揺らぎ半径
 float lightJitterRadius(LightInstance L) {
-    return min(L.colorSize.a * LIGHT_SOURCE_SIZE * LIGHT_SOURCE_SIZE_SCALE, LIGHT_JITTER_MAX_RADIUS);
+    return min(lightSourceSize(L) * LIGHT_SOURCE_SIZE * LIGHT_SOURCE_SIZE_SCALE, LIGHT_JITTER_MAX_RADIUS);
 }
 
 // 光源の体 (エンティティ光源) で自分を遮らないよう、光源側でエンティティ占有を無視する距離
@@ -611,9 +615,9 @@ const float LIGHT_ENTITY_SKIP_BASE = 0.25; // ボクセル方式の基礎値
 float lightEntitySkip(LightInstance L) {
 #ifdef ENTITY_TRI_OCCLUSION
     // たいまつ (半径 0.08) で 0.31、発光・燃焼エンティティ (半径 0.4) で体の大半を覆う 0.95
-    return L.colorSize.a * 2.0 + LIGHT_ENTITY_SKIP_TRI_BASE;
+    return lightSourceSize(L) * 2.0 + LIGHT_ENTITY_SKIP_TRI_BASE;
 #else
-    return max(TRACE_ENTITY_SKIP_END, L.colorSize.a * 2.0 + LIGHT_ENTITY_SKIP_BASE);
+    return max(TRACE_ENTITY_SKIP_END, lightSourceSize(L) * 2.0 + LIGHT_ENTITY_SKIP_BASE);
 #endif
 }
 
