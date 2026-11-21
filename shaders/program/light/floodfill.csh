@@ -200,6 +200,17 @@ bool isEntityLightRepresentative(ivec3 cell, uint key) {
     return true;
 }
 
+/*
+ * 向きのある光源 (点灯したかまど・ジャック・オ・ランタン) は、火の光が出る前面 (炉の口・顔) 以外の面をふさぐ
+ * 光源のセルから 6 方向へ一様に広げると、光源自身の横・上・裏の面と裏の床まで口の前と同じに照らされ、ブロック全体が光って見えた
+ * 向きの番号 (0 北 1 東 2 南 3 西) から、前面の面の番号 (0 +x 1 -x 2 +y 3 -y 4 +z 5 -z。floodfill の隣の順) へ
+ */
+uint facingLightCoveredFaces(int voxelId) {
+    if (!isFacingLight(getBlockLightIndex(voxelId))) return 0u;
+    const uint FRONT_FACE[4] = uint[4](5u, 0u, 4u, 1u);
+    return 63u & ~(1u << FRONT_FACE[blockLightFacing(voxelId) & 3]);
+}
+
 // 塊に属するセルの頂点位置の平均 (蓄積表に無いセルはセル中心で代用)
 vec3 entityLightCentroid(ivec3 cell, uint key) {
     uint index = key & 255u;
@@ -301,7 +312,8 @@ void main() {
             for (int i = 0; i < 6; i++) {
                 ivec3 n = cell;
                 n[i >> 1] += (i & 1) == 0 ? 1 : -1;
-                uint nFaces = isInVoxelVolume(n) ? getShapeCoveredFaces(unpackVoxelBlockId(imageLoad(voxelBlockImg, n).r)) : 0u;
+                int nId = isInVoxelVolume(n) ? unpackVoxelBlockId(imageLoad(voxelBlockImg, n).r) : BLOCK_AIR;
+                uint nFaces = getShapeCoveredFaces(nId) | facingLightCoveredFaces(nId);
                 if ((((selfFaces >> uint(i)) | (nFaces >> uint(i ^ 1))) & 1u) != 0u) light -= nb[i];
             }
         }

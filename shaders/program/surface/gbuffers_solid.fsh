@@ -244,10 +244,16 @@ float facingFireMask(vec3 albedoSrgb) {
     return max(smoothstep(FACING_FIRE_SATURATION.x, FACING_FIRE_SATURATION.y, sat), smoothstep(FACING_FIRE_CORE.x, FACING_FIRE_CORE.y, mx));
 }
 
-// facing: 前面の向き (0 北 1 東 2 南 3 西。lib/ids/id_decode.glsl blockLightFacing)
-float facingLightEmissionMask(vec3 albedoSrgb, vec3 geoNormal, int facing) {
+/*
+ * ジャック・オ・ランタンの顔以外の面の発光。中の火がカボチャの皮を透けて淡く光る
+ * 皮の色 (アルベド) を一様に光らせる。明るい画素だけの推定 (estimateEmission) のままでは皮の筋の模様が光の模様になる
+ */
+const float JACK_O_LANTERN_SHELL_EMISSION = 0.05;
+
+// facing: 前面の向き (0 北 1 東 2 南 3 西。lib/ids/id_decode.glsl blockLightFacing)。shell: 前面以外の面の発光
+float facingLightEmission(float emission, vec3 albedoSrgb, vec3 geoNormal, int facing, float shell) {
     const vec3 FRONT[4] = vec3[4](vec3(0.0, 0.0, -1.0), vec3(1.0, 0.0, 0.0), vec3(0.0, 0.0, 1.0), vec3(-1.0, 0.0, 0.0));
-    return dot(geoNormal, FRONT[facing & 3]) > 0.5 ? facingFireMask(albedoSrgb) : 0.0;
+    return dot(geoNormal, FRONT[facing & 3]) > 0.5 ? emission * facingFireMask(albedoSrgb) : shell;
 }
 
 // スプライト内で UV を折り返す (POM でスプライトの外を読まないため)
@@ -635,7 +641,11 @@ void main() {
     g.wetness = max(wetAmount, puddle);
     g.emission = dryEmission;
 #if defined GBUF_TERRAIN
-    if (isFacingLight(getBlockLightIndex(blockBase))) g.emission *= facingLightEmissionMask(albedoDry, geoN, blockLightFacing(blockBase));
+    int lightIndex = getBlockLightIndex(blockBase);
+    if (isFacingLight(lightIndex)) {
+        float shell = lightIndex == LIGHT_JACK_O_LANTERN ? JACK_O_LANTERN_SHELL_EMISSION : 0.0;
+        g.emission = facingLightEmission(g.emission, albedoDry, geoN, blockLightFacing(blockBase), shell);
+    }
 #endif
 #if defined GBUF_ENTITIES
     // クリーパー・TNT は点滅の白さ (entityColor) の分だけ、発光エンティティと同じ式で明るい画素を光らせる。点滅していない時は光らない
