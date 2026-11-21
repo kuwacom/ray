@@ -73,6 +73,20 @@ float cloudStepAt(CloudSteps s, int i, float dither, out float dt) {
     return s.nearEnd + s.dt * (float(i - s.nearSteps) + dither);
 }
 
+/*
+ * 雲の中にいる時の手前の雲の消散の倍率 (CLOUD_INTERIOR_VISIBILITY)。既定の視程なら 1 で、外から見た雲と同じ
+ * カメラの周りの濃さ (skyParams[4].a。縁から十数ブロックで立ち上がる) で入れるので、雲に入っていく間に滑らかに効き、
+ * 手前の区間の奥で 1 に戻すので、遠くの雲の見え方は変わらない
+ */
+float cloudNearBoost(CloudSteps s, float t) {
+#ifdef CLOUD_INTERIOR
+    if (CLOUD_INTERIOR_DENSITY_SCALE == 1.0 || s.nearSteps == 0) return 1.0;
+    return 1.0 + (CLOUD_INTERIOR_DENSITY_SCALE - 1.0) * frameData.skyParams[4].a * (1.0 - smoothstep(0.5 * CLOUD_NEAR_LENGTH, CLOUD_NEAR_LENGTH, t));
+#else
+    return 1.0;
+#endif
+}
+
 // share: 区間を分けて呼ぶ時のこの区間の歩数の割合 (分けない時 1)
 CloudAccum cloudMarchLow(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, vec2 dither, float share) {
     CloudAccum acc = CloudAccum(vec3(0.0), 1.0, 0.0, 0.0);
@@ -97,7 +111,7 @@ CloudAccum cloudMarchLow(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, 
         float density = cloudLowDensity(ctx, col, rel, altitude, cloudDetailLod(tRef), false, cloudHeight);
         if (density <= 0.0) continue;
 
-        float extinction = density * CLOUD_LOW_SIGMA;
+        float extinction = density * CLOUD_LOW_SIGMA * cloudNearBoost(walk, t);
         float h = saturate((altitude - CLOUD_R_BASE) / CLOUD_R_DEPTH);
         vec3 lightDir = cloudRefDir(l.lightDir, CLOUD_KH, slope);
         float odNear;
@@ -280,7 +294,7 @@ CloudAccum cloudMarchMid(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, 
         float density = cloudMidDensity(ctx, cover, rel, altitude, tRef < CLOUD_DETAIL_FADE.y, grainHeight);
         if (density <= 0.0) continue;
 
-        float extinction = density * CLOUD_MID_SIGMA;
+        float extinction = density * CLOUD_MID_SIGMA * cloudNearBoost(walk, t);
         float h = saturate((altitude - CLOUD_R_MID_BASE) / CLOUD_R_MID_DEPTH);
         vec3 lightDir = cloudRefDir(l.lightDir, CLOUD_KH, slope);
         float odLight = cloudMidLightOD(ctx, cover, rel, altitude, lightDir, dither.y);

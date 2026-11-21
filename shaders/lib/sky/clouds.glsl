@@ -45,6 +45,12 @@
 #if defined CLOUD_INTERIOR && defined CLOUD_VANILLA_SHAPE
     #define CLOUD_INTERIOR_FOG
 #endif
+#ifdef CLOUD_INTERIOR
+// 雲の中の見通しの倍率。既定の視程 (CLOUD_INTERIOR_VISIBILITY_REF) で 1 の消散の倍率で、体積の層は雲の中にいる時の手前の雲 (cloudNearBoost)、
+// バニラの形は板の中の霧に掛ける。どちらも雲の濃さの設定 (CLOUD_LOW_DENSITY) にも比例するので、濃い雲ほど中の見通しも短い
+const float CLOUD_INTERIOR_VISIBILITY_REF = 64.0;
+const float CLOUD_INTERIOR_DENSITY_SCALE = CLOUD_INTERIOR_VISIBILITY_REF / float(CLOUD_INTERIOR_VISIBILITY);
+#endif
 
 const float CLOUD_RAY_FAR = 1e12; // 球との交差が無い方向の距離 (十分遠い値)
 
@@ -364,7 +370,9 @@ float cloudRainBelowDeck() {
  * 板の柱は面から内側で雲のマーチの消散を弱め切るので (skyParams[7].z)、板の中の視程はこちらで決める
  * 視程 = 3 / 消散係数 (WMO の定義)。濃さ・光・マーチの消散を引いた霧の消散係数は、prepare2 がカメラの位置で求める (frameData.skyParams[4] [5])
  */
-const float CLOUD_INTERIOR_EXTINCTION = 3.0 / float(CLOUD_INTERIOR_VISIBILITY);
+// 既定の濃さ (CLOUD_INTERIOR_DENSITY_REF) で視程が CLOUD_INTERIOR_VISIBILITY になる
+const float CLOUD_INTERIOR_DENSITY_REF = 0.25;
+const float CLOUD_INTERIOR_EXTINCTION = 3.0 / float(CLOUD_INTERIOR_VISIBILITY) * (CLOUD_LOW_DENSITY / CLOUD_INTERIOR_DENSITY_REF);
 // 真横に近い視線の霧の長さの上限 (ブロック)。板の上面・下面を抜ける視線は短く、真横の視線だけ無限に長いと水平線に白い帯が出る。
 // 視程の 2 倍で光は 0.25% まで減るので、ここで打ち切っても見た目は変わらない
 const float CLOUD_INTERIOR_MAX_LENGTH = 2.0 * float(CLOUD_INTERIOR_VISIBILITY);
