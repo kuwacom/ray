@@ -274,6 +274,7 @@ vec3 reflectorSun(vec3 xVox, vec3 N, LightSample sun) {
 /*
  * ブロックライトの反射光。ビンの明るい REFLECTOR_BLOCKLIGHT_COUNT 個の光源を、面の向き ±x ±z ごとに面の位置で鏡映して辿る
  * 光源が受信点と同じ側にある面だけが鏡になるので、面は受信点と光源の両方より先 (反射体の側) に置く
+ * 片面の光源 (点灯したかまど) は、光が当たる鏡の面の点 (反射点) が口の前にある時だけ光る (lightOneSidedGate)
  */
 vec3 reflectorBlockLights(vec3 xVox, vec3 N) {
     int bin = lightBinIndex(ivec3(floor(xVox)));
@@ -323,7 +324,7 @@ vec3 reflectorBlockLights(vec3 xVox, vec3 N) {
                 vec3 dir = toImage / dist;
                 vec3 n = vec3(0.0);
                 n[a] = -s;
-                float cosR = sphereLightNdotL(N, dir, dist, L.colorSize.a);
+                float cosR = sphereLightNdotL(N, dir, dist, lightSourceSize(L));
                 float cosI = dot(n, normalize(lp - h.q));
                 if (cosR <= 0.0 || cosI <= REFLECTOR_MIN_COS) break;
                 float cover = reflectorCoverage(h.cell, a, h.q, dist * reflectorSpread(h.kind));
@@ -331,7 +332,7 @@ vec3 reflectorBlockLights(vec3 xVox, vec3 N) {
                 vec3 vis = traceVisibility(xVox, h.q - dir * REFLECTOR_FACE_OFFSET, REFLECTOR_TRACE_FLAGS, 0.5, 0.0, 0.0);
                 if (maxOf(vis) <= 0.0) break;
                 vis *= traceVisibility(h.q + n * REFLECTOR_FACE_OFFSET, lp, REFLECTOR_TRACE_FLAGS, 0.5, 0.0, 0.0);
-                sum += L.colorSize.rgb * lightFalloff(dist, reach) * reflectorReflectance(h.kind, h.id, cosI) * (vis * (cosR * cover * reflectorPattern(h.id, a, h.q)));
+                sum += L.colorSize.rgb * lightFalloff(dist, reach) * lightOneSidedGate(L, h.q) * reflectorReflectance(h.kind, h.id, cosI) * (vis * (cosR * cover * reflectorPattern(h.id, a, h.q)));
                 break;
             }
         }
