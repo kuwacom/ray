@@ -392,8 +392,14 @@ void main() {
     }
     vec3 ambient = skyAmbient + blockLight + indirectLight + minAmbientIrradiance() * ao;
 #ifdef FIREWORK_LIGHT
-    // 花火の爆発の光 (lib/light/firework_light.glsl)。遮蔽はスカイライトの近似なので、ほかの環境光と同じく AO を掛ける
-    if (hasFireworkLight()) ambient += evalFireworkIrradiance(playerPos, g.normal, g.lightmap.y) * ao;
+    // 花火の爆発の光 (lib/light/firework_light.glsl)。拡散と鏡面 (濡れた地面・金属の照り返し)
+    // 遮蔽はスカイライトの近似なので、ほかの環境光と同じく AO を掛ける
+    if (hasFireworkLight()) {
+        LightSample firework = evalFireworkLight(playerPos, g.lightmap.y);
+        firework.irradiance *= ao;
+        if (plant) color += evalDiffuseIrradiance(m, firework.irradiance * PLANT_LIGHT_NDOTL);
+        else color += directLight(m, g.normal, V, firework, puddleVar, 1.0, 1.0, SPECULAR_BLOCK_STRENGTH, specSum);
+    }
 #endif
     color += evalDiffuseIrradiance(m, ambient);
 

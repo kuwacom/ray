@@ -3,7 +3,8 @@
  * 光るパーティクル (バニラがライトマップ最大で描く自己発光の粒。花火の火花が大半) の平均の位置と色から点光源を 1 つ作る
  *   1. gbuffers_particles_translucent の頂点が 4 頂点に 1 回 fireworkAccAdd で位置と色を足す (画面内の粒だけ)
  *   2. 次のフレームの begin が updateFireworkLight で平均を取り、粒の数に応じた強さの光にして置く
- *   3. deferred30 が地面・壁の拡散 (evalFireworkIrradiance)、composite19 が空気と霧の内散乱 (evalFireworkGlow) を足す
+ *   3. 光源としての花火 (evalFireworkLight) を deferred30 が地面・壁の拡散と鏡面、composite2 が水・ガラスの鏡面と水の内散乱に、
+ *      composite19 が空気と霧の内散乱 (evalFireworkGlow) に足す
  * 遮蔽はスカイライトで近似する (花火は空にあり、空の見える面ほど照らされる)。光源シャドウ・ビンには入れない
  * (到達距離が 100 ブロック近くあり、ビンに入れると数千のビンに登録されて全画素のトレースが 1 本増える)
  * 同時に上がった花火も 1 つの光にまとめる (色と位置は重みの平均)
@@ -16,6 +17,7 @@
 //@include "/lib/common/uniforms.glsl"
 //@include "/lib/common/math.glsl"
 //@include "/lib/common/phase.glsl"
+//@include "/lib/common/shading_types.glsl"
 //@include "/lib/buffers/firework_light.glsl"
 
 // 固定小数点の倍率。位置は多数の粒の平均なので 1/2 ブロックで足り、和が int に収まる粒の数を稼ぐ (約 13 万粒)
@@ -28,8 +30,21 @@ const float FIREWORK_LIGHT_MIN_SPARKS = 12.0;
 // 小さな玉の花火 1 発 (火花と尾で約 150 粒) を強さ 1 とする。大きな玉や同時の打ち上げは頭打ちで最大 2 倍
 const float FIREWORK_LIGHT_FULL_SPARKS = 150.0;
 const float FIREWORK_LIGHT_GAIN_MAX = 2.0;
-// 強さ 1 の放射強度。40 ブロック下の地面の照度が満月の月明かり (MOON_ILLUMINANCE) と同じくらい
-const float FIREWORK_LIGHT_INTENSITY = 20.0 * PHYSICAL_BLOCKLIGHT;
+/*
+ * 強さ 1 の放射強度。実物の玉 (照明弾 1 本 M127A1 が 9 万 cd で、玉はその桁) を観客の距離 (100-300 m) で見た地面の照度
+ * (1-4 lx、満月 0.05-0.3 lx の数倍から数十倍) を、バニラの花火の開く 30-40 ブロック下で出す値
+ * 実物の cd のまま (10 万 cd、照度 1 は約 8200 lx なので 1e5 / 8200 / 2^-8.5 = 4400) では、開く距離が実物の 1/5 ほどなので
+ * 地面が 25 倍明るく、暗さに慣れた露出で地面も霧の暈も白く飛んだ
+ * 現実の光の比 (灯りの段 -8.5) で約 3600 cd、40 ブロック下で約 2.2 lx (満月 MOON_ILLUMINANCE の約 8 倍)
+ * 以前の 20 (満月と同じくらい) では水面の鏡面 (フレネル 2%) にすると見えなかった
+ */
+const float FIREWORK_LIGHT_INTENSITY = 160.0 * PHYSICAL_BLOCKLIGHT;
+/*
+ * 現実の光の比を使わない時 (PHYSICAL_LIGHT_ACTIVE なし) は灯りが太陽に比べて 2^8.5 倍明るい (constants.glsl)。
+ * 昼の花火が日なたを照らさないよう、太陽の高さ (sin) が x -> y で現実の比 (FIREWORK_LIGHT_DAY_RATIO) へ下げる
+ */
+const vec2 FIREWORK_LIGHT_DAY_SUN = vec2(-0.1, 0.1);
+const float FIREWORK_LIGHT_DAY_RATIO = exp2(-8.5);
 // 火花が広がる球の半径 (ブロック)。真下の地面だけが点で強く照らされないように距離に足す
 const float FIREWORK_LIGHT_RADIUS = 5.0;
 // 粒の数の揺れ (バニラの点滅する花火) で光がちらつき過ぎないように均す時定数 (秒)
@@ -38,8 +53,11 @@ const float FIREWORK_LIGHT_SMOOTH_TIME = 0.06;
 const float FIREWORK_LIGHT_CUTOFF = 0.01;
 // 地面を照らす面のスカイライトの範囲 (0-1)。屋根の下・洞窟は照らさない
 const vec2 FIREWORK_LIGHT_SKYLIGHT = vec2(0.5, 0.95);
-// 空気の散乱係数の下限 (1/ブロック)。晴れた夜は霧が薄く、火薬の煙に当たって色付いて光る暈をこの濃さで近似する
-const float FIREWORK_SMOKE_SCATTER = 0.001;
+/*
+ * 空気の散乱係数の下限 (1/ブロック)。晴れた夜は霧が薄く、火薬の煙に当たって色付いて光る暈をこの濃さで近似する
+ * 視程 25 km の空気 (Koschmieder 3.9 / 視程) くらい。0.001 (視程 4 km) では強さを上げた光で空が一面に花火の色になった
+ */
+const float FIREWORK_SMOKE_SCATTER = 1.5e-4;
 
 #ifdef SSBO_FIREWORK_LIGHT_WRITE
 // 光る粒 1 つ (4 頂点に 1 回呼ぶ)。weight: 粒の不透明度 (消えかけの火花ほど弱い)
@@ -65,6 +83,10 @@ void updateFireworkLight() {
     vec3 shift = previousCameraPosition - cameraPosition;
     vec3 pos = fireworkLight.posRadius.xyz + shift;
     vec3 target = vec3(0.0);
+    float peak = FIREWORK_LIGHT_INTENSITY * FIREWORK_LIGHT_STRENGTH;
+#ifndef PHYSICAL_LIGHT_ACTIVE
+    peak *= mix(1.0, FIREWORK_LIGHT_DAY_RATIO, smoothstep(FIREWORK_LIGHT_DAY_SUN.x, FIREWORK_LIGHT_DAY_SUN.y, sin(sunAngle * TAU)));
+#endif
     float wq = float(fireworkLight.acc[1]);
     float sparks = wq / FIREWORK_ACC_WEIGHT_SCALE;
     if (sparks > 0.0) {
@@ -72,13 +94,13 @@ void updateFireworkLight() {
         vec3 c = vec3(fireworkLight.acc[5], fireworkLight.acc[6], fireworkLight.acc[7]) / (wq * FIREWORK_ACC_COLOR_SCALE);
         float k = sparks / FIREWORK_LIGHT_FULL_SPARKS;
         float amount = smoothstep(FIREWORK_LIGHT_MIN_SPARKS, FIREWORK_LIGHT_MIN_SPARKS * 2.0, sparks) * k / (1.0 + k / FIREWORK_LIGHT_GAIN_MAX);
-        target = c / max(maxOf(c), 1e-3) * (amount * FIREWORK_LIGHT_INTENSITY * FIREWORK_LIGHT_STRENGTH);
+        target = c / max(maxOf(c), 1e-3) * (amount * peak);
         // 光っていなかった時は新しい位置へ飛ぶ。光っている間は位置も均す (別の花火が加わった時に光が跳ばない)
         pos = fireworkLight.posRadius.w > 0.0 ? mix(pos, p, 0.5) : p;
     }
     float blend = 1.0 - exp(-frameTime / FIREWORK_LIGHT_SMOOTH_TIME);
     vec3 intensity = mix(prevIntensity, target, blend);
-    bool lit = maxOf(intensity) > FIREWORK_LIGHT_CUTOFF * FIREWORK_LIGHT_INTENSITY * FIREWORK_LIGHT_STRENGTH;
+    bool lit = maxOf(intensity) > FIREWORK_LIGHT_CUTOFF * peak;
     fireworkLight.posRadius = vec4(pos, lit ? FIREWORK_LIGHT_RADIUS : 0.0);
     fireworkLight.intensity = vec4(lit ? intensity : vec3(0.0), 0.0);
     for (int i = 0; i < FIREWORK_ACC_COUNT; i++) fireworkLight.acc[i] = 0;
@@ -87,14 +109,21 @@ void updateFireworkLight() {
 
 bool hasFireworkLight() { return fireworkLight.posRadius.w > 0.0; }
 
-// 面の照度 (拡散に足す)。skylight: ライトマップのスカイライト (0-1)
-vec3 evalFireworkIrradiance(vec3 playerPos, vec3 normal, float skylight) {
+/*
+ * 光源としての花火 (手持ち光源の evalHandLight と同じ形)。skylight: ライトマップのスカイライト (0-1)
+ * 見かけの半径は火花の球の半径で、鏡面のローブを広げて水面に映る光を玉の大きさにする (波の法線で縦に伸びて光の柱になる)
+ */
+LightSample evalFireworkLight(vec3 playerPos, float skylight) {
     vec3 toLight = fireworkLight.posRadius.xyz - playerPos;
     float d2 = dot(toLight, toLight);
-    float NdotL = saturate(dot(normal, toLight * inversesqrt(max(d2, 1e-4))));
+    float d = sqrt(d2);
     float r = fireworkLight.posRadius.w;
     float sky = smoothstep(FIREWORK_LIGHT_SKYLIGHT.x, FIREWORK_LIGHT_SKYLIGHT.y, skylight);
-    return fireworkLight.intensity.rgb * (NdotL * sky / (d2 + r * r));
+    LightSample s;
+    s.direction = toLight / max(d, 1e-2);
+    s.angularSize = atan(r, max(d, 1e-2));
+    s.irradiance = fireworkLight.intensity.rgb * (sky / (d2 + r * r));
+    return s;
 }
 
 /*
