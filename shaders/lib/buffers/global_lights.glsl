@@ -37,6 +37,7 @@ struct LightInstance {
  * 確かめ方: 1 つだけ置いたかまどの裏の床と裏・上の面が、口の前の床より十分暗いこと (program/light/floodfill.csh が登録する)
  */
 const float LIGHT_ONE_SIDED_INSET = 0.49; // 口の面へ寄せる量 (セルの中心から)。0.5 にすると floor で隣のセルになる
+const float LIGHT_ONE_SIDED_CELL_MARGIN = 0.005; // 半影の揺らした終点を光源のセルの中に留める余白 (program/light/block_light_trace.csh)
 
 float lightSourceSize(LightInstance L) { return abs(L.colorSize.a); }
 
