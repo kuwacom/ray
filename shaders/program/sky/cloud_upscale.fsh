@@ -129,7 +129,7 @@ void main() {
 
         vec3 dir = normalize(viewToPlayerDir(screenToView(vec3(texcoord, 1.0))));
         vec2 prevUv = cloudPreviousUv(dir);
-        bool valid = reprojectionInside(prevUv) && frameData.skyParams[1].y > 1.5;
+        bool valid = reprojectionInside(prevUv) && skyScreenHistoryValid();
         if (valid) {
             vec4 history = texture(colortex11, prevUv);
             history = clamp(history, lo - pad, hi + pad);

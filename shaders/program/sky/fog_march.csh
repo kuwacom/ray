@@ -181,7 +181,7 @@ void main() {
     } else {
         prevUv = playerToPreviousScreen(playerPos).xy;
     }
-    bool valid = reprojectionInside(prevUv) && frameData.skyParams[1].y > 1.5;
+    bool valid = reprojectionInside(prevUv) && skyScreenHistoryValid();
 
     vec4 result = raw;
     if (valid) {

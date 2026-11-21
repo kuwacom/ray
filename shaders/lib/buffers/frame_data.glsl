@@ -28,7 +28,7 @@ layout(std430, binding = 0) SSBO_FRAME_DATA_ACCESS buffer FrameDataBuffer {
     vec4 moonIrradiance;         // rgb = 地表での月直達照度, a = 月高度の sin
     vec4 shadowLightIrradiance;  // rgb = 影を落とす側 (昼は太陽 / 夜は月) の直達照度, a = 1 なら太陽
     vec4 skySH[9];               // rgb = 空の放射の SH L2 係数 (照度は shEvalIrradiance で)
-    vec4 skyParams[8];           // sky の自由領域 ([4] [5] [7] は prepare2 が書く、カメラの位置の雲の中の霧と、その板の上面・下面までの高さ。[6] は雨の空の置き換え)
+    vec4 skyParams[8];           // sky の自由領域 ([1] = (worldTime, 履歴のフレーム数, 画面の幅, 高さ。幅と高さは変わったフレームだけ負) は prepare が書く。[4] [5] [7] は prepare2 が書く、カメラの位置の雲の中の霧と、その板の上面・下面までの高さ。[6] は雨の空の置き換え)
 
     // light (begin / deferred_a で書く。handLights は下)
     uvec4 lightStats;            // x = 前フレームの光源数, y = 溢れ数, z = エンティティ光源の登録締め切りフラグ (light), w = 前フレームに距離で間引いた数
@@ -52,5 +52,14 @@ layout(std430, binding = 0) SSBO_FRAME_DATA_ACCESS buffer FrameDataBuffer {
     uint histogram[256];         // 露出ヒストグラム (composite25 内で毎フレームクリア)
     vec4 postParams[];           // post の自由領域。要素数: FRAME_POST_PARAMS
 } frameData;
+
+// 画面の大きさの履歴 (雲の時間アップスケール・VL) を使ってよいか。再読み込み・時刻の飛びの直後と、画面の大きさが変わったフレームは捨てる
+// 大きさが変わると Iris が colortex と画面の大きさの image を作り直して中身が 0 になる。0 の履歴は rgb が近傍クランプの余白 (固定の小さな値) に収まって残り、
+// a (透過率) だけが近傍の雲の値へ引かれるので、暗い夜ほど雲の縁が黒く不透明になる。夜の暗い値は fp16 の非正規化数の刻みで混合が進まず、
+// Fabrishot (大きさを変えて 60 フレーム描き、戻す) の後の普段の画面で、月夜の雲の縁の黒い線が 76 フレーム後も残った
+// 確かめ方: 月夜の雲を Fabrishot (F9) で撮り、撮った直後の普段の画面の雲の縁を見る
+bool skyScreenHistoryValid() {
+    return frameData.skyParams[1].y > 1.5 && frameData.skyParams[1].z > 0.0;
+}
 
 #endif
