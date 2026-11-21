@@ -819,12 +819,12 @@ void main() {
     // EV100 = log2(N^2 / t) - log2(ISO / 100)。マニュアルと同じく環境の補正 (夜の持ち上げ・屋内・雨・水中) は掛けない
     float fNumber = cameraFNumber();
     float measuredEv = log2(fNumber * fNumber / optShutterSpeed) - log2(optExposureIso / EXPOSURE_ISO_REFERENCE) - EXPOSURE_CAMERA_EV_OFFSET;
-        #ifdef CAMERA_FILTER
-    // M はフィルターの段数だけ暗く写る
-    measuredEv += CAMERA_FILTER_STOPS;
-        #endif
     #else
     float measuredEv = EXPOSURE_MANUAL_EV;
+    #endif
+    #ifdef CAMERA_FILTER
+    // M とマニュアルはフィルターの段数だけ暗く写る
+    measuredEv += CAMERA_FILTER_STOPS;
     #endif
     float adaptedEv = measuredEv;
     float appliedEv = measuredEv;

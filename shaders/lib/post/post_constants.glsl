@@ -71,8 +71,10 @@ const uint CAMERA_LIMIT_CLOSED = 8u;
 // M + ISO オートで ISO が下限か上限に着いて露出が合わない (Sony は ISO の表示が点滅)
 const uint CAMERA_LIMIT_ISO = 16u;
 /*
- * レンズの前のフィルター (ND・PL) の減光 (段)。カメラのモードの時だけ露出に掛ける (ゲーム向けのオートは打ち消し、マニュアルは EV そのものを選ぶので掛けない)
- * PL は実物の C-PL の 1.3〜1.7 段の中の値 (理想の偏光子の 1 段に吸収を足した分)。偏光の向きによる比は空と鏡面が掛ける (lib/common/polarizer.glsl)
+ * レンズの前のフィルター (ND・PL) の減光 (段)。ND はカメラのモードの時だけ露出に掛ける (ゲーム向けのオートは打ち消し、マニュアルは EV そのものを選ぶ)
+ * PL は実物の C-PL の 1.3〜1.7 段の中の値 (理想の偏光子の 1 段に吸収を足した分)。偏光の向きによる比 (理想の偏光子が非偏光を通す 1/2 を 1 とした比、
+ * 最大 2) は空と鏡面が掛ける (lib/common/polarizer.glsl)。理想の 1 段を掛けないと比が 1 を超えて OFF より明るくなるので、ゲーム向けの
+ * マニュアルにも理想の偏光子の 1 段を掛ける。ゲーム向けのオートは画全体に一様に掛かる段を測光が打ち消すので掛けない
  */
 #if defined EXPOSURE_CAMERA && (CAMERA_ND > 0 || defined CAMERA_PL)
     #define CAMERA_FILTER
@@ -82,6 +84,9 @@ const float CAMERA_FILTER_STOPS = float(CAMERA_ND) + CAMERA_PL_STOPS;
     #else
 const float CAMERA_FILTER_STOPS = float(CAMERA_ND);
     #endif
+#elif EXPOSURE_MODE == 0 && defined CAMERA_PL
+    #define CAMERA_FILTER
+const float CAMERA_FILTER_STOPS = 1.0;
 #endif
 // DR の補正が働くか (今の方式の自動露出だけ。局所の明るさのタイルもこの時だけ作る)
 #if defined EXPOSURE_DR && defined EXPOSURE_AUTO && EXPOSURE_RESPONSE_MODE == 0
