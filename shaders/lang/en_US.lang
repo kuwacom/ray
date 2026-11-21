@@ -308,6 +308,33 @@ option.GI_HIT_LIGHTS=Lights at Off-screen GI Hits
 option.GI_HIT_LIGHTS.comment=Most placed lights summed when a GI ray hits a surface off screen. Where there are many lights, they are taken at even steps in brightness order and scaled by the ratio. Lower is faster where there are many lights, with a little more noise in light bounced from off screen. SSGI and voxel ray tracing only.
 value.GI_HIT_LIGHTS.0=All
 
+# Reflector light
+screen.REFLECTOR_OPTIONS=Reflector Light
+option.REFLECTOR_LIGHT=Reflector Light
+option.REFLECTOR_LIGHT.comment=Glass, ice, metal and mineral blocks (lapis, emerald, diamond, gold) bounce sun, moon and block light onto their surroundings. A bright patch shaped like the window falls on the ground next to it, and a metal wall tints the area around it. Computed in the GI pass, so it has no effect when both GI and AO are off. It only looks for flat faces along the axes and traces one ray at the face it finds, but the GI pass gets a little heavier.
+option.REFLECTOR_SUN=Sun & Moon Reflection
+option.REFLECTOR_SUN.comment=Reflected sun and moon light. It arrives in the direction set by the face and the light, as a patch the shape of the face that does not fade with distance.
+option.REFLECTOR_BLOCKLIGHT=Block Light Reflection
+option.REFLECTOR_BLOCKLIGHT.comment=Reflected block light. Lights the surroundings as if the light sat at its mirror image behind the reflecting face. Visible at night, in caves and indoors near windows and metal walls, and barely visible under a daytime sky.
+option.REFLECTOR_STRENGTH=Reflection Strength
+option.REFLECTOR_STRENGTH.comment=Overall multiplier of the reflected light. 1 is the material reflectance. A pane of glass reflects about 8% (more at grazing angles), so raise this together with the per-material multipliers if it is hard to see.
+option.REFLECTOR_GLASS_STRENGTH=Glass & Ice Reflection
+option.REFLECTOR_GLASS_STRENGTH.comment=Multiplier for light reflected by glass, stained glass, glass panes and ice. Stained glass tints it.
+option.REFLECTOR_METAL_STRENGTH=Metal Reflection
+option.REFLECTOR_METAL_STRENGTH.comment=Multiplier for the mirror reflection of metal blocks (iron, copper, gold...). GI already returns their diffuse bounce in the block color, so the default is 0.5 to avoid brightening twice.
+option.REFLECTOR_GEM_STRENGTH=Mineral Reflection
+option.REFLECTOR_GEM_STRENGTH.comment=Multiplier for the reflection of lapis, emerald and diamond blocks. The reflection carries the block color.
+option.REFLECTOR_PATTERN=Mineral Pattern
+option.REFLECTOR_PATTERN.comment=How strongly the pattern on the face of lapis, emerald, diamond and gold blocks (the light and dark parts of the texture) shows up in the reflected light. 0 is a uniform face. The pattern is clear close up and averages out with distance.
+option.REFLECTOR_DISTANCE=Sun Reflection Distance
+option.REFLECTOR_DISTANCE.comment=How far to look for reflected sun and moon light (blocks). At a sun height of 45 degrees the light lands as far from the wall as the window is high. Longer shows reflections of taller buildings but costs more.
+option.REFLECTOR_BLOCKLIGHT_COUNT=Reflected Lights
+option.REFLECTOR_BLOCKLIGHT_COUNT.comment=How many lights get their reflection computed (brightest first in the lit point's bin). More adds reflections where there are many lights but costs more.
+option.REFLECTOR_GLINT=Metal & Mineral Glints
+option.REFLECTOR_GLINT.comment=Splits the faces of metal and mineral blocks (polished stone included) into 1/16 block facets and lights only the facets that catch the image of the sun or a lamp. Lit points change as you walk. The average highlight is unchanged. Fades out where a texel gets smaller than a pixel.
+option.REFLECTOR_GLINT_STRENGTH=Glint Strength
+option.REFLECTOR_GLINT_STRENGTH.comment=How far the facets tilt. Higher gives fewer, brighter points; 0 is the plain highlight.
+
 # Materials
 option.PBR_FORMAT=PBR Format
 value.PBR_FORMAT.0=None

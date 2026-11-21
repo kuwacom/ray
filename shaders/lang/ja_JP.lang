@@ -308,6 +308,33 @@ option.GI_HIT_LIGHTS=画面外の GI の当たりの光源数
 option.GI_HIT_LIGHTS.comment=GI のレイが画面の外の面に当たった時に数える設置光源の数の上限。光源の多い場所では、明るさの順に等間隔で拾って数の比で戻す。下げると光源の多い場所で軽くなり、画面の外から照り返す光のノイズが少し増える。SSGI とボクセル RT のみ
 value.GI_HIT_LIGHTS.0=全部
 
+# 反射体の反射光
+screen.REFLECTOR_OPTIONS=反射体の反射光
+option.REFLECTOR_LIGHT=反射体の反射光
+option.REFLECTOR_LIGHT.comment=ガラス・氷・金属・鉱物 (ラピスラズリ・エメラルド・ダイヤモンド・金) のブロックが太陽・月・ブロックライトを周りへ跳ね返す。窓の形の明るい帯が隣の地面に落ち、金属の壁の色が周りを照らす。GI と同じパスで求めるので、GI と AO の両方が無しの時は効かない。GI のパスが少し重くなる
+option.REFLECTOR_SUN=太陽・月の反射
+option.REFLECTOR_SUN.comment=太陽・月の光の反射。反射した光は、反射体の面の向きと光の向きで決まる方向へ、距離で落ちずに面の形の帯になって届く
+option.REFLECTOR_BLOCKLIGHT=ブロックライトの反射
+option.REFLECTOR_BLOCKLIGHT.comment=ブロックライトの反射。反射体の面で光源を鏡映した位置から光が来るように照らす。夜・洞窟・屋内で、窓や金属の壁の近くの光源が見える。昼の屋外ではほとんど見えない
+option.REFLECTOR_STRENGTH=反射光の強さ
+option.REFLECTOR_STRENGTH.comment=反射光全体の倍率。1 が材質の反射率どおり。ガラスの反射は板 1 枚で約 8% (かすめ角では上がる) なので、見えにくければ材質ごとの倍率と合わせて上げる
+option.REFLECTOR_GLASS_STRENGTH=ガラス・氷の反射光
+option.REFLECTOR_GLASS_STRENGTH.comment=ガラス・色付きガラス・ガラス板・氷の反射光の倍率。色付きガラスは色が付く
+option.REFLECTOR_METAL_STRENGTH=金属の反射光
+option.REFLECTOR_METAL_STRENGTH.comment=金属ブロック (鉄・銅・金など) の鏡の反射光の倍率。拡散の照り返しは GI がブロックの色で既に返しているので、既定は 0.5 にして二重に明るくならないようにしてある
+option.REFLECTOR_GEM_STRENGTH=鉱物の反射光
+option.REFLECTOR_GEM_STRENGTH.comment=ラピスラズリ・エメラルド・ダイヤモンドのブロックの反射光の倍率。反射にブロックの色が乗る
+option.REFLECTOR_PATTERN=鉱物の模様
+option.REFLECTOR_PATTERN.comment=ラピスラズリ・エメラルド・ダイヤモンド・金のブロックの面の模様 (テクスチャの明暗) が、反射光に乗る強さ。0 で面全体が一様。近いほど模様がはっきり残り、離れると面の平均にならされる
+option.REFLECTOR_DISTANCE=太陽の反射光の届く距離
+option.REFLECTOR_DISTANCE.comment=太陽・月の反射光を探す距離 (ブロック)。窓の高さと同じ距離に、太陽高度 45 度の反射光が落ちる。長いほど高い建物の反射光が見えるが、重くなる
+option.REFLECTOR_BLOCKLIGHT_COUNT=反射を求める光源の数
+option.REFLECTOR_BLOCKLIGHT_COUNT.comment=ブロックライトの反射を求める光源の数 (照らされる点のビンの明るい順)。多いと光源の多い場所で反射が増えるが、重くなる
+option.REFLECTOR_GLINT=金属・鉱物のキラキラ
+option.REFLECTOR_GLINT.comment=金属・鉱物 (磨いた石を含む) のブロックの面を 1/16 ブロックごとの細かい面に分け、太陽・灯りの像が当たった所だけを光らせる。歩くと光る点が入れ替わる。照り返しの平均は変えない。遠くで 1 テクセルが画素より細かくなると消える
+option.REFLECTOR_GLINT_STRENGTH=キラキラの強さ
+option.REFLECTOR_GLINT_STRENGTH.comment=細かい面の傾きの大きさ。上げると光る点が少なく明るくなり、0 で通常の照り返し
+
 # マテリアル
 option.PBR_FORMAT=PBR 形式
 value.PBR_FORMAT.0=なし
