@@ -58,6 +58,11 @@ const uint SL_BLOCK_SPECULAR_TRACED = 1u << 9; // 鏡面の光源を 1 つずつ
 const vec2 SHADOW_FALLBACK_SKYLIGHT = vec2(0.8, 0.97);
 // GI が空の光を運ぶ時 (GI_TRACES_SKY): ボクセル体積の判定で面から浮かせる量
 const float GI_VOLUME_TEST_OFFSET = 0.1;
+/*
+ * SL_BLOCK_SPECULAR: colortex7 の比がこれ以上なら、全部の光源が見えているとみなして光源ごとのトレースを省く
+ * 隠れた光源が拡散の 2% より小さい所では照り返しが残るが、比が 1 に近い画面の大半でトレースを足さずに済む
+ */
+const float BLOCK_SPECULAR_SHARED_VIS_FULL = 0.98;
 // 太陽の可視率の上限 (CAVE_LEAK_PREVENTION)。スカイライトが 0 段なら 0、2 段以上なら 1
 // 空が無い所に太陽は届かないので、上のチャンクのメッシュが描かれず影マップに穴が空いても、洞窟の奥には射さない
 // 影マップの外の推定 (SHADOW_FALLBACK_SKYLIGHT) は 0.8 未満で 0 なので、手には重ねて掛からない
@@ -108,6 +113,7 @@ struct SurfacePoint {
     // 入れると実行時の値になって全部の項がリンクされるので、点の値で渡す
     bool caustics;
     // SL_BLOCK_SPECULAR_TRACED を集めるか。装備の金属だけが実行時に決めるので、caustics と同じく点の値で渡す
+    // SL_BLOCK_SPECULAR では、colortex7 の比が混ざる所で光源ごとにトレースするか (つやのある面だけ。deferred30 が決める)
     bool blockSpecular;
     // 法線を上向きに固定した植物 (isUpNormalPlant)。SL_HAND の影の始点と画面空間の影を植物用にする (点の値)
     bool plant;
@@ -299,7 +305,22 @@ SurfaceLights gatherSurfaceLights(SurfacePoint p, int sunMode, int blockMode, ui
     if ((terms & SL_BLOCK_SPECULAR_TRACED) != 0u || tracedBins) {
         gatherBlockTracedLights(p, (terms & SL_BLOCK_SPECULAR_TRACED) != 0u && p.blockSpecular, tracedBins, L);
     }
-    if ((terms & SL_BLOCK_SPECULAR) != 0u) L.blockSpecCount = getBlockLightSpecular(p.texel, p.playerPos, p.geoNormal, L.blockSpec);
+    if ((terms & SL_BLOCK_SPECULAR) != 0u) {
+        L.blockSpecCount = getBlockLightSpecular(p.texel, p.playerPos, p.geoNormal, L.blockSpec);
+#if defined LIGHT_SPECULAR && defined LIGHT_SHADOWS
+        /*
+         * colortex7 の比は光源全体の 1 つの値なので、見える光源と隠れた光源が混ざる所では隠れた光源の照り返しも比のぶん残る
+         * つやのある面 (p.blockSpecular) で比が 0 と 1 の間の時だけ、光源ごとにトレースして隠れた光源を 0 にする
+         * 見える光源には今までどおり比を掛ける (デノイズした半影の柔らかさと明るさを変えない)。比が 1 に近い所はトレースしない
+         * 確かめ方: 金属のブロックの上から、角の先の発光ブロック (エメラルド・グロウストーン) が直接見えない配置で緑などの四角が映らないか
+         */
+        float sharedVis = blockSpecularSharedVisibility(p.texel);
+        if (p.blockSpecular && L.blockSpecCount > 1 && sharedVis > 0.0 && sharedVis < BLOCK_SPECULAR_SHARED_VIS_FULL) {
+            gatherBlockTracedLights(p, true, false, L);
+            for (int j = 0; j < BLOCKLIGHT_SPECULAR_LIGHTS; j++) L.blockSpec[j].irradiance *= sharedVis;
+        }
+#endif
+    }
 
     if (blockMode == SL_BLOCK_OPAQUE) {
         L.block = getBlockLightOpaque(p.texel, p.playerPos, p.geoNormal, p.normal, p.lightmap.x);

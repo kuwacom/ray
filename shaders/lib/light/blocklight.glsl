@@ -105,6 +105,8 @@ const int BLOCKLIGHT_SPECULAR_LIGHTS = LIGHT_SPECULAR_COUNT;
  * 代表光源 1 つだけだと、2 つの光源の拡散が釣り合う線で代表が入れ替わり、床の照り返しが斜めの直線で切れた
  * 光源ごとの可視率は無いので、deferred2 の可視率 (colortex7, トレースした光源全体の比) を共通に掛ける。
  * 体積の端ではフォールバックと同じ割合で弱める
+ * 共通の比だけだと、見える光源がある所では隠れた光源の照り返しも残る (壁の陰のエメラルドが金属に緑の四角で映った)。
+ * つやのある面で比が 0 と 1 の間の時は、surface_lights.glsl の gatherSurfaceLights が光源ごとにトレースして隠れた光源を消す
  * colortex7 は不透明面の可視率なので、水・ガラスなど半透明の面は光源ごとにトレースして可視率を出す
  * (lib/surface/surface_lights.glsl の gatherBlockTracedLights。選び方と LightSample はここの関数を使う)
  */
@@ -140,6 +142,11 @@ LightSample blockSpecularSample(LightInstance L, vec3 voxelPos, float scale) {
 }
 #endif
 
+// deferred2 の可視率 (colortex7) の輝度。トレースした光源全体の比で、光源ごとの可視率ではない
+float blockSpecularSharedVisibility(ivec2 texel) {
+    return saturate(luminance(texelFetch(colortex7, texel, 0).rgb));
+}
+
 // 不透明面の鏡面 (deferred30)。可視率は deferred2 の colortex7
 int getBlockLightSpecular(ivec2 texel, vec3 playerPos, vec3 geoNormal, out LightSample s[BLOCKLIGHT_SPECULAR_LIGHTS]) {
     for (int j = 0; j < BLOCKLIGHT_SPECULAR_LIGHTS; j++) s[j] = noLight();
@@ -149,7 +156,7 @@ int getBlockLightSpecular(ivec2 texel, vec3 playerPos, vec3 geoNormal, out Light
     int bin = lightBinIndex(ivec3(fromVoxel));
     int topIdx[BLOCKLIGHT_SPECULAR_LIGHTS];
     selectBlockSpecularLights(bin, lightBinCount(bin), fromVoxel, geoNormal, topIdx);
-    float scale = saturate(luminance(texelFetch(colortex7, texel, 0).rgb)) * floodCoverage(playerPos);
+    float scale = blockSpecularSharedVisibility(texel) * floodCoverage(playerPos);
     vec3 voxelPos = playerToVoxel(playerPos);
     int count = 0;
     for (int j = 0; j < BLOCKLIGHT_SPECULAR_LIGHTS; j++) {

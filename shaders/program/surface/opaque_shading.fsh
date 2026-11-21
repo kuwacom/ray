@@ -233,6 +233,8 @@ void directSpecular(Material m, vec3 N, vec3 V, LightSample L, float slopeVar, f
  */
 const vec2 SPARKLE_TEXEL_PX = vec2(0.3, 0.7);  // 1 テクセルの画素数がこの範囲で 0 -> 1
 const float SPARKLE_TEXEL_SIZE = 1.0 / 16.0;
+// ブロックライトの鏡面を光源ごとにトレースする誘電体の知覚的ラフネスの上限 (金属と水たまりは常に)
+const float BLOCK_SPECULAR_TRACE_ROUGHNESS = 0.5;
 
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
@@ -321,6 +323,8 @@ void main() {
         color += directLight(m, g.normal, V, H.handOff, puddleVar, 1.0, 1.0, SPECULAR_BLOCK_STRENGTH, specSum);
 #endif
     }
+    // 隠れた光源の照り返しを光源ごとのトレースで消すのは、照り返しの目立つ面だけ (粗い誘電体は暗く広がるので共通の比のまま)
+    sp.blockSpecular = m.metalness > 0.5 || m.perceptualRoughness < BLOCK_SPECULAR_TRACE_ROUGHNESS || puddleWeight > 0.0;
     SurfaceLights S = gatherSurfaceLights(sp, SL_SUN_NONE, SL_BLOCK_NONE, SL_BLOCK_SPECULAR);
     int blockSpecCount = plant ? 0 : S.blockSpecCount;
     for (int j = 0; j < blockSpecCount; j++) directSpecular(m, g.normal, V, S.blockSpec[j], puddleVar, SPECULAR_BLOCK_STRENGTH, specSum);
