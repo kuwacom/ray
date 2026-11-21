@@ -42,6 +42,10 @@ Ghost color and shape, distortion, vignetting, bokeh shape, and chromatic aberra
 > This is still an alpha version
 > Visuals and performance are still being tuned, and settings and defaults may change without notice
 
+> [!NOTE]
+> For the latest development news, check my posts on [Twitter/X](https://x.com/kuwamain)
+> Pushes usually land about a day behind my local development build
+
 ## Requirements
 
 | Item | Requirement |
