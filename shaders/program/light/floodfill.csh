@@ -200,6 +200,21 @@ bool isEntityLightRepresentative(ivec3 cell, uint key) {
     return true;
 }
 
+/*
+ * 向きのある光源 (点灯したかまど・ジャック・オ・ランタン) は、火の光が出る前面 (炉の口・顔) 以外の面をふさぐ
+ * 光源のセルから 6 方向へ一様に広げると、光源自身の横・上・裏の面と裏の床まで口の前と同じに照らされ、ブロック全体が光って見えた
+ * 面の番号は floodfill の隣の順 (0 +x 1 -x 2 +y 3 -y 4 +z 5 -z)。前面は水平なので x か z
+ * ふさぐのは隣から見た光源の面だけでよい。光源のセル自身は LT_OCC で不透明なので受け取らない。LT_OCC でない向きのある光源を足すと、
+ * 自分のセルが前面から受け取った光を横へ渡して漏れる。確かめ方: 1 つだけ置いた光源の横・上の面を FLOODFILL_STRENGTH=0 の時と比べる (ほぼ同じなら漏れていない)
+ * 前面のセルが不透明 (壁に向けて置いた) なら floodfill はまったく出ない。口以外から光を出さないので、それが正しい
+ */
+uint facingLightCoveredFaces(int voxelId) {
+    if (!isFacingLight(getBlockLightIndex(voxelId))) return 0u;
+    vec3 front = facingDirection(blockLightFacing(voxelId));
+    uint face = (front.x != 0.0 ? 0u : 4u) + (front.x + front.z > 0.0 ? 0u : 1u);
+    return 63u & ~(1u << face);
+}
+
 // 塊に属するセルの頂点位置の平均 (蓄積表に無いセルはセル中心で代用)
 vec3 entityLightCentroid(ivec3 cell, uint key) {
     uint index = key & 255u;
@@ -255,7 +270,14 @@ void main() {
             }
             emission *= LAVA_FLOOD_GAIN * LAVA_LIGHT;
         } else if (level > 0.5 && (d.info.x & LIGHT_FLAG_FLOOD_ONLY) == 0u) {
-            registerLight(vec3(cell) + d.shape.xyz, range, flickered, luminance(emission), d.shape.w, true);
+            vec3 pos = vec3(cell) + d.shape.xyz;
+            float size = d.shape.w;
+            // 点灯したかまどは片面の光源 (lib/buffers/global_lights.glsl lightOneSidedGate)。ジャック・オ・ランタンは皮から淡く出るので中心のまま
+            if (lightIndex == LIGHT_FURNACE) {
+                pos += facingDirection(blockLightFacing(voxelId)) * LIGHT_ONE_SIDED_INSET;
+                size = -size;
+            }
+            registerLight(pos, range, flickered, luminance(emission), size, true);
         }
     }
 #ifdef GENERIC_LIGHT
@@ -310,7 +332,8 @@ void main() {
             for (int i = 0; i < 6; i++) {
                 ivec3 n = cell;
                 n[i >> 1] += (i & 1) == 0 ? 1 : -1;
-                uint nFaces = isInVoxelVolume(n) ? getShapeCoveredFaces(unpackVoxelBlockId(imageLoad(voxelBlockImg, n).r)) : 0u;
+                int nId = isInVoxelVolume(n) ? unpackVoxelBlockId(imageLoad(voxelBlockImg, n).r) : BLOCK_AIR;
+                uint nFaces = getShapeCoveredFaces(nId) | facingLightCoveredFaces(nId);
                 if ((((selfFaces >> uint(i)) | (nFaces >> uint(i ^ 1))) & 1u) != 0u) light -= nb[i];
             }
         }

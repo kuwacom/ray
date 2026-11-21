@@ -307,7 +307,7 @@ float waterBlockLightPhaseWeight(vec3 voxelPos, vec3 dir) {
         vec3 toL = L.posRadius.xyz - voxelPos;
         float d = length(toL);
         if (d >= L.posRadius.w) continue;
-        float e = luminance(L.colorSize.rgb) * lightFalloff(d, L.posRadius.w);
+        float e = luminance(L.colorSize.rgb) * lightFalloff(d, L.posRadius.w) * lightOneSidedGate(L, voxelPos);
         // 光は光源 -> 散乱点へ進み、カメラ (-dir) へ曲がる。その角の cos は dot(toL, dir) / d
         sumP += e * waterPhase(dot(toL, dir) / max(d, 1e-3));
         sumE += e;

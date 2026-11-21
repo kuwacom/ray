@@ -127,6 +127,9 @@ vec3 traceBlockLight(int li, vec3 fromVoxel, vec3 playerPos, vec3 geoNormal, uin
     float a = xi.y * TAU;
     vec2 disk = sqrt(xi.x) * vec2(cos(a), sin(a)) * lightJitterRadius(L);
     vec3 target = lp + tbn[0] * disk.x + tbn[1] * disk.y;
+    // 片面の光源 (かまど) は口の面のすぐ内側にあり、揺らした終点が口の前のセルへ出る。トレースは終点のセルを判定しないので、
+    // 口の前を塞いだ石の向こうの床まで照らしていた。終点を光源のセルの中に留める
+    if (L.colorSize.a < 0.0) target = clamp(target, floor(lp) + LIGHT_ONE_SIDED_CELL_MARGIN, floor(lp) + (1.0 - LIGHT_ONE_SIDED_CELL_MARGIN));
     vec3 vis = traceVisibility(fromVoxel, target, flags, dither, skipStart, lightEntitySkip(L));
 #ifdef LIGHT_CONTACT_SHADOWS
     if (contact && maxOf(vis) > 0.0) {
