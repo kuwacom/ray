@@ -219,7 +219,11 @@ uv run tools/mc.py --stop
 uv run tools/ab_scene.py noon water_noon --variant base= --variant c0=CLOUDS=0 --tag cl --out ab_cl
 # パックのフォルダ (shaderpacks/Ray のジャンクションの先) を替えて比べ、frame_ms も測る
 uv run tools/ab_scene.py noon --variant old=dir:<フォルダ> --variant new=dir:<フォルダ> --fps 4 --out ab_ver
+# 同じフォルダで設定だけ替える (区切りは ; と , のどちらでもよい。PowerShell では --variant の値を引用符で囲む)
+uv run tools/ab_scene.py noon --variant "a=dir:<フォルダ>;GENERIC_LIGHT=false;DEBUG_VIEW=3" --variant "b=dir:<フォルダ>;GENERIC_LIGHT=true" --out ab_set
 ```
+
+`ab_scene.py` は版ごとに Ray.txt を全部書き直し、再読み込みの後に Iris が書き直した Ray.txt を読んで、上書きが残っているかを確かめます (パックに無い設定や不正な値は警告と report.md に出ます)。ジャンクションの付け替えは、新しいものを別名で作ってから置き換えるので、失敗しても今の先が残ります。終わりに本体へ戻せなかったときは大きなエラーで止まり、手で戻す命令を表示します
 
 再読み込みから撮影までの待ち (`--settle`) は既定 6 秒です (昼・夜とも、再読み込みの後は約 3 秒で画面の明るさが 1% 以内に落ち着きます)。待ちは壁時計ではなく、新しいフレームを `--settle-frames` 枚 (既定 10) 数えた後の Iris の `frameTimeCounter` (再読み込みで 0 に戻る) で測ります。壁時計で待つと、パイプラインの作成が速い版 (ドライバのキャッシュにある版) は作成の直後の詰まりと待ちが重なって最初のフレームを撮り、霧・葉・波の動きの位相も版ごとにずれて、版の差のように見えます。手順を直接送るときは `{"wait_frames": 10}` と `{"wait_frame_time": 6}` を使います。`--out` に、差の表と frame_ms と時間の report.md と、シーンごとの比較シート (版を並べ、差を 8 倍した画像を添える) を書きます。前後の差が揺れの基準と同じ程度なら、見た目は変わっていません
 
