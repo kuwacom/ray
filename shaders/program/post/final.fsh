@@ -137,8 +137,11 @@ vec3 debugView(ivec2 texel, vec3 color) {
     // 目の高さのボクセル断面 (固体=白, エンティティ=赤, 光源=黄)
     ivec2 xz = ivec2(texcoord * vec2(VOXEL_SIZE.xz));
     ivec3 cell = ivec3(xz.x, VOXEL_HALF.y, xz.y);
-    int id = unpackVoxelBlockId(readVoxelBlock(cell));
+    uint voxel = readVoxelBlock(cell);
+    int id = unpackVoxelBlockId(voxel);
     bool ent = readVoxelEntity(cell) != 0u;
+    // 光源=黄, ID の無い発光ブロックの光源 (GENERIC_LIGHT)=橙
+    if (isGenericLightVoxel(voxel)) return vec3(1.0, 0.5, 0.1);
     return ent ? vec3(1.0, 0.2, 0.2) : (getBlockLightIndex(id) != 0 ? vec3(1.0, 0.9, 0.2) : vec3(id != 0 ? 0.8 : 0.05));
 #elif DEBUG_VIEW == 11
     // 最終的に TAA・モーションブラーが使う速度 (ピクセル単位, 1 px で 0.25)。b は colortex15 (エンティティ・手) の有効フラグ

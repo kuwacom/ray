@@ -400,6 +400,15 @@ option.FIREWORK_LIGHT=Firework Light
 option.FIREWORK_LIGHT.comment=When a firework bursts, it lights the ground and walls under the open sky and the surrounding air (fog, smoke) in its color. No shadows. Low cost
 option.FIREWORK_LIGHT_STRENGTH=Firework Light Strength
 option.FIREWORK_LIGHT_STRENGTH.comment=Strength of the light fireworks cast on their surroundings. Does not change the brightness of the sparks
+option.GENERIC_LIGHT=Unlisted Emissive Block Light
+option.GENERIC_LIGHT.comment=Blocks that give off light but are not listed in this pack (such as modded blocks) become light sources from the light level the game reports for them, light their surroundings and glow in their bright parts. Listed blocks are unchanged. Nothing happens for blocks below light level 2, or where the light level is not available (old Iris)
+option.GENERIC_LIGHT_BRIGHTNESS=Unlisted Emissive Block Light Strength
+option.GENERIC_LIGHT_BRIGHTNESS.comment=How strongly unlisted emissive blocks light their surroundings. Higher values light farther. 0 = they do not light their surroundings. Scales with the block's light level
+option.GENERIC_LIGHT_COLOR=Unlisted Emissive Block Light Color
+option.GENERIC_LIGHT_COLOR.comment=The game does not report block colors, so the light uses a single color. Fire: follows the block light warmth. White: no tint. Cool White: a cold white
+value.GENERIC_LIGHT_COLOR.0=Fire
+value.GENERIC_LIGHT_COLOR.1=White
+value.GENERIC_LIGHT_COLOR.2=Cool White
 
 # Water & reflections
 option.WATER_WAVES=Water Waves
@@ -1593,6 +1602,8 @@ value.DEBUG_VIEW.9=Sky View LUT
 value.DEBUG_VIEW.10=Voxel Slice
 value.DEBUG_VIEW.11=Velocity
 value.DEBUG_VIEW.12=Debug Image
+option.GENERIC_LIGHT_TEST=Unlisted Emissive Block Test
+option.GENERIC_LIGHT_TEST.comment=For testing. Treats listed emissive blocks (except lava) as unlisted blocks, so only the unlisted emissive block light makes them glow. Shown in orange in the voxel slice debug view
 option.RAY_VERSION=Version
 value.RAY_VERSION.1=v0.1.0-alpha
 option.RAY_AUTHOR=Author

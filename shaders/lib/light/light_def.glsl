@@ -85,5 +85,29 @@ const uint LT_LANTERN = LIGHT_FLAG_KIND_LANTERN;
 const uint LT_BEACON = LIGHT_FLAG_KIND_BEACON;
 const uint LT_EYEBLOSSOM = LIGHT_FLAG_KIND_EYEBLOSSOM;
 
+#ifdef GENERIC_LIGHT
+/*
+ * ID の無い発光ブロック (MOD など) の光源。表には載せず、色はこの設定だけで決める (Iris から色は渡されない)
+ * 形は点光源。レベル 15 の時の届く距離は、主要な光源 (レベル GENERIC_LIGHT_MAJOR_LEVEL 以上) と弱い・群生する光源で分ける
+ */
+const float GENERIC_LIGHT_SIZE = 0.3;
+const float GENERIC_LIGHT_MAJOR_LEVEL = 10.0;
+
+vec3 genericLightSrgb() {
+#if GENERIC_LIGHT_COLOR == 1
+    return vec3(1.0);
+#elif GENERIC_LIGHT_COLOR == 2
+    return vec3(0.85, 0.95, 1.0);
+#else
+    return fireSrgb();
+#endif
+}
+
+LightDef genericLightDef(float level) {
+    return makeLight(genericLightSrgb(), GENERIC_LIGHT_BRIGHTNESS, LIGHT_LEVEL_MAX, GENERIC_LIGHT_SIZE, LT_CENTER, 0.0,
+                     level >= GENERIC_LIGHT_MAJOR_LEVEL ? 0u : LT_MINOR);
+}
+#endif
+
 #endif
 

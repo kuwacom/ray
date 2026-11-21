@@ -400,6 +400,15 @@ option.FIREWORK_LIGHT=花火の光
 option.FIREWORK_LIGHT.comment=花火が開いた瞬間、空の見える地面・壁と周りの空気 (霧・煙) を花火の色で照らす。影は付かない。軽い
 option.FIREWORK_LIGHT_STRENGTH=花火の光の強さ
 option.FIREWORK_LIGHT_STRENGTH.comment=花火が周りを照らす光の強さ。火花そのものの明るさは変わらない
+option.GENERIC_LIGHT=ID の無い発光ブロックの光
+option.GENERIC_LIGHT.comment=MOD などが追加した、このパックに登録の無い発光ブロックを、ゲームが持つ発光レベルから光源にして周りを照らし、明るい部分を光らせる。登録済みのブロックは変わらない。発光レベル 2 未満のブロックと、発光レベルが渡らない環境 (古い Iris など) では何も起きない
+option.GENERIC_LIGHT_BRIGHTNESS=ID の無い発光ブロックの光の強さ
+option.GENERIC_LIGHT_BRIGHTNESS.comment=ID の無い発光ブロックが周りを照らす光の強さ。上げるほど遠くまで明るくなる。0 で周りを照らさない。ブロックの発光レベルが高いほど強くなる
+option.GENERIC_LIGHT_COLOR=ID の無い発光ブロックの光の色
+option.GENERIC_LIGHT_COLOR.comment=ゲームからブロックの色は渡らないので、光の色は 1 色で決める。炎: ブロックライトの暖かさに従う。白: 色を付けない。青白: 冷たい白
+value.GENERIC_LIGHT_COLOR.0=炎
+value.GENERIC_LIGHT_COLOR.1=白
+value.GENERIC_LIGHT_COLOR.2=青白
 
 # 水と反射
 option.WATER_WAVES=水の波
@@ -1593,6 +1602,8 @@ value.DEBUG_VIEW.9=SkyView LUT
 value.DEBUG_VIEW.10=ボクセル断面
 value.DEBUG_VIEW.11=速度ベクトル
 value.DEBUG_VIEW.12=デバッグイメージ
+option.GENERIC_LIGHT_TEST=ID の無い発光ブロックのテスト
+option.GENERIC_LIGHT_TEST.comment=検証用。登録済みの発光ブロック (溶岩を除く) を ID の無いブロックとして扱い、ID の無い発光ブロックの光だけで光らせる。ボクセル断面 (デバッグ表示) では橙で表示される
 option.RAY_VERSION=バージョン
 value.RAY_VERSION.1=v0.1.0-alpha
 option.RAY_AUTHOR=作者

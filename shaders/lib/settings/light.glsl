@@ -65,5 +65,9 @@
 #define CHARGED_CREEPER_LIGHT_BRIGHTNESS 1.0 // [0.25 0.5 0.75 1.0 1.5 2.0] 電気の渦が周りを照らす光の強さ (見た目の明るさは変わらない)
 #define FIREWORK_LIGHT // 花火の爆発が空の見える地面・壁と、空気 (霧・煙) を色付きで照らす
 #define FIREWORK_LIGHT_STRENGTH 1.0 // [0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0] 花火の爆発が周りを照らす光の強さ
+#define GENERIC_LIGHT // MOD などの ID の無い発光ブロックを、発光レベルから光源にする
+#define GENERIC_LIGHT_BRIGHTNESS 1.0 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0] ID の無い発光ブロックが周りを照らす光の強さ (0 で周りを照らさない)
+#define GENERIC_LIGHT_COLOR 0 // [0 1 2] ID の無い発光ブロックの光の色 0=炎 1=白 2=青白
+//#define GENERIC_LIGHT_TEST // 検証用: 登録済みの発光ブロック (溶岩を除く) を ID の無いブロックとして扱い、汎用の光源だけで光らせる
 
 #endif

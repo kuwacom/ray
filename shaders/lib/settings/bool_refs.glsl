@@ -66,6 +66,10 @@
 #endif
 #ifdef FIREWORK_LIGHT
 #endif
+#ifdef GENERIC_LIGHT
+#endif
+#ifdef GENERIC_LIGHT_TEST
+#endif
 #ifdef SHADOW_COLORED
 #endif
 #ifdef ENTITY_SHADOWS
