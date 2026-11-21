@@ -96,6 +96,10 @@
 | CHARGED_CREEPER_LIGHT_BRIGHTNESS | 1.0 | 0.25, 0.5, 0.75, 1.0, 1.5, 2.0 |
 | FIREWORK_LIGHT | ON | ON / OFF |
 | FIREWORK_LIGHT_STRENGTH | 1.0 | 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0 |
+| GENERIC_LIGHT | ON | ON / OFF |
+| GENERIC_LIGHT_BRIGHTNESS | 1.0 | 0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0 |
+| GENERIC_LIGHT_COLOR | 0 | 0, 1, 2 |
+| GENERIC_LIGHT_TEST | OFF | ON / OFF |
 
 ## surface (`lib/settings/surface.glsl`)
 

@@ -103,6 +103,9 @@ in vec4 tangentPlayer;
 in vec2 tileMid;
 in vec2 tileHalf;
 flat in int blockId;
+#if defined GBUF_TERRAIN && defined GENERIC_LIGHT
+    flat in int genericGlow;
+#endif
 #ifdef GBUF_ENTITIES
     flat in int swirlLayer;
 #endif
@@ -460,6 +463,9 @@ void main() {
     int materialId = MAT_TERRAIN;
 #if defined GBUF_TERRAIN
     materialId = vesselPixelMaterial(blockIdToMaterial(blockBase), metalGateOfId(blockId), texRgb);
+    #ifdef GENERIC_LIGHT
+    if (genericGlow != 0) materialId = MAT_EMISSIVE_BLOCK;
+    #endif
     // 壁や地面に張り付くツタ・スカルクの脈は面が軸に沿う (垂れ下がるつるは十字で斜め)。葉と同じく面の向きと凹凸で照らす
     if (blockBase == BLOCK_VINES && maxOf(abs(geoN)) > FLAT_VINE_MIN_AXIS) materialId = MAT_LEAVES;
 #elif defined GBUF_ENTITIES

@@ -266,8 +266,10 @@ float secondaryHitEmission(float emission, int voxelId, int materialId) {
 const float VOXEL_HIT_INSET = 0.05;
 float screenHitEmission(GBufferData h, vec3 hitPlayer) {
     if (h.emission <= 0.0) return 0.0;
-    int voxelId = unpackVoxelBlockId(readVoxelBlock(ivec3(floor(playerToVoxel(hitPlayer - h.geoNormal * VOXEL_HIT_INSET)))));
-    return secondaryHitEmission(h.emission, voxelId, h.materialId);
+    uint voxelData = readVoxelBlock(ivec3(floor(playerToVoxel(hitPlayer - h.geoNormal * VOXEL_HIT_INSET))));
+    // ID の無い発光ブロック (GENERIC_LIGHT) も登録した光源と同じ。直接光と floodfill が数えているので GI の発光に足さない
+    if (isGenericLightVoxel(voxelData)) return 0.0;
+    return secondaryHitEmission(h.emission, unpackVoxelBlockId(voxelData), h.materialId);
 }
 
 // 画面に映らないボクセルのヒットで分かる登録外の発光は溶岩だけ (G バッファの推定値 0.12-0.3 の中ほど)
@@ -448,6 +450,7 @@ vec4 traceVoxelRadiance(vec3 originPlayer, vec3 dir, float maxDist, float skyLm,
         if (all(equal(ivec3(floor(playerToVoxel(scenePlayer) - hitNormal * VOXEL_HIT_INSET)), hitCell))) {
             emission = unpack2x8(texelFetch(colortex3, t, 0).g).y;
             hitMaterial = readMaterialId(t);
+            if (isGenericLightVoxel(readVoxelBlock(hitCell))) emission = 0.0;
         }
     }
     // useSceneColor = false は GI (多重反射込み)、true は反射

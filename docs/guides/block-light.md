@@ -188,6 +188,7 @@ floodfill の柔らかい光なので影は付かず、ほとんど重くなり�
 | ヒカリゴケの光 (`GLOW_LICHEN_LIGHT`) / 強さ (`GLOW_LICHEN_BRIGHTNESS`) | ON / 0.45 | OFF にすると光って見えるだけになる |
 | ホタルの茂みの光の強さ (`FIREFLY_BUSH_BRIGHTNESS`) | 0.25 | 上げるほど遠くまで明るい |
 | 開いたアイブロッサムの明るさ (`EYEBLOSSOM_BRIGHTNESS`) | 1.0 | 0 で光らない |
+| ID の無い発光ブロックの光 (`GENERIC_LIGHT`) / 強さ (`GENERIC_LIGHT_BRIGHTNESS`) / 色 (`GENERIC_LIGHT_COLOR`) | ON / 1.0 / 炎 | MOD などの登録の無い発光ブロックを、発光レベル (2 以上) から光源にする。色は 1 色で、ブロックごとの色は出ない。登録済みのブロックは変わらない |
 
 溶岩・ビーコンの光線・花火
 

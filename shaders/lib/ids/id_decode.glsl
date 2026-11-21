@@ -18,6 +18,20 @@ int blockIdToVoxelId(int blockId) {
     return (blockId <= 0 || blockId > 4095) ? BLOCK_SOLID : blockId;
 }
 
+/*
+ * ID の無い (BLOCK_SOLID の) ブロックを、発光レベル (at_midBlock.w) で光源として扱うか (GENERIC_LIGHT)
+ * 表にある ID (> 1) は対象にしない。明るい色ではなく発光レベルだけで決めるので、雪や白いブロックは光らない
+ * レベル 1 (バニラの終端の枠など) は光源にしない。弱すぎて光だまりにならず、光源の数だけ増える
+ */
+const int GENERIC_LIGHT_MIN_LEVEL = 2;
+bool isGenericEmitter(int voxelId, int emissionLevel) {
+#ifdef GENERIC_LIGHT
+    return voxelId == BLOCK_SOLID && emissionLevel >= GENERIC_LIGHT_MIN_LEVEL;
+#else
+    return false;
+#endif
+}
+
 // mc_Entity.x の流れる水を水に戻す (流れる水の ID はボクセルの印 VOXEL_WATER_FLOWING にだけ使う)
 int terrainBlockId(int blockId) { return blockId == BLOCK_WATER_FLOWING ? BLOCK_WATER : blockId; }
 

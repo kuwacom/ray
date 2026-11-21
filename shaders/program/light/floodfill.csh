@@ -258,6 +258,15 @@ void main() {
             registerLight(vec3(cell) + d.shape.xyz, range, flickered, luminance(emission), d.shape.w, true);
         }
     }
+#ifdef GENERIC_LIGHT
+    else if (GENERIC_LIGHT_BRIGHTNESS > 0.0 && isGenericLightVoxel(voxelData)) {
+        // ID の無い発光ブロック。発光レベルだけが分かるので、設定の色の点光源として登録する
+        float level = float(unpackVoxelEmission(voxelData));
+        LightDef d = genericLightDef(level);
+        emission = lightEmission(d, level);
+        registerLight(vec3(cell) + d.shape.xyz, lightRange(d, level), emission, luminance(emission), d.shape.w, true);
+    }
+#endif
 
     // エンティティ光源 (地形に同じ光源がある時は二重に数えない)
     uint emitKey = imageLoad(voxelEmitImg, cell).r;
