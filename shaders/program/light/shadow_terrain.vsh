@@ -29,12 +29,12 @@
 #include "/lib/common/math.glsl"
 #include "/lib/common/shading_types.glsl"
 #include "/lib/common/common.glsl"
+#include "/lib/common/color.glsl"
 #include "/lib/ids/block_ids.glsl"
 #include "/lib/ids/entity_ids.glsl"
 #include "/lib/ids/light_ids.glsl"
 #include "/lib/ids/material_ids.glsl"
 #include "/lib/ids/id_decode.glsl"
-#include "/lib/common/color.glsl"
 #include "/lib/common/voxel_space.glsl"
 #include "/lib/buffers/images.glsl"
 #include "/lib/common/noise.glsl"
@@ -97,6 +97,10 @@ void main() {
     if (!isTerrain) {
         blockId = BLOCK_AIR;
         tintTransmittance = vec3(1.0);
+        // 染めたブロックエンティティ (旗・ベッド・シュルカーボックス) だけは ID を渡し、RSM の色に反射率の設定を掛ける (shadow_entities.fsh と同じ)
+        // 渡すのは反射率の対象の ID だけなので、色付き影・水・揺れの判定には当たらない
+        int beId = stripMetalGate(blockEntityId);
+        if (COLOR_ALBEDO_ACTIVE && renderStage == MC_RENDER_STAGE_BLOCK_ENTITIES && isColorAlbedoBlock(beId)) blockId = beId;
     }
 #endif
     if (isTerrain) {

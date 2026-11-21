@@ -158,6 +158,25 @@ if DYED_PROPS[-1][0] != block_const("BLOCK_DYED_LAST"):
     raise SystemExit("BLOCK_DYED_LAST が染めた小物の最後の ID と合わない")
 NON_OCCLUDING_ID = block_const("BLOCK_NON_OCCLUDING")
 
+# 彩釉テラコッタ。もとは BLOCK_GLOSSY の行にあったものを、反射率の設定を掛けるために分けた。質感と遮蔽は BLOCK_GLOSSY と同じで、
+# BLOCK_GLOSSY のボクセルの色は分ける前と同じく彩釉テラコッタを含めた平均にする (render_albedo_glsl)
+GLAZED_PROPS: list[tuple[int, str, list[str]]] = [
+    (block_const("BLOCK_GLAZED_TERRACOTTA") + i, f"{c} glazed terracotta", [f"{c}_glazed_terracotta"]) for i, c in enumerate(COLORS)
+]
+if GLAZED_PROPS[-1][0] != block_const("BLOCK_GLAZED_LAST"):
+    raise SystemExit("BLOCK_GLAZED_LAST が彩釉テラコッタの最後の ID と合わない")
+GLOSSY_ID = block_const("BLOCK_GLOSSY")
+
+# 染めたブロックエンティティ (ベッド・シュルカーボックス)。地形の面が無く、Iris はブロックエンティティを描く間の blockEntityId に
+# block.properties の ID を入れる (Iris 1.7 / Oculus も同じ)。どの行にも無いと表に無いブロックエンティティ (-1) として来る
+DYED_ENTITY_PROPS: list[tuple[int, str, list[str]]] = [
+    *[(block_const("BLOCK_BED") + i, f"{c} bed", [f"{c}_bed"]) for i, c in enumerate(COLORS)],
+    (block_const("BLOCK_SHULKER_BOX"), "shulker box", ["shulker_box"]),
+    *[(block_const("BLOCK_SHULKER_BOX") + 1 + i, f"{c} shulker box", [f"{c}_shulker_box"]) for i, c in enumerate(COLORS)],
+]
+if DYED_ENTITY_PROPS[-1][0] != block_const("BLOCK_DYED_ENTITY_LAST"):
+    raise SystemExit("BLOCK_DYED_ENTITY_LAST が染めたブロックエンティティの最後の ID と合わない")
+
 
 # 光源でないブロックの表。光源 (ID 1001-1255) は id_tables.py の LIGHTS
 # (ID, コメント, ブロック一覧) の順に並べる
@@ -171,7 +190,7 @@ BLOCKS: list[tuple[int, str, list[str]]] = [
                                      *[f"{p}copper_grate" for p in COPPER_PREFIX], *[f"waxed_{p}copper_grate" for p in COPPER_PREFIX]]),
     (11, "polished stone / minerals", ["quartz_block", "smooth_quartz", "quartz_bricks",
                             "polished_granite", "polished_diorite", "polished_andesite", "polished_deepslate", "polished_blackstone",
-                            "polished_tuff", "polished_basalt", "packed_ice", "blue_ice", "obsidian", *colored("glazed_terracotta")]),
+                            "polished_tuff", "polished_basalt", "packed_ice", "blue_ice", "obsidian"]),
     (12, "snow", ["snow_block", "powder_snow"]),
     # 光らないが鮮やかな鉱物ブロック。DECORATIVE_BLOCK_LIGHTS で発光・光源にできる (OFF では元のマテリアル, lib/ids/id_decode.glsl)
     (13, "decorative: lapis (glossy)", ["lapis_block"]),
@@ -180,6 +199,7 @@ BLOCKS: list[tuple[int, str, list[str]]] = [
     (16, "decorative: gold (metal)", ["gold_block"]),
     (17, "decorative: redstone", ["redstone_block"]),
     (18, "decorative: amethyst", ["amethyst_block", "budding_amethyst"]),
+    *GLAZED_PROPS,
 
     (100, "short plants (wave with fixed root)", ["short_grass", "grass", "fern", "dead_bush", "dandelion", "poppy", "blue_orchid", "allium",
                                          "azure_bluet", "red_tulip", "orange_tulip", "white_tulip", "pink_tulip", "oxeye_daisy",
@@ -242,6 +262,7 @@ BLOCKS: list[tuple[int, str, list[str]]] = [
     *connected_entries(BARS_FIRST, "bars (panes other than glass)",
                        ["iron_bars", *[f"{p}copper_bars" for p in COPPER_PREFIX], *[f"waxed_{p}copper_bars" for p in COPPER_PREFIX]],
                        ["false", "true"]),
+    *DYED_ENTITY_PROPS,
 ]
 
 
@@ -343,6 +364,8 @@ def render_albedo_glsl(colors: dict[str, list[int]], tops: dict[str, list[int]],
             continue
         if bid == NON_OCCLUDING_ID:
             names = names + [n for _, _, ns in DYED_PROPS for n in ns]
+        if bid == GLOSSY_ID:
+            names = names + [n for _, _, ns in GLAZED_PROPS for n in ns]
         known = [n.split(":")[0] for n in names if n.split(":")[0] in colors]
         if known:
             by_id[bid] = mean_srgb([colors[n] for n in known])
@@ -582,7 +605,7 @@ def render_light_ids() -> str:
 COLOR_KINDS = [
     ("COLOR_KIND_CONCRETE", re.compile(r"^(\w+_)?concrete(_powder)?$"), "コンクリート・コンクリートパウダー"),
     ("COLOR_KIND_WOOL", re.compile(r"^\w+_wool$"), "羊毛"),
-    ("COLOR_KIND_TERRACOTTA", re.compile(r"^(\w+_)?terracotta$"), "テラコッタ (彩釉テラコッタは BLOCK_GLOSSY の行にある)"),
+    ("COLOR_KIND_TERRACOTTA", re.compile(r"^(\w+_)?terracotta$"), "テラコッタ (彩釉テラコッタは BLOCK_GLAZED_TERRACOTTA)"),
 ]
 COLOR_KIND_BITS = 2
 
@@ -626,10 +649,12 @@ def render_block_ids(colored: list[tuple[int, str, list[str]]]) -> str:
         " * 番号帯",
         " *   1        : 未登録の固体 (mc_Entity.x = -1 をボクセルではこれに置き換える)",
         " *   10-19    : マテリアルのヒント付き固体 (完全遮蔽)",
+        " *   20-35    : 彩釉テラコッタ (完全遮蔽。扱いは BLOCK_GLOSSY と同じ)",
         " *   100-129  : 遮蔽しない植物・小物",
         " *   130-178  : 染めた小物 (カーペット・旗・火のないロウソク。扱いは BLOCK_NON_OCCLUDING と同じ)",
         " *   200-299  : 半透明 (透過色テーブル index = id - 200)",
         " *   300-399  : 部分形状 (形状テーブル index = id - 300)",
+        " *   400-432  : 染めたブロックエンティティ (ベッド・シュルカーボックス。blockEntityId でだけ来る)",
         f" *   {LIGHT_ID_BASE + 1}-{LIGHT_ID_BASE + LIGHT_ENTITY_LAST}: 光源 (光源インデックス = id - {LIGHT_ID_BASE}, lib/ids/light_ids.glsl)",
         f" *   {LIGHT_ID_BASE + LIGHT_FACING_STRIDE + 1}-{LIGHT_FACING_LAST}: 向きのある光源の東・南・西 (id - {LIGHT_ID_BASE} = 256 x 向き + 光源インデックス)",
         f" *   {COLOR_BAND_FIRST}-{COLOR_BAND_LAST}: 色の付いた固体 (完全遮蔽。上の帯に無いブロックを平均の色ごとにまとめたもの。色は lib/ids/block_albedo.glsl)",

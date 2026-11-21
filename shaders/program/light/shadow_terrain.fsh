@@ -10,6 +10,7 @@
 //@include "/lib/common/shadow_space.glsl"
 //@include "/lib/ids/block_ids.glsl"
 //@include "/lib/ids/id_decode.glsl"
+//@include "/lib/light/block_data.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
 #include "/lib/settings/light.glsl"
@@ -34,6 +35,9 @@
 #include "/lib/ids/light_ids.glsl"
 #include "/lib/ids/material_ids.glsl"
 #include "/lib/ids/id_decode.glsl"
+#include "/lib/common/noise.glsl"
+#include "/lib/buffers/block_data.glsl"
+#include "/lib/light/block_data.glsl"
 // END GENERATED includes
 
 in vec2 texcoord;
@@ -70,7 +74,10 @@ void main() {
     } else {
         // RSM の VPL の色。G バッファと同じ色の付いた固体の反射率 (ALBEDO_*_STRENGTH) を掛ける
         albedo.a = 1.0;
-        if (COLOR_ALBEDO_ACTIVE && isColorAlbedoBlock(blockId)) albedo.rgb = linearToSrgb(applyColorBlockAlbedo(blockId, srgbToLinear(albedo.rgb)));
+        if (COLOR_ALBEDO_ACTIVE && isColorAlbedoBlock(blockId)) {
+            float meanMax = isPatternAlbedoBlock(blockId) ? colorBlockMeanMax(blockId) : 0.0;
+            albedo.rgb = linearToSrgb(applyColorBlockAlbedo(blockId, srgbToLinear(albedo.rgb), meanMax));
+        }
     }
     outColor = albedo;
     outNormal = vec4(octEncode(normalize(normalPlayer)), skyLight, kind);

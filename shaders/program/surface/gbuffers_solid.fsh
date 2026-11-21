@@ -11,6 +11,10 @@
 //@include "/lib/surface/surface.glsl"
 //@include "/lib/surface/generated_normal.glsl"
 //@include "/lib/post/post.glsl"
+#ifdef GBUF_TERRAIN
+    // テラコッタの反射率がブロックの平均の色を引く (colorBlockMeanMax)
+    //@include "/lib/light/block_data.glsl"
+#endif
 #ifdef GBUF_ENTITIES
     //@include "/lib/common/exposure.glsl"
     //@include "/lib/settings/capabilities.glsl"
@@ -39,11 +43,11 @@
 #include "/lib/common/shading_types.glsl"
 #include "/lib/common/common.glsl"
 #include "/lib/ids/entity_ids.glsl"
+#include "/lib/common/color.glsl"
 #include "/lib/ids/block_ids.glsl"
 #include "/lib/ids/light_ids.glsl"
 #include "/lib/ids/material_ids.glsl"
 #include "/lib/ids/id_decode.glsl"
-#include "/lib/common/color.glsl"
 #include "/lib/common/encoding.glsl"
 #include "/lib/common/gbuffer.glsl"
 #include "/lib/surface/material.glsl"
@@ -72,6 +76,10 @@
 #include "/lib/post/velocity.glsl"
 #include "/lib/post/tonemap.glsl"
 #include "/lib/post/post.glsl"
+#ifdef GBUF_TERRAIN
+    #include "/lib/buffers/block_data.glsl"
+    #include "/lib/light/block_data.glsl"
+#endif
 #ifdef GBUF_ENTITIES
     #include "/lib/common/exposure.glsl"
     #include "/lib/settings/capabilities.glsl"
@@ -592,10 +600,15 @@ void main() {
     GBufferData g = gbufferDefault();
     g.albedo = srgbToLinear(albedo.rgb);
 #ifdef GBUF_TERRAIN
-    g.albedo = applyColorBlockAlbedo(blockBase, g.albedo);
+    if (COLOR_ALBEDO_ACTIVE && isColorAlbedoBlock(blockBase)) {
+        g.albedo = applyColorBlockAlbedo(blockBase, g.albedo, isPatternAlbedoBlock(blockBase) ? colorBlockMeanMax(blockBase) : 0.0);
+    }
 #elif defined GBUF_BLOCK
-    // 旗はブロックエンティティとして描かれる。ブロックのアイテムを描く間 (blockEntityId = 1) は掛けない
-    if (isBlockEntityDraw(blockEntityId)) g.albedo = applyColorBlockAlbedo(stripMetalGate(blockEntityId), g.albedo);
+    /*
+     * 旗・ベッド・シュルカーボックスはブロックエンティティとして描かれる。ブロックのアイテムを描く間 (blockEntityId = 1、
+     * ブロックの ID は currentRenderedItemId に入る) は掛けない。手持ち・落ちたアイテムは GBUF_HAND / GBUF_ENTITIES で描かれ、掛からない
+     */
+    if (isBlockEntityDraw(blockEntityId)) g.albedo = applyColorBlockAlbedo(stripMetalGate(blockEntityId), g.albedo, 0.0);
 #endif
     if (railMirror) g.albedo = min(g.albedo * RAIL_F0_GAIN, vec3(1.0));
 #if defined GBUF_ENTITIES || defined GBUF_HAND
