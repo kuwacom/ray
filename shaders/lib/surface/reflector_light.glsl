@@ -192,27 +192,44 @@ int reflectorProbe(vec3 x, vec3 lightPos, bool directional, int a, float s, floa
     if (id == BLOCK_AIR) return 0;
     int kind = reflectorKind(id);
     if (kind == REFLECTOR_KIND_NONE) return (isPlainSolidBlock(id) || (id >= 10 && id < 100)) ? 2 : 0;
-    if (kind == REFLECTOR_KIND_PANE) {
-        float mid = float(cell[a]) + 0.5;
-        end = reflectorLineEnd(x, lightPos, directional, a, mid);
-        den = end[a] - x[a];
-        if (abs(den) < 1e-4) return 0;
-        q = x + (end - x) * ((mid - x[a]) / den);
-        ivec3 c2 = ivec3(floor(q));
-        c2[a] = cell[a];
-        if (c2 != cell) return 0;
-    } else {
-        // 面の手前のセルが固体なら面は隠れている (線が手前のセルの横から入ると、面の位置の 1 枚前では見つからない)。
-        // 光を通すガラス・氷は色付けのトレースが見る
-        ivec3 front = cell;
-        front[a] -= int(s);
-        int fid = reflectorBlockId(front);
-        if (isPlainSolidBlock(fid) || (fid >= 10 && fid < 100)) return 2;
-    }
+    // パネルは面がセルの中央にあるので reflectorProbePane が引く
+    if (kind == REFLECTOR_KIND_PANE) return 0;
+    // 面の手前のセルが固体なら面は隠れている (線が手前のセルの横から入ると、面の位置の 1 枚前では見つからない)。
+    // 光を通すガラス・氷は色付けのトレースが見る
+    ivec3 front = cell;
+    front[a] -= int(s);
+    int fid = reflectorBlockId(front);
+    if (isPlainSolidBlock(fid) || (fid >= 10 && fid < 100)) return 2;
     h.q = q;
     h.cell = cell;
     h.id = id;
     h.kind = kind;
+    return 1;
+}
+
+/*
+ * ガラス板: 面がセルの中央 (セルの a 軸の座標 + 0.5) にあるので、中央の面と線の交点のセルを引く。
+ * 整数の面で引いたセルと中央の面で引いたセルは、線が傾いているとセルの 1 つ隣になるので別に引く
+ * 見つかれば 1 (h に入れる)、なければ 0。光を遮る固体の判定は reflectorProbe がする
+ */
+int reflectorProbePane(vec3 x, vec3 lightPos, bool directional, int a, float mid, out ReflectorHit h) {
+    h.q = x;
+    h.cell = ivec3(0);
+    h.id = 0;
+    h.kind = REFLECTOR_KIND_NONE;
+    vec3 end = reflectorLineEnd(x, lightPos, directional, a, mid);
+    float den = end[a] - x[a];
+    if (abs(den) < 1e-4) return 0;
+    vec3 q = x + (end - x) * ((mid - x[a]) / den);
+    ivec3 cell = ivec3(floor(q));
+    cell[a] = int(floor(mid));
+    if (!isInVoxelVolume(cell)) return 0;
+    int id = fetchVoxelBlockId(cell);
+    if (reflectorKind(id) != REFLECTOR_KIND_PANE) return 0;
+    h.q = q;
+    h.cell = cell;
+    h.id = id;
+    h.kind = REFLECTOR_KIND_PANE;
     return 1;
 }
 
@@ -250,8 +267,10 @@ vec3 reflectorSun(vec3 xVox, vec3 N, LightSample sun) {
         int steps = min(int(float(REFLECTOR_DISTANCE) * abs(dir[a])) + 1, REFLECTOR_DISTANCE);
         for (int i = 0; i < steps; i++) {
             ReflectorHit h;
-            int st = reflectorProbe(xVox, dir, true, a, s, start + s * float(i), h);
+            float plane = start + s * float(i);
+            int st = reflectorProbe(xVox, dir, true, a, s, plane, h);
             if (st == 2) break;
+            if (st == 0) st = reflectorProbePane(xVox, dir, true, a, plane + 0.5 * s, h);
             if (st == 0) continue;
             float path = length(h.q - xVox);
             float spread = sqrt(sqr(reflectorSpread(h.kind)) + sqr(SUN_ANGULAR_RADIUS));
@@ -311,8 +330,10 @@ vec3 reflectorBlockLights(vec3 xVox, vec3 N) {
             int planes = min(int(reach * 0.5) + 1, REFLECTOR_BLOCKLIGHT_PLANES);
             for (int i = 0; i < planes; i++) {
                 ReflectorHit h;
-                int st = reflectorProbe(xVox, lp, false, a, s, start + s * float(i), h);
+                float probePlane = start + s * float(i);
+                int st = reflectorProbe(xVox, lp, false, a, s, probePlane, h);
                 if (st == 2) break;
+                if (st == 0) st = reflectorProbePane(xVox, lp, false, a, probePlane + 0.5 * s, h);
                 if (st == 0) continue;
                 float plane = s > 0.0 ? float(h.cell[a]) : float(h.cell[a] + 1);
                 if (h.kind == REFLECTOR_KIND_PANE) plane = float(h.cell[a]) + 0.5;
