@@ -51,7 +51,7 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define REFLECTOR_DISTANCE 32 // [16 24 32 48 64] 太陽・月の反射光が届く距離 (ブロック)。窓の高さ = 地面に落ちる距離 (太陽高度 45 度)
 #define REFLECTOR_BLOCKLIGHT_COUNT 2 // [1 2 3 4] ブロックライトの反射を求める光源の数 (受ける点のビンの明るい順)
 #define REFLECTOR_GLINT // 金属・鉱物ブロックの面のキラキラ: テクセルごとの細かい面が太陽・灯りの像を映し、歩くと点が入れ替わる
-#define REFLECTOR_GLINT_STRENGTH 1.0 // [0.0 0.25 0.5 0.75 1.0] キラキラの強さ。照り返しの平均は変えず、テクセルごとの明るさのばらつきだけを上げる
+#define REFLECTOR_GLINT_STRENGTH 0.75 // [0.0 0.25 0.5 0.75 1.0] キラキラの強さ。照り返しの平均は変えず、テクセルごとの明るさのばらつきだけを上げる
 
 // マテリアル / 水 / 反射 (surface モジュール)
 #define PBR_FORMAT 0 // [0 1] 0=なし 1=labPBR
