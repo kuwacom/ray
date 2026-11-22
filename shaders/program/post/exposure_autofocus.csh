@@ -558,44 +558,6 @@ float eyeBlockLight() {
     return max(float(eyeBrightnessSmooth.x) / EYE_BRIGHTNESS_MAX, held);
 }
 
-#if (defined EXPOSURE_AUTO && EXPOSURE_RESPONSE_MODE == 0) || defined EXPOSURE_CAMERA_AE
-// ヒストグラムの重みのうち log2 輝度が logL より暗い割合 (ビンの中は一様とみなす)
-float histogramShareBelow(float logL) {
-    float edge = (logL - HISTOGRAM_LOG_MIN) / (HISTOGRAM_LOG_MAX - HISTOGRAM_LOG_MIN) * HISTOGRAM_LAST_BIN + 0.5;
-    float total = 0.0;
-    float below = 0.0;
-    for (int i = 0; i < 256; i++) {
-        float n = float(sharedHistogram[i]);
-        total += n;
-        below += n * saturate(edge - (float(i) - 0.5));
-    }
-    return total > 0.0 ? below / total : 0.0;
-}
-
-// 夜の屋外で暗く写す段 (EXPOSURE_NIGHT_KEY_*)。昼・屋内・洞窟・水中は 0
-float nightKeyEv() {
-    #ifdef HAS_SKYLIGHT
-    float night = nightFactor() * eyeOutdoor() * (isEyeInWater == 0 ? 1.0 : 0.0);
-    if (night <= 0.0) return 0.0;
-    float brightLog = histogramPercentileLog(1.0 - EXPOSURE_NIGHT_KEY_BRIGHT_SHARE);
-    float darkShare = histogramShareBelow(brightLog - EXPOSURE_NIGHT_KEY_DARK_EV);
-    float key = mix(EXPOSURE_NIGHT_KEY_MIN, EXPOSURE_NIGHT_KEY_MAX,
-                    smoothstep(EXPOSURE_NIGHT_KEY_DARK_SHARE.x, EXPOSURE_NIGHT_KEY_DARK_SHARE.y, darkShare));
-    return night * key;
-    #else
-    return 0.0;
-    #endif
-}
-
-// 夜の段を時間方向に均す (FrameData.postParams[1].z)
-float adaptNightKey(float measured, bool initialized, float dt) {
-    float prev = frameData.postParams[1].z;
-    float key = initialized && !isnan(prev) && !isinf(prev) ? mix(prev, measured, 1.0 - exp(-EXPOSURE_NIGHT_KEY_SPEED * dt)) : measured;
-    frameData.postParams[1].z = key;
-    return key;
-}
-#endif
-
 /*
  * 曲線と下限で止めた EV を目の位置の明るさ (屋外 / 屋内・洞窟) で補正する
  * 屋外の夜は明るく写す (下限 EXPOSURE_MIN_EV は洞窟の暗さのために残す)、灯りの点いた屋内・洞窟は少し暗く写す
@@ -838,20 +800,17 @@ void main() {
     float adaptedEv = adaptCameraEv(prevEv, measuredEv, initialized, dt);
     // 露出補正は決める組に入れる (画に別に掛けると二重になる)
     float sceneOffset = EXPOSURE_CAMERA_EV_OFFSET - LOOK_EXPOSURE_BIAS;
-    // 夜の屋外は露出補正と同じく決める組に入れる (場面を明るく見積もった分だけ暗く撮る)
-    float measuredKey = nightKeyEv();
-    float nightKey = adaptNightKey(measuredKey, initialized, dt);
     #ifdef CAMERA_FILTER
     // 実機と同じくフィルター越しに測る (減光の分だけ SS・F 値・ISO で明るく撮る。ND で SS が延び、ISO オートと限界の表示もそのまま効く)
     sceneOffset -= CAMERA_FILTER_STOPS;
     #endif
-    CameraExposure camera = cameraAutoExposure(adaptedEv + sceneOffset + nightKey);
+    CameraExposure camera = cameraAutoExposure(adaptedEv + sceneOffset);
     frameData.postParams[CAMERA_AE_PARAM] = vec4(camera.shutter, camera.fNumber, camera.iso, float(camera.limits));
     #if EXPOSURE_INFO_MODE > 0
     writeCameraInfo(camera);
     #endif
     float appliedEv = cameraExposureEv(camera);
-    float targetEv = cameraExposureEv(cameraAutoExposure(measuredEv + sceneOffset + measuredKey));
+    float targetEv = cameraExposureEv(cameraAutoExposure(measuredEv + sceneOffset));
     #ifdef CAMERA_FILTER
     // 組が写す明るさはフィルターの後の光に対してなので、場面の輝度に対してはフィルターの段数だけ暗い側
     appliedEv += CAMERA_FILTER_STOPS;
@@ -921,10 +880,6 @@ void main() {
     #endif
     float appliedEv = applyEnvironmentExposure(clamp(exposureCurve(adaptedEv), EXPOSURE_MIN_EV, EXPOSURE_MAX_EV), adaptedEv, adaptedDarkEv, lightShare);
     float targetEv = applyEnvironmentExposure(clamp(exposureCurve(measuredEv), EXPOSURE_MIN_EV, EXPOSURE_MAX_EV), measuredEv, measuredDarkEv, lightShare);
-    // 夜の屋外の目標 (EXPOSURE_NIGHT_KEY_*)。持ち上げの後に掛け、白飛びの見張りとハイライト重点はその後に効かせる
-    float measuredKey = nightKeyEv();
-    appliedEv += adaptNightKey(measuredKey, initialized, dt);
-    targetEv += measuredKey;
     #if METERING_ACTIVE_MODE == 0 && defined HAS_SKYLIGHT
         /*
          * 評価測光: 夜の屋外で灯りに照らされた所が白く飛ぶ時は、白を超える所が重みの EXPOSURE_NIGHT_CLIP_SHARE までになる所まで暗く写す
@@ -970,7 +925,7 @@ void main() {
      * (M は補正を exposure にだけ掛けるので、組が写す明るさに補正の分を戻す)
      */
     const float bias = 1.0;
-    float averageEv = appliedEv + LOOK_EXPOSURE_BIAS - nightKey;
+    float averageEv = appliedEv + LOOK_EXPOSURE_BIAS;
 #else
     float bias = exp2(LOOK_EXPOSURE_BIAS);
     float averageEv = adaptedEv;

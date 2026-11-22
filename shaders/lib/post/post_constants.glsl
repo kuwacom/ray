@@ -178,19 +178,6 @@ const float EXPOSURE_NIGHT_CLIP_SHARE = 0.02;
 const float EXPOSURE_NIGHT_CLIP_LEVEL = 1.3;
 const float EXPOSURE_NIGHT_CLIP_MAX = 1.0;
 /*
- * 夜の屋外の目標 (ゲーム向けのオートとカメラの P・A・S・M + ISO オートの全測光)。測光は暗い夜空と地面を中間グレーへ寄せるので、
- * 夜景が 1〜2 段明るく写っていた (露出補正 -2〜-1 でちょうどよい明るさ)。実機の作法も同じで、暗い夜空の多い構図はマイナス、
- * 灯りが画面を占める構図は 0 からプラスに補正する。暗い所の割合で KEY_MIN .. KEY_MAX 段だけ暗く写す。上限を 2 段にすると、丘から見下ろす灯りの村 (暗い夜空と地面が大半) が実写の遠い街の夜景 (sRGB の輝度の平均 20-55) より暗くなった
- * 暗い所 = 明るい側 (重みの上位 BRIGHT_SHARE) の境より DARK_EV 段以上暗い所。割合が DARK_SHARE.x .. y で MIN -> MAX
- * 割合は時間方向に KEY_SPEED (/秒) で均す (視点を少し振っただけで露出が揺れないように)
- */
-const float EXPOSURE_NIGHT_KEY_MIN = 1.0;
-const float EXPOSURE_NIGHT_KEY_MAX = 1.5;
-const float EXPOSURE_NIGHT_KEY_BRIGHT_SHARE = 0.02;
-const float EXPOSURE_NIGHT_KEY_DARK_EV = 4.0;
-const vec2 EXPOSURE_NIGHT_KEY_DARK_SHARE = vec2(0.3, 0.8);
-const float EXPOSURE_NIGHT_KEY_SPEED = 1.0;
-/*
  * DR の補正 (EXPOSURE_DR)。撮る側: 重みの上位 PROTECT_SHARE が露出後に PROTECT_LEVEL (白の手前) を超える分だけ、最大 HIGHLIGHT_MAX EV 暗く撮る
  * (ハイライト優先は 1 段暗く撮って戻す。最低 ISO が 1 段上がるのはそのため)
  * 現像の側 (applyDynamicRange): 局所の明るさが平均の RESTORE_EV.x 段上までは暗く撮った分を戻し、.y 段上からは戻さない。
