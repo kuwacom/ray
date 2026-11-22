@@ -14,6 +14,7 @@
 //@include "/lib/buffers/light_bins.glsl"
 //@include "/lib/light/light.glsl"
 //@include "/lib/light/light_mask_data.glsl"
+//@include "/lib/light/reflector_map_data.glsl"
 //@include "/lib/ids/block_albedo.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
@@ -65,6 +66,7 @@
 #include "/lib/light/blocklight.glsl"
 #include "/lib/light/light.glsl"
 #include "/lib/light/light_mask_data.glsl"
+#include "/lib/light/reflector_map_data.glsl"
 #include "/lib/ids/block_albedo.glsl"
 // END GENERATED includes
 
@@ -114,6 +116,7 @@ void main() {
         }
         if (litFaces != 0u) blockData.lightDefs[i].info.x |= LIGHT_FLAG_EMISSION_MASK;
     }
+    for (int j = i; j < REFLECTOR_MAP_BLOCKS * REFLECTOR_MAP_VEC4S; j += 256) blockData.lightMasks[REFLECTOR_MAP_BASE + j] = reflectorMapStatic(j);
     /*
      * ライトビンを全部 0 にする。begin は前フレームに使った枠だけを戻すので、確保直後の中身が 0 でないと残り続ける
      * 1 回だけなので 1 ワークグループで足りる (約 5M uint)

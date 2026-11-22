@@ -86,6 +86,10 @@
 #endif
 #ifdef REFLECTOR_BLOCKLIGHT
 #endif
+#ifdef REFLECTOR_GEM_PATTERN
+#endif
+#ifdef REFLECTOR_METAL_PATTERN
+#endif
 #ifdef REFLECTOR_GLINT
 #endif
 #ifdef NORMAL_MAPPING

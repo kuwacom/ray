@@ -3,10 +3,11 @@ ID と光源の表から、シェーダー側の ID の定数・properties・光
 
     shaders/block.properties, item.properties, entity.properties
     shaders/lib/ids/block_ids.glsl, light_ids.glsl, entity_ids.glsl, block_albedo.glsl
-    shaders/lib/light/light_table_data.glsl, light_mask_data.glsl
+    shaders/lib/light/light_table_data.glsl, light_mask_data.glsl, reflector_map_data.glsl
 
 正本は、光源・エンティティ・ID の定数が tools/id_tables.py、光源でないブロックの表 (BLOCKS) がこのスクリプト、
-ブロックの色と光源の面の光り方が tools/block_colors.json と tools/light_masks.json (tools/gen_block_colors.py が作る)
+ブロックの色と光源の面の光り方が tools/block_colors.json と tools/light_masks.json (tools/gen_block_colors.py が作る)、
+反射体の面の凹凸が tools/reflector_maps.json (tools/gen_reflector_maps.py が作る)
 未登録のブロックはボクセルで「完全な固体」として扱われるので、光を通す形のブロックは必ずどこかに載せる。
 下の表に載っていないブロックのうち tools/block_colors.json に色のあるものは、色ごとに 2000 番台の ID (色の付いた固体) を振る
 
@@ -20,6 +21,7 @@ from __future__ import annotations
 import itertools
 import json
 import re
+import struct
 import sys
 from pathlib import Path
 
@@ -38,6 +40,10 @@ from lib.paths import ROOT, SHADERS  # noqa: E402
 
 BLOCK_COLORS = ROOT / "tools" / "block_colors.json"
 LIGHT_MASKS = ROOT / "tools" / "light_masks.json"
+REFLECTOR_MAPS = ROOT / "tools" / "reflector_maps.json"
+# lib/buffers/block_data.glsl の REFLECTOR_MAP_BLOCKS / REFLECTOR_MAP_VEC4S と同じ値
+REFLECTOR_MAP_BLOCKS = 5
+REFLECTOR_MAP_VEC4S = 22
 
 # この刻み (sRGB 8bit) で同じになる色は 1 つの ID にまとめる。照り返しの色にはこれで十分
 COLOR_QUANT = 4
@@ -848,6 +854,48 @@ def render_light_mask_data(masks: dict[str, dict]) -> str:
     return "\n".join(lines)
 
 
+def reflector_map_words(m: dict) -> list[int]:
+    """反射体 1 ブロックの 88 語 (22 uvec4): 段 0-3 の 8bit の符号付き (16x16、8x8、4x4、2x2。4 個ずつ下位から) の後に、段の倍率の half 2 組"""
+    def pack4(values: list[int]) -> list[int]:
+        values = values + [0] * (-len(values) % 4)
+        return [sum((v & 0xFF) << (8 * k) for k, v in enumerate(values[i:i + 4])) for i in range(0, len(values), 4)]
+
+    def half(v: float) -> int:
+        return struct.unpack("<H", struct.pack("<e", v))[0]
+
+    words = [w for level in m["levels"] for w in pack4(level)]
+    s = m["scales"]
+    words += [half(s[0]) | half(s[1]) << 16, half(s[2]) | half(s[3]) << 16, 0]
+    if len(words) != REFLECTOR_MAP_VEC4S * 4:
+        raise SystemExit(f"tools/reflector_maps.json の 1 ブロックが {len(words)} 語 (期待 {REFLECTOR_MAP_VEC4S * 4})")
+    return words
+
+
+def render_reflector_map_data(maps: dict[str, dict]) -> str:
+    if len(maps) != REFLECTOR_MAP_BLOCKS:
+        raise SystemExit(f"tools/reflector_maps.json が {len(maps)} ブロック (lib/buffers/block_data.glsl の REFLECTOR_MAP_BLOCKS は {REFLECTOR_MAP_BLOCKS})")
+    lines = [
+        "/*",
+        " * 反射体の面の凹凸 (テクスチャの明るさのラプラシアンの 4 段のミップ)。ブロック x 22 uvec4。添字 j は SSBO の lightMasks の REFLECTOR_MAP_BASE からの位置",
+        f" * {GENERATED_NOTE.replace('tools/id_tables.py', 'tools/reflector_maps.json')}",
+        " * 中身の意味は lib/buffers/block_data.glsl の lightMasks。ブロックの順は lib/surface/reflector_light.glsl の reflectorMapIndex",
+        " */",
+        "#ifndef LIGHT_REFLECTOR_MAP_DATA_GLSL",
+        "#define LIGHT_REFLECTOR_MAP_DATA_GLSL",
+        "",
+        "uvec4 reflectorMapStatic(int j) {",
+        "    switch (j) {",
+    ]
+    for b, (block_id, m) in enumerate(sorted(maps.items(), key=lambda kv: int(kv[0]))):
+        words = reflector_map_words(m)
+        for k in range(REFLECTOR_MAP_VEC4S):
+            w = words[k * 4:k * 4 + 4]
+            if any(w):
+                lines.append(f"        case {b * REFLECTOR_MAP_VEC4S + k}: return uvec4(" + ", ".join(f"0x{x:08X}u" for x in w) + ");")
+    lines += ["    }", "    return uvec4(0u);", "}", "", "#endif", ""]
+    return "\n".join(lines)
+
+
 def generated(shaders: Path = SHADERS) -> dict[Path, str]:
     check_tables()
     data = json.loads(BLOCK_COLORS.read_text(encoding="utf-8"))
@@ -867,6 +915,8 @@ def generated(shaders: Path = SHADERS) -> dict[Path, str]:
         shaders / "lib" / "light" / "light_table_data.glsl": render_light_table_data(),
         shaders / "lib" / "light" / "light_mask_data.glsl": render_light_mask_data(
             json.loads(LIGHT_MASKS.read_text(encoding="utf-8"))["lights"]),
+        shaders / "lib" / "light" / "reflector_map_data.glsl": render_reflector_map_data(
+            json.loads(REFLECTOR_MAPS.read_text(encoding="utf-8"))["maps"]),
     }
 
 

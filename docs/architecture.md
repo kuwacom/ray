@@ -580,6 +580,8 @@ gbuffers で `blockIdToMaterial()` / `entityIdToMaterial()` (lib/ids/id_decode.g
 | REFLECTOR_LIGHT | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
 | REFLECTOR_SUN | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
 | REFLECTOR_BLOCKLIGHT | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
+| REFLECTOR_GEM_PATTERN | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
+| REFLECTOR_METAL_PATTERN | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |
 | REFLECTOR_DISTANCE | 32 | **16** | **16** | 32 | 32 | 32 | 32 | **64** | **64** | **64** |
 | REFLECTOR_BLOCKLIGHT_COUNT | 2 | **1** | **1** | 2 | 2 | 2 | 2 | **3** | **3** | **3** |
 | REFLECTOR_GLINT | ON | **OFF** | **OFF** | ON | ON | ON | ON | ON | ON | ON |

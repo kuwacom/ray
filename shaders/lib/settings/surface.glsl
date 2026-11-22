@@ -47,7 +47,10 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 #define REFLECTOR_GLASS_STRENGTH 2.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0 6.0 8.0] ガラス・氷の反射光の倍率。1 は板 1 枚 (約 8%)。既定 2 は建築の反射コート・複層ガラス (約 15%) 相当で、影の地面に窓の形が見える強さ
 #define REFLECTOR_METAL_STRENGTH 0.5 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0] 金属ブロックの鏡の反射光の倍率。GI が拡散の照り返しとして既に返している分があるので 0.5 が既定
 #define REFLECTOR_GEM_STRENGTH 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0 6.0 8.0] 鉱物ブロック (ラピスラズリ・エメラルド・ダイヤモンド) の反射光の倍率
-#define REFLECTOR_PATTERN 1.0 // [0.0 0.25 0.5 0.75 1.0] 鉱物・金のブロックの面の模様が反射光に乗る強さ (ブロックのテクスチャの 4x4 の明暗)。0 で面全体が一様
+#define REFLECTOR_GEM_PATTERN // 鉱物ブロックの反射光の模様: 面の凹凸で反射の向きがずれ、受ける面に光の集まる所と散る所ができる
+#define REFLECTOR_GEM_PATTERN_STRENGTH 1.0 // [0.25 0.5 0.75 1.0 1.5 2.0 3.0] 鉱物の模様の濃さ
+#define REFLECTOR_METAL_PATTERN // 金属ブロックの反射光の模様。鉱物より凹凸が小さく、穏やか
+#define REFLECTOR_METAL_PATTERN_STRENGTH 1.0 // [0.25 0.5 0.75 1.0 1.5 2.0 3.0] 金属の模様の濃さ
 #define REFLECTOR_DISTANCE 32 // [16 24 32 48 64] 太陽・月の反射光が届く距離 (ブロック)。窓の高さ = 地面に落ちる距離 (太陽高度 45 度)
 #define REFLECTOR_BLOCKLIGHT_COUNT 2 // [1 2 3 4] ブロックライトの反射を求める光源の数 (受ける点のビンの明るい順)
 #define REFLECTOR_GLINT // 金属・鉱物ブロックの面のキラキラ: テクセルごとの細かい面が太陽・灯りの像を映し、歩くと点が入れ替わる
