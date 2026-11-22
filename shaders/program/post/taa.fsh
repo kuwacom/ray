@@ -242,6 +242,10 @@ float taaCloudAlpha(float alpha, vec2 uv, ivec2 texel) {
     // prepare2 が書かなかった (どちらも 0) 時は、近い雲の距離が分からないので上げない
     if (gap <= 0.0 && frameData.skyParams[1].w <= 0.0) return alpha;
     float nearest = gap > 0.0 ? gap / max(abs(dir.y), 0.05) : max(frameData.skyParams[1].w, 1.0);
+    #if CLOUD_RES > 1
+    // 層の中と近い雲 (層の外では skyParams[1].w が手前の歩く長さ) は上げない。deferred21 の cloudHistoryTrust と同じ (雲の中は粒立つだけ)
+    if (gap <= 0.0 || nearest < frameData.skyParams[1].w) return alpha;
+    #endif
     float lag = lagWeight(parallaxPx(dir, 0.0, 1.0 / max(nearest, 1.0)), TAA_CLOUD_LAG_TOLERANCE);
     #endif
     return max(alpha, min(cover * lag, TAA_CLOUD_ALPHA_MAX));

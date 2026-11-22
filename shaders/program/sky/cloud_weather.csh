@@ -391,7 +391,7 @@ void main() {
     #else
         float interior = 1.0;
     #endif
-        frameData.skyParams[1].zw = vec2(gap, gap > 0.0 ? 0.0 : mix(CLOUD_MOTION_GAP_DISTANCE, CLOUD_MOTION_INSIDE_DISTANCE, interior));
+        frameData.skyParams[1].zw = vec2(gap, gap > 0.0 ? CLOUD_NEAR_LENGTH : mix(CLOUD_MOTION_GAP_DISTANCE, CLOUD_MOTION_INSIDE_DISTANCE, interior));
     }
 #endif
 #ifdef CLOUD_SHADOWS

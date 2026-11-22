@@ -122,10 +122,15 @@ float cloudBlend(bool exact, float trust) {
  * 視線 dir の雲の履歴を、今フレームにどれだけ譲るか (0 = 従来の重みのまま、1 = 履歴を使わない)
  * 戻す距離 D (cloudReprojectionDistance) と、近い雲までの距離 s の食い違いが、カメラの平行移動で出す位置のずれから決める。
  * s は層の外なら層の入口、層の中は prepare2 の見積もり (skyParams[1].w)。止まっている時と層を通らない視線は 0
+ * CLOUD_RES 2 以上は、層の中と、層の入口が手前の歩く区間 (CLOUD_NEAR_LENGTH) の中の視線では 0 にする。雲の中の見える所は一様で従来でも残像は
+ * 見えず、重みを上げると 1 サンプルごとの低解像度のノイズが直接見えて粒立つだけ (ゲームで確かめた)。CLOUD_RES 1 は全画素を計算して均すので上げても粒立たない
  */
 float cloudHistoryTrust(vec3 dir) {
     vec2 seg = cloudPrimarySegment(cameraPosition.y, dir.y);
     if (seg.y <= seg.x) return 0.0;
+    #if CLOUD_RES > 1
+    if (seg.x < CLOUD_NEAR_LENGTH) return 0.0;
+    #endif
     float inside = frameData.skyParams[1].w > 0.0 ? frameData.skyParams[1].w : CLOUD_MOTION_GAP_DISTANCE;
     float nearest = seg.x > 0.0 ? seg.x : inside;
     return lagWeight(parallaxPx(dir, 1.0 / cloudReprojectionDistance(seg), 1.0 / max(nearest, 1.0)), CLOUD_LAG_TOLERANCE);
