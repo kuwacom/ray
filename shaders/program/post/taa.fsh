@@ -225,6 +225,29 @@ float taaBlendAlpha(float motionPx, float centerDepth) {
     return alpha;
 }
 
+/*
+ * 雲の画素の今フレームの重み (CLOUD_MOTION)。雲は深度も速度も書かないので、空の画素は無限遠で戻り、地形の手前の雲は地形の動きで戻る。
+ * カメラが動くと近い雲の視差を追えず、履歴の雲が残る (雲の中は歩きでも)。雲の被覆 (透過率) の分だけ、視差のずれから決めた重みへ上げる
+ * 近い雲までの距離は prepare2 の見積もり (skyParams[1].zw)。層の外は層までの高さを視線の仰角で割った距離
+ */
+float taaCloudAlpha(float alpha, vec2 uv, ivec2 texel) {
+#if CLOUD_MOTION > 0 && CLOUDS >= 2 && defined HAS_SKY
+    float cover = 1.0 - saturate(hdrFromStore(texelFetch(colortex11, texel, 0)).a);
+    if (cover <= 0.0) return alpha;
+    #if CLOUD_MOTION == 2
+    float lag = 1.0;
+    #else
+    vec3 dir = normalize(viewToPlayerDir(screenToView(vec3(uv, 1.0))));
+    float gap = frameData.skyParams[1].z;
+    float nearest = gap > 0.0 ? gap / max(abs(dir.y), 0.05) : max(frameData.skyParams[1].w, 1.0);
+    float lag = lagWeight(parallaxPx(dir, 0.0, 1.0 / max(nearest, 1.0)), TAA_CLOUD_LAG_TOLERANCE);
+    #endif
+    return max(alpha, min(cover * lag, TAA_CLOUD_ALPHA_MAX));
+#else
+    return alpha;
+#endif
+}
+
 // center の周り 3x3 の統計 (露出込みの YCoCg の平均・標準偏差・min/max) と、最も手前の深度とその位置
 struct TaaNeighborhood {
     vec3 mean;
@@ -347,7 +370,7 @@ void taaWarped() {
     vec3 resultYcc;
     if (valid) {
         vec3 historyYcc = taaClipHistory(history, exposure, mean, sigma, boxMin, boxMax, motionPx);
-        float alpha = taaBlendAlpha(motionPx, centerDepth);
+        float alpha = taaCloudAlpha(taaBlendAlpha(motionPx, centerDepth), nearestUv, nearest);
         // 出力の画素の中心から遠い元の画素は弱く混ぜる
         alpha = max(alpha * mix(1.0, nearWeight, superResEff), LENS_WARP_TAA_MIN_BLEND);
         resultYcc = mix(historyYcc, currentYcc, alpha);
@@ -420,7 +443,7 @@ void main() {
     vec3 resultYcc;
     if (valid) {
         vec3 historyYcc = taaClipHistory(history, exposure, mean, sigma, boxMin, boxMax, motionPx);
-        float alpha = taaBlendAlpha(motionPx, centerDepth);
+        float alpha = taaCloudAlpha(taaBlendAlpha(motionPx, centerDepth), uv, texel);
         resultYcc = mix(historyYcc, currentYcc, alpha);
     } else {
         // 履歴が無い所は 1 フレームだけなのでジャギーが目立つ。近傍平均へ少し寄せて和らげる
