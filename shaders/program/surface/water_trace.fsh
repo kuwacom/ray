@@ -193,6 +193,31 @@ int traceWaterBehindLayer(vec3 surfPlayer, vec3 dir, float maxDist, out vec3 hit
     return 2;
 }
 
+/*
+ * 辿る前の見積もり: 奥の層 (TEX_WATER_BEHIND の a) がその画素・水底の屈折先・屈折した光線の画面上の線のどこにも無ければ、
+ * 辿っても当たらない (当たる点はその線の上で、そこに奥の層が描かれている)。奥の層の無い水の画素は辿りを飛ばし、海だけの画面は辿らない
+ * 線の上は間引いて読み (位置を画素ごと・フレームごとにずらす)、細い板ガラスなどを見落とす画素は TAA でならされる
+ */
+const int WATER_BEHIND_PROBE_TAPS = 10;
+const float WATER_BEHIND_PROBE_NEAR = 0.1;  // 画面へ投影できる最も近い点 (ブロック)。カメラの後ろへ伸びる線を手前で止める
+
+bool waterBehindLayerNearby(vec3 surfView, vec3 dir, float maxDist, vec2 floorUv, float dither) {
+    if (texture(TEX_WATER_BEHIND, texcoord).a > 0.0 || texture(TEX_WATER_BEHIND, floorUv).a > 0.0) return true;
+    vec3 endView = surfView + playerToViewDir(dir) * maxDist;
+    if (endView.z > -WATER_BEHIND_PROBE_NEAR) {
+        float s = (-WATER_BEHIND_PROBE_NEAR - surfView.z) / (endView.z - surfView.z);
+        endView = mix(surfView, endView, clamp(s, 0.0, 1.0));
+    }
+    vec2 delta = viewToScreen(endView).xy - texcoord;
+    vec2 room = mix(texcoord, 1.0 - texcoord, step(0.0, delta));
+    vec2 reach = room / max(abs(delta), vec2(1e-6));
+    delta *= min(1.0, min(reach.x, reach.y));
+    for (int i = 0; i < WATER_BEHIND_PROBE_TAPS; i++) {
+        if (texture(TEX_WATER_BEHIND, texcoord + delta * ((float(i) + dither) / float(WATER_BEHIND_PROBE_TAPS))).a > 0.0) return true;
+    }
+    return false;
+}
+
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
     float d0 = texelFetch(depthtex0, texel, 0).r;
@@ -386,21 +411,27 @@ void main() {
     }
     if (behindDir != vec3(0.0)) {
         float floorDist = d1 >= 1.0 ? WATER_BEHIND_TRACE_DISTANCE : max(pathLen, distance(floorPlayer, surfPlayer)) + 1.0;
-        vec3 layerPlayer;
-        int layerHit = traceWaterBehindLayer(surfPlayer, behindDir, min(floorDist, WATER_BEHIND_TRACE_DISTANCE), layerPlayer);
-        vec2 layerUv = viewToScreen(playerToView(layerPlayer)).xy;
-        if (layerHit == 1 && all(greaterThan(layerUv, vec2(0.0))) && all(lessThan(layerUv, vec2(1.0)))) {
-            behindUv = layerUv;
-            behindW = 1.0;
-        } else if (layerHit == 1 || layerHit == -1) {
-            // ボクセルの範囲外・画面の外は屈折させずに重ねる (読む所が無くて消えるよりよい)
-            behindUv = texcoord;
-            behindW = 1.0;
-        } else if (layerHit == 0 || floorDist <= WATER_BEHIND_TRACE_DISTANCE) {
-            // 水底までに半透明のブロックが無い。水底の屈折先の奥の層は別の所のもの (読むと水の中に無い氷が出る)
+        float traceDist = min(floorDist, WATER_BEHIND_TRACE_DISTANCE);
+        if (!waterBehindLayerNearby(surfView, behindDir, traceDist, behindUv, dither)) {
+            // どこにも奥の層が無いので、読んでも 0。辿らない
             behindW = 0.0;
+        } else {
+            vec3 layerPlayer;
+            int layerHit = traceWaterBehindLayer(surfPlayer, behindDir, traceDist, layerPlayer);
+            vec2 layerUv = viewToScreen(playerToView(layerPlayer)).xy;
+            if (layerHit == 1 && all(greaterThan(layerUv, vec2(0.0))) && all(lessThan(layerUv, vec2(1.0)))) {
+                behindUv = layerUv;
+                behindW = 1.0;
+            } else if (layerHit == 1 || layerHit == -1) {
+                // ボクセルの範囲外・画面の外は屈折させずに重ねる (読む所が無くて消えるよりよい)
+                behindUv = texcoord;
+                behindW = 1.0;
+            } else if (layerHit == 0 || floorDist <= WATER_BEHIND_TRACE_DISTANCE) {
+                // 水底までに半透明のブロックが無い。水底の屈折先の奥の層は別の所のもの (読むと水の中に無い氷が出る)
+                behindW = 0.0;
+            }
+            // 2 で水底が探す距離より深い時は、水底の屈折先で読む (水底に置いた深いガラス)
         }
-        // 2 で水底が探す距離より深い時は、水底の屈折先で読む (水底に置いた深いガラス)
     }
     /*
      * 屈折先が水の画素でない (水の手前のガラスの画素) 時は読まない。そこの TEX_WATER_BEHIND には水より後に描かれた手前のガラスも入っていて、
