@@ -30,6 +30,7 @@
 //@include "/lib/common/pre_exposure.glsl"
 #ifdef FIREWORK_LIGHT
     //@include "/lib/light/firework_light.glsl"
+    //@include "/lib/light/firework_shadow.glsl"
 #endif
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
@@ -125,6 +126,7 @@
 #ifdef FIREWORK_LIGHT
     #include "/lib/buffers/firework_light.glsl"
     #include "/lib/light/firework_light.glsl"
+    #include "/lib/light/firework_shadow.glsl"
 #endif
 // END GENERATED includes
 
@@ -241,9 +243,14 @@ void main() {
 #ifdef FIREWORK_LIGHT
     // 花火の爆発の光 (lib/light/firework_light.glsl): 鏡面と、水の内散乱 (照度は floodfill に足す)
     LightSample firework = noLight();
+    // 面から花火が見える割合。遮られた水面には光の柱も火花の映り込みも出さない (lib/light/firework_shadow.glsl)
+    float fireworkVis = 0.0;
     bool fireworkLit = hasFireworkLight() && (matT != MAT_WATER || isEyeInWater != 1);
     if (fireworkLit) {
         firework = evalFireworkLight(surfPlayer, lmT.y);
+        float unshadowed = luminance(firework.irradiance);
+        firework = shadowFireworkLight(firework, surfPlayer, lightN, dither);
+        fireworkVis = saturate(luminance(firework.irradiance) / max(unshadowed, 1e-12 * PHYSICAL_DARKEST));
         if (matT == MAT_WATER) lights.block += firework.irradiance * saturate(dot(lightN, firework.direction));
     }
 #endif
@@ -312,7 +319,7 @@ void main() {
         vec3 refl;
         vec4 sparks = vec4(0.0);
 #ifdef FIREWORK_LIGHT
-        if (fireworkLit && !below && !side) sparks = fireworkSparkReflection(surfPlayer, R);
+        if (fireworkLit && !below && !side) sparks = fireworkSparkReflection(surfPlayer, R) * fireworkVis;
 #endif
 #if REFLECTIONS > 0
         float skyWeight;
