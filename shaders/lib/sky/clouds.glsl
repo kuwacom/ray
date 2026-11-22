@@ -357,6 +357,28 @@ float cloudLowestBase() {
 #endif
 }
 
+#if CLOUD_MOTION > 0
+/*
+ * 履歴の信頼の見積もりに使う、カメラと近い雲の距離 (CLOUD_MOTION。prepare2 が skyParams[1].zw に書き、cloud_upscale と taa が読む)
+ * z = 低層の雲の層までの高さ (ブロック。層の中は 0)、w = 層の中の近い雲までの距離の見積もり (ブロック。層の外は 0)
+ * 層の中の距離は、雲の中 (濃さ 1) は視程の 1/3 (WMO の 3 / 消散係数。見える雲の主役はこの距離まで)、雲の外の隙間は手前の歩く長さの 1/4
+ * 視程の設定が 0 (雲の中の判定なし) でも履歴は弱めたいので、既定の視程で代える
+ */
+const float CLOUD_MOTION_INSIDE_DISTANCE = float(CLOUD_INTERIOR_VISIBILITY > 0 ? CLOUD_INTERIOR_VISIBILITY : 64) / 3.0;
+const float CLOUD_MOTION_GAP_DISTANCE = 0.25 * CLOUD_NEAR_LENGTH;
+
+// カメラから低層の雲の層の下面・上面までの高さ (層の中は 0)。バニラの形は板の下面・上面
+float cloudLayerGap() {
+    #ifdef CLOUD_VANILLA_SHAPE
+    float base = vanillaCloudBottom();
+    float top = base + VANILLA_CLOUD_ENVELOPE;
+    #else
+    float base = CLOUD_BASE;
+    float top = CLOUD_TOP;
+    #endif
+    return max(max(base - cameraPosition.y, cameraPosition.y - top), 0.0);
+}
+#endif
 /*
  * 雨雲の層の下にいる度合い [0,1]。雨の曇天 (空の灰色・雲の向こうの灰色の置き換え) は雲の層の下から見たときだけ掛け、
  * 層の上に出たら普通の空にする。雨雲は雲の層の上端までで、その上は晴れている

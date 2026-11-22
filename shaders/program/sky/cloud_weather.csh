@@ -382,6 +382,18 @@ void main() {
     // 1 スレッドだけが書く。ほかのスレッドは天気図と雲影マップを作る
     if (texel == ivec2(0)) cloudInteriorWrite(ctx);
 #endif
+#if CLOUD_MOTION > 0 && defined HAS_SKY
+    // 履歴の信頼の見積もり (cloud_upscale と taa が読む)。雲の中の度合いは上で書いた skyParams[4].a で、無い時は層の中なら 1
+    if (texel == ivec2(0)) {
+        float gap = cloudLayerGap();
+    #ifdef CLOUD_INTERIOR
+        float interior = frameData.skyParams[4].a;
+    #else
+        float interior = 1.0;
+    #endif
+        frameData.skyParams[1].zw = vec2(gap, gap > 0.0 ? 0.0 : mix(CLOUD_MOTION_GAP_DISTANCE, CLOUD_MOTION_INSIDE_DISTANCE, interior));
+    }
+#endif
 #ifdef CLOUD_SHADOWS
     vec3 lightDir = getShadowLightDir();
     // このテクセルが持つ面上のテクセル番号 (窓の中のどれか 1 つ。前フレームの窓と同じ番号なら履歴がそのまま使える)
