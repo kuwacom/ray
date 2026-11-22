@@ -78,6 +78,9 @@ const float REFLECTOR_FACE_OFFSET = 0.03;
 const float REFLECTOR_MIN_COS = 0.02;
 // ブロックライトの鏡像を探す面の枚数の上限 (受信点・光源から面まで)。光の届く距離の半分より先は鏡像が届かない
 const int REFLECTOR_BLOCKLIGHT_PLANES = 12;
+// 反射を求める光源の候補として見るビンの枠の数。ビンは重要度の降順なので先頭だけで明るい光源は揃い、
+// 全枠 (極限は 96) の重みを画素ごとに計算して並べるより軽い
+const int REFLECTOR_BLOCKLIGHT_CANDIDATES = 16;
 // 遮蔽のトレース。ガラスの色付けと部分形状は見る (動くエンティティは見ない)
 const uint REFLECTOR_TRACE_FLAGS = TRACE_TINT | TRACE_SHAPES;
 // ボクセル体積の端で反射光を弱める幅 (ブロック)。端の外は面を引けない
@@ -227,6 +230,8 @@ struct ReflectorHit {
     ivec3 cell;   // 反射体のセル
     int id;
     int kind;
+    ivec3 entryCell; // 整数の面で最後に引いたセルと ID (ガラス板の中央の面が同じセルなら引き直さない)
+    int entryId;
 };
 
 /*
@@ -247,6 +252,8 @@ int reflectorProbe(vec3 x, vec3 lightPos, bool directional, int a, float s, floa
     h.cell = ivec3(0);
     h.id = 0;
     h.kind = REFLECTOR_KIND_NONE;
+    h.entryCell = ivec3(0x7FFFFFFF);
+    h.entryId = BLOCK_AIR;
     vec3 end = reflectorLineEnd(x, lightPos, directional, a, plane);
     float den = end[a] - x[a];
     if (abs(den) < 1e-4) return 2;
@@ -255,6 +262,8 @@ int reflectorProbe(vec3 x, vec3 lightPos, bool directional, int a, float s, floa
     cell[a] = int(floor(plane + 0.001 * s));
     if (!isInVoxelVolume(cell)) return 2;
     int id = fetchVoxelBlockId(cell);
+    h.entryCell = cell;
+    h.entryId = id;
     if (id == BLOCK_AIR) return 0;
     int kind = reflectorKind(id);
     if (kind == REFLECTOR_KIND_NONE) return (isPlainSolidBlock(id) || (id >= 10 && id < 100)) ? 2 : 0;
@@ -278,7 +287,7 @@ int reflectorProbe(vec3 x, vec3 lightPos, bool directional, int a, float s, floa
  * 整数の面で引いたセルと中央の面で引いたセルは、線が傾いているとセルの 1 つ隣になるので別に引く
  * 見つかれば 1 (h に入れる)、なければ 0。光を遮る固体の判定は reflectorProbe がする
  */
-int reflectorProbePane(vec3 x, vec3 lightPos, bool directional, int a, float mid, out ReflectorHit h) {
+int reflectorProbePane(vec3 x, vec3 lightPos, bool directional, int a, float mid, inout ReflectorHit h) {
     h.q = x;
     h.cell = ivec3(0);
     h.id = 0;
@@ -290,7 +299,8 @@ int reflectorProbePane(vec3 x, vec3 lightPos, bool directional, int a, float mid
     ivec3 cell = ivec3(floor(q));
     cell[a] = int(floor(mid));
     if (!isInVoxelVolume(cell)) return 0;
-    int id = fetchVoxelBlockId(cell);
+    // 線が傾いていなければ中央の面のセルは整数の面で引いたセルと同じ (読みは 3D テクスチャの帯域が重い)
+    int id = cell == h.entryCell ? h.entryId : fetchVoxelBlockId(cell);
     if (reflectorKind(id) != REFLECTOR_KIND_PANE) return 0;
     h.q = q;
     h.cell = cell;
@@ -363,7 +373,7 @@ vec3 reflectorSun(vec3 xVox, vec3 N, LightSample sun) {
  */
 vec3 reflectorBlockLights(vec3 xVox, vec3 N) {
     int bin = lightBinIndex(ivec3(floor(xVox)));
-    uint count = lightBinCount(bin);
+    uint count = min(lightBinCount(bin), uint(REFLECTOR_BLOCKLIGHT_CANDIDATES));
     int topIdx[REFLECTOR_BLOCKLIGHT_COUNT];
     float topW[REFLECTOR_BLOCKLIGHT_COUNT];
     for (int j = 0; j < REFLECTOR_BLOCKLIGHT_COUNT; j++) { topIdx[j] = -1; topW[j] = 0.0; }
@@ -391,6 +401,8 @@ vec3 reflectorBlockLights(vec3 xVox, vec3 N) {
         for (int k = 0; k < 4; k++) {
             int a = k < 2 ? 0 : 2;
             float s = (k & 1) == 0 ? 1.0 : -1.0;
+            // 受ける面が鏡の側へ真後ろを向く (壁の裏の鏡) と、鏡像は面の裏にあって照らさない
+            if (N[a] * s < -0.99) continue;
             float near = s > 0.0 ? max(xVox[a], lp[a]) : min(xVox[a], lp[a]);
             float start = s > 0.0 ? floor(near) + 1.0 : ceil(near) - 1.0;
             int planes = min(int(reach * 0.5) + 1, REFLECTOR_BLOCKLIGHT_PLANES);
