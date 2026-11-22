@@ -69,26 +69,73 @@ const float CLOUD_BLEND_INTERPOLATED = 0.03;
 // 近傍クランプの箱をノイズ分だけ広げる割合 (狭いとディザのノイズで履歴が揺れる)
 const float CLOUD_CLAMP_EXPAND = CLOUD_RES == 1 ? 1.0 : 0.5;
 const vec4 CLOUD_CLAMP_PAD = vec4(vec3(1e-4), 0.01);
+#if CLOUD_MOTION > 0
+// 動き・雲の中 (CLOUD_MOTION): 視差で履歴の平均が許す画素数までしかずれないよう、今フレームの重みの下限を上げる (lagWeight)。
+// 近傍クランプが履歴の遅れを CLOUD_RES 画素ほどで頭打ちにするので、粗い解像度ほど多めに許す。CLOUD_RES 2 以上は、重みを上げると 1 画素ごとの低解像度のノイズが直接見える
+// (ゲームで 1.0 だと雲の縁と雲の中が従来よりずっと粒立った)。CLOUD_RES 1 は全画素を毎フレーム計算して 3x3 で均すので、小さくしても粒が増えない
+const float CLOUD_LAG_TOLERANCE = CLOUD_RES == 1 ? 1.5 : (CLOUD_RES == 2 ? 3.0 : 4.0);
+// 重みの下限が高い画素の近傍クランプの箱の広がりの倍率 (箱を広げるのは、ノイズで揺れる履歴を残すための処置)
+const float CLOUD_CLAMP_MOVING_SHRINK = 0.25;
+#endif
 
 vec4 fetchLowRes(ivec2 q) {
     return hdrFromStore(texelFetch(TEX_CLOUD_LOW, clamp(q, ivec2(0), cloudLowResSize() - 1), 0));
+}
+
+// 層の区間 seg の雲を戻す距離 (ワールド)
+float cloudReprojectionDistance(vec2 seg) {
+    float dist = min(seg.x + 0.3 * (seg.y - seg.x), 30000.0 / CLOUD_KH);
+    #ifndef CLOUD_VANILLA_SHAPE
+    // 層の中では雲のマーチが手前を細かく歩き、見える雲の多くが手前にあるので、手前の区間の中ほどで戻す (層の 3 割の距離では動くと手前の雲がずれる)
+    if (seg.x <= 0.0) dist = 0.5 * min(seg.y, CLOUD_NEAR_LENGTH);
+    #endif
+    return dist;
 }
 
 // 雲の再投影距離。層を通らない (雲の無い) 方向は無限遠として回転だけで戻す
 vec2 cloudPreviousUv(vec3 dir) {
     vec2 seg = cloudPrimarySegment(cameraPosition.y, dir.y);
     if (seg.y > seg.x) {
-        float dist = min(seg.x + 0.3 * (seg.y - seg.x), 30000.0 / CLOUD_KH);
-        #ifndef CLOUD_VANILLA_SHAPE
-        // 層の中では雲のマーチが手前を細かく歩き、見える雲の多くが手前にあるので、手前の区間の中ほどで戻す (層の 3 割の距離では動くと手前の雲がずれる)
-        if (seg.x <= 0.0) dist = 0.5 * min(seg.y, CLOUD_NEAR_LENGTH);
-        #endif
-        return playerToPreviousScreen(dir * dist).xy;
+        return playerToPreviousScreen(dir * cloudReprojectionDistance(seg)).xy;
     }
     vec3 prevView = mat3(gbufferPreviousModelView) * dir;
     if (prevView.z >= 0.0) return vec2(-1.0);
     return projectAndDivide(gbufferPreviousProjection, prevView).xy * 0.5 + 0.5;
 }
+
+#if CLOUD_MOTION == 1
+/*
+ * 履歴の重みの下限 trust (1 フレームあたりの実効の重み) を、画素ごとの今フレームの重みにする
+ * CLOUD_RES 2 以上は CLOUD_RES^2 フレームに 1 回、計算した画素を強く入れ替える (CLOUD_BLEND_EXACT) ので、補間画素の重みを trust にそろえると
+ * 履歴を短くしすぎてノイズが出る。巡回の実効の重みが trust になる補間画素の重みを解く:
+ * (1 - wInterp)^(n - 1) (1 - wExact) = (1 - trust)^n、n = CLOUD_RES^2。trust = 0 は従来の重み、1 は履歴を使わない
+ */
+float cloudBlend(bool exact, float trust) {
+    float wExact = max(CLOUD_BLEND_EXACT, trust);
+    if (exact || CLOUD_RES == 1) return wExact;
+    const float CYCLE = float(CLOUD_RES * CLOUD_RES);
+    float keep = min(pow(1.0 - trust, CYCLE) / max(1.0 - wExact, 1e-4), 1.0);
+    return max(1.0 - pow(keep, 1.0 / (CYCLE - 1.0)), CLOUD_BLEND_INTERPOLATED);
+}
+
+/*
+ * 視線 dir の雲の履歴を、今フレームにどれだけ譲るか (0 = 従来の重みのまま、1 = 履歴を使わない)
+ * 戻す距離 D (cloudReprojectionDistance) と、近い雲までの距離 s の食い違いが、カメラの平行移動で出す位置のずれから決める。
+ * s は層の外なら層の入口、層の中は prepare2 の見積もり (skyParams[1].w)。止まっている時と層を通らない視線は 0
+ * CLOUD_RES 2 以上は、層の中と、層の入口が手前の歩く区間 (CLOUD_NEAR_LENGTH) の中の視線では 0 にする。雲の中の見える所は一様で従来でも残像は
+ * 見えず、重みを上げると 1 サンプルごとの低解像度のノイズが直接見えて粒立つだけ (ゲームで確かめた)。CLOUD_RES 1 は全画素を計算して均すので上げても粒立たない
+ */
+float cloudHistoryTrust(vec3 dir) {
+    vec2 seg = cloudPrimarySegment(cameraPosition.y, dir.y);
+    if (seg.y <= seg.x) return 0.0;
+    #if CLOUD_RES > 1
+    if (seg.x < CLOUD_NEAR_LENGTH) return 0.0;
+    #endif
+    float inside = frameData.skyParams[1].w > 0.0 ? frameData.skyParams[1].w : CLOUD_MOTION_GAP_DISTANCE;
+    float nearest = seg.x > 0.0 ? seg.x : inside;
+    return lagWeight(parallaxPx(dir, 1.0 / cloudReprojectionDistance(seg), 1.0 / max(nearest, 1.0)), CLOUD_LAG_TOLERANCE);
+}
+#endif
 
 void main() {
 #if CLOUDS >= 2 && defined HAS_SKY
@@ -134,14 +181,27 @@ void main() {
             current = tent / max(tentWeight, 1.0);
         #endif
 
+        // CLOUD_MOTION 2 は履歴を使わない (今フレームの低解像度の補間だけ)
+        #if CLOUD_MOTION != 2
         vec3 dir = normalize(viewToPlayerDir(screenToView(vec3(texcoord, 1.0))));
         vec2 prevUv = cloudPreviousUv(dir);
         bool valid = reprojectionInside(prevUv) && screenHistoryValid() && frameData.skyParams[1].y > 1.5;
         if (valid) {
+            #if CLOUD_MOTION == 1
+            float trust = cloudHistoryTrust(dir);
+            vec4 history = hdrFromStorePrev(sampleCatmullRom4(colortex11, prevUv, viewSize()));
+            pad = neighborBoxMargin(lo, hi, CLOUD_CLAMP_EXPAND * mix(1.0, CLOUD_CLAMP_MOVING_SHRINK, trust), CLOUD_CLAMP_PAD);
+            #else
             vec4 history = hdrFromStorePrev(texture(colortex11, prevUv));
+            #endif
             history = clamp(history, lo - pad, hi + pad);
-            current = mix(history, current, exact ? CLOUD_BLEND_EXACT : CLOUD_BLEND_INTERPOLATED);
+            float blend = exact ? CLOUD_BLEND_EXACT : CLOUD_BLEND_INTERPOLATED;
+            #if CLOUD_MOTION == 1
+            blend = cloudBlend(exact, trust);
+            #endif
+            current = mix(history, current, blend);
         }
+        #endif
     #endif
     outClouds = vec4(hdrToStore(max(current.rgb, 0.0)), saturate(current.a));
 #else

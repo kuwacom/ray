@@ -289,7 +289,10 @@ const float TAA_BLEND_STATIC = 0.07;
 const float TAA_BLEND_MOVING = 0.2;
 // 手は画面に貼り付いて別の動きをするので履歴を短くする
 const float TAA_BLEND_HAND = 0.35;
-// variance clipping の幅 (σ の倍数)。静止時は緩く、動くと狭く
+// 雲の画素 (CLOUD_MOTION): 雲は無限遠で戻すので平行移動の視差を知らない。視差のずれの履歴の遅れを収める画素数と、今フレームの重みの上限
+// (上限を上げるほど残像は減り、雲のノイズを均せなくなる)
+const float TAA_CLOUD_LAG_TOLERANCE = CLOUD_RES == 1 ? 1.0 : (CLOUD_RES == 2 ? 3.0 : 4.0);
+const float TAA_CLOUD_ALPHA_MAX = 0.5;// variance clipping の幅 (σ の倍数)。静止時は緩く、動くと狭く
 const float TAA_GAMMA_STATIC = 2.0;
 const float TAA_GAMMA_MOVING = 0.85;
 // ディスオクルージョン判定: 前フレームの距離との相対誤差

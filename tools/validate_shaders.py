@@ -78,6 +78,14 @@ WORLDS = ["world0", "world-1", "world1"]
 # 検証用の設定の組。プロファイル (profile.*) に載せない機能 (ANALOG など) を ON にした本文を --full で検証する。
 # 利用者の画面には出ない。値は Iris と同じく文字列 (bool は "true" / "false")
 VALIDATION_SETS: dict[str, dict[str, str]] = {
+    # 雲の動きへの対応 (CLOUD_MOTION)。既定は 1 なので、従来 (0)・履歴を使わない (2)・補間画素の無い解像度・バニラの形 (柱の縁)・
+    # 履歴なし (CLOUD_TEMPORAL OFF)・雲の中の判定なし (視程 0) の経路
+    "CLOUD_MOTION0": {"CLOUD_MOTION": "0"},
+    "CLOUD_MOTION2": {"CLOUD_MOTION": "2"},
+    "CLOUD_MOTION2_RES1": {"CLOUD_MOTION": "2", "CLOUD_RES": "1"},
+    "CLOUD_MOTION1_RES1_VANILLA": {"CLOUD_RES": "1", "CLOUD_STYLE": "3"},
+    "CLOUD_MOTION1_RES4_NO_TEMPORAL": {"CLOUD_RES": "4", "CLOUD_TEMPORAL": "false"},
+    "CLOUD_MOTION1_NO_INTERIOR": {"CLOUD_INTERIOR_VISIBILITY": "0"},
     "ANALOG_P1": {"ANALOG": "true"},
     # ブルーミングと、ニーを外してトーンマップに戻る経路
     "ANALOG_P4_NO_KNEE": {"ANALOG": "true", "ANALOG_PRESET": "4", "ANALOG_KNEE": "false"},
