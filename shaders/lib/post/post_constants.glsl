@@ -59,6 +59,13 @@ const float CAMERA_SHUTTER_SLOW = 30.0;
  * 目的は書かれていない (雪・砂を明るく写す意図か、測光の範囲か) ので Ray の調整値。晴れの昼 (14.3) には効かず、雪原・空を見上げた時だけ明るめに写す
  */
 const float CAMERA_EVALUATIVE_EV_MAX = 16.0 + 1.0 / 3.0;
+/*
+ * カメラの自動露出で暗い場面を暗いまま残す (exposure_autofocus.csh の cameraDarkRetention)。カメラの EV100 が ANCHOR より暗い分の RETAIN 倍
+ * ANCHOR 3 は灯りの点いた村の通り (この明るさではカメラとゲーム向けの自動露出が同じ明るさに写る)。RETAIN 0.3 はゲーム向けの曲線が残す
+ * 1 - 0.55 = 0.45 を、場面の明暗の幅の比 (ゲーム向けの昼と夜の差 約 9 段 / 現実の光の比の約 16 段) で縮めた約 0.25 に近い値
+ */
+const float CAMERA_DARK_ANCHOR_EV = 3.0;
+const float CAMERA_DARK_RETAIN = 0.3;
 // 絞り (S) と ISO (M + ISO オート) が限界と見なす比 (約 1/17 段)。ちょうど端で合わせた時に、丸めの誤差で限界の表示が点かないように
 const float CAMERA_LIMIT_TOLERANCE = 1.02;
 // FrameData.postParams の、自動で決めた SS・F 値・ISO と限界の印を置く場所 (lib/post/exposure.glsl)

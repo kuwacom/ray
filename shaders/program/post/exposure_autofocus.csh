@@ -402,6 +402,21 @@ CameraExposure cameraAutoExposure(float sceneEv) {
     return e;
 }
 
+/*
+ * 暗い場面を暗いまま残す段 (CAMERA_DARK_*)。ゲーム向けの自動露出は曲線 (EXPOSURE_CURVE) で暗い場面の補正を緩めるが、カメラは
+ * 中間グレーへ完全に補正するので、夜の野原や見下ろした夜景が同じ場面のゲーム向けより 1〜1.6 段明るく昼のように写っていた。
+ * 場面のカメラの EV100 が ANCHOR より暗い分に RETAIN を掛けた段だけ暗く撮る (昼・室内・灯りの通りは ANCHOR より明るく変わらない)。
+ * ハイライト重点は明るい側で露出を決めるので掛けない。現実の光の比の時だけ (切ると夜も昼と近い明るさの場面になり、カメラの EV が
+ * 夜の段に届かない)
+ */
+float cameraDarkRetention(float ev) {
+    #if defined PHYSICAL_LIGHT_ACTIVE && METERING_ACTIVE_MODE != 4
+    return CAMERA_DARK_RETAIN * max(CAMERA_DARK_ANCHOR_EV - EXPOSURE_CAMERA_EV_OFFSET - ev, 0.0);
+    #else
+    return 0.0;
+    #endif
+}
+
 // 決めた組が写す明るさ (Ray の EV100)。M と同じ式
 float cameraExposureEv(CameraExposure e) {
     return log2(e.fNumber * e.fNumber / e.shutter) - log2(e.iso / EXPOSURE_ISO_REFERENCE) - EXPOSURE_CAMERA_EV_OFFSET;
@@ -804,13 +819,13 @@ void main() {
     // 実機と同じくフィルター越しに測る (減光の分だけ SS・F 値・ISO で明るく撮る。ND で SS が延び、ISO オートと限界の表示もそのまま効く)
     sceneOffset -= CAMERA_FILTER_STOPS;
     #endif
-    CameraExposure camera = cameraAutoExposure(adaptedEv + sceneOffset);
+    CameraExposure camera = cameraAutoExposure(adaptedEv + sceneOffset + cameraDarkRetention(adaptedEv));
     frameData.postParams[CAMERA_AE_PARAM] = vec4(camera.shutter, camera.fNumber, camera.iso, float(camera.limits));
     #if EXPOSURE_INFO_MODE > 0
     writeCameraInfo(camera);
     #endif
     float appliedEv = cameraExposureEv(camera);
-    float targetEv = cameraExposureEv(cameraAutoExposure(measuredEv + sceneOffset));
+    float targetEv = cameraExposureEv(cameraAutoExposure(measuredEv + sceneOffset + cameraDarkRetention(measuredEv)));
     #ifdef CAMERA_FILTER
     // 組が写す明るさはフィルターの後の光に対してなので、場面の輝度に対してはフィルターの段数だけ暗い側
     appliedEv += CAMERA_FILTER_STOPS;
@@ -925,7 +940,7 @@ void main() {
      * (M は補正を exposure にだけ掛けるので、組が写す明るさに補正の分を戻す)
      */
     const float bias = 1.0;
-    float averageEv = appliedEv + LOOK_EXPOSURE_BIAS;
+    float averageEv = appliedEv + LOOK_EXPOSURE_BIAS - cameraDarkRetention(adaptedEv);
 #else
     float bias = exp2(LOOK_EXPOSURE_BIAS);
     float averageEv = adaptedEv;
