@@ -53,6 +53,15 @@ const int noiseTextureResolution = 256;
     #undef CHARGED_CREEPER_LIGHT
 #endif
 
+// 反射体の反射光は GI のパス (deferred10) の出力に足すので、GI と AO が両方 0 でパスが止まる時は無効にする
+#if GI_MODE == 0 && AO_MODE == 0
+    #undef REFLECTOR_LIGHT
+#endif
+#ifndef REFLECTOR_LIGHT
+    #undef REFLECTOR_SUN
+    #undef REFLECTOR_BLOCKLIGHT
+#endif
+
 // 手持ち光源が OFF ならレイ・影も無効
 #ifndef HAND_LIGHT
     #undef HAND_LIGHT_RAYS

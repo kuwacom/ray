@@ -22,6 +22,7 @@
 //@include "/lib/light/light.glsl"
 //@include "/lib/surface/surface_lights.glsl"
 //@include "/lib/common/polarizer.glsl"
+//@include "/lib/surface/reflector_glint.glsl"
 #ifdef FIREWORK_LIGHT
     //@include "/lib/light/firework_light.glsl"
     //@include "/lib/light/firework_shadow.glsl"
@@ -111,6 +112,7 @@
 #include "/lib/light/blocklight.glsl"
 #include "/lib/light/light.glsl"
 #include "/lib/surface/surface_lights.glsl"
+#include "/lib/surface/reflector_glint.glsl"
 #ifdef FIREWORK_LIGHT
     #include "/lib/buffers/firework_light.glsl"
     #include "/lib/light/firework_light.glsl"
@@ -229,9 +231,17 @@ float polarizerSpecularMaterial(Material m, vec3 V, vec3 L) {
  * slopeVar > 0 (水たまり): 鏡面の粗さを傾きの分散の分だけ広げる (雨粒の跳ねと画素より細かい波紋)
  * specVis: 光の円盤の見え方 (太陽は雨雲の層の下で隠れる。他の光は 1)。拡散には掛けない
  */
+#ifdef REFLECTOR_GLINT
+// 金属・鉱物ブロックのキラキラ。鏡面だけを、セルごとの微小面の法線と狭いローブに置き換える (拡散は元の法線のまま)
+GlintSurface glintSurface;
+#endif
+
 vec3 directLight(Material m, vec3 N, vec3 V, LightSample L, float slopeVar, float specVis, float discScale, float strength, inout vec3 specSum) {
     vec3 spec;
     vec3 diffuse = evalDirectLight(m, N, V, L, discScale, spec);
+#ifdef REFLECTOR_GLINT
+    if (glintSurface.on) spec = evalDirectSpecular(glintSurface.m, glintSurface.N, V, L, discScale);
+#endif
     if (slopeVar > 0.0) {
         Material rough = m;
         rough.roughness = sqrt(sqr(m.roughness) + slopeVar);
@@ -249,6 +259,14 @@ void directSpecular(Material m, vec3 N, vec3 V, LightSample L, float slopeVar, f
     rough.roughness = sqrt(sqr(m.roughness) + slopeVar);
 #ifdef CAMERA_PL
     strength *= polarizerSpecularMaterial(m, V, L.direction);
+#endif
+#ifdef REFLECTOR_GLINT
+    if (glintSurface.on) {
+        rough = glintSurface.m;
+        rough.roughness = sqrt(sqr(glintSurface.m.roughness) + slopeVar);
+        specSum += evalDirectSpecular(rough, glintSurface.N, V, L) * strength;
+        return;
+    }
 #endif
     specSum += evalDirectSpecular(rough, N, V, L) * strength;
 }
@@ -307,6 +325,13 @@ void main() {
     float puddleWeight = hand ? 0.0 : saturate(puddle * 2.0);
     float puddleVar = puddleSlopeVar() * puddleWeight;
     vec3 specSum = vec3(0.0);
+#ifdef REFLECTOR_GLINT
+    {
+        float glintWeight = g.materialId == MAT_METAL ? 1.0 : (g.materialId == MAT_GLOSSY ? GLINT_GLOSSY_WEIGHT : 0.0);
+        float cellPx = (1.0 / GLINT_CELLS_PER_BLOCK) / max(waterFootprint(length(playerPos), abs(dot(g.geoNormal, V))), 1e-5);
+        glintSurface = reflectorGlintSurface(m, g.normal, g.geoNormal, playerPos, hand ? 0.0 : glintWeight * smoothstep(GLINT_CELL_PX.x, GLINT_CELL_PX.y, cellPx));
+    }
+#endif
 
     // 集める項: 太陽 (PCSS・POM・接触影。影マップの外はスカイライトで近似)・手持ち光源・ブロックライトの鏡面・
     //   空 (GI が運ぶ分を引く)・ブロックライト・手持ちの照り返し・GI

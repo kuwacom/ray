@@ -39,6 +39,23 @@ const float sunPathRotation = -30.0; // [-60.0 -50.0 -40.0 -30.0 -20.0 -10.0 0.0
 //#define GI_HIT_REUSE // SSGI / ボクセル RT で、画面に映る GI の当たりの設置光源の光を、光源を数え直さずに着色点の直接光から求める
 #define GI_HIT_LIGHTS 0 // [0 8 16 24 32] SSGI / ボクセル RT で、画面の外の GI の当たりが数える設置光源の数の上限 (多いビンは等間隔に拾って比で戻す) 0=全部
 
+// 反射体の反射光 (ガラス・氷・金属・鉱物のブロックが太陽・月・ブロックライトを周りへ跳ね返す)。GI のパスに載る (GI と AO が両方 0 なら無効)
+#define REFLECTOR_LIGHT // 反射体の反射光: 窓の形の明るい帯が隣の地面に落ち、金属・鉱物のブロックの色が周りを照らす
+#define REFLECTOR_SUN // 太陽・月の光の反射
+#define REFLECTOR_BLOCKLIGHT // ブロックライトの反射 (夜・洞窟・屋内)
+#define REFLECTOR_STRENGTH 1.5 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0 6.0 8.0] 反射光全体の強さ。1 が反射率どおり
+#define REFLECTOR_GLASS_STRENGTH 2.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0 6.0 8.0] ガラス・氷の反射光の倍率。1 は板 1 枚 (約 8%)。既定 2 は建築の反射コート・複層ガラス (約 15%) 相当で、全体の強さと合わせて鏡に近い反射
+#define REFLECTOR_METAL_STRENGTH 1.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0] 金属ブロックの鏡の反射光の倍率。GI が拡散の照り返しとして既に返している分とは別に、鏡の反射が見える強さ
+#define REFLECTOR_GEM_STRENGTH 2.0 // [0.0 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0 6.0 8.0] 鉱物ブロック (ラピスラズリ・エメラルド・ダイヤモンド) の反射光の倍率
+#define REFLECTOR_GEM_PATTERN // 鉱物ブロックの反射光の模様: 面の凹凸で反射の向きがずれ、受ける面に光の集まる所と散る所ができる
+#define REFLECTOR_GEM_PATTERN_STRENGTH 1.0 // [0.25 0.5 0.75 1.0 1.5 2.0 3.0] 鉱物の模様の濃さ
+#define REFLECTOR_METAL_PATTERN // 金属ブロックの反射光の模様。鉱物より凹凸が小さく、穏やか
+#define REFLECTOR_METAL_PATTERN_STRENGTH 1.0 // [0.25 0.5 0.75 1.0 1.5 2.0 3.0] 金属の模様の濃さ
+#define REFLECTOR_DISTANCE 32 // [16 24 32 48 64] 太陽・月の反射光が届く距離 (ブロック)。窓の高さ = 地面に落ちる距離 (太陽高度 45 度)
+#define REFLECTOR_BLOCKLIGHT_COUNT 2 // [1 2 3 4] ブロックライトの反射を求める光源の数 (受ける点のビンの明るい順)
+#define REFLECTOR_GLINT // 金属・鉱物ブロックの面のキラキラ: テクセルごとの細かい面が太陽・灯りの像を映し、歩くと点が入れ替わる
+#define REFLECTOR_GLINT_STRENGTH 0.75 // [0.0 0.25 0.5 0.75 1.0] キラキラの強さ。照り返しの平均は変えず、テクセルごとの明るさのばらつきだけを上げる
+
 // マテリアル / 水 / 反射 (surface モジュール)
 #define PBR_FORMAT 0 // [0 1] 0=なし 1=labPBR
 #define NORMAL_MAPPING // リソースパックの法線マップ

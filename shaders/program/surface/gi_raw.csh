@@ -24,6 +24,7 @@
 //@include "/lib/light/light.glsl"
 //@include "/lib/surface/screen_trace.glsl"
 //@include "/lib/surface/lighting.glsl"
+//@include "/lib/surface/reflector_light.glsl"
 //@include "/lib/buffers/slots.glsl"
 //@include "/lib/common/pre_exposure.glsl"
 // BEGIN GENERATED includes (tools/gen_includes.py)
@@ -110,6 +111,7 @@
 #include "/lib/surface/screen_trace.glsl"
 #include "/lib/surface/surface_lights.glsl"
 #include "/lib/surface/lighting.glsl"
+#include "/lib/surface/reflector_light.glsl"
 // END GENERATED includes
 
 layout(local_size_x = 8, local_size_y = 8) in;
@@ -389,6 +391,10 @@ void main() {
     gi = voxelIndirect(playerPos, g.geoNormal, g.geoNormal, g.lightmap.y, giNoise);
 #endif
     gi *= GI_EFFECTIVE_STRENGTH;
+#ifdef REFLECTOR_LIGHT
+    // 鏡像の光はレイの方式の補正を受けない (反射率と設定の強さだけで決まる)
+    gi += reflectorLight(voxelRayOrigin(playerPos, g.geoNormal), g.geoNormal);
+#endif
 
     imageStore(STORE_GI_RAW, low, vec4(hdrToStore(max(gi, 0.0)), ao));
 }

@@ -80,6 +80,18 @@
 #endif
 #ifdef GI_HIT_REUSE
 #endif
+#ifdef REFLECTOR_LIGHT
+#endif
+#ifdef REFLECTOR_SUN
+#endif
+#ifdef REFLECTOR_BLOCKLIGHT
+#endif
+#ifdef REFLECTOR_GEM_PATTERN
+#endif
+#ifdef REFLECTOR_METAL_PATTERN
+#endif
+#ifdef REFLECTOR_GLINT
+#endif
 #ifdef NORMAL_MAPPING
 #endif
 #ifdef GENERATED_NORMALS

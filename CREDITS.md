@@ -43,6 +43,10 @@
 | GTAO | Jimenez et al., "Practical Real-Time Strategies for Accurate Indirect Occlusion", SIGGRAPH 2016 | program/surface/gi_raw.csh |
 | 反射率の測定値・濡れた面 | Lagarde, "Water drop 2b - Dynamic rain and its effects", 2013 | program/surface/gbuffers_solid.fsh |
 | RSM | Dachsbacher & Stamminger, "Reflective Shadow Maps", I3D 2005 | program/surface/gi_raw.csh |
+| 平面の反射体を鏡映した虚像の光源 (鏡面で反射した光源を探すために、実在しない仮想の光源へ影のレイを向ける) | Ward, "The RADIANCE Lighting Simulation and Rendering System", SIGGRAPH 1994 の virtual sources | lib/surface/reflector_light.glsl |
+| 反射体の面の縁を粗さの広がり (経路長 x ローブの半幅) でぼかす | 平面の仮想光源を面光源として扱う考え方 (Real-time indirect illumination by virtual planar area lights, Computers & Graphics 2021 を参考に独自実装) | lib/surface/reflector_light.glsl |
+| 金属・鉱物ブロックのキラキラ (法線分布の確率を、ワールドに固定した 1/16 ブロックのセルごとの微小面に置き換える) | Yan et al., "Rendering Glints on High-Resolution Normal-Mapped Specular Surfaces", ACM TOG 2014 / Zirr & Kaplanyan, "Real-time Rendering of Procedural Multiscale Materials", I3D 2016 の考え方を参考に独自実装 | lib/surface/reflector_glint.glsl |
+| 鉱物・金属ブロックの反射光の模様 (凹凸のある面が反射の向きをずらし、受ける点の光の密度が写像のヤコビアンの逆数になる。1 次近似でテクスチャの明るさのラプラシアンから求め、反射のぼけをミップの段で受ける) | Mitchell & Hanrahan, "Illumination from Curved Reflectors", SIGGRAPH 1992 の考え方を参考に独自実装 | lib/surface/reflector_light.glsl、tools/gen_reflector_maps.py |
 | 粗い誘電体の透過 | Walter et al., "Microfacet Models for Refraction through Rough Surfaces", EGSR 2007 | lib/surface/water_shading.glsl, program/surface/translucent_composite.fsh |
 | 純水の吸収係数 | Pope & Fry, "Absorption spectrum (380-700 nm) of pure water", Applied Optics 1997 | lib/common/water_waves.glsl |
 | POM | Tatarchuk, "Dynamic Parallax Occlusion Mapping with Approximate Soft Shadows", I3D 2006 | program/surface/gbuffers_solid.fsh |

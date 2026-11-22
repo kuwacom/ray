@@ -1,6 +1,6 @@
 /*
  * SSBO binding 1: ブロックデータ表 (setup.csh が起動時に 1 回だけ書く。以降は読み取り専用)
- * 確保: 65536 バイト (使用 61968、shaders.properties の bufferObject.1)
+ * 確保: 65536 バイト (使用 63728、shaders.properties の bufferObject.1)
  * 既定は readonly。書くプログラム (setup) は include の前に SSBO_BLOCK_DATA_WRITE を定義する
  */
 #ifndef BUFFERS_BLOCK_DATA_GLSL
@@ -19,6 +19,10 @@ const int ALBEDO_TABLE_SIZE = 4096; // ブロックの平均の色の数 (ボク
 const int LIGHT_MASK_LIGHTS = 128;  // 面の光り方を持てる光源の数 (ブロック光源の帯 0-127)
 const int LIGHT_MASK_FACE_CLASSES = 4; // 面の種類: 0 = 上、1 = 下、2 = 側面 (4 面の平均)、3 = 前面 (向きのある光源だけ)
 const int LIGHT_MASK_TABLE_SIZE = LIGHT_MASK_LIGHTS * LIGHT_MASK_FACE_CLASSES;
+// 反射体の面の凹凸 (lightMasks の LIGHT_MASK_TABLE_SIZE の後ろ)。tools/gen_block_properties.py の REFLECTOR_MAP_BLOCKS / REFLECTOR_MAP_VEC4S と同じ値
+const int REFLECTOR_MAP_BLOCKS = 5;     // 鉄・ラピスラズリ・エメラルド・ダイヤモンド・金
+const int REFLECTOR_MAP_VEC4S = 22;     // 1 ブロックの uvec4 の数
+const int REFLECTOR_MAP_BASE = LIGHT_MASK_TABLE_SIZE;
 
 struct LightDef {
     vec4 color;   // rgb = 線形色 (最大成分 1), a = 明るさ倍率
@@ -67,8 +71,12 @@ layout(std430, binding = 1) SSBO_BLOCK_DATA_ACCESS buffer BlockDataBuffer {
      *   行 r 列 c は bit 4 x (c + 4 x (r & 1))。r は v の向き、c は u の向き
      * 光らない面は全部 0。データの無い光源は LIGHT_FLAG_EMISSION_MASK が立たない
      * albedoUp の後ろに置くのは、手前のメンバーのオフセットを変えないため
+     *
+     * 後ろに反射体の面の凹凸が続く (REFLECTOR_MAP_BASE から ブロック x REFLECTOR_MAP_VEC4S 個。lib/light/reflector_map_data.glsl)。
+     * 1 ブロックは 88 語 (4 語 = 1 uvec4): 語 0-63 = 16x16、64-79 = 8x8、80-83 = 4x4、84 = 2x2 (8bit の符号付きを 4 つずつ。値 / 127 x 段の倍率が
+     * テクスチャの明るさのラプラシアン。段ごとに二乗平均平方根をそろえ、ブロックの凹凸の相対の強さを掛けてある)、85 = half 2 つ (段 0 と 1 の倍率)、86 = 同 (段 2 と 3)
      */
-    uvec4 lightMasks[]; // 要素数: LIGHT_MASK_TABLE_SIZE
+    uvec4 lightMasks[]; // 要素数: LIGHT_MASK_TABLE_SIZE + REFLECTOR_MAP_BLOCKS * REFLECTOR_MAP_VEC4S
 } blockData;
 
 #endif
