@@ -9,7 +9,7 @@
  * FrameData.postParams[5]: 自動露出の順応済みの補助の値。x = ハイライト重点の上限の EV100, y = 評価測光の夜の白飛びを抑える EV100,
  *                         z = 灯りに照らされた所の割合, w = DR の補正で暗く撮った EV (final が戻す)
  * FrameData.postParams[6]: 古い方式の自動露出の状態。x = 絞りの EV100, y = 絞りの動く速さ, z = ゲイン (段), w = 検波した測光 EV100
- * FrameData.postParams[7]: シャッター速度の反映の状態 (composite21_a が書く)。x = このフレームを溜める重み, y = 今の露光で溜めた秒 (1 枚ずつ),
+ * FrameData.postParams[7]: シャッター速度の反映の状態 (composite21_a が書く)。x = このフレームを溜める重み, y = 今の露光で溜めた秒 (1 枚ずつ。負は溜め直しの後の待ち),
  *                         z = 0 (使わない), w = 印 (SHUTTER_FLAG_*)
  * FrameData.postParams[8]: カメラの自動露出 (P・A・S) が決めた値 (composite25 が書く)。x = SS (秒), y = F 値, z = ISO, w = 限界の印 (CAMERA_LIMIT_*)
  * FrameData.postParams[9..10]: カメラの情報の文字 (lib/post/camera_info.glsl)
