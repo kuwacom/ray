@@ -104,6 +104,20 @@ vec2 cloudPreviousUv(vec3 dir) {
 
 #if CLOUD_MOTION == 1
 /*
+ * 履歴の重みの下限 trust (1 フレームあたりの実効の重み) を、画素ごとの今フレームの重みにする
+ * CLOUD_RES 2 以上は CLOUD_RES^2 フレームに 1 回、計算した画素を強く入れ替える (CLOUD_BLEND_EXACT) ので、補間画素の重みを trust にそろえると
+ * 履歴を短くしすぎてノイズが出る。巡回の実効の重みが trust になる補間画素の重みを解く:
+ * (1 - wInterp)^(n - 1) (1 - wExact) = (1 - trust)^n、n = CLOUD_RES^2。trust = 0 は従来の重み、1 は履歴を使わない
+ */
+float cloudBlend(bool exact, float trust) {
+    float wExact = max(CLOUD_BLEND_EXACT, trust);
+    if (exact || CLOUD_RES == 1) return wExact;
+    const float CYCLE = float(CLOUD_RES * CLOUD_RES);
+    float keep = min(pow(1.0 - trust, CYCLE) / max(1.0 - wExact, 1e-4), 1.0);
+    return max(1.0 - pow(keep, 1.0 / (CYCLE - 1.0)), CLOUD_BLEND_INTERPOLATED);
+}
+
+/*
  * 視線 dir の雲の履歴を、今フレームにどれだけ譲るか (0 = 従来の重みのまま、1 = 履歴を使わない)
  * 戻す距離 D (cloudReprojectionDistance) と、近い雲までの距離 s の食い違いが、カメラの平行移動で出す位置のずれから決める。
  * s は層の外なら層の入口、層の中は prepare2 の見積もり (skyParams[1].w)。止まっている時と層を通らない視線は 0
@@ -177,7 +191,7 @@ void main() {
             history = clamp(history, lo - pad, hi + pad);
             float blend = exact ? CLOUD_BLEND_EXACT : CLOUD_BLEND_INTERPOLATED;
             #if CLOUD_MOTION == 1
-            blend = max(blend, trust);
+            blend = cloudBlend(exact, trust);
             #endif
             current = mix(history, current, blend);
         }
