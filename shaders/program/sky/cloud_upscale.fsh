@@ -71,8 +71,9 @@ const float CLOUD_CLAMP_EXPAND = CLOUD_RES == 1 ? 1.0 : 0.5;
 const vec4 CLOUD_CLAMP_PAD = vec4(vec3(1e-4), 0.01);
 #if CLOUD_MOTION > 0
 // 動き・雲の中 (CLOUD_MOTION): 視差で履歴の平均が許す画素数までしかずれないよう、今フレームの重みの下限を上げる (lagWeight)。
-// 補間画素が無く履歴が長い CLOUD_RES 1 はノイズが出やすいので多めに許し、補間画素の多い CLOUD_RES 4 は階段が見えやすいので少なめにする
-const float CLOUD_LAG_TOLERANCE = CLOUD_RES == 1 ? 1.5 : (CLOUD_RES == 2 ? 1.0 : 0.75);
+// 近傍クランプが履歴の遅れを CLOUD_RES 画素ほどで頭打ちにするので、粗い解像度ほど多めに許す。CLOUD_RES 2 以上は、重みを上げると 1 画素ごとの低解像度のノイズが直接見える
+// (ゲームで 1.0 だと雲の縁と雲の中が従来よりずっと粒立った)。CLOUD_RES 1 は全画素を毎フレーム計算して 3x3 で均すので、小さくしても粒が増えない
+const float CLOUD_LAG_TOLERANCE = CLOUD_RES == 1 ? 1.5 : (CLOUD_RES == 2 ? 3.0 : 4.0);
 // 重みの下限が高い画素の近傍クランプの箱の広がりの倍率 (箱を広げるのは、ノイズで揺れる履歴を残すための処置)
 const float CLOUD_CLAMP_MOVING_SHRINK = 0.25;
 #endif
