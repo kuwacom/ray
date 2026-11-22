@@ -24,6 +24,7 @@
 //@include "/lib/common/polarizer.glsl"
 #ifdef FIREWORK_LIGHT
     //@include "/lib/light/firework_light.glsl"
+    //@include "/lib/light/firework_shadow.glsl"
 #endif
 // BEGIN GENERATED includes (tools/gen_includes.py)
 #include "/lib/settings/look.glsl"
@@ -113,6 +114,7 @@
 #ifdef FIREWORK_LIGHT
     #include "/lib/buffers/firework_light.glsl"
     #include "/lib/light/firework_light.glsl"
+    #include "/lib/light/firework_shadow.glsl"
 #endif
 // END GENERATED includes
 
@@ -396,6 +398,8 @@ void main() {
     // 遮蔽はスカイライトの近似なので、ほかの環境光と同じく AO を掛ける
     if (hasFireworkLight()) {
         LightSample firework = evalFireworkLight(playerPos, g.lightmap.y);
+        // 遮るものの裏を照らさない (lib/light/firework_shadow.glsl)。一人称の手は体のボクセルの中から辿るので掛けない
+        if (!hand) firework = shadowFireworkLight(firework, playerPos, plant ? firework.direction : g.geoNormal, dither);
         firework.irradiance *= ao;
         if (plant) color += evalDiffuseIrradiance(m, firework.irradiance * PLANT_LIGHT_NDOTL);
         else color += directLight(m, g.normal, V, firework, puddleVar, 1.0, 1.0, SPECULAR_BLOCK_STRENGTH, specSum);

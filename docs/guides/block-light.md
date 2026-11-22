@@ -201,7 +201,7 @@ floodfill の柔らかい光なので影は付かず、ほとんど重くなり�
 | ビーコンの光線のにじみ (`EMISSION_BEACON_SCATTER_STRENGTH`) | 1.0 | 霧・もや・雨の中でビームの周りがにじむ強さ |
 | 花火の輝き (`FIREWORK_GLOW`) | ON | 火花などの光るパーティクルを色を保って明るくする |
 | 花火の輝きの明るさ / 瞬き (`FIREWORK_GLOW_STRENGTH` / `FIREWORK_TWINKLE_STRENGTH`) | 1.0 / 0.3 | 瞬きは 0 で揺らがない |
-| 花火の光 (`FIREWORK_LIGHT`) / 強さ (`FIREWORK_LIGHT_STRENGTH`) | ON / 1.0 | 開いた瞬間に周りを花火の色で照らし、水面に光の柱が映る、影は付かず軽い |
+| 花火の光 (`FIREWORK_LIGHT`) / 強さ (`FIREWORK_LIGHT_STRENGTH`) | ON / 1.0 | 開いた瞬間に周りを花火の色で照らし、水面に光の柱が映る、光源シャドウが ON なら壁や丘の裏は照らさない |
 
 ## 光の計算の流れ
 
