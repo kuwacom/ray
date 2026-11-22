@@ -13,6 +13,7 @@
 #define IMG_REFLECTION
 //@include "/lib/common/common.glsl"
 //@include "/lib/common/temporal.glsl"
+//@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/surface/surface.glsl"
 //@include "/lib/sky/sky.glsl"
 //@include "/lib/light/light.glsl"
@@ -39,6 +40,7 @@
 #include "/lib/common/shading_types.glsl"
 #include "/lib/common/common.glsl"
 #include "/lib/common/temporal.glsl"
+#include "/lib/buffers/frame_data.glsl"
 #include "/lib/common/color.glsl"
 #include "/lib/common/encoding.glsl"
 #include "/lib/common/gbuffer.glsl"
@@ -54,7 +56,6 @@
 #include "/lib/surface/gi.glsl"
 #include "/lib/common/noise.glsl"
 #include "/lib/common/transforms.glsl"
-#include "/lib/buffers/frame_data.glsl"
 #include "/lib/common/water_waves.glsl"
 #include "/lib/common/water_glitter.glsl"
 #include "/lib/common/water_lod.glsl"
@@ -273,7 +274,7 @@ void main() {
         float alpha = waterRough ? WATER_REFLECTION_ALPHA : mix(0.5, REFLECTION_ALPHA_MIN, saturate((s.perceptualRoughness - MIRROR_ROUGHNESS) / 0.4));
         vec2 uv = (vec2(texel) + 0.5) / viewSize();
         vec2 prevUv = getPreviousUv(uv, s.depth);
-        if (reprojectionInside(prevUv)) {
+        if (reprojectionInside(prevUv) && screenHistoryValid()) {
             ivec2 pl = clamp(ivec2(prevUv * vec2(lowSize)), ivec2(0), lowSize - 1);
             vec4 h = imageLoad(reflectionImg, pl + prevRegion);
             float expected = length(playerPos + cameraPosition - previousCameraPosition);

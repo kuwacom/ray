@@ -318,9 +318,11 @@ const float SHUTTER_DT_MIN = 0.001;
 const float SHUTTER_DT_MAX = 0.1;
 /*
  * 状態 (FrameData.postParams[SHUTTER_PARAM]) の w の印。COMPLETE = このフレームで露光を終えた、SHOWN = 撮れた絵がある、RESET = 溜め直し
- * w = 印 + RANGE x 画面の高さ (高さ 2^21 まで float で厳密)。印は w の下位 3 ビット
  */
-const float SHUTTER_FLAG_RANGE = 8.0;
+const int SHUTTER_PARAM = 7;
+const uint SHUTTER_FLAG_COMPLETE = 1u;
+const uint SHUTTER_FLAG_SHOWN = 2u;
+const uint SHUTTER_FLAG_RESET = 4u;
 /*
  * 1 枚ずつの溜め直し (再読み込み・画面の大きさの変更) の後、最初の露光を始めるまでの待ち。待ちの間は今のフレームを出す
  * 再読み込みの最初のフレームは P・A の SS がまだ決まっておらず設定の SS で露光するので、短い SS ではそのフレーム (地形の読み込み前で、
@@ -332,10 +334,6 @@ const float SHUTTER_WARMUP_MIN = 1.0;
 const float SHUTTER_WARMUP_MAX = 10.0;
 const float SHUTTER_WARMUP_SETTLE = 0.25;
 const float SHUTTER_WARMUP_STEP = 1.0 / 30.0;
-const int SHUTTER_PARAM = 7;
-const uint SHUTTER_FLAG_COMPLETE = 1u;
-const uint SHUTTER_FLAG_SHOWN = 2u;
-const uint SHUTTER_FLAG_RESET = 4u;
 
 // 被写界深度
 /*

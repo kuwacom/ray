@@ -70,6 +70,7 @@
 #include "/lib/buffers/slots.glsl"
 #include "/lib/sky/godrays.glsl"
 #include "/lib/common/exposure.glsl"
+#include "/lib/sky/beacon_beam_shape.glsl"
 #include "/lib/sky/beacon_beam.glsl"
 #include "/lib/common/jitter.glsl"
 #include "/lib/buffers/light_bins.glsl"
@@ -297,7 +298,7 @@ void main() {
 #endif
         color = color * frontClouds.a + frontClouds.rgb;
         sparkle *= frontClouds.a;
-#ifdef CLOUD_INTERIOR
+#ifdef CLOUD_INTERIOR_FOG
         // カメラが雲の中: 層を出るまで一様な霧として掛ける。手持ちの物・自分の体 (手の深度) には掛けない
         // 半透明の向こうの背景の分 (半透明から奥の不透明面まで) は translucent_composite が先に掛けてあり、ここは手前の半透明までの区間
         if (!isHandDepth(depth)) {

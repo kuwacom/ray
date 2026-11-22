@@ -207,8 +207,9 @@ vec4 cloudWeatherTexel(vec2 world, CloudClimate c) {
 
 #ifdef CLOUD_INTERIOR
 /*
- * カメラの位置の雲の媒質 (fog_apply が雲の中の霧として掛ける)
+ * カメラの位置の雲の媒質 (バニラの形の板は fog_apply が雲の中の霧として掛ける)
  * skyParams[4] = (太陽の光, 濃さ), skyParams[5] = (空の光, 霧の消散係数 1/ブロック)。濃さが 0 なら雲の外
+ * 体積の層は霧を掛けず (中は雲のマーチが描く)、濃さだけを画面の外の光源の隠れ具合 (フレア・光芒) に使う
  * 縁で急に切り替わらないよう、周りの点 (中心・上下・水平の 2 つの輪。バニラの形の板は円盤) の平均の濃さから霧の濃さを作る。縁から輪の半径ほど中へ入るまで
  * 霧は滑らかに濃くなり、出るときも同じ距離で薄くなる。密度の場もカメラの動きも滑らかなので時間方向には均さない
  * (均すと雲を出た後も遠景が白いまま残る)
@@ -231,9 +232,7 @@ const float CLOUD_INTERIOR_SLAB_FACE = 3.0;       // ブロック: 頭・底の�
 const vec2 CLOUD_INTERIOR_WALL_OPEN = vec2(0.14, 0.55);
 const float CLOUD_INTERIOR_WALL_FALLOFF = 5.5;
 const float CLOUD_INTERIOR_MID_SHARE = 0.5;       // 中層の雲は薄いので低層より霧を弱める
-const float CLOUD_INTERIOR_MIN_SHARE = 0.5;       // 雲のマーチが濃くても、霧は視程の消散係数のこの割合を下限にする (遠くで空と地形の雲の色の差を残さない)
 const float CLOUD_INTERIOR_SATURATION = 0.3;      // 空の光の彩度の残し方 (雲の中は何度も散乱して色が抜ける。空の青のままだと青い霧に見える)
-const float CLOUD_INTERIOR_LIGHT_DITHER = 0.5;    // 光方向のマーチの開始位置 (揺らさず 1 本で代表させる)
 
 // i 番目の点のカメラからのずれ (ワールド, ブロック)
 vec3 cloudInteriorTap(int i) {
@@ -255,22 +254,16 @@ VanillaTier cloudInteriorTier() {
 #endif
 
 #ifndef CLOUD_VANILLA_SHAPE
-/*
- * カメラからのずれ offset の点の雲の濃さ [0,1] (体積の層)
- * cloudHeight: 低層の雲の中の高さ、marchExtinction: 雲のマーチがその点に持つ消散係数 (1/ブロック)
- */
-float cloudInteriorDensity(CloudContext ctx, vec3 offset, out float cloudHeight, out float marchExtinction) {
+// カメラからのずれ offset の点の雲の濃さ [0,1] (体積の層)
+float cloudInteriorDensity(CloudContext ctx, vec3 offset) {
     float y = cameraPosition.y + offset.y;
     vec2 rel = offset.xz * CLOUD_KH;
     float altitude = cloudRefAltitude(y);
     vec4 map = cloudMapFetch(rel);
-    float low = cloudLowDensity(ctx, cloudLowColumn(map), rel, altitude, 0.0, false, cloudHeight);
-    float rho = low;
-    marchExtinction = low * CLOUD_LOW_SIGMA * CLOUD_KH;
+    float cloudHeight;
+    float rho = cloudLowDensity(ctx, cloudLowColumn(map), rel, altitude, 0.0, false, cloudHeight);
     #ifdef CLOUD_MID_LAYER
-    float mid = cloudMidDensity(ctx, map.b * CLOUD_COVER_RANGE, rel, altitude, false);
-    rho = max(rho, mid * CLOUD_INTERIOR_MID_SHARE);
-    marchExtinction += mid * CLOUD_MID_SIGMA * CLOUD_KH;
+    rho = max(rho, cloudMidDensity(ctx, map.b * CLOUD_COVER_RANGE, rel, altitude, false) * CLOUD_INTERIOR_MID_SHARE);
     #endif
     return saturate(rho);
 }
@@ -294,28 +287,15 @@ float cloudInteriorSlabCover(VanillaTier tier) {
 #endif
 
 void cloudInteriorWrite(CloudContext ctx) {
-    float rho = 0.0;
-    float extinction = 0.0;
-    float cloudHeight = 0.5;
     #ifndef CLOUD_VANILLA_SHAPE
-    for (int i = 0; i < CLOUD_INTERIOR_TAPS; i++) {
-        float height, tapExtinction;
-        rho += cloudInteriorDensity(ctx, cloudInteriorTap(i), height, tapExtinction);
-        extinction += tapExtinction;
-        if (i == 0) cloudHeight = height;
-    }
-    rho /= float(CLOUD_INTERIOR_TAPS);
-    #endif
-    // 雲のマーチがすでに持つ消散を差し引いて、マーチと霧の合計が設定の視程になるようにする (薄い雲だけ霧が足す)。
-    // バニラの形の柱の中ではマーチの消散を弱め切るので、霧が視程どおりの消散を全部持つ
-    #ifdef CLOUD_VANILLA_SHAPE
-    float fogExtinction = CLOUD_INTERIOR_EXTINCTION;
+    float rho = 0.0;
+    for (int i = 0; i < CLOUD_INTERIOR_TAPS; i++) rho += cloudInteriorDensity(ctx, cloudInteriorTap(i));
+    rho = sqr(smoothstep(CLOUD_INTERIOR_ENTER.x, CLOUD_INTERIOR_ENTER.y, rho / float(CLOUD_INTERIOR_TAPS)));
+    frameData.skyParams[4] = vec4(0.0, 0.0, 0.0, rho);
     #else
-    float fogExtinction = max(CLOUD_INTERIOR_EXTINCTION - extinction / float(CLOUD_INTERIOR_TAPS), CLOUD_INTERIOR_EXTINCTION * CLOUD_INTERIOR_MIN_SHARE);
-    #endif
-    // 縁の立ち上がりを緩くするため 2 乗する (濃さが小さくても遠景を白く閉じてしまうので、縁ではまず手前だけが霞むように)
-    rho = sqr(smoothstep(CLOUD_INTERIOR_ENTER.x, CLOUD_INTERIOR_ENTER.y, rho));
-    #ifdef CLOUD_VANILLA_SHAPE
+    float cloudHeight = 0.5;
+    // 柱の中ではマーチの消散を弱め切るので、霧が視程どおりの消散を全部持つ
+    float fogExtinction = CLOUD_INTERIOR_EXTINCTION;
     // 柱の頭と底から CLOUD_INTERIOR_SLAB_FACE ブロックまで霧を立ち上げる (柱の外へ出る縁もなめらかにする)。柱の外のマスは頭が 0 なので、円盤の濃さだけで決める
     VanillaTier tier = cloudInteriorTier();
     vec2 column = vanillaCloudColumn(tier, vanillaCloudCellOf(tier, vanillaCloudOrigin(tier)));
@@ -325,8 +305,7 @@ void cloudInteriorWrite(CloudContext ctx) {
     float faceFade = column.x > 0.0 ? smoothstep(0.0, CLOUD_INTERIOR_SLAB_FACE, max(faceDepth, 0.0)) : 1.0;
     // 霧は視線の全長に掛かるので、縁の外のわずかな濃さでも遠景が曇る。2 乗にして縁の手前はごく薄く、縁を越えるあたりから濃くする
     float cover = cloudInteriorSlabCover(tier);
-    rho = max(rho, sqr(smoothstep(CLOUD_INTERIOR_SLAB_ENTER.x, CLOUD_INTERIOR_SLAB_ENTER.y, cover)) * faceFade);
-    #endif
+    float rho = sqr(smoothstep(CLOUD_INTERIOR_SLAB_ENTER.x, CLOUD_INTERIOR_SLAB_ENTER.y, cover)) * faceFade;
 
     vec3 sun = vec3(0.0);
     vec3 ambient = vec3(0.0);
@@ -341,7 +320,6 @@ void cloudInteriorWrite(CloudContext ctx) {
         float odLight = 0.0;
         float odSky = 0.0;
         float groundVisibility = 1.0;
-        #ifdef CLOUD_VANILLA_SHAPE
         // 写実の層は描かない。バニラの形の柱の中の光だけ
         float slabWeight = cloudRainDensityScale(ctx);
         vec2 q = vanillaCloudOrigin(tier);
@@ -353,21 +331,8 @@ void cloudInteriorWrite(CloudContext ctx) {
             cloudHeight = saturate(slabHeight);
             groundVisibility = sqr(1.0 - cloudHeight);
         }
-        #else
-        vec4 map = cloudMapFetch(vec2(0.0));
-        odLight = cloudLowLightOD(ctx, cloudLowColumn(map), vec2(0.0), altitude, lightDir, CLOUD_INTERIOR_LIGHT_DITHER, odNear);
-        odSky = cloudLowSkyOD(ctx, cloudLowColumn(map), vec2(0.0), altitude);
-        groundVisibility = sqr(1.0 - saturate((altitude - CLOUD_R_BASE) / CLOUD_R_DEPTH));
-        #ifdef CLOUD_MID_LAYER
-        odLight += cloudMidLightOD(ctx, map.b * CLOUD_COVER_RANGE, vec2(0.0), altitude, lightDir, CLOUD_INTERIOR_LIGHT_DITHER);
-        #endif
-        #endif
-        #ifdef CLOUD_VANILLA_SHAPE
         // 雲のマーチが柱の中の点で持つ消散係数 (濃さ 1)
         float sigma = VANILLA_CLOUD_SHADE_SIGMA * tier.shade * slabWeight;
-        #else
-        float sigma = extinction / (float(CLOUD_INTERIOR_TAPS) * CLOUD_KH);
-        #endif
         float upperT = cloudUpperTransmittance(ctx, vec2(0.0), altitude, lightDir);
         // 光源の光だけ、空と地面の光だけを別々に求める (向きによる差を光源の光だけに掛けるため)
         CloudLighting sunOnly = l;
@@ -379,16 +344,13 @@ void cloudInteriorWrite(CloudContext ctx) {
         sun = cloudInscatter(sunOnly, sigma, odLight, odNear, odSky, groundVisibility, upperT, cloudHeight) * CLOUD_ALBEDO;
         ambient = cloudInscatter(skyOnly, sigma, odLight, odNear, odSky, groundVisibility, upperT, cloudHeight) * CLOUD_ALBEDO;
         ambient = mix(vec3(luminance(ambient)), ambient, CLOUD_INTERIOR_SATURATION);
-        #ifdef CLOUD_VANILLA_SHAPE
         // 夜の中段は雲のマーチと同じく暗くする (霧だけ明るく浮かない)
         float nightGain = mix(1.0, VANILLA_TIER_NIGHT_GAIN, tier.index == 0 ? 0.0 : cloudVanillaNight());
         sun *= nightGain;
         ambient *= nightGain;
-        #endif
     }
     frameData.skyParams[4] = vec4(sun, rho);
     frameData.skyParams[5] = vec4(ambient, fogExtinction);
-    #ifdef CLOUD_VANILLA_SHAPE
     // 霧を掛ける長さの上限になる、カメラのいる板の上面・下面までの高さ (柱の外では 0) と、雲のマーチが描く壁の消散の倍率。
     // 倍率は縁の外から周りの濃さに応じて下がり (CLOUD_INTERIOR_WALL_OPEN)、面から内側へ VANILLA_CLOUD_INSIDE_DEPTH 入るまでに 0 になる
     // (中の見通しは霧が決める。入る・出るときに壁の消散が白く閉じない)

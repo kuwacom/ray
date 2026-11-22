@@ -81,7 +81,7 @@ const float FORWARD_ENTITY_BOUNCE = 0.5;
 vec3 forwardEntityLightUnshadowed(LightInstance L, vec3 fromVoxel, vec3 normal, vec3 geoNormal, out vec3 box, out vec3 bounceE) {
     float dist = distance(L.posRadius.xyz, fromVoxel);
     box = lightBoxIrradiance(L, fromVoxel, geoNormal);
-    bounceE = L.colorSize.rgb * lightFalloff(dist, L.posRadius.w);
+    bounceE = L.colorSize.rgb * (lightFalloff(dist, L.posRadius.w) * lightOneSidedGate(L, fromVoxel));
     return evalLightIrradiance(L, fromVoxel, normal, geoNormal);
 }
 
@@ -136,8 +136,8 @@ LightSample blockSpecularSample(LightInstance L, vec3 voxelPos, float scale) {
     vec3 toL = L.posRadius.xyz - voxelPos;
     float dist = length(toL);
     s.direction = toL / max(dist, EPS);
-    s.irradiance = L.colorSize.rgb * lightFalloff(dist, L.posRadius.w) * scale;
-    s.angularSize = atan(L.colorSize.a, max(dist, EPS));
+    s.irradiance = L.colorSize.rgb * (lightFalloff(dist, L.posRadius.w) * lightOneSidedGate(L, voxelPos) * scale);
+    s.angularSize = atan(lightSourceSize(L), max(dist, EPS));
     return s;
 }
 #endif

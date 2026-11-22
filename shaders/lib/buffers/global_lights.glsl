@@ -26,8 +26,28 @@ const float LIGHT_CULL_NONE = 1e9;  // 間引かない時の cullDistance
 
 struct LightInstance {
     vec4 posRadius;  // xyz = ボクセル空間の位置 (今フレーム), w = 到達半径 (ブロック)
-    vec4 colorSize;  // rgb = 放射 (色 x 明るさ x レベル, BLOCKLIGHT_ILLUMINANCE 倍済み), a = 光源半径
+    vec4 colorSize;  // rgb = 放射 (色 x 明るさ x レベル, BLOCKLIGHT_ILLUMINANCE 倍済み), a = 光源半径 (負は片面の光源。lightSourceSize で読む)
 };
+
+/*
+ * 片面の光源 (点灯したかまど・燻製器・溶鉱炉): 炉の口の面の中心のすぐ内側に置き、口の前の半空間だけを照らす (口の面の法線とのコサイン)
+ * 中心の点から全方向に照らすと、裏の床や並べた隣の光源の横の面まで照らし、ブロック全体が光って見えた
+ * 欄に空きが無いので colorSize.a の符号で印を付け、口の向きは位置 (セルの中で口の面に寄った軸) から求める
+ * 半径を読む所は lightSourceSize、照らす光を求める所は lightOneSidedGate を掛ける。足し忘れると口の裏へ光が出る
+ * 確かめ方: 1 つだけ置いたかまどの裏の床と裏・上の面が、口の前の床より十分暗いこと (program/light/floodfill.csh が登録する)
+ */
+const float LIGHT_ONE_SIDED_INSET = 0.49; // 口の面へ寄せる量 (セルの中心から)。0.5 にすると floor で隣のセルになる
+const float LIGHT_ONE_SIDED_CELL_MARGIN = 0.005; // 半影の揺らした終点を光源のセルの中に留める余白 (program/light/block_light_trace.csh)
+
+float lightSourceSize(LightInstance L) { return abs(L.colorSize.a); }
+
+float lightOneSidedGate(LightInstance L, vec3 voxelPos) {
+    if (L.colorSize.a >= 0.0) return 1.0;
+    vec3 f = fract(L.posRadius.xyz) - 0.5;
+    vec3 front = abs(f.x) > abs(f.z) ? vec3(sign(f.x), 0.0, 0.0) : vec3(0.0, 0.0, sign(f.z));
+    vec3 d = voxelPos - L.posRadius.xyz;
+    return clamp(dot(front, d) / max(length(d), 1e-4), 0.0, 1.0);
+}
 
 layout(std430, binding = 2) SSBO_GLOBAL_LIGHTS_ACCESS buffer GlobalLightsBuffer {
     uint count;       // 登録数 (atomicAdd で確保。GLOBAL_LIGHTS_MAX を超えた分は捨てる)
