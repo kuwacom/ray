@@ -38,6 +38,54 @@ void cloudAccumFinish(inout CloudAccum acc, vec3 sums, CloudContext ctx, vec3 di
     }
 }
 
+/*
+ * 区間 seg を steps 歩で歩く時の歩き方。カメラが層の中 (区間が 0 から始まる) なら、手前 CLOUD_NEAR_LENGTH を
+ * 歩数の CLOUD_NEAR_SHARE で距離の平方根に沿って細かく歩き、残りを等間隔で歩く
+ * (層の中の横向きの視線は数千ブロックあり、等間隔では歩幅が数十ブロックになって、カメラの周りの雲が粗く透ける。
+ * 細かく歩けば雲の中の見通しも外から見た雲と同じ密度と光の積分で決まり、縁で薄く芯で濃くなる)
+ */
+struct CloudSteps {
+    float nearEnd;  // 細かく歩く区間の終わり (ワールド)。層の外なら seg.x
+    int nearSteps;
+    float nearDs;   // 平方根の刻み
+    float dt;       // 残りの等間隔の歩幅
+};
+CloudSteps cloudStepsSetup(vec2 seg, int steps) {
+    CloudSteps s = CloudSteps(seg.x, 0, 0.0, 0.0);
+    if (seg.x <= 0.0) {
+        s.nearEnd = min(seg.y, CLOUD_NEAR_LENGTH);
+        // 手前の区間が視線の大部分なら歩数もその割合で振る (二択にすると、層の出口や地形が CLOUD_NEAR_LENGTH の所で歩幅が数倍跳び、空と地面に輪が出た)
+        s.nearSteps = max(int(float(steps) * clamp(s.nearEnd / seg.y, CLOUD_NEAR_SHARE, 1.0)), 1);
+        s.nearDs = sqrt(s.nearEnd) / float(s.nearSteps);
+    }
+    s.dt = (seg.y - s.nearEnd) / float(max(steps - s.nearSteps, 1));
+    return s;
+}
+// i 歩目の位置 (ワールドの距離) と、その歩幅 dt。手前の区間のジッターは平方根の空間で一様 (距離では区間の近い側に寄るが、歩幅の和は区間に一致する。cloudMarchShaft と同じ)
+float cloudStepAt(CloudSteps s, int i, float dither, out float dt) {
+    if (i < s.nearSteps) {
+        float s0 = s.nearDs * float(i);
+        dt = sqr(s0 + s.nearDs) - s0 * s0;
+        return sqr(s0 + s.nearDs * dither);
+    }
+    dt = s.dt;
+    return s.nearEnd + s.dt * (float(i - s.nearSteps) + dither);
+}
+
+/*
+ * 雲の中にいる時の手前の雲の消散の倍率 (CLOUD_INTERIOR_VISIBILITY)。既定の視程なら 1 で、外から見た雲と同じ
+ * カメラの周りの濃さ (skyParams[4].a。縁から十数ブロックで立ち上がる) で入れるので、雲に入っていく間に滑らかに効き、
+ * 手前の区間の奥で 1 に戻すので、遠くの雲の見え方は変わらない
+ */
+float cloudNearBoost(CloudSteps s, float t) {
+#ifdef CLOUD_INTERIOR
+    if (CLOUD_INTERIOR_DENSITY_SCALE == 1.0 || s.nearSteps == 0) return 1.0;
+    return 1.0 + (CLOUD_INTERIOR_DENSITY_SCALE - 1.0) * frameData.skyParams[4].a * (1.0 - smoothstep(0.5 * CLOUD_NEAR_LENGTH, CLOUD_NEAR_LENGTH, t));
+#else
+    return 1.0;
+#endif
+}
+
 // share: 区間を分けて呼ぶ時のこの区間の歩数の割合 (分けない時 1)
 CloudAccum cloudMarchLow(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, vec2 dither, float share) {
     CloudAccum acc = CloudAccum(vec3(0.0), 1.0, 0.0, 0.0);
@@ -46,11 +94,12 @@ CloudAccum cloudMarchLow(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, 
     // 水平に近い視線ほど層の中を長く通るので歩数を増やす (上限 3 倍)
     float stepScale = clamp(segLength / share / ((ctx.lowTopWorld - CLOUD_BASE) * 1.5), 1.0, CLOUD_STEP_SCALE_MAX);
     int steps = max(int(float(CLOUD_LOW_STEPS) * stepScale * share), 4);
-    float dt = segLength / float(steps);
-    float t = seg.x + dt * dither.x;
+    CloudSteps walk = cloudStepsSetup(seg, steps);
     float y0 = cameraPosition.y;
     vec3 sums = vec3(0.0); // 距離 x 重み, 高度 x 重み, 重み
-    for (int i = 0; i < steps; i++, t += dt) {
+    for (int i = 0; i < steps; i++) {
+        float dt;
+        float t = cloudStepAt(walk, i, dither.x, dt);
         float y = cloudAltitudeAt(y0, dir.y, t, yMid);
         float slope;
         float altitude = cloudRefAltitude(y, slope);
@@ -61,7 +110,7 @@ CloudAccum cloudMarchLow(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, 
         float density = cloudLowDensity(ctx, col, rel, altitude, cloudDetailLod(tRef), false, cloudHeight);
         if (density <= 0.0) continue;
 
-        float extinction = density * CLOUD_LOW_SIGMA;
+        float extinction = density * CLOUD_LOW_SIGMA * cloudNearBoost(walk, t);
         float h = saturate((altitude - CLOUD_R_BASE) / CLOUD_R_DEPTH);
         vec3 lightDir = cloudRefDir(l.lightDir, CLOUD_KH, slope);
         float odNear;
@@ -70,7 +119,9 @@ CloudAccum cloudMarchLow(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, 
         float upperT = cloudUpperTransmittance(ctx, rel, altitude, lightDir);
         vec3 inscatter = cloudInscatter(l, extinction, odLight, odNear, odSky, sqr(1.0 - h), upperT, cloudHeight);
 
-        float stepT = exp(-extinction * dt * cloudRefStretch(dir, CLOUD_KH, slope));
+        // 芯の奥は実物の芯ほど濃くする (CLOUD_DEEP_GAIN)。厚い雲の向こうの地面や空が透けない
+        float deepGain = mix(CLOUD_DEEP_GAIN, 1.0, smoothstep(CLOUD_DEEP_T.x, CLOUD_DEEP_T.y, acc.transmittance));
+        float stepT = exp(-extinction * deepGain * dt * cloudRefStretch(dir, CLOUD_KH, slope));
         float weight = acc.transmittance * (1.0 - stepT);
         acc.scattering += inscatter * CLOUD_ALBEDO * weight;
         sums += vec3(tRef, altitude, 1.0) * weight;
@@ -228,11 +279,12 @@ CloudAccum cloudMarchMid(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, 
     float yMid = 0.5 * (CLOUD_MID_BASE + CLOUD_MID_TOP);
     float stepScale = clamp(segLength / ((CLOUD_MID_TOP - CLOUD_MID_BASE) * 2.0), 1.0, CLOUD_STEP_SCALE_MAX);
     int steps = int(float(CLOUD_MID_STEPS) * stepScale);
-    float dt = segLength / float(steps);
-    float t = seg.x + dt * dither.x;
+    CloudSteps walk = cloudStepsSetup(seg, steps);
     float y0 = cameraPosition.y;
     vec3 sums = vec3(0.0);
-    for (int i = 0; i < steps; i++, t += dt) {
+    for (int i = 0; i < steps; i++) {
+        float dt;
+        float t = cloudStepAt(walk, i, dither.x, dt);
         float y = cloudAltitudeAt(y0, dir.y, t, yMid);
         float slope;
         float altitude = cloudRefAltitude(y, slope);
@@ -243,7 +295,7 @@ CloudAccum cloudMarchMid(CloudContext ctx, CloudLighting l, vec3 dir, vec2 seg, 
         float density = cloudMidDensity(ctx, cover, rel, altitude, tRef < CLOUD_DETAIL_FADE.y, grainHeight);
         if (density <= 0.0) continue;
 
-        float extinction = density * CLOUD_MID_SIGMA;
+        float extinction = density * CLOUD_MID_SIGMA * cloudNearBoost(walk, t);
         float h = saturate((altitude - CLOUD_R_MID_BASE) / CLOUD_R_MID_DEPTH);
         vec3 lightDir = cloudRefDir(l.lightDir, CLOUD_KH, slope);
         float odLight = cloudMidLightOD(ctx, cover, rel, altitude, lightDir, dither.y);

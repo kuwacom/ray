@@ -9,6 +9,7 @@
 //@include "/lib/common/common.glsl"
 //@include "/lib/common/exposure.glsl"
 //@include "/lib/common/temporal.glsl"
+//@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/post/post_internal.glsl"
 //@include "/lib/buffers/slots.glsl"
 //@include "/lib/common/pre_exposure.glsl"
@@ -333,7 +334,7 @@ void taaWarped() {
     vec3 currentColor = mix(smoothColor, nearColor, superResEff);
     vec3 currentYcc = rgbToYCoCg(taaCompress(currentColor, exposure));
 
-    bool valid = reprojectionInside(prevUv);
+    bool valid = reprojectionInside(prevUv) && screenHistoryValid();
     vec3 history = vec3(0.0);
     if (valid) {
         float tolCenter, tolClosest;
@@ -403,7 +404,7 @@ void main() {
     }
     float motionPx = length((prevUv - uv) * viewSize());
 
-    bool valid = reprojectionInside(prevUv);
+    bool valid = reprojectionInside(prevUv) && screenHistoryValid();
 
     vec3 history = vec3(0.0);
     if (valid) {

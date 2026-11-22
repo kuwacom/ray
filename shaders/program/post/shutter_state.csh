@@ -38,13 +38,8 @@ void main() {
     float t = cameraShutterSpeed();
     float dt = clamp(frameTime, SHUTTER_DT_MIN, SHUTTER_DT_MAX);
     vec4 state = frameData.postParams[SHUTTER_PARAM];
-    /*
-     * 再読み込み (FrameData も 0) と画面の大きさの変更 (Iris が SSBO 7 / 8 を 0 で作り直す) では溜め直す
-     * 画素数が同じまま縦横が変わる時 (1920x1080 -> 1080x1920) も溜め直すよう、幅と高さを別々に比べる
-     */
-    float width = float(int(viewWidth));
-    float height = float(int(viewHeight));
-    bool reset = state.z != width || floor(state.w / SHUTTER_FLAG_RANGE) != height;
+    // 再読み込み (FrameData も 0) と画面の大きさの変更 (Iris が SSBO 7 / 8 を 0 で作り直す) では溜め直す
+    bool reset = !screenHistoryValid();
     uint flags = reset ? SHUTTER_FLAG_RESET : 0u;
 #if SHUTTER_MODE == 1
     float exposed = reset ? 0.0 : state.y;
@@ -60,9 +55,9 @@ void main() {
         frameData.postParams[PRE_EXPOSURE_PARAM].z = preExposure();
     #endif
     }
-    frameData.postParams[SHUTTER_PARAM] = vec4(weight, exposed, width, float(flags) + SHUTTER_FLAG_RANGE * height);
+    frameData.postParams[SHUTTER_PARAM] = vec4(weight, exposed, 0.0, float(flags));
 #else
     float weight = reset ? 1.0 : min(2.0 * dt / (t + dt), 1.0);
-    frameData.postParams[SHUTTER_PARAM] = vec4(weight, 0.0, width, float(flags) + SHUTTER_FLAG_RANGE * height);
+    frameData.postParams[SHUTTER_PARAM] = vec4(weight, 0.0, 0.0, float(flags));
 #endif
 }

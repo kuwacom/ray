@@ -154,6 +154,14 @@ const float CLOUD_AERIAL_RAIN = 1.0;  // 雨の日のもやの増え方 (Mie の
 const float CLOUD_MAX_DISTANCE = CLOUD_DRAW_DISTANCE * 1000.0;
 const float CLOUD_HIGH_MAX_DISTANCE = 160000.0;
 const float CLOUD_MIN_TRANSMITTANCE = 0.02;
+/*
+ * 芯の奥の濃さ: 視線が雲を通って透過率が CLOUD_DEEP_T.y を下回った先は、消散を CLOUD_DEEP_GAIN 倍まで上げる (CLOUD_DEEP_T.x で最大)
+ * 消散係数は縁を淡く透かすため実物の芯 (0.05-0.1 /m) の 1/3 にしてあり、厚い芯を通しても数 % 透けて、上から見下ろすと日の当たる地面が
+ * 雲の芯越しに見えた (実物の積雲の光学的厚さは数十で、地面は見えない)。奥の分は手前の透過率で弱まるので散乱 (雲の明るさ) にほとんど効かず、
+ * 縁と薄い雲 (全体の透過率が CLOUD_DEEP_T.y 以上) は変わらない。厚い所だけ向こうを隠す
+ */
+const vec2 CLOUD_DEEP_T = vec2(0.1, 0.4);
+const float CLOUD_DEEP_GAIN = 8.0;
 const float CLOUD_STEP_SCALE_MAX = 3.0;  // 水平に近い視線で歩数を増やす倍率の上限
 const float CLOUD_SEG_NONE = 1e30;      // 区間なしの開始距離 (並べ替えで最後になる)
 const float CLOUD_SEG_NONE_TEST = 1e29;

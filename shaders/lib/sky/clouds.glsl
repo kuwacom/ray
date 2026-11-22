@@ -41,6 +41,17 @@
 #if CLOUDS >= 2 && CLOUD_INTERIOR_VISIBILITY > 0 && defined HAS_SKY
     #define CLOUD_INTERIOR
 #endif
+// 霧として掛けるのはバニラの形の板だけ。体積の層の中は雲のマーチがカメラの周りを細かく歩くので (cloudStepsSetup)、外から見た雲と同じ
+// 密度と光の積分の続きになる。一様な霧を層の出口まで掛けると、雲の隙間の向こうまで同じ濃さで霞み、入った瞬間から画面全体が一様に白くなった
+#if defined CLOUD_INTERIOR && defined CLOUD_VANILLA_SHAPE
+    #define CLOUD_INTERIOR_FOG
+#endif
+#ifdef CLOUD_INTERIOR
+// 雲の中の見通しの倍率。既定の視程 (CLOUD_INTERIOR_VISIBILITY_REF) で 1 の消散の倍率で、体積の層は雲の中にいる時の手前の雲 (cloudNearBoost)、
+// バニラの形は板の中の霧に掛ける。どちらも雲の濃さの設定 (CLOUD_LOW_DENSITY) にも比例するので、濃い雲ほど中の見通しも短い
+const float CLOUD_INTERIOR_VISIBILITY_REF = 64.0;
+const float CLOUD_INTERIOR_DENSITY_SCALE = CLOUD_INTERIOR_VISIBILITY_REF / float(CLOUD_INTERIOR_VISIBILITY);
+#endif
 
 const float CLOUD_RAY_FAR = 1e12; // 球との交差が無い方向の距離 (十分遠い値)
 
@@ -312,6 +323,22 @@ vec2 vanillaCloudSegment(float y0, float dy, float bottom, float envelope, float
 }
 #endif
 
+/*
+ * 体積の層の中の視線で、雲のマーチが細かく歩く手前の長さ (ブロック) と、そこに使う歩数の割合の下限
+ * (cloud_march の cloudStepsSetup と、cloud_upscale の再投影の距離が使う)
+ * 雲の中では手前の密度のある歩ごとに光の積分をするので、雲の中にいる間だけ重くなる。品質の低い段は手前を短く、割合を小さくする
+ */
+#if CLOUD_QUALITY == 0
+    const float CLOUD_NEAR_LENGTH = 128.0;
+    const float CLOUD_NEAR_SHARE = 0.15;
+#elif CLOUD_QUALITY == 1
+    const float CLOUD_NEAR_LENGTH = 192.0;
+    const float CLOUD_NEAR_SHARE = 0.2;
+#else
+    const float CLOUD_NEAR_LENGTH = 256.0;
+    const float CLOUD_NEAR_SHARE = 0.3;
+#endif
+
 // 最初に通る雲の層の区間 (半透明の手前の分を見積もる基準)
 vec2 cloudPrimarySegment(float y0, float dy) {
 #ifdef CLOUD_VANILLA_SHAPE
@@ -351,13 +378,15 @@ float cloudRainBelowDeck() {
 #endif
 }
 
-#ifdef CLOUD_INTERIOR
+#ifdef CLOUD_INTERIOR_FOG
 /*
- * 雲の中の霧: カメラが雲の層の中にいる時、層を出るまでを一様な霧として掛ける (fog_apply)
- * 雲のマーチの消散係数は外から見た雲のための薄い値で、中にいても地面や遠くが透けるので、雲の中の視程はこちらで決める
+ * 雲の中の霧: カメラがバニラの形の板の中にいる時、板を出るまでを一様な霧として掛ける (fog_apply)
+ * 板の柱は面から内側で雲のマーチの消散を弱め切るので (skyParams[7].z)、板の中の視程はこちらで決める
  * 視程 = 3 / 消散係数 (WMO の定義)。濃さ・光・マーチの消散を引いた霧の消散係数は、prepare2 がカメラの位置で求める (frameData.skyParams[4] [5])
  */
-const float CLOUD_INTERIOR_EXTINCTION = 3.0 / float(CLOUD_INTERIOR_VISIBILITY);
+// 既定の濃さ (CLOUD_INTERIOR_DENSITY_REF) で視程が CLOUD_INTERIOR_VISIBILITY になる
+const float CLOUD_INTERIOR_DENSITY_REF = 0.25;
+const float CLOUD_INTERIOR_EXTINCTION = 3.0 / float(CLOUD_INTERIOR_VISIBILITY) * (CLOUD_LOW_DENSITY / CLOUD_INTERIOR_DENSITY_REF);
 // 真横に近い視線の霧の長さの上限 (ブロック)。板の上面・下面を抜ける視線は短く、真横の視線だけ無限に長いと水平線に白い帯が出る。
 // 視程の 2 倍で光は 0.25% まで減るので、ここで打ち切っても見た目は変わらない
 const float CLOUD_INTERIOR_MAX_LENGTH = 2.0 * float(CLOUD_INTERIOR_VISIBILITY);
@@ -370,22 +399,12 @@ float cloudInteriorPhase(float cosTheta) {
          / mix(phaseHG(0.0, CLOUD_INTERIOR_G), PHASE_ISOTROPIC, CLOUD_INTERIOR_ISO);
 }
 
-// 霧を掛ける長さ (ワールド)。カメラを含む雲の層の出口までの距離。どの層の中でもなければ 0
-// バニラの形の板は、カメラのいる板の上面までと下面までの高さ (prepare2 が frameData.skyParams[7] に書く) から、板を抜ける視線だけ短くなる
+// 霧を掛ける長さ (ワールド)。カメラのいる板の上面までと下面までの高さ (prepare2 が frameData.skyParams[7] に書く) から、板を抜ける視線だけ短くなる
 float cloudInteriorExit(vec3 dir) {
-    float y = cameraPosition.y;
-    #ifdef CLOUD_VANILLA_SHAPE
     vec2 gap = frameData.skyParams[7].xy;
     float exitUp = dir.y > 1e-4 ? gap.x / dir.y : CLOUD_INTERIOR_MAX_LENGTH;
     float exitDown = dir.y < -1e-4 ? gap.y / -dir.y : CLOUD_INTERIOR_MAX_LENGTH;
     return min(min(exitUp, exitDown), CLOUD_INTERIOR_MAX_LENGTH);
-    #else
-    if (y > CLOUD_BASE && y < CLOUD_TOP) return cloudLayerSegment(y, dir.y, CLOUD_BASE, CLOUD_TOP).y;
-    #if CLOUDS == 3
-    if (y > CLOUD_MID_BASE && y < CLOUD_MID_TOP) return cloudLayerSegment(y, dir.y, CLOUD_MID_BASE, CLOUD_MID_TOP).y;
-    #endif
-    return 0.0;
-    #endif
 }
 
 /*
@@ -418,6 +437,14 @@ vec4 cloudFrontPart(vec4 clouds, vec3 dir, float frontDist, float backDist) {
     float t = pow(max(clouds.a, CLOUD_FRONT_MIN_T), f);
     float s = clouds.a < 1.0 - CLOUD_FRONT_EPS ? (1.0 - t) / (1.0 - clouds.a) : f;
     return vec4(clouds.rgb * s, t);
+}
+
+// 雲の全体 clouds から手前の分 front (cloudFrontPart) を除いた奥の分。全体 = 手前の上に奥を重ねたもの (rgb = 手前 + 手前の透過率 x 奥)
+// 手前がほぼ不透明なら奥は見えないので、割り算で散乱が膨らまない (fp16 で溢れない) よう分母に下限を置く
+const float CLOUD_BACK_MIN_FRONT_T = 0.01;
+vec4 cloudBackPart(vec4 clouds, vec4 front) {
+    float frontT = max(front.a, CLOUD_BACK_MIN_FRONT_T);
+    return vec4(max(clouds.rgb - front.rgb, 0.0) / frontT, saturate(clouds.a / frontT));
 }
 
 /*

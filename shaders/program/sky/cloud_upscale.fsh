@@ -79,6 +79,10 @@ vec2 cloudPreviousUv(vec3 dir) {
     vec2 seg = cloudPrimarySegment(cameraPosition.y, dir.y);
     if (seg.y > seg.x) {
         float dist = min(seg.x + 0.3 * (seg.y - seg.x), 30000.0 / CLOUD_KH);
+        #ifndef CLOUD_VANILLA_SHAPE
+        // 層の中では雲のマーチが手前を細かく歩き、見える雲の多くが手前にあるので、手前の区間の中ほどで戻す (層の 3 割の距離では動くと手前の雲がずれる)
+        if (seg.x <= 0.0) dist = 0.5 * min(seg.y, CLOUD_NEAR_LENGTH);
+        #endif
         return playerToPreviousScreen(dir * dist).xy;
     }
     vec3 prevView = mat3(gbufferPreviousModelView) * dir;
@@ -132,7 +136,7 @@ void main() {
 
         vec3 dir = normalize(viewToPlayerDir(screenToView(vec3(texcoord, 1.0))));
         vec2 prevUv = cloudPreviousUv(dir);
-        bool valid = reprojectionInside(prevUv) && frameData.skyParams[1].y > 1.5;
+        bool valid = reprojectionInside(prevUv) && screenHistoryValid() && frameData.skyParams[1].y > 1.5;
         if (valid) {
             vec4 history = hdrFromStorePrev(texture(colortex11, prevUv));
             history = clamp(history, lo - pad, hi + pad);

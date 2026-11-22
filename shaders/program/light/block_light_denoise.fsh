@@ -15,6 +15,7 @@
 //@include "/lib/common/gbuffer.glsl"
 //@include "/lib/common/joint_bilateral.glsl"
 //@include "/lib/common/temporal.glsl"
+//@include "/lib/buffers/frame_data.glsl"
 //@include "/lib/light/light.glsl"
 //@include "/lib/post/post.glsl"
 //@include "/lib/buffers/slots.glsl"
@@ -39,6 +40,7 @@
 #include "/lib/common/gbuffer.glsl"
 #include "/lib/common/joint_bilateral.glsl"
 #include "/lib/common/temporal.glsl"
+#include "/lib/buffers/frame_data.glsl"
 #include "/lib/buffers/light_bins.glsl"
 #include "/lib/light/light_bins.glsl"
 #include "/lib/buffers/block_data.glsl"
@@ -65,7 +67,6 @@
 #include "/lib/buffers/global_lights.glsl"
 #include "/lib/light/light_select.glsl"
 #include "/lib/settings/capabilities.glsl"
-#include "/lib/buffers/frame_data.glsl"
 #include "/lib/light/hand_pose.glsl"
 #include "/lib/light/entity_light.glsl"
 #include "/lib/light/hand_light.glsl"
@@ -221,7 +222,7 @@ void main() {
 
     // 時間: 再投影 + 遮蔽判定 + 分散クリップ
     vec2 prevUv = getPreviousUv(texcoord, hd);
-    if (reprojectionInside(prevUv)) {
+    if (reprojectionInside(prevUv) && screenHistoryValid()) {
         // 動くもの (速度ベクトルあり) は距離がほぼ変わらないとみなし、静止物は前フレームのカメラで距離を求める
         float expected = viewDist;
         if (texture(colortex15, texcoord).a < 0.5) {
