@@ -74,7 +74,7 @@ layout(std430, binding = 1) SSBO_BLOCK_DATA_ACCESS buffer BlockDataBuffer {
      *
      * 後ろに反射体の面の凹凸が続く (REFLECTOR_MAP_BASE から ブロック x REFLECTOR_MAP_VEC4S 個。lib/light/reflector_map_data.glsl)。
      * 1 ブロックは 88 語 (4 語 = 1 uvec4): 語 0-63 = 16x16、64-79 = 8x8、80-83 = 4x4、84 = 2x2 (8bit の符号付きを 4 つずつ。値 / 127 x 段の倍率が
-     * テクスチャの明るさのラプラシアン / 50)、85 = half 2 つ (段 0 と 1 の倍率)、86 = 同 (段 2 と 3)
+     * テクスチャの明るさのラプラシアン。段ごとに二乗平均平方根をそろえ、ブロックの凹凸の相対の強さを掛けてある)、85 = half 2 つ (段 0 と 1 の倍率)、86 = 同 (段 2 と 3)
      */
     uvec4 lightMasks[]; // 要素数: LIGHT_MASK_TABLE_SIZE + REFLECTOR_MAP_BLOCKS * REFLECTOR_MAP_VEC4S
 } blockData;

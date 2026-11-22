@@ -139,13 +139,16 @@ float reflectorCoverage(ivec3 cell, int axis, vec3 q, float radius) {
 }
 
 #if defined REFLECTOR_GEM_PATTERN || defined REFLECTOR_METAL_PATTERN
-// 模様の元の強さ (設定の濃さ 1 の時)。テクスチャの明るさを高さとみなした凹凸のラプラシアンに掛ける。金属は凹凸が小さく反射のローブが
-// 広くて粗いミップしか効かないので、大きい値でやっと穏やかに見える
-const float REFLECTOR_PATTERN_GEM_AMP = 0.05;
-const float REFLECTOR_PATTERN_METAL_AMP = 0.5;
-// 受ける点の光の密度の下限・上限 (光が集まる縁で発散しないように)
-const float REFLECTOR_PATTERN_MIN = 0.2;
-const float REFLECTOR_PATTERN_MAX = 3.0;
+// 模様の元の強さ (設定の濃さ 1 の時)。テクスチャの明るさを高さとみなした凹凸のラプラシアンに掛ける。金属は凹凸が小さいので穏やかにする
+const float REFLECTOR_PATTERN_GEM_AMP = 0.18;
+const float REFLECTOR_PATTERN_METAL_AMP = 0.28;
+// 集光が育つ距離 (ブロック)。面から受ける点までの実効の距離がこれの数倍で模様の強さが飽和する
+const float REFLECTOR_PATTERN_FOCUS = 4.0;
+// 金属の模様のぼけに使うローブの半幅 (ラジアン)。縁のぼかし用の REFLECTOR_SPREAD_METAL は粗さ全体の広がりで、
+// 凹凸の細かい模様は粗い面の中の鏡に近い成分が決めるので、それより狭く取る (広いままだと 2 ブロック先で模様が平均に消える)
+const float REFLECTOR_PATTERN_SPREAD_METAL = 0.035;
+// 受ける点の光の密度の倍率の対数の上限 (exp(1.35) = 3.9 倍、1 / 3.9 倍)
+const float REFLECTOR_PATTERN_LOG_LIMIT = 1.35;
 // 凹凸の表のミップの段数 (16x16 から 2x2) と、最も細かい段の 1 テクセルの大きさ (ブロック)
 const int REFLECTOR_MAP_LEVELS = 4;
 const float REFLECTOR_MAP_TEXEL = 1.0 / 16.0;
@@ -170,7 +173,7 @@ float reflectorMapTexel(int base, int level, ivec2 t) {
     return float(b >= 128 ? b - 256 : b) * (1.0 / 127.0);
 }
 
-// 段 level の双線形補間。テクスチャの明るさのラプラシアン / 50 (範囲外の段は 0)
+// 段 level の双線形補間。テクスチャの明るさのラプラシアン (範囲外の段は 0)
 float reflectorMapLevel(int base, int level, vec2 uv) {
     if (level >= REFLECTOR_MAP_LEVELS) return 0.0;
     vec2 p = uv * float(16 >> level) - 0.5;
@@ -187,9 +190,10 @@ float reflectorMapLevel(int base, int level, vec2 uv) {
  * 面から距離 d の点の光の密度は、反射の向きのずれが作る写像のヤコビアンの逆数 (1 次では 1 + d x 凹凸のラプラシアン)。
  * 凹凸はテクスチャの明るさを高さとみなして tools/gen_reflector_maps.py が測った表を引く (バニラには法線も高さも無い)
  * 反射のローブが広い (距離 x 広がり) ほど面の広い範囲の平均になるので粗い段のミップを引き、遠いほど模様は大きくぼける
- * q: 反射の点 (ボクセル空間)、outward: 面の外向きの法線の軸の符号、focus: 光が面から受ける点まで進む実効の距離、blur: 反射のぼけの半径 (ブロック)
+ * 段の強さは二乗平均平方根をそろえてあり、ぼけた段でも模様が平均に消えない (遠くの大きなまだらとして残す)
+ * q: 反射の点 (ボクセル空間)、outward: 面の外向きの法線の軸の符号、focus: 光が面から受ける点まで進む実効の距離、path: 面から受ける点までの距離、lightSpread: 光源の見かけの広がり (ラジアン)
  */
-float reflectorPattern(int kind, int id, int axis, float outward, vec3 q, float focus, float blur) {
+float reflectorPattern(int kind, int id, int axis, float outward, vec3 q, float focus, float path, float lightSpread) {
     float amp = 0.0;
 #ifdef REFLECTOR_GEM_PATTERN
     if (kind == REFLECTOR_KIND_GEM) amp = REFLECTOR_PATTERN_GEM_AMP * REFLECTOR_GEM_PATTERN_STRENGTH;
@@ -205,13 +209,17 @@ float reflectorPattern(int kind, int id, int axis, float outward, vec3 q, float 
     else if (axis == 0) uv = vec2(outward > 0.0 ? 1.0 - fract(q.z) : fract(q.z), 1.0 - fract(q.y));
     else uv = vec2(outward > 0.0 ? fract(q.x) : 1.0 - fract(q.x), 1.0 - fract(q.y));
     int base = REFLECTOR_MAP_BASE + index * REFLECTOR_MAP_VEC4S;
+    float blur = path * length(vec2(kind == REFLECTOR_KIND_METAL ? REFLECTOR_PATTERN_SPREAD_METAL : REFLECTOR_SPREAD_GEM, lightSpread));
     float lod = log2(max(blur / REFLECTOR_MAP_TEXEL, 1.0));
     int level = int(floor(lod));
     float lap = mix(reflectorMapLevel(base, level, uv), reflectorMapLevel(base, level + 1, uv), lod - float(level));
-    return clamp(1.0 + 2.0 * focus * amp * lap, REFLECTOR_PATTERN_MIN, REFLECTOR_PATTERN_MAX);
+    // 密度の変化は 1 + y が 1 次近似。面のすぐそばでは集光が育っておらず、距離とともに飽和へ近づく。
+    // 大きい所 (光が集まりすぎる縁) は指数で滑らかに頭打ちにして、0 や発散にしない
+    float y = 2.0 * (1.0 - exp(-focus / REFLECTOR_PATTERN_FOCUS)) * amp * lap;
+    return exp(REFLECTOR_PATTERN_LOG_LIMIT * tanh(y / REFLECTOR_PATTERN_LOG_LIMIT));
 }
 #else
-float reflectorPattern(int kind, int id, int axis, float outward, vec3 q, float focus, float blur) { return 1.0; }
+float reflectorPattern(int kind, int id, int axis, float outward, vec3 q, float focus, float path, float lightSpread) { return 1.0; }
 #endif
 
 struct ReflectorHit {
@@ -339,7 +347,7 @@ vec3 reflectorSun(vec3 xVox, vec3 N, LightSample sun) {
             vec3 qPlayer = voxelToPlayer(h.q);
             float sunVis = reflectorSunVisibility(qPlayer, n) * getCloudShadow(qPlayer);
             if (sunVis <= 0.0) break;
-            sum += sun.irradiance * reflectorReflectance(h.kind, h.id, cosI) * (vis * (sunVis * cover * cosR * reflectorPattern(h.kind, h.id, a, n[a], h.q, path, path * spread)));
+            sum += sun.irradiance * reflectorReflectance(h.kind, h.id, cosI) * (vis * (sunVis * cover * cosR * reflectorPattern(h.kind, h.id, a, n[a], h.q, path, path, SUN_ANGULAR_RADIUS)));
             break;
         }
     }
@@ -413,7 +421,7 @@ vec3 reflectorBlockLights(vec3 xVox, vec3 N) {
                 vis *= traceVisibility(h.q + n * REFLECTOR_FACE_OFFSET, lp, REFLECTOR_TRACE_FLAGS, 0.5, 0.0, 0.0);
                 // 点光源から面までの距離 D と面から受ける点までの距離 d1 では、光源の広がりの分だけ集光の効きが d1 D / (d1 + D) になる
                 float d1 = length(h.q - xVox);
-                float pattern = reflectorPattern(h.kind, h.id, a, n[a], h.q, d1 * (dist - d1) / dist, d1 * reflectorSpread(h.kind));
+                float pattern = reflectorPattern(h.kind, h.id, a, n[a], h.q, d1 * (dist - d1) / dist, d1, 0.0);
                 sum += L.colorSize.rgb * lightFalloff(dist, reach) * lightOneSidedGate(L, h.q) * reflectorReflectance(h.kind, h.id, cosI) * (vis * (cosR * cover * pattern));
                 break;
             }

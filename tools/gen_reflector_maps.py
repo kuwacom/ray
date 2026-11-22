@@ -29,21 +29,24 @@ OUT = ROOT / "tools" / "reflector_maps.json"
 BLOCKS = {10: "iron_block", 13: "lapis_block", 14: "emerald_block", 15: "diamond_block", 16: "gold_block"}
 SIZE = 16
 LEVELS = 4
-# ラプラシアン (明るさ / ブロック^2) をこの値で割って持つ。レベル 0 の二乗平均平方根がおよそ 1 になる値
+# ブロックの凹凸の強さの基準: 最も細かい段のラプラシアン (明るさ / ブロック^2) の二乗平均平方根がこの値のブロックを 1 とする
 NORM = 50.0
 LUMA = np.array([0.2126, 0.7152, 0.0722])
 
 
 def laplacian_levels(lum: np.ndarray) -> list[np.ndarray]:
     """明るさを 2x2 の平均で粗くしながら、各段の周期的なラプラシアンを返す (ブロックの面は同じテクスチャで繰り返す)"""
-    out = []
+    laps = []
     h = lum
     for m in range(LEVELS):
         step = (2**m) / SIZE
-        lap = (np.roll(h, 1, 0) + np.roll(h, -1, 0) + np.roll(h, 1, 1) + np.roll(h, -1, 1) - 4.0 * h) / (step * step)
-        out.append(lap / NORM)
+        laps.append((np.roll(h, 1, 0) + np.roll(h, -1, 0) + np.roll(h, 1, 1) + np.roll(h, -1, 1) - 4.0 * h) / (step * step))
         h = h.reshape(h.shape[0] // 2, 2, h.shape[1] // 2, 2).mean(axis=(1, 3))
-    return out
+    # 段ごとに二乗平均平方根を 1 にそろえ、ブロックの凹凸の相対の強さ (最も細かい段の二乗平均平方根 / NORM) を掛ける。
+    # 粗くぼかした段は物理どおりだと凹凸が平均に消えるが、遠くでも大きくぼけた模様として残すため段の強さを落とさない
+    rms = [float(np.sqrt((v**2).mean())) for v in laps]
+    contrast = rms[0] / NORM
+    return [v / max(r, 1e-9) * contrast for v, r in zip(laps, rms)]
 
 
 def main() -> None:

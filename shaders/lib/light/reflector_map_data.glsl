@@ -29,7 +29,7 @@ uvec4 reflectorMapStatic(int j) {
         case 18: return uvec4(0x322DF15Fu, 0x62E7EB1Au, 0xCFC286FAu, 0x3788DBDBu);
         case 19: return uvec4(0xD3DE813Au, 0x5CB0E4C6u, 0x6D5F4032u, 0x6717565Du);
         case 20: return uvec4(0x50DDDF2Au, 0x40C595E8u, 0x2F8BAC00u, 0x7F231828u);
-        case 21: return uvec4(0x60EC3481u, 0x324C406Bu, 0x1C6728A5u, 0x00000000u);
+        case 21: return uvec4(0x60EC3481u, 0x3D90406Bu, 0x3C523D6Au, 0x00000000u);
         case 22: return uvec4(0xDDBEF2C9u, 0xC2F2BEC2u, 0xE6D5A181u, 0xE6C5F1BCu);
         case 23: return uvec4(0xB62C17F2u, 0x53FDEC3Eu, 0x1735002Cu, 0x58E8F707u);
         case 24: return uvec4(0x27A226C1u, 0xE5E532E0u, 0x19F2F61Au, 0x170FDC17u);
@@ -51,7 +51,7 @@ uvec4 reflectorMapStatic(int j) {
         case 40: return uvec4(0x18E051A2u, 0x04111EEEu, 0xC5210FEBu, 0x142BB228u);
         case 41: return uvec4(0x1BFE03ADu, 0x30D1F017u, 0x152A3812u, 0x391A2631u);
         case 42: return uvec4(0x13CFC581u, 0x43F12FADu, 0x23F105E3u, 0x323E5B00u);
-        case 43: return uvec4(0x4C270C81u, 0x35693F88u, 0x211F29E7u, 0x00000000u);
+        case 43: return uvec4(0x4C270C81u, 0x3EB53F88u, 0x3BF63D4Du, 0x00000000u);
         case 44: return uvec4(0x111111EFu, 0x11071111u, 0xF9111107u, 0x09FE07F9u);
         case 45: return uvec4(0xBCBCBC11u, 0xA9E4B3BCu, 0x04A5B3DBu, 0x43BFB9FAu);
         case 46: return uvec4(0x3A44B311u, 0x313A4444u, 0x142C2345u, 0x3AB64A19u);
@@ -73,7 +73,7 @@ uvec4 reflectorMapStatic(int j) {
         case 62: return uvec4(0xF6F4F0BAu, 0x12320068u, 0xEB1140D2u, 0x728244F8u);
         case 63: return uvec4(0x2BBAF0C2u, 0xF14D8225u, 0x3C57563Cu, 0x0BF17818u);
         case 64: return uvec4(0x13E08ED3u, 0x68CFA8A3u, 0x3168D7C5u, 0x18267F37u);
-        case 65: return uvec4(0x501F1081u, 0x380B44EFu, 0x268E2CE7u, 0x00000000u);
+        case 65: return uvec4(0x501F1081u, 0x43F944EFu, 0x42424298u, 0x00000000u);
         case 66: return uvec4(0xFD00FFC4u, 0xFAF20A0Fu, 0xF5020FF7u, 0x37DCF702u);
         case 67: return uvec4(0xB1BAD2FFu, 0xDAD1F5EBu, 0xEDBAD8C4u, 0x59A7BCFFu);
         case 68: return uvec4(0x2639BA06u, 0xF412D524u, 0x202D131Bu, 0x59AB1518u);
@@ -95,7 +95,7 @@ uvec4 reflectorMapStatic(int j) {
         case 84: return uvec4(0xED22F1EDu, 0x1FF30D01u, 0xF2C30A00u, 0x728A0207u);
         case 85: return uvec4(0x29CA9210u, 0xFAFCA9FEu, 0x6A5C7F36u, 0x4B127221u);
         case 86: return uvec4(0xEE169ABFu, 0x7FC50BAFu, 0x10DDB9EBu, 0x3F1A7845u);
-        case 87: return uvec4(0x25342781u, 0x3820438Fu, 0x25F72E5Du, 0x00000000u);
+        case 87: return uvec4(0x25342781u, 0x4075438Fu, 0x3F564000u, 0x00000000u);
         case 88: return uvec4(0xFCFD00C1u, 0xFAF30409u, 0xF2FD09F9u, 0x3ADAF9FEu);
         case 89: return uvec4(0xB4C0C700u, 0xD5C9FDEEu, 0xEBC0DDBEu, 0x5FA1B7FEu);
         case 90: return uvec4(0x2334C003u, 0xFA18CA27u, 0x1E291519u, 0x5FA3181Cu);
@@ -117,7 +117,7 @@ uvec4 reflectorMapStatic(int j) {
         case 106: return uvec4(0xEF1DF1F0u, 0x1EF50AFFu, 0xF3CB05FCu, 0x788B0405u);
         case 107: return uvec4(0x24C8940Au, 0xFAFAA5FEu, 0x6F5E7F38u, 0x53137921u);
         case 108: return uvec4(0xED1299C0u, 0x7FC809B1u, 0x14D6BAE6u, 0x441B7A44u);
-        case 109: return uvec4(0x27322581u, 0x38054340u, 0x25BC2E2Au, 0x00000000u);
+        case 109: return uvec4(0x27322581u, 0x40674340u, 0x3F483FE4u, 0x00000000u);
     }
     return uvec4(0u);
 }
